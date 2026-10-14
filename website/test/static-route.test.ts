@@ -59,6 +59,36 @@ function renderedText(html: string): string {
     .replace(/&amp;/g, '&')
 }
 
+/** Collects prose sentences while excluding code, navigation, headings, and metadata values. */
+function mainProseSentences(html: string): readonly string[] {
+  /** Main content owns the page prose; header and rails are shared navigation. */
+  const main = html.match(/<main(?:\s[^>]*)?>([\s\S]*?)<\/main>/i)?.[1]
+  assert.ok(main, 'missing main content')
+  /** Block boundaries preserve separate descriptions without losing inline API names. */
+  const prose = main
+    .replace(/<dl class="option-meta[^"]*"[^>]*>[\s\S]*?<\/dl>/gi, '')
+    .replace(
+      /<span class="library-reference-popover"[^>]*><strong>[\s\S]*?<\/strong><span>[\s\S]*?<\/span><b>[\s\S]*?<\/b><\/span>/gi,
+      ''
+    )
+    .replace(/<(pre|figure|nav|aside|script|style|button|h[1-6])(?:\s[^>]*)?>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(?:dt|th)(?:\s[^>]*)?>[\s\S]*?<\/(?:dt|th)>/gi, '')
+    .replace(/<(dd|td)(?:\s[^>]*)?>\s*<code[^>]*>[\s\S]*?<\/code>\s*<\/\1>/gi, '')
+    .replace(/<\/?(?:article|blockquote|div|dd|li|p|section|td|tr)(?:\s[^>]*)?>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+
+  return renderedText(prose)
+    .split('\n')
+    .flatMap((block) =>
+      block
+        .replace(/\s+/gu, ' ')
+        .trim()
+        .split(/(?<=[。！？])|(?<=[.!?])(?=\s|$)/u)
+        .map((sentence) => sentence.trim())
+    )
+    .filter((sentence) => Array.from(sentence).length >= 12 && /[。！？.!?]$/.test(sentence))
+}
+
 /** Extracts the navigation tree while ignoring the route-specific active marker. */
 function stableLeftRail(html: string): string {
   const rail = html.match(/<aside class="left-rail-content"[^>]*>([\s\S]*?)<\/aside>/)?.[1]
@@ -170,14 +200,41 @@ test('SITE-T-DOCS-RAIL keeps the expanded API navigation visible below the stick
   assert.match(styleSource, /max-height: calc\(100dvh - 6\.5rem\);/)
   assert.match(styleSource, /position: sticky;/)
   assert.match(styleSource, /top: 6\.5rem;/)
-  assert.equal(docsSource.match(/className="left-rail-sticky"/g)?.length, 2)
+  for (const locale of ['zh', 'en']) {
+    for (const route of ['docs/tray', 'docs/tray/createTray', 'guides/rpc-core/getting-started']) {
+      /** Every rendered reading shell has one desktop category sidebar. */
+      const html = readFileSync(join(buildRoot, artifactPath(`/${locale}/${route}`)), 'utf8')
+      assert.match(html, /class="left-rail-sticky"[\s\S]*class="left-rail-content"/)
+      assert.equal(html.match(/<aside[^>]*class="left-rail-content"/g)?.length, 1)
+      assert.ok(stableLeftRail(html).includes(`/${locale}/docs/`))
+    }
+  }
 })
 
-test('SITE-T-API-SCENARIOS renders maintained multi-host examples as separate sections', () => {
-  assert.match(docsSource, /guide\?\.examples\?\.length/)
-  assert.match(docsSource, /className="api-scenario-example"/)
-  assert.match(docsSource, /在不同宿主中使用/)
-  assert.match(docsSource, /examples: \['Production scenarios', '场景实战'\]/)
+test('SITE-T-API-STRUCTURE presents a purpose, example, option table, related APIs, then collapsed types', () => {
+  for (const locale of ['zh', 'en']) {
+    /** A maintained callable with configuration exercises the complete reference layout. */
+    const html = readFileSync(
+      join(buildRoot, artifactPath(`/${locale}/docs/tray/createTray`)),
+      'utf8'
+    )
+    /** Section anchors expose the reading order independently of translated headings. */
+    const sections = ['overview', 'quick-start', 'configuration', 'related-apis', 'signature']
+    /** Every required section must follow its predecessor. */
+    let previous = -1
+    for (const section of sections) {
+      /** Existing fragment suffixes identify the selected API sections. */
+      const position = html.indexOf(`--${section}"`)
+      assert.ok(position > previous, `${locale} createTray section order: ${section}`)
+      previous = position
+    }
+    /** Configuration reads as one comparison table rather than repeated description cards. */
+    const optionTable = html.match(/<table class="option-reference">([\s\S]*?)<\/table>/)?.[1]
+    assert.ok(optionTable, `${locale} createTray missing options table`)
+    for (const header of locale === 'zh' ? ['名称', '类型', '行为'] : ['Name', 'Type', 'Behavior'])
+      assert.match(optionTable, new RegExp(`<th>${header}</th>`))
+    assert.doesNotMatch(html, /class="api-decision-guide"|class="api-scenario-examples"/)
+  }
 })
 
 test('SITE-T-WEBRPC-CONTRACT-TRANSPORTS documents contract use across host boundaries', () => {
@@ -267,7 +324,7 @@ test('SITE-T-TOC renders only right-rail anchors backed by real page sections', 
     const path = join(libraryRoot, entry.name, 'index.html')
     if (!existsSync(path)) continue
     const html = readFileSync(path, 'utf8')
-    if (!html.includes('id="module-guidance"')) continue
+    if (!html.includes('id="learning-advanced"')) continue
     const rail = html.match(/<aside class="right-rail"[^>]*>([\s\S]*?)<\/aside>/)?.[1]
     assert.ok(rail, `${entry.name}: missing right rail`)
     assert.match(rail, /href="#learning-advanced"[^>]*>高级用法</, `${entry.name}: advanced link`)
@@ -401,7 +458,10 @@ test('SITE-T01 embeds route content before JavaScript', () => {
   const apiRoute = artifactPath(
     `${publicModulePath('en', ownerApi.library, ownerApi.module)}/${apiSymbolPath(ownerSymbol, ownerApi.symbols)}`
   )
-  assert.match(readFileSync(join(buildRoot, apiRoute), 'utf8'), /<h2>Purpose<\/h2>/)
+  assert.match(
+    readFileSync(join(buildRoot, apiRoute), 'utf8'),
+    /class="api-overview"[\s\S]*?<p class="lede">/
+  )
 })
 
 test('SITE-T-READABILITY emits semantic symbol lists and labelled code surfaces', () => {
@@ -418,13 +478,13 @@ test('SITE-T-READABILITY emits semantic symbol lists and labelled code surfaces'
   )
 
   assert.match(html, /<figure class="code-frame">/)
-  assert.match(html, /<span>Public type signature<\/span>/)
+  assert.match(html, /<summary>Public type signature<\/summary>/)
   assert.match(html, /<pre class="code-block"><code>/)
   assert.match(html, /class="syntax-keyword">export<\/span>/)
   assert.match(html, /class="syntax-type">IEventApiStyle<\/span>/)
   assert.match(html, /export<\/span> <span class="syntax-keyword">declare<\/span>[\s\S]*?\n/)
   assert.doesNotMatch(html, /Declared shape:/)
-  assert.match(html, /<h2>Purpose<\/h2>/)
+  assert.match(html, /class="api-overview"[\s\S]*?<p class="lede">/)
   assert.doesNotMatch(html, /<h4>介绍<\/h4>/)
   assert.doesNotMatch(html, /when its public contract matches the result you need/)
   assert.doesNotMatch(html, /start with the smallest valid input/i)
@@ -437,7 +497,7 @@ test('SITE-T-RESOURCE-OPTIONS renders maintained constructor fields omitted by d
     .find((api) => api.library === 'resource' && api.module === 'index')
     ?.symbols.find((symbol) => symbol.name === 'Resource')?.fragment
   assert.ok(resourceFragment)
-  assert.match(resourceHtml, />配置参考</)
+  assert.match(resourceHtml, /<h2>选项<\/h2>/)
   for (const option of [
     'debugName',
     'ttl',
@@ -455,17 +515,20 @@ test('SITE-T-RESOURCE-OPTIONS renders maintained constructor fields omitted by d
   assert.match(resourceHtml, /systemScheduler/)
 })
 
-test('SITE-T-RESOURCE-OVERVIEW renders the maintained learning path before its API index', () => {
+test('SITE-T-RESOURCE-OVERVIEW keeps concrete learning content without the generated reading checklist', () => {
   const html = readFileSync(join(buildRoot, 'zh/docs/resource/index.html'), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /从场景到生产组合/)
+  assert.doesNotMatch(
+    text,
+    /从场景到生产组合|理解适用场景|完成 Quick Start|组合核心能力|确认高阶边界|按频率选择 API/
+  )
   assert.match(text, /需要缓存过期与后台刷新/)
   assert.match(text, /new Resource/)
   assert.match(text, /userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑/)
   assert.match(text, /generation 校验.*?旧结果/s)
   assert.match(text, /高阶用法教程/)
-  assert.ok(text.indexOf('从场景到生产组合') < text.indexOf('选择一个入口'))
+  assert.ok(text.indexOf('需要缓存过期与后台刷新') < text.indexOf('选择一个入口'))
 })
 
 test('SITE-T-RESOURCE-START explains request generations, observation, and terminal cleanup', () => {
@@ -610,7 +673,12 @@ test('SITE-T-MIDDLEWARE-ENTRYPOINTS render each control algebra and supported ad
   for (const mode of ['sync', 'async', 'generator', 'async-generator']) {
     assert.ok(text.includes(mode), `createPipeline must explain ${mode}`)
   }
-  for (const operation of ['lift', 'run()', 'onViolation', 'combineStageAndDownstreamError']) {
+  for (const operation of [
+    'lift',
+    'pipeline.run(',
+    'onViolation',
+    'combineStageAndDownstreamError'
+  ]) {
     assert.ok(text.includes(operation), `createPipeline must explain ${operation}`)
   }
   assert.match(text, /创建时固定.*代数/)
@@ -727,27 +795,24 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
     'style',
     'valueConfig'
   ]) {
-    assert.match(apiDetail, new RegExp(`<code>${option}</code>`))
+    assert.match(apiDetail, new RegExp(`id="${symbol.fragment}--option-${option}"`))
   }
-  assert.match(apiDetail, /配置参考/)
-  assert.match(apiDetail, /适合这些场景/)
-  assert.match(apiDetail, /不要用于/)
-  assert.match(apiDetail, /何时使用：/)
-  assert.match(apiDetail, /最小可运行示例/)
+  assert.match(apiDetail, /<h2>选项<\/h2>/)
+  assert.match(apiDetail, /<h2>最小示例<\/h2>/)
   assert.match(renderedText(apiDetail), /channel\.subscribe/)
   assert.match(renderedText(apiDetail), /jobs\.publish/)
   assert.match(apiDetail, /style 不改变顺序、调度、错误或生命周期语义/)
   assert.match(apiDetail, /subscribe-publish/)
   assert.match(apiDetail, /defineEventApiStyle/)
-  assert.doesNotMatch(apiDetail, /<h2>错误码<\/h2>|配置与任务指南/)
+  assert.doesNotMatch(apiDetail, /配置与任务指南/)
   assert.match(apiDetail, /<h2>完整类型签名<\/h2>/)
-  assert.ok(apiDetail.indexOf('最小可运行示例') < apiDetail.indexOf('配置参考'))
-  assert.ok(apiDetail.indexOf('配置参考') < apiDetail.indexOf('类型签名'))
+  assert.ok(apiDetail.indexOf('最小示例') < apiDetail.indexOf('<h2>选项</h2>'))
+  assert.ok(apiDetail.indexOf('<h2>选项</h2>') < apiDetail.indexOf('类型签名'))
   assert.match(apiDetail, /<figure class="code-frame">/)
   assert.doesNotMatch(architecture + api, /本节说明|场景 1|打开完整|This section records/)
 
   for (const [name, expectations] of [
-    ['createEventHub', ['按事件键惰性分配 Channel', 'resourceId', 'style 示例']],
+    ['createEventHub', ['按事件键惰性分配 Channel', 'resourceId']],
     ['defineEventApiStyle', ['保留字符串字面量类型', '同一套领域命名', 'handle']]
   ] as const) {
     const candidate = apiManifest.apis
@@ -762,6 +827,18 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
       'utf8'
     )
     for (const expectation of expectations) assert.match(candidateHtml, new RegExp(expectation))
+    if (name === 'createEventHub') {
+      /** The field's authored snippet proves the style projection independently of its caption. */
+      const styleOption = candidateHtml.match(
+        new RegExp(
+          `<tr class="option-entry" id="${candidate.fragment}--option-style">([\\s\\S]*?)</tr>`
+        )
+      )?.[1]
+      assert.ok(styleOption, 'createEventHub must retain its style option')
+      assert.match(styleOption, /<figure class="code-frame">/)
+      for (const behavior of [/style: 'on-emit'/, /events\.on\(/, /events\.emit\(/, /stop\.off\(/])
+        assert.match(renderedText(styleOption), behavior)
+    }
     assert.doesNotMatch(candidateHtml, /配置与任务指南|Declaration:| · [a-f0-9]{8}/)
   }
 })
@@ -941,7 +1018,7 @@ test('SITE-T-A05/A10 closes every generated route and API body artifact', () => 
           'utf8'
         )
         let previous = -1
-        for (const section of ['overview', 'core-usage', 'signature']) {
+        for (const section of ['overview', 'signature']) {
           const position = detail.indexOf(`--${section}"`)
           assert.ok(
             position > previous,
@@ -1101,11 +1178,11 @@ test('SITE-T-ARCHITECTURE-API-NAV exposes library API shortcuts beside architect
   assert.match(html, /href="\/zh\/docs\/utils\/function\/onceAsync"/)
 })
 
-test('SITE-T-CODE-EXPLANATION-PROSE renders explanations without decorative numbering', () => {
+test('SITE-T-CODE-EXPLANATION-PROSE renders authored code without synthesized walkthrough prose', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
 
-  assert.match(html, /class="code-walkthrough-notes"><p>/)
-  assert.doesNotMatch(html, /class="code-walkthrough"><ol>/)
+  assert.match(html, /<figure class="code-frame">/)
+  assert.doesNotMatch(html, /class="code-walkthrough(?:-notes)?"/)
 })
 
 test('SITE-T-CODE-SURFACES gives inline and block code a consistent themed hierarchy', () => {
@@ -1160,7 +1237,8 @@ test('SITE-T-DOMAIN-INDEX-SPACING keeps catalogue introductions compact', () => 
   )
 })
 
-test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler across every rendered page', () => {
+test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler and repeated prose on every rendered page', () => {
+  /** Synthesized commentary must never become reader-facing copy or example comments. */
   const forbidden = [
     '先从示例标出的公开路径引入',
     '这里先把下一步要用的值放进变量',
@@ -1178,63 +1256,140 @@ test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler across every rend
     "is part of this module's public type contract",
     "is part of this module's public function contract",
     "is part of this module's public const contract",
-    "is part of this module's public class contract"
+    "is part of this module's public class contract",
+    '本例对应的生产场景是',
+    '没有创建可供后续复用的实例',
+    '返回的本次实例',
+    'The production situation shown here is:',
+    'without creating a reusable instance',
+    '输出用于确认上一操作的结果。',
+    'Logs the result of the preceding operation.',
+    '签名、参数、例子和相关类型只在对应页面展开',
+    '先按目标选择 API',
+    '这些符号用于配置、状态比较或错误识别',
+    '用于核对泛型、重载与返回类型',
+    '日常使用应先阅读上面的场景、示例和配置语义',
+    '从场景到生产组合',
+    '理解适用场景',
+    '完成 Quick Start',
+    '组合核心能力',
+    '确认高阶边界',
+    '按频率选择 API',
+    'Choose by outcome first.',
+    'Each group is ordered by use frequency in maintained documentation.',
+    'Signatures, examples, and related types expand on the API page.',
+    'These symbols support configuration, state comparison, or error identification',
+    'Use this to inspect generics, overloads, and return types after reading the scenarios',
+    'From use case to production composition',
+    'Understand the use case',
+    'Complete the Quick Start',
+    'Compose core capabilities',
+    'Check advanced boundaries',
+    'Choose APIs by frequency'
   ]
+  /** Closed-world output scan covers every route in both locales, including the landing page. */
   const htmlFiles = emittedFiles(buildRoot).filter((path) => path.endsWith('.html'))
+  assert.ok(htmlFiles.length > 0, 'expected prerendered pages')
 
   for (const path of htmlFiles) {
+    /** Prerendered document is the evidence for reader-facing output. */
     const html = readFileSync(path, 'utf8')
+    /** Decode syntax spans so prose and authored comments remain searchable. */
     const text = renderedText(html)
     for (const phrase of forbidden)
       assert.ok(!text.includes(phrase), `generated filler remains in ${path}: ${phrase}`)
-  }
-})
-
-test('SITE-T-API-EXAMPLE-COMMENTARY requires concrete guidance on every primary API example', () => {
-  const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
-    path.endsWith('index.html')
-  )
-
-  for (const path of detailPages) {
-    const html = readFileSync(path, 'utf8')
-    for (const section of html.matchAll(
-      /<section[^>]*data-primary-api-example="([^"]+)"[^>]*>([\s\S]*?)<\/section>/g
-    )) {
-      const apiName = section[1]
-      assert.match(
-        section[2],
-        /data-comment-count="[1-9]\d*"/,
-        `${apiName} has no code-specific explanation: ${path}`
-      )
-      assert.match(
-        section[2],
-        /class="code-walkthrough"/,
-        `${apiName} has no reader-visible walkthrough: ${path}`
-      )
+    /** Router's loading shell has metadata but no page body; prose belongs to resolved routes. */
+    if (path.endsWith('/__spa-fallback.html')) continue
+    assert.doesNotMatch(
+      text,
+      /\b[\w$]+ holds this [\w$.]+\(\) result/,
+      `synthesized retained-instance prose remains: ${path}`
+    )
+    assert.doesNotMatch(
+      text,
+      /每组依据[^。]*真实使用频率/,
+      `generated sorting prose remains: ${path}`
+    )
+    assert.doesNotMatch(
+      text,
+      /何时使用：|When to use:/,
+      `duplicate option guidance remains: ${path}`
+    )
+    /** Prose may appear once; navigation and repeatable code fragments do not count as sentences. */
+    const seen = new Set<string>()
+    for (const sentence of mainProseSentences(html)) {
+      assert.ok(!seen.has(sentence), `repeated main-content sentence in ${path}: ${sentence}`)
+      seen.add(sentence)
     }
   }
 })
 
-test('SITE-T-API-SIGNATURE-COMMENTARY explains every public declaration and overload set', () => {
-  const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
-    path.endsWith('index.html')
-  )
-
-  for (const path of detailPages) {
+test('SITE-T-PAGE-META gives every rendered page a nonempty title and purpose description', () => {
+  for (const path of emittedFiles(buildRoot).filter((entry) => entry.endsWith('.html'))) {
+    /** Metadata must exist in static HTML before the client starts. */
     const html = readFileSync(path, 'utf8')
-    for (const section of html.matchAll(
-      /<section class="api-signature"[^>]*>([\s\S]*?)<\/section>/g
+    /** Title names the current page rather than relying on browser navigation state. */
+    const title = html.match(/<title>([\s\S]*?)<\/title>/i)?.[1]
+    assert.ok(title && renderedText(title).trim(), `empty or missing title: ${path}`)
+    /** Description carries the existing page purpose for search and previews. */
+    const description = html.match(
+      /<meta\b(?=[^>]*\bname="description")(?=[^>]*\bcontent="([^"]*)")[^>]*>/i
+    )?.[1]
+    assert.ok(
+      description && renderedText(description).trim(),
+      `empty or missing meta description: ${path}`
+    )
+  }
+})
+
+test('SITE-T-API-EXAMPLE-COMMENTARY keeps examples without synthesized walkthroughs', () => {
+  for (const locale of ['zh', 'en']) {
+    for (const path of emittedFiles(join(buildRoot, `${locale}/docs`)).filter((entry) =>
+      entry.endsWith('index.html')
     )) {
-      assert.match(
-        section[1],
-        /data-comment-count="[1-9]\d*"/,
-        `public signature has no explanation: ${path}`
-      )
-      assert.match(
-        section[1],
-        /class="code-walkthrough"/,
-        `public signature has no reader-visible walkthrough: ${path}`
-      )
+      /** Primary examples retain their copyable authored code. */
+      const html = readFileSync(path, 'utf8')
+      for (const section of html.matchAll(
+        /<section[^>]*data-primary-api-example="([^"]+)"[^>]*>([\s\S]*?)<\/section>/g
+      )) {
+        assert.match(section[2], /<figure class="code-frame">/, `missing example code: ${path}`)
+        assert.doesNotMatch(
+          section[2],
+          /class="code-walkthrough"|data-comment-count="[1-9]\d*"/,
+          `synthesized example walkthrough remains: ${path}`
+        )
+      }
+    }
+  }
+})
+
+test('SITE-T-API-SIGNATURE-COMMENTARY collapses complete declarations without synthesized walkthroughs', () => {
+  for (const locale of ['zh', 'en']) {
+    for (const path of emittedFiles(join(buildRoot, `${locale}/docs`)).filter((entry) =>
+      entry.endsWith('index.html')
+    )) {
+      /** Signature sections must stay present but closed until a reader expands them. */
+      const html = readFileSync(path, 'utf8')
+      /** Section navigation follows the article and starts collapsed. */
+      const pageNavigation = html.match(/<details[^>]*class="page-toc"[^>]*>/g) ?? []
+      for (const navigation of pageNavigation) {
+        assert.ok(
+          html.indexOf(navigation) > html.lastIndexOf('</article>'),
+          `section navigation precedes the article: ${path}`
+        )
+        assert.doesNotMatch(navigation, /\bopen(?:=|\s|>)/, `expanded section navigation: ${path}`)
+      }
+      for (const section of html.matchAll(
+        /<section class="api-signature"[^>]*>([\s\S]*?)<\/section>/g
+      )) {
+        assert.match(section[1], /<details(?:\s[^>]*)?>/, `missing signature disclosure: ${path}`)
+        assert.doesNotMatch(section[1], /<details[^>]*\bopen(?:=|\s|>)/, `open signature: ${path}`)
+        assert.doesNotMatch(
+          section[1],
+          /class="code-walkthrough"|data-comment-count="[1-9]\d*"/,
+          `synthesized signature walkthrough remains: ${path}`
+        )
+      }
     }
   }
 })
@@ -1246,12 +1401,14 @@ test('SITE-T-CAPABILITY-HOST-EXAMPLE explains its complete production lifecycle'
   )
   const text = renderedText(html)
 
-  assert.match(text, /flags\.persistence 只允许这一项能力启用/)
+  assert.match(text, /flags: \{ persistence: true \}/)
   assert.match(text, /undefined（未配置错误接收回调）/)
   assert.doesNotMatch(text, /诊断 sink/)
-  assert.match(text, /并不会立即下载或打开存储/)
-  assert.match(text, /只有 enabled 才能从 handle\('persistence'\)/)
-  assert.match(text, /作废在途激活并释放已经打开或迟到返回的 handle/)
+  assert.match(text, /host\.register\(/)
+  assert.match(text, /result\.status === CapabilityEnableStatus\.enabled/)
+  assert.match(text, /await host\.handle\('persistence'\)\?\.sync\(\)/)
+  assert.match(text, /finally \{\s*await host\.dispose\(\)/)
+  assert.doesNotMatch(text, /class="code-walkthrough"|输出用于确认上一操作的结果/)
 })
 
 test('SITE-T-EVENT-STYLE explains the exact subscription, delivery, and removal behavior', () => {
@@ -1593,10 +1750,24 @@ test('SITE-T-API-TYPING renders legacy type paths inside the subordinate module 
   assert.match(docsSource, /target\.scrollIntoView\(\{ block: 'start' }\)/)
 })
 
-test('SITE-T-NO-ACCORDION keeps all generated content continuously readable', () => {
-  assert.doesNotMatch(docsSource, /<details|<summary/)
-  for (const file of emittedFiles(buildRoot).filter((candidate) => candidate.endsWith('.html')))
-    assert.doesNotMatch(readFileSync(file, 'utf8'), /<details(?:\s|>)|<summary(?:\s|>)/, file)
+test('SITE-T-NO-ACCORDION keeps prose visible while complete signatures stay subordinate', () => {
+  for (const file of emittedFiles(buildRoot).filter((candidate) => candidate.endsWith('.html'))) {
+    /** Signature declarations and the trailing page navigation may start collapsed. */
+    const html = readFileSync(file, 'utf8')
+    /** All remaining prose must be visible outside those two defined disclosures. */
+    const visibleProse = html
+      .replace(/<section class="api-signature"[^>]*>[\s\S]*?<\/details>\s*<\/section>/g, '')
+      .replace(/<details class="page-toc"[^>]*>[\s\S]*?<\/details>/g, (navigation) => {
+        assert.ok(html.indexOf(navigation) > html.lastIndexOf('</article>'), file)
+        assert.doesNotMatch(
+          navigation.match(/^<details[^>]*>/)?.[0] ?? '',
+          /\bopen(?:=|\s|>)/,
+          file
+        )
+        return ''
+      })
+    assert.doesNotMatch(visibleProse, /<details(?:\s|>)|<summary(?:\s|>)/, file)
+  }
 })
 
 test('SITE-T-TYPE-CODE keeps every module type declaration visible with its code', () => {

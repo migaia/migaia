@@ -1,3 +1,15 @@
+import type { MetaFunction as IMetaFunction } from 'react-router'
+
+/** Shared page purpose for the neutral home introduction and its search description. */
+const HOME_DESCRIPTION =
+  'Move from a goal to the exact API, implementation path, and architectural boundary.'
+
+/** Supplies the language-neutral home title and its existing one-sentence purpose. */
+export const meta: IMetaFunction = () => [
+  { title: 'migaia' },
+  { name: 'description', content: HOME_DESCRIPTION }
+]
+
 /** Describes the three documentation paths available from the global navigation. */
 const DOCUMENTATION_PATHS = [
   {
@@ -20,9 +32,7 @@ function Home() {
     <main id="main-content" className="page-shell home-shell" data-pagefind-body>
       <p className="eyebrow">Migaia library documentation</p>
       <h1>Build with clear, composable libraries.</h1>
-      <p className="lede">
-        Move from a goal to the exact API, implementation path, and architectural boundary.
-      </p>
+      <p className="lede">{HOME_DESCRIPTION}</p>
       <dl className="home-paths" aria-label="Documentation paths">
         {DOCUMENTATION_PATHS.map((path) => (
           <div key={path.title}>

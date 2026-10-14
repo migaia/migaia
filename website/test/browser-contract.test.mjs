@@ -235,14 +235,17 @@ test(
             )
             if (width === 320) {
               const mobileState = await page.evaluate(() => ({
-                desktopRail: getComputedStyle(document.querySelector('.left-rail')).display,
-                mobileNav: getComputedStyle(document.querySelector('.mobile-module-nav')).display,
+                desktopRailVisible:
+                  (document.querySelector('.left-rail-sticky')?.getClientRects().length ?? 0) > 0,
+                mobileNavExists: Boolean(document.querySelector('.mobile-module-nav')),
+                pageTocClosed: !document.querySelector('.page-toc')?.open,
                 typeBody: document.querySelector('.type-reference-body')
                   ? getComputedStyle(document.querySelector('.type-reference-body')).display
                   : null
               }))
-              assert.equal(mobileState.desktopRail, 'none')
-              assert.equal(mobileState.mobileNav, 'block')
+              assert.equal(mobileState.desktopRailVisible, false)
+              assert.equal(mobileState.mobileNavExists, false)
+              assert.equal(mobileState.pageTocClosed, true)
               if (mobileState.typeBody !== null) assert.equal(mobileState.typeBody, 'block')
             }
           })
@@ -446,24 +449,88 @@ test('SITE-T-TOC keeps API anchors in the correct responsive rail', async () => 
         await page.goto(`${baseUrl}/zh/docs/event-subscriber/createEventHub/`)
         const layout = await page.evaluate(() => {
           const article = document.querySelector('.article-column')
-          const mobile = document.querySelector('.mobile-toc')
+          const mobile = document.querySelector('.page-toc')
           const right = document.querySelector('.right-rail')
           return {
             articleTop: article?.getBoundingClientRect().top ?? 0,
             mobileDisplay: mobile ? getComputedStyle(mobile).display : '',
             mobileTop: mobile?.getBoundingClientRect().top ?? 0,
-            rightDisplay: right ? getComputedStyle(right).display : ''
+            rightDisplay: right ? getComputedStyle(right).display : '',
+            articleBeforeMobile: Boolean(
+              article &&
+              mobile &&
+              article.compareDocumentPosition(mobile) & Node.DOCUMENT_POSITION_FOLLOWING
+            ),
+            mobileClosed: mobile?.tagName === 'DETAILS' && !mobile.open
           }
         })
-        if (width > 620) {
-          assert.notEqual(layout.rightDisplay, 'none')
-          assert.equal(layout.mobileDisplay, 'none')
-        } else {
-          assert.equal(layout.rightDisplay, 'none')
-          assert.equal(layout.mobileDisplay, 'block')
-          assert.ok(layout.mobileTop < layout.articleTop)
-        }
+        assert.notEqual(layout.mobileDisplay, 'none')
+        assert.ok(layout.mobileTop >= layout.articleTop)
+        assert.equal(layout.articleBeforeMobile, true)
+        assert.equal(layout.mobileClosed, true)
       })
+    }
+    /** Representative API, guide, and package routes expose their title on the first screen. */
+    const mobileRoutes = [
+      'docs/tray/createTray',
+      'docs/rpc-core/createEndpoint',
+      'guides/rpc-core/getting-started',
+      'docs/utils'
+    ]
+    for (const locale of ['zh', 'en']) {
+      for (const route of mobileRoutes) {
+        /** A fresh page proves initial layout without preserving the previous route's scroll. */
+        const path = `/${locale}/${route}`
+        for (const width of [1280, 375]) {
+          await withPage(browser, { width, height: width === 375 ? 812 : 900 }, async (page) => {
+            await visit(page, path)
+            /** Coordinates and styles describe the initial reading surface. */
+            const position = await page.evaluate(() => {
+              /** Article owns the page name and opening purpose. */
+              const article = document.querySelector('main .article-column')
+              /** The heading identifies the route independently of navigation. */
+              const heading = article?.querySelector('h1')
+              /** The opening purpose excludes decorative section labels. */
+              const purpose = article?.querySelector('p:not(.eyebrow)')
+              /** Computed article values capture responsive reading layout. */
+              const articleStyle = article ? getComputedStyle(article) : null
+              /** Paragraph values reflect overrides such as the introductory lede. */
+              const purposeStyle = purpose ? getComputedStyle(purpose) : null
+              return {
+                headingTop: heading?.getBoundingClientRect().top ?? null,
+                purposeTop: purpose?.getBoundingClientRect().top ?? null,
+                article: {
+                  fontSize: articleStyle?.fontSize ?? null,
+                  lineHeight: articleStyle?.lineHeight ?? null,
+                  maxWidth: articleStyle?.maxWidth ?? null,
+                  rectWidth: article?.getBoundingClientRect().width ?? null
+                },
+                purpose: {
+                  fontSize: purposeStyle?.fontSize ?? null,
+                  lineHeight: purposeStyle?.lineHeight ?? null,
+                  maxWidth: purposeStyle?.maxWidth ?? null,
+                  rectWidth: purpose?.getBoundingClientRect().width ?? null
+                }
+              }
+            })
+            console.log(`[SITE-T-TOC] ${JSON.stringify({ path, width, ...position })}`)
+            if (width === 375) {
+              assert.ok(
+                position.headingTop !== null &&
+                  position.headingTop >= 0 &&
+                  position.headingTop < 500,
+                `375px title is below the first screen: ${path} ${JSON.stringify(position)}`
+              )
+              assert.ok(
+                position.purposeTop !== null &&
+                  position.purposeTop >= 0 &&
+                  position.purposeTop < 812,
+                `375px purpose is below the first screen: ${path} ${JSON.stringify(position)}`
+              )
+            }
+          })
+        }
+      }
     }
   })
 })
