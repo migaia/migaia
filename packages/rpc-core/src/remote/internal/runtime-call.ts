@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcError,
   isLocalRpcError,
@@ -15,7 +16,7 @@ import { RpcCapability } from '@migaia/rpc-contract/wire'
 import { RpcRuntimeMode } from '@migaia/rpc-contract/wire'
 import { normalizePortable } from '@migaia/rpc-contract/portable'
 import { hasRpcBinaryEnvelope } from '@migaia/rpc-contract/binary/inspect'
-import type { IRpcEndpoint, ISendOptions, IRpcAbortSignal } from '../../core/typing.js'
+import type { IRpcEndpoint, ISendOptions } from '../../core/typing.js'
 
 import { RpcCoreErrorText } from '../../core/error-text.js'
 import {
@@ -51,7 +52,7 @@ import {
 type ICallEvents = Readonly<{
   current(): Readonly<{ generation: number; active: boolean }>
   onLeave(generation: number, listener: (reason: unknown) => void): () => void
-  whenReady(afterGeneration: number, signal?: IRpcAbortSignal): Promise<number>
+  whenReady(afterGeneration: number, signal?: IAbortSignal): Promise<number>
 }>
 /** Retry sees one send closure; its Core-owned snapshot remains private inside the merged package. */
 export type ICoreRuntimeRetryDispatch = Readonly<{
@@ -60,7 +61,7 @@ export type ICoreRuntimeRetryDispatch = Readonly<{
   idempotent: boolean
   key?: string
   generation: number
-  signal?: IRpcAbortSignal
+  signal?: IAbortSignal
   timeoutMs?: number
   deadlineAt?: number
   events: ICallEvents

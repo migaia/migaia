@@ -8820,7 +8820,7 @@ try {
         description:
           'Optional cooperative cancellation observed before each slice and during default yields.',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'Stop work when its owner closes.',
         example: 'controller.signal'
       }
@@ -8888,7 +8888,7 @@ try {
         name: 'signal',
         description: '每片前及 default yield 期间观察的 optional cooperative cancellation。',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'owner close 时停止 work。',
         example: 'controller.signal'
       }
@@ -9016,7 +9016,7 @@ try {
         name: 'signal',
         description: 'Caller cancellation composed with stream ownership.',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'Cancel on navigation or disposal.',
         example: 'controller.signal'
       }
@@ -9117,7 +9117,7 @@ try {
         name: 'signal',
         description: '与 stream ownership 组合的 caller cancellation。',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'navigation 或 disposal 时取消。',
         example: 'controller.signal'
       }
@@ -9188,7 +9188,7 @@ try {
         name: 'signal',
         description: 'Cooperative cancellation observed between chunks.',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'Stop consuming when the owner closes.',
         example: 'controller.signal'
       }
@@ -9232,7 +9232,7 @@ try {
         name: 'signal',
         description: 'chunk 之间观察的 cooperative cancellation。',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'owner close 时停止消费。',
         example: 'controller.signal'
       }
@@ -9287,7 +9287,7 @@ try {
         name: 'signal',
         description: 'Cancellation checked before and during iterator consumption.',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'Abort an expensive collection.',
         example: 'controller.signal'
       },
@@ -9330,7 +9330,7 @@ try {
         name: 'signal',
         description: 'iterator consumption 前及期间检查的 cancellation。',
         defaultValue: 'undefined',
-        type: 'ISerializeAbortSignal',
+        type: 'IAbortSignal',
         whenToUse: 'abort expensive collection。',
         example: 'controller.signal'
       },

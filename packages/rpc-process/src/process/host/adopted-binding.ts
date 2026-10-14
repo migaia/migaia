@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -20,7 +21,6 @@ import {
   DEFAULT_HEALTH_TIMEOUT_MS
 } from '../resilience/constants.js'
 import type { IProcessSessionLease } from '../resilience/types.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import { RpcProcessErrorCode } from '../error-code.js'
 
 /** Adoption changes only channel ownership; local supervision never gains an external PID. */

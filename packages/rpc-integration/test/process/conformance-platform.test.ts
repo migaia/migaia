@@ -255,6 +255,13 @@ describe('conformance toolchain and platform evidence boundaries', () => {
         }
         if (path === 'packages/tray/package.json' && key === 'devDependencies')
           expected['@migaia/supervision'] = 'workspace:^'
+        /** IAbortSignal moved to @migaia/utils; these packages no longer use lifecycle at all. */
+        if (
+          (path === 'packages/storage-contract/package.json' ||
+            path === 'packages/rpc-process/package.json') &&
+          key === 'dependencies'
+        )
+          delete expected['@migaia/lifecycle']
         expect(after[key], `${path} ${key}`).toEqual(expected)
       }
     }

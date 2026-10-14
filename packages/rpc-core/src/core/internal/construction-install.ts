@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcAbortError,
   createRpcConfigurationError,
@@ -7,7 +8,7 @@ import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle'
 
 import { RpcCoreErrorText } from '../error-text.js'
 import { raceWithAsyncControl, resolveAbortReason } from './async-control.js'
-import type { IRpcAbortSignal, IRpcHookEvent } from '../typing.js'
+import type { IRpcHookEvent } from '../typing.js'
 import type { IRpcTransport } from '../transport.js'
 import type { IEndpointTimePort } from './time-port.js'
 import type { IRpcPluginInstallScope } from './plugin-contract.js'
@@ -17,7 +18,7 @@ export type IRpcConstructionTime = IEndpointTimePort
 
 /** Immutable batch-entry construction signal and absolute deadline snapshot. */
 export type IRpcConstructionControl = {
-  readonly signal: IRpcAbortSignal
+  readonly signal: IAbortSignal
   readonly time: IEndpointTimePort
   readonly deadlineAt: number | undefined
   remaining(): number | false | undefined
@@ -26,7 +27,7 @@ export type IRpcConstructionControl = {
 
 /** Creates the one construction control shared by every plugin in a batch. */
 export function createConstructionControl(options: {
-  readonly signal: IRpcAbortSignal
+  readonly signal: IAbortSignal
   readonly timeoutMs?: number | false
   readonly time: IRpcConstructionTime
 }): IRpcConstructionControl {
@@ -61,7 +62,7 @@ export function createConstructionControl(options: {
     controller.abort()
   }
   return Object.freeze({
-    signal: controller.signal as IRpcAbortSignal,
+    signal: controller.signal as IAbortSignal,
     time,
     deadlineAt,
     remaining: (): number | false | undefined =>

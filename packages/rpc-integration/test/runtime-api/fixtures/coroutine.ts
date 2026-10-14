@@ -1,10 +1,10 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   defineFeature,
   defineHost,
   definePlugin,
   type IDefinedPluginConstraint
 } from '@migaia/plugin-host'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import { deferred } from '@migaia/utils/promise'
 import {
   createCoroutinePlugin,

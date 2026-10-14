@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcError, createRpcSerializationError } from '../../core/errors.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
 import type { IRpcProbe } from '../../core/probe/types.js'
@@ -12,7 +13,7 @@ import {
   type IRuntimeConnectionDirectory
 } from './overview.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
+import { createAbortController } from '@migaia/lifecycle'
 import { normalizePortable } from '@migaia/rpc-contract'
 import { normalizeRuntimeGeneration } from '@migaia/rpc-contract/runtime/metadata'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
@@ -71,8 +72,7 @@ import {
   type IRpcProvider,
   type IRpcProviderLimits,
   type IRpcFactoryConfig,
-  type IRpcAuthenticationConfig,
-  type IRpcAbortSignal
+  type IRpcAuthenticationConfig
 } from '../../core/index.js'
 import { RemoteMethodName } from '../constants.js'
 import type { IRemoteContract } from '../contract.js'
@@ -316,7 +316,7 @@ type IRuntimePeerResources = Readonly<{
     stagePolicy(maxGlobal?: number, maxPerPeer?: number): void
     isCommitted(): boolean
   }>
-  signal?: IRpcAbortSignal
+  signal?: IAbortSignal
   generation?: IRpcRuntimeGeneration
   endpoint?: IRemoteServeEndpoint
   wrapEndpoint?(endpoint: IRemoteServeEndpoint): IRemoteServeEndpoint

@@ -1,9 +1,9 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it } from 'vitest'
 import {
   SerializeCodecError,
   collectStream,
   createSerializeRegistry,
-  type ISerializeAbortSignal,
   type ISerializeChunk,
   type ISerializeParser,
   type ITextEncoder
@@ -44,7 +44,7 @@ describe('Round29 serialize boundaries', () => {
     const registry = createSerializeRegistry([plugin(['text', 'ignored'] as const)])
 
     const error = await registry
-      .encode('value', { signal: signal as unknown as ISerializeAbortSignal })
+      .encode('value', { signal: signal as unknown as IAbortSignal })
       .catch((caught: unknown) => caught)
 
     expect(error).toBeInstanceOf(SerializeCodecError)
@@ -74,7 +74,7 @@ describe('Round29 serialize boundaries', () => {
     })
     const hostileRegistry = createSerializeRegistry([plugin(['text', 'unused'] as const)])
     const hostileError = await hostileRegistry
-      .encode('value', { signal: hostileSignal as unknown as ISerializeAbortSignal })
+      .encode('value', { signal: hostileSignal as unknown as IAbortSignal })
       .catch((caught: unknown) => caught)
 
     expect(hostileError).toMatchObject({
@@ -88,7 +88,7 @@ describe('Round29 serialize boundaries', () => {
     let aborted = false
     let abortedReads = 0
     let removeCalls = 0
-    const caller: ISerializeAbortSignal = {
+    const caller: IAbortSignal = {
       get aborted() {
         abortedReads += 1
         if (abortedReads > 3) throw new Error('aborted getter escaped')
@@ -102,7 +102,7 @@ describe('Round29 serialize boundaries', () => {
         removeCalls += 1
       }
     }
-    const closing: ISerializeAbortSignal = {
+    const closing: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {},

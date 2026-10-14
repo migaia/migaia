@@ -21,7 +21,7 @@ import {
   validateSchedulerDelay,
   validateSchedulerTime
 } from './scheduler.js'
-import { type IAbortSignal } from './abort.js'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import {
   observeAbortSubscription,

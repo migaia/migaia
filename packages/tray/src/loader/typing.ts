@@ -1,4 +1,5 @@
-import type { IAbortSignal, IReleaseDescriptor } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IReleaseDescriptor } from '@migaia/lifecycle'
 import type { IAdapter } from '../adapter/typing.js'
 import type { ITrayHost, ITrayPluginConstraint, ITrayPluginMutationResult } from '../host/typing.js'
 import type { PluginHost } from '@migaia/plugin-host'

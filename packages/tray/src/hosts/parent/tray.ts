@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { defineHost } from '@migaia/plugin-host'
 import type { IRpcProbe } from '@migaia/rpc-core/probe'
 import {
@@ -5,7 +6,6 @@ import {
   type IRuntimeEvent,
   type IRuntimeConnectionDetail
 } from '@migaia/rpc-core/remote'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import { createTrayError, TRAY_SOURCE } from '../../errors.js'
 import { TrayErrorCode } from '../../error-code.js'
 import {

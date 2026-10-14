@@ -1,4 +1,5 @@
-import type { IAbortSignal, ILifecycleScope } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import type { ILifecycleScope } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type {
   BudgetOverflow,

@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   defineFeature,
   definePlugin,
@@ -9,7 +10,6 @@ import { deferred } from '@migaia/utils/promise'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { describe, expect, it } from 'vitest'
 import { createRpcAbortError, RpcCoreErrorCode } from '../../dist/core/errors.js'
-import type { IRpcAbortSignal } from '../../dist/core/typing.js'
 import {
   attachProviderPreflight,
   readProviderPreflight
@@ -23,7 +23,7 @@ import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES, runtimeSources } from '../runtim
 /** The private side table is optional only for the required unmodified-main red run. */
 type IObservedCommitGate = Readonly<{
   isOpen(): boolean
-  wait(signal: IRpcAbortSignal): Promise<void>
+  wait(signal: IAbortSignal): Promise<void>
 }>
 
 /** Preserve complete local and wire error classification in the acceptance evidence. */
@@ -72,7 +72,7 @@ async function installBarrier(rollback = false) {
   /** Provider reports distinguish one-way failure from caller send completion. */
   const reports: unknown[] = []
   /** Each real provider wait exposes its rejection and original context signal. */
-  const gateWaits: { method: string; signal: IRpcAbortSignal; error?: unknown }[] = []
+  const gateWaits: { method: string; signal: IAbortSignal; error?: unknown }[] = []
   /** An independent observer records lifecycle gate refusal when transport-close wins on the wire. */
   let rollbackGate: Promise<{ value: void } | { error: unknown }> | undefined
   /** Invocation counts prove that exposed business methods remain unavailable before commit. */
@@ -154,7 +154,7 @@ async function installBarrier(rollback = false) {
               /** Record every provider-owned signal before delegating to the real install gate. */
               const observation = { method: entry.name, signal } as {
                 method: string
-                signal: IRpcAbortSignal
+                signal: IAbortSignal
                 error?: unknown
               }
               gateWaits.push(observation)

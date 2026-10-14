@@ -1,4 +1,5 @@
-import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import { createAbortController } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import { ParentLossExitCode } from './constants.js'
 import { invalidProcessOption } from './spec.js'

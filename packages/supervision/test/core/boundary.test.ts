@@ -57,7 +57,9 @@ describe('A1 runtime-neutral boundary', () => {
             '@migaia/utils/scheduler',
             '@migaia/utils/error',
             // U24 D27 reuses the canonical runtime-neutral thenable observer for passive listeners.
-            '@migaia/utils/function'
+            '@migaia/utils/function',
+            // Type-only: the structural abort signal is owned by utils.
+            '@migaia/utils/promise'
           ]).toContain(specifier)
         }
       }

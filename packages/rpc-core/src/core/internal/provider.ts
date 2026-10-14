@@ -1,9 +1,10 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcError, RpcCoreErrorCode, RpcError } from '../errors.js'
 import { createEventChannel, withSnapshotEntries } from '@migaia/event-subscriber'
 import type { ICanonicalEventChannel } from '@migaia/event-subscriber'
 import type { IRpcEventListener, IRpcProvider, IRpcProviderResult } from '../typing.js'
 import { probeThenable, ThenableProbeKind, assimilateCapturedThen } from '@migaia/utils/function'
-import type { IRpcAbortSignal, IRpcContext } from '../typing.js'
+import type { IRpcContext } from '../typing.js'
 import type { IRpcRouteHeader } from '@migaia/rpc-contract'
 import {
   registerLocalErrorWireSummary,
@@ -64,7 +65,7 @@ async function completeAsyncProviderReturn(
 /** The original executor hands start, identity and seal authority to its registered stream owner. */
 export type IProviderRuntimeStream = Readonly<{
   envelope: Extract<IRpcRuntimeEnvelope, { kind: 'runtime-call' }>
-  signal: IRpcAbortSignal
+  signal: IAbortSignal
   /** Reverse source identity comes from the admitted native/authentication owner. */
   replyReceiverId?: string
   /** A relay retains its local stream lifetime while the final provider receives start intent. */
@@ -314,10 +315,7 @@ export class ProviderRegistry {
   /** Stream handlers share the method namespace with ordinary providers. */
   readonly streamProviders = new Map<
     string,
-    (
-      message: unknown,
-      createContext: (signal: IRpcAbortSignal) => IRpcContext
-    ) => void | Promise<void>
+    (message: unknown, createContext: (signal: IAbortSignal) => IRpcContext) => void | Promise<void>
   >()
   /** Each event owns one channel so subscription handles identify their own registration. */
   readonly #events = new Map<string, ICanonicalEventChannel<IRpcContext, void | Promise<void>>>()
@@ -343,7 +341,7 @@ export class ProviderRegistry {
     method: string,
     handler: (
       message: unknown,
-      createContext: (signal: IRpcAbortSignal) => IRpcContext
+      createContext: (signal: IAbortSignal) => IRpcContext
     ) => void | Promise<void>
   ): boolean {
     if (this.providers.has(method) || this.streamProviders.has(method)) return false

@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcAbortError,
   createRpcError,
@@ -50,10 +51,10 @@ import { allocateRpcId } from '../id.js'
 import { OperationScope } from '../operation-scope.js'
 import type { IRpcFrameAdmission, IRpcOutboundOperationsPort } from '../plugin-shared-keys.js'
 import { tupleKey } from '../safe-value.js'
-import { resolveAbortReason, type IAbortSignal } from '../async-control.js'
+import { resolveAbortReason } from '../async-control.js'
 import { authenticationReplyReceiverId } from '../authentication-replay.js'
 import type { IEndpointTimer } from '../time-port.js'
-import type { IRpcAbortSignal, IRpcContext } from '../../typing.js'
+import type { IRpcContext } from '../../typing.js'
 import { RpcStreamLimit } from '@migaia/rpc-contract'
 import type { IProviderRuntimeStream } from '../provider.js'
 import type { RpcOutboundAttachment, IRpcRuntimeSendOptions } from '../outbound-attachment.js'
@@ -197,7 +198,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     method: string,
     handler: (
       message: unknown,
-      createContext: (signal: IRpcAbortSignal) => IRpcContext
+      createContext: (signal: IAbortSignal) => IRpcContext
     ) => void | Promise<void>
   ) => () => void
   /** Connection capability decision supplied by the channel owner. */
@@ -232,7 +233,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       method: string,
       handler: (
         message: unknown,
-        createContext: (signal: IRpcAbortSignal) => IRpcContext
+        createContext: (signal: IAbortSignal) => IRpcContext
       ) => void | Promise<void>
     ) => () => void,
     capability?: IRpcStreamCapabilityPort
@@ -370,7 +371,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       method,
       retainProviderPreflight(
         run,
-        (message: unknown, createContext: (signal: IRpcAbortSignal) => IRpcContext) =>
+        (message: unknown, createContext: (signal: IAbortSignal) => IRpcContext) =>
           this.#acceptRequest(message, run, createContext)
       )
     )
@@ -1040,7 +1041,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   async #acceptRequest(
     message: unknown,
     run: IRpcStreamRun,
-    createContext: (signal: IRpcAbortSignal) => IRpcContext
+    createContext: (signal: IAbortSignal) => IRpcContext
   ): Promise<void> {
     /** Only the final executor can attach this opt-in start/seal/control provenance. */
     const runtime = (message as { runtime?: IProviderRuntimeStream }).runtime

@@ -1,9 +1,9 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { RpcCoreErrorCode } from '../../dist/core/errors.js'
 import { RpcContractErrorCode } from '@migaia/rpc-contract'
-import type { IRpcAbortSignal } from '../../dist/core/typing.js'
 import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } from './fixture.js'
 import { connected } from './fixture.js'
 import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js'
@@ -230,7 +230,7 @@ it('[A67] concurrent next/return shares one producer credit and returns the actu
   /** Before-start return must never invoke this provider's interruption callback. */
   let returns = 0
   /** The actual run context proves that an elapsed start deadline does not abort started work. */
-  let signal: IRpcAbortSignal | undefined
+  let signal: IAbortSignal | undefined
   /** Fixture releases the original outstanding next after return intent has been sent. */
   let finish!: () => void
   /** Only the first genuine producer credit waits on this business promise. */
@@ -241,7 +241,7 @@ it('[A67] concurrent next/return shares one producer credit and returns the actu
   const fixture = await connected(
     {},
     {
-      values: (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+      values: (_payload: unknown, context: { signal: IAbortSignal }) => {
         signal = context.signal
         return {
           [Symbol.asyncIterator]() {
@@ -504,7 +504,7 @@ it('[A59][A67] ordered stream keeps ordinary return cleanup and its key lease un
 
 it('[A66][A67] started stream ignores start cancellation and return drains the same generator to its actual final value', async () => {
   /** The real provider exposes its actual context signal for start/cancel arbitration. */
-  let signal: IRpcAbortSignal | undefined
+  let signal: IAbortSignal | undefined
   /** Every executed yield is an observable business effect, including discarded yields. */
   const effects: number[] = []
   /** A finite generator can pause without requiring another caller credit after return. */
@@ -517,7 +517,7 @@ it('[A66][A67] started stream ignores start cancellation and return drains the s
   const fixture = await connected(
     {},
     {
-      values: async function* (_payload: unknown, context: { signal: IRpcAbortSignal }) {
+      values: async function* (_payload: unknown, context: { signal: IAbortSignal }) {
         signal = context.signal
         effects.push(1)
         yield 1

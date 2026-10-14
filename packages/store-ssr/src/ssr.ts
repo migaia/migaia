@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   SerializeChunkKind,
   type ISerializeChunk,
@@ -763,7 +764,7 @@ function assertElementId(elementId: string): void {
 export type ISSRScriptOptions = {
   readonly codecs: ISerializeRegistry
   readonly elementId?: string
-  readonly signal?: AbortSignal
+  readonly signal?: IAbortSignal
 }
 
 /**
@@ -811,7 +812,7 @@ export type ISSRReadOptions = {
   readonly codecs: ISerializeRegistry
   readonly elementId?: string
   readonly document?: ISSRDocument
-  readonly signal?: AbortSignal
+  readonly signal?: IAbortSignal
 }
 
 /** Reads a codec-tagged SSR payload from an injected document-like host. */

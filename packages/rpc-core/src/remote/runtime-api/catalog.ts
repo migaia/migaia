@@ -1,8 +1,9 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcError } from '../../core/errors.js'
 import { RPC_PORTABLE_MAX_DEPTH } from '@migaia/rpc-contract'
 import { RpcWireLimit } from '@migaia/rpc-contract'
 import { RpcCoreErrorCode } from '../../core/index.js'
-import { type IRpcContext, type IRpcAbortSignal } from '../../core/index.js'
+import { type IRpcContext } from '../../core/index.js'
 import { RemoteMethodName } from '../constants.js'
 import {
   RemoteCatalogLimit,
@@ -25,7 +26,7 @@ export type IRuntimePeerMethod = (payload: any, context: IRpcContext) => unknown
 export type ICommitGate = Readonly<{
   isOpen(): boolean
   /** Rejects with the lifecycle failure or this invocation's original cancellation reason. */
-  wait(signal: IRpcAbortSignal): Promise<void>
+  wait(signal: IAbortSignal): Promise<void>
 }>
 
 /** Private method metadata connects compilation to both registration owners without a new registry. */

@@ -1,4 +1,5 @@
-import type { IAbortSignal, IQuiescenceTracker } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IQuiescenceTracker } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'

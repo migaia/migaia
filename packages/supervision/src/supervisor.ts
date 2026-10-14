@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createAbortController,
   createGenerationController,
@@ -5,7 +6,6 @@ import {
   createMutationQueue,
   createTerminalController,
   type IAbortController,
-  type IAbortSignal,
   type IGenerationRequest,
   type ILifecycleScope
 } from '@migaia/lifecycle'

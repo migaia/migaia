@@ -4,7 +4,7 @@ import { createLifecycleError, tagLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createDisposeTransaction } from './dispose-transaction.js'
-import { type IAbortSignal } from './abort.js'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import {
   observeAbortSubscription,

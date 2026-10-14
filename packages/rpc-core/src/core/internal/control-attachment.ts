@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcContractError,
   createRpcError,
@@ -13,7 +14,7 @@ import { RpcCoreErrorText } from '../error-text.js'
 import { authenticationReplyReceiverId } from './authentication-replay.js'
 import { RpcControl, RpcRouteProfile, RpcWireLimit, type IRpcEnvelope } from '@migaia/rpc-contract'
 import { RpcProtocolEvent } from '../protocol-constants.js'
-import type { IRpcAbortSignal, IRpcFanoutResult } from '../typing.js'
+import type { IRpcFanoutResult } from '../typing.js'
 import type { IRpcUuidConfig } from '../typing.js'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
@@ -31,7 +32,7 @@ import type { IEndpointTimer } from './time-port.js'
 /** Caller-facing ping options mirroring the legacy per-call timeout/abort contract. */
 type IPingOptions = {
   readonly timeoutMs?: number | false
-  readonly signal?: IRpcAbortSignal
+  readonly signal?: IAbortSignal
 }
 
 /** Exact shared ports consumed by the native control attachment. */

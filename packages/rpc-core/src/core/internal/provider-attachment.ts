@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcConfigurationError,
   createRpcError,
@@ -18,7 +19,7 @@ import {
   RpcReplayCapacityNamespace
 } from '../semantic-constants.js'
 import { RpcCoreErrorText } from '../error-text.js'
-import type { IRpcAbortSignal, IRpcContext, IRpcEventListener, IRpcProvider } from '../typing.js'
+import type { IRpcContext, IRpcEventListener, IRpcProvider } from '../typing.js'
 import {
   RpcControl,
   RpcRouteProfile,
@@ -300,7 +301,7 @@ export class RpcProviderAttachment {
     method: string,
     handler: (
       message: unknown,
-      createContext: (signal: IRpcAbortSignal) => IRpcContext
+      createContext: (signal: IAbortSignal) => IRpcContext
     ) => void | Promise<void>
   ): () => void {
     this.#kernel.assertActive()

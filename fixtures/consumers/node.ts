@@ -18,7 +18,8 @@ import { createSSRRequestScope } from '@migaia/store-ssr'
 import { createMutationPolicy } from '@migaia/store-middleware'
 import { getDependencyTree } from '@migaia/store-devtools'
 import { createEventChannel, type IEventAbortSignal } from '@migaia/event-subscriber'
-import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
+import { createAbortController } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 
 const capabilityHost = createCapabilityHost(undefined)
 void capabilityHost.dispose()

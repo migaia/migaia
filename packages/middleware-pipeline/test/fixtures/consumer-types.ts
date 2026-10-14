@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type {
   IAsyncGeneratorMiddlewareStage,
   IGeneratorMiddlewareStage,

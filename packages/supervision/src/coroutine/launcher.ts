@@ -1,4 +1,5 @@
-import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import { createAbortController } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { SupervisionErrorCode } from '../error-code.js'
 import { SupervisionErrorText } from '../error-text.js'

@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../dist/core/internal/time-port.js'
 import { readFileSync } from 'node:fs'
@@ -34,7 +35,6 @@ import type {
   IRpcPluginCore
 } from '../../dist/core/internal/plugin-contract.js'
 import type {
-  IRpcAbortSignal,
   IRpcHookEvent,
   IRpcAuthenticationCapability,
   IRpcConnectCapability,
@@ -383,7 +383,7 @@ async function createProductionBatch(
   }
   const construction = createConstructionControl({
     time: createEndpointTimePort(systemScheduler),
-    signal: (options.construction?.signal ?? new AbortController().signal) as IRpcAbortSignal,
+    signal: (options.construction?.signal ?? new AbortController().signal) as IAbortSignal,
     timeoutMs: options.construction?.timeoutMs
   })
   const hookEvents: IRpcHookEvent[] = []
@@ -1191,7 +1191,7 @@ describe('B12a atomic middleware and claim contracts', () => {
         transport,
         createConstructionControl({
           time: createEndpointTimePort(systemScheduler),
-          signal: new AbortController().signal as IRpcAbortSignal
+          signal: new AbortController().signal as IAbortSignal
         }),
         () => undefined,
         { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
@@ -3256,7 +3256,7 @@ describe('B12a atomic middleware and claim contracts', () => {
   })
 
   it('B12b03: composed Host installs receive the canonical construction control', async () => {
-    let observedSignal: IRpcAbortSignal | undefined
+    let observedSignal: IAbortSignal | undefined
     const batch = await createProductionBatch({
       injectInstall: (role, install) => {
         if (role.kind !== 'middleware' || role.name !== 'timeout') return install
@@ -3323,7 +3323,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const result = await plugin.install({
       id: 'b12b03-native-timeout-install',
       transport,
-      signal: new AbortController().signal as IRpcAbortSignal,
+      signal: new AbortController().signal as IAbortSignal,
       hooks: () => undefined,
       getPort: () => undefined,
       own: <T>(resource: T) => resource
@@ -3465,7 +3465,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const preReason = new DOMException('pre-abort', 'AbortError')
     preController.abort(preReason)
     const pre = await createProductionBatch({
-      construction: { signal: preController.signal as IRpcAbortSignal }
+      construction: { signal: preController.signal as IAbortSignal }
     })
     const failure = await pre.host
       .installBatch(pre.translated.map(({ definition }) => definition))
@@ -3478,7 +3478,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const duringController = new AbortController()
     let releaseInstall!: () => void
     const during = await createProductionBatch({
-      construction: { signal: duringController.signal as IRpcAbortSignal },
+      construction: { signal: duringController.signal as IAbortSignal },
       injectInstall: (role, install) =>
         role.kind === 'middleware' && role.name === 'timeout'
           ? () =>
@@ -3499,7 +3499,7 @@ describe('B12a atomic middleware and claim contracts', () => {
 
     const afterController = new AbortController()
     const after = await createProductionBatch({
-      construction: { signal: afterController.signal as IRpcAbortSignal }
+      construction: { signal: afterController.signal as IAbortSignal }
     })
     await after.host.installBatch(after.translated.map(({ definition }) => definition))
     afterController.abort(new DOMException('after-success', 'AbortError'))
@@ -3522,7 +3522,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       dispose: () => undefined
     }
     const control = createConstructionControl({
-      signal: new AbortController().signal as IRpcAbortSignal,
+      signal: new AbortController().signal as IAbortSignal,
       timeoutMs: 0,
       time
     })
@@ -3550,7 +3550,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const reason = new DOMException('same-tick construction abort', 'AbortError')
     controller.abort(reason)
     const batch = await createProductionBatch({
-      construction: { signal: controller.signal as IRpcAbortSignal, timeoutMs: 0 }
+      construction: { signal: controller.signal as IAbortSignal, timeoutMs: 0 }
     })
     const failure = await batch.host
       .installBatch(batch.translated.map(({ definition }) => definition))
@@ -3588,7 +3588,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const controller = new AbortController()
     const reason = new DOMException('operation abort', 'AbortError')
     const pending = readProjectedSend(client)('b12b03-server', 'hang', null, {
-      signal: controller.signal as IRpcAbortSignal,
+      signal: controller.signal as IAbortSignal,
       timeoutMs: false
     })
     controller.abort(reason)
@@ -3612,7 +3612,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       }
     }
     const control = createConstructionControl({
-      signal: new AbortController().signal as IRpcAbortSignal,
+      signal: new AbortController().signal as IAbortSignal,
       timeoutMs: 25,
       time
     })
@@ -3629,7 +3629,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const controller = new AbortController()
     const control = createConstructionControl({
       time: createEndpointTimePort(systemScheduler),
-      signal: controller.signal as IRpcAbortSignal
+      signal: controller.signal as IAbortSignal
     })
     const reason = new DOMException('hostile construction cancellation', 'AbortError')
     controller.abort(reason)
@@ -4043,7 +4043,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const reason = new DOMException('same-tick construction abort', 'AbortError')
     controller.abort(reason)
     const batch = await createProductionBatch({
-      construction: { signal: controller.signal as IRpcAbortSignal, timeoutMs: 0 }
+      construction: { signal: controller.signal as IAbortSignal, timeoutMs: 0 }
     })
     const failure = await batch.host
       .installBatch(batch.translated.map(({ definition }) => definition))
@@ -4065,7 +4065,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       let release!: () => void
       const events: string[] = []
       const batch = await createProductionBatch({
-        construction: { signal: controller.signal as IRpcAbortSignal },
+        construction: { signal: controller.signal as IAbortSignal },
         injectInstall: (candidate, install) => {
           if (candidate.kind !== 'middleware' || candidate.name !== role) return install
           const key = role === 'timeout' ? RpcPortName.timeout : plannedAbortEnablementKey
@@ -4107,7 +4107,7 @@ describe('B12a atomic middleware and claim contracts', () => {
       const latePrimary = new Error(`${role} late-reject primary`)
       let release!: () => void
       const batch = await createProductionBatch({
-        construction: { signal: controller.signal as IRpcAbortSignal },
+        construction: { signal: controller.signal as IAbortSignal },
         injectInstall: (candidate, install) => {
           if (candidate.kind !== 'middleware' || candidate.name !== role) return install
           return async () => {
@@ -4202,7 +4202,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const controller = new AbortController()
     const reason = new DOMException('timeout race caller abort', 'AbortError')
     const pending = readProjectedSend(client)('b12b03-round10-server', 'hang', null, {
-      signal: controller.signal as IRpcAbortSignal,
+      signal: controller.signal as IAbortSignal,
       timeoutMs: 1
     })
     const settled = pending.catch((error: unknown) => error)
@@ -4257,7 +4257,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const controller = new AbortController()
     const reason = new DOMException('late caller abort', 'AbortError')
     const pending = readProjectedSend(client)('b12b03-round11-timeout-server', 'hang', null, {
-      signal: controller.signal as IRpcAbortSignal,
+      signal: controller.signal as IAbortSignal,
       timeoutMs: 1
     })
     const settled = pending.catch((error: unknown) => error)
@@ -4329,7 +4329,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     expect(idleServerSnapshot.providers).toBe(1)
     const controller = new AbortController()
     const pending = readProjectedSend(client)('b12b03-round13-late-reject-server', 'hang', null, {
-      signal: controller.signal as IRpcAbortSignal,
+      signal: controller.signal as IAbortSignal,
       timeoutMs: false
     })
     const settled = pending.catch((error: unknown) => error)

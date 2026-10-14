@@ -1,5 +1,5 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { asyncDisposeKey, disposeKey } from './symbols.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type {
   IFeatureOutput,

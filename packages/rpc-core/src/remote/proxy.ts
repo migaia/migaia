@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcAbortError, createRpcError, isRpcRemoteError } from '../core/errors.js'
 import { createRuntimeBindingCalls } from './internal/runtime-call.js'
 import type { IRuntimeCallOptions } from './runtime-api/typing.js'
@@ -23,7 +24,7 @@ import {
   RuntimeSourceKind,
   RuntimeConnectionDirection
 } from './runtime-api/constants.js'
-import { createGenerationController, type IAbortSignal } from '@migaia/lifecycle'
+import { createGenerationController } from '@migaia/lifecycle'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../core/plugins/reporter-context.js'

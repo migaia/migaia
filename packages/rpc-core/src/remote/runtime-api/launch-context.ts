@@ -1,5 +1,5 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRuntimePeerSourceContext, IRuntimePeerProvide, IRuntimePeer } from './peer.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 import type { IProviderAdmissionScope } from '../../core/features/provider.js'
 

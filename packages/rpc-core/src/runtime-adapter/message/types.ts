@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
 import type { IRuntimePeerSourceResult, IRuntimePeerSourceContext } from '../../remote/index.js'

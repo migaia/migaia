@@ -1,6 +1,6 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { Worker } from 'node:worker_threads'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import { it, expect, vi, type MockInstance } from 'vitest'
 import { defineMessageAdapter } from '../../dist/adapter.js'
 

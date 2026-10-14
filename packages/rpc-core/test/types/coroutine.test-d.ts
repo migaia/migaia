@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createCoroutinePlugin, type ICoroutineTaskContext } from '../../dist/remote/index.js'
 
 /** Public signal follows supervision's cooperative signal contract without a cast. */

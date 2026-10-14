@@ -1,10 +1,10 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { build } from 'vite'
 import { composeSerializeSignal } from '../src/signal.js'
-import type { ISerializeAbortSignal } from '../src/types.js'
 
 type ISerializeManifest = {
   readonly dependencies?: Readonly<Record<string, string>>
@@ -68,6 +68,7 @@ describe('Round27 serialize boundaries', () => {
       '@migaia/lifecycle/abort',
       '@migaia/utils/bytes',
       '@migaia/utils/error',
+      '@migaia/utils/promise',
       '@migaia/utils/scheduler'
     ])
     for (const dependency of dependencies.filter(
@@ -110,7 +111,7 @@ describe('Round27 serialize boundaries', () => {
     const secondReason = new Error('second abort')
     let callerAborted = false
     let callerListener: (() => void) | undefined
-    const caller: ISerializeAbortSignal = {
+    const caller: IAbortSignal = {
       get aborted() {
         return callerAborted
       },
@@ -120,7 +121,7 @@ describe('Round27 serialize boundaries', () => {
       },
       removeEventListener() {}
     }
-    const closing: ISerializeAbortSignal = {
+    const closing: IAbortSignal = {
       aborted: false,
       reason: secondReason,
       addEventListener() {},

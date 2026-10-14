@@ -1,6 +1,7 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createManagedRuntimeCalls } from '../internal/runtime-call.js'
 import { runtimeQuery } from './overview.js'
-import { createAbortController, type IAbortSignal } from '@migaia/lifecycle'
+import { createAbortController } from '@migaia/lifecycle'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
 import { createProbeEmitter } from '../../core/internal/probe-emitter.js'
