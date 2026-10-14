@@ -83,7 +83,7 @@ const stopRendering = runtime.effect(() => {
 userId.value = '2';
 
 export function disposeUserPanel(): void {
-  stopRendering();
+  stopRendering.dispose();
   user.dispose();
   userId.dispose();
 }
