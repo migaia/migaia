@@ -11,7 +11,7 @@ function exclusiveBuffer(bytes: Uint8Array): ArrayBuffer | undefined {
 }
 
 /** Builds a transfer list without placing non-transferable shared memory in it. */
-export function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): Transferable[] {
+export function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): unknown[] {
   if (ownership !== WorkerByteOwnership.transfer || chunk[0] !== SerializeChunkKind.bytes) return []
   if (!isUint8Array(chunk[1])) return []
   const buffer = exclusiveBuffer(chunk[1])

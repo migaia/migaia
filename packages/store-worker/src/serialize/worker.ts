@@ -1,3 +1,4 @@
+import type { IWorkerMessageEvent } from '../worker-message-event.js'
 import {
   SerializeCodecError,
   SerializeChunkKind,
@@ -546,7 +547,7 @@ export const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin =>
  */
 export function createSerializeWorkerHandler(
   parser: ISerializeParser,
-  post: (message: unknown, transfer?: readonly Transferable[]) => void
+  post: (message: unknown, transfer?: readonly unknown[]) => void
 ): IManagedRpcHandler {
   if (
     parser === null ||
@@ -560,12 +561,12 @@ export function createSerializeWorkerHandler(
       StoreWorkerErrorText.handlerInvalid
     )
   }
-  let inboundListener: ((event: MessageEvent<unknown>) => void) | undefined
+  let inboundListener: ((event: IWorkerMessageEvent) => void) | undefined
   const endpoint = createWorkerContractEndpoint(
     {
       postMessage: (message, transfer) => post(message, transfer),
       addEventListener: (type, listener) => {
-        if (type === 'message') inboundListener = listener as (event: MessageEvent<unknown>) => void
+        if (type === 'message') inboundListener = listener as (event: IWorkerMessageEvent) => void
       },
       removeEventListener: (type, listener) => {
         if (type === 'message' && inboundListener === listener) inboundListener = undefined
@@ -740,6 +741,6 @@ export function createSerializeWorkerHandler(
     }
   })
   return toManagedRpcHandler(endpointPromise, (message) =>
-    inboundListener?.({ data: message } as MessageEvent<unknown>)
+    inboundListener?.({ data: message } as IWorkerMessageEvent)
   )
 }

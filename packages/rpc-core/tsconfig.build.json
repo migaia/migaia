@@ -1,14 +1,14 @@
 {
   // The actual independent-publish artifact: real ESM `.js` + `.d.ts` output
-  // under `dist/`, source only (no tests, no `ambient.d.ts` — that file's
-  // global redeclarations must never ship in a consumer-facing `.d.ts`).
+  // under `dist/`, source only (no tests). the shared utils host-global declarations are a compile
+  // input only: tsc never emits `.d.ts` inputs, so they never ship to consumers.
   // Run via `pnpm --filter ./packages/rpc run build`.
   "compilerOptions": {
     "target": "es2023",
-    "lib": ["ES2023", "DOM"],
+    "lib": ["ES2023", "ESNext.Disposable"],
     "module": "esnext",
     "moduleResolution": "bundler",
-    "types": ["node"],
+    "types": [],
     "declaration": true,
     "declarationMap": true,
     "stripInternal": true,
@@ -23,6 +23,6 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true
   },
-  "include": ["src"],
-  "exclude": ["src/core/ambient.d.ts", "src/**/*.test.ts"]
+  "include": ["src", "../utils/types/host-globals.d.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }

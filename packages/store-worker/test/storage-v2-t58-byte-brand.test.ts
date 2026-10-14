@@ -51,7 +51,7 @@ describe('SWV2-T58 store-worker byte boundaries', () => {
     const bytes = new Uint8Array([21, 22])
     const transfer = transferablesOf(['bytes', bytes], WorkerByteOwnership.transfer)
     expect(transfer).toEqual([bytes.buffer])
-    structuredClone(bytes, { transfer })
+    structuredClone(bytes, { transfer: transfer as Transferable[] })
     expect(bytes.byteLength).toBe(0)
   })
 })

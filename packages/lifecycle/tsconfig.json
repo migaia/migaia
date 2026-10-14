@@ -8,5 +8,5 @@
     "outDir": "dist",
     "types": []
   },
-  "include": ["src"]
+  "include": ["src", "../utils/types/host-globals.d.ts"]
 }

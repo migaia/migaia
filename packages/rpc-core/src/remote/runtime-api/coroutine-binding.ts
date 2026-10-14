@@ -22,6 +22,7 @@ import {
   registerCoroutineReporter,
   wrapCoroutineTask,
   type ICoroutineConnect,
+  type ICoroutineMessagePort,
   type ICoroutineUserTask
 } from './coroutine-task.js'
 
@@ -29,7 +30,7 @@ import {
 export type ICoroutineSupervisorPolicy = Readonly<
   Partial<
     Pick<
-      ICoroutineSupervisorOptions<MessagePort>,
+      ICoroutineSupervisorOptions<ICoroutineMessagePort>,
       'restart' | 'terminalPolicy' | 'startupTimeoutMs' | 'stop' | 'budget' | 'heartbeat'
     >
   >
@@ -39,9 +40,10 @@ export type ICoroutineSupervisorPolicy = Readonly<
  * Hide EventEmitter methods so the canonical recipe selects EventTarget. Native delivery starts
  * once, immediately after the first capture/message listener exists.
  */
-export function startOnListen(port: MessagePort): IAdapterEventTargetMessagePort {
+export function startOnListen(port: ICoroutineMessagePort): IAdapterEventTargetMessagePort {
   /** Optional physical observers retain their original port receiver through arrow operations. */
-  const observed = port as MessagePort & Pick<IAdapterEventTargetMessagePort, 'observe' | 'onError'>
+  const observed = port as ICoroutineMessagePort &
+    Pick<IAdapterEventTargetMessagePort, 'observe' | 'onError'>
   /** Only native port activation belongs here; capture and replay remain resource-owned. */
   let started = false
   return Object.freeze({
@@ -53,7 +55,7 @@ export function startOnListen(port: MessagePort): IAdapterEventTargetMessagePort
       ? (listener: (error: unknown) => void) => observed.onError!(listener)
       : undefined,
     postMessage: (message: unknown, transfer?: readonly unknown[]) =>
-      port.postMessage(message, transfer as Transferable[]),
+      port.postMessage(message, transfer),
     addEventListener: (type: string, listener: (event: any) => void) => {
       port.addEventListener(type, listener)
       if (type === MessageResourceEvent.message && !started) {
@@ -82,7 +84,10 @@ export function createCoroutineBinding(
   task: ICoroutineUserTask,
   report: (error: unknown) => void,
   policy?: ICoroutineSupervisorPolicy
-): IAdapterManagedBinding<ICoroutineHandle<MessagePort>, ICoroutineSpec<MessagePort>> {
+): IAdapterManagedBinding<
+  ICoroutineHandle<ICoroutineMessagePort>,
+  ICoroutineSpec<ICoroutineMessagePort>
+> {
   /** The original profile and message resources share one supported scheduler. */
   const scheduler = systemScheduler
   /** Requests and provider teardown retain the canonical remote binding drain. */
@@ -92,7 +97,7 @@ export function createCoroutineBinding(
     policy?.budget ??
     createUnitBudget({ kind: 'coroutine', maxUnits: 1, overflow: BudgetOverflow.reject })
   /** The existing supervisor owns generation, startup, restart, termination and late reap. */
-  const supervisor = createCoroutineSupervisor<MessagePort>({
+  const supervisor = createCoroutineSupervisor<ICoroutineMessagePort>({
     ...policy,
     id: defaultRpcId(),
     spec: { task: wrapCoroutineTask(task, report) },

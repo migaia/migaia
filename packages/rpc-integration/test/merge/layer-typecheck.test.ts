@@ -8,18 +8,18 @@ const packageRoots = {
   contract: resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-contract'),
   core: resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core')
 } as const
-/** Files the core type proof must include after the S3 move. */
+/** Files the core type proof must include after the S3 move, spelled as `tsc --showConfig` lists them. */
 const coreFiles = [
-  'src/core/ambient.d.ts',
-  'src/core/composed.ts',
-  'src/core/endpoint-kernel.ts',
-  'src/core/errors.ts',
-  'src/core/error-code.ts',
-  'src/core/error-text.ts',
-  'src/core/transport.ts',
-  'src/core/typing.ts',
-  'src/core/adapters/memory.ts',
-  'src/core/adapters/message-port.ts'
+  '../utils/types/host-globals.d.ts',
+  './src/core/composed.ts',
+  './src/core/endpoint-kernel.ts',
+  './src/core/errors.ts',
+  './src/core/error-code.ts',
+  './src/core/error-text.ts',
+  './src/core/transport.ts',
+  './src/core/typing.ts',
+  './src/core/adapters/memory.ts',
+  './src/core/adapters/message-port.ts'
 ]
 
 /** Execute TypeScript exactly as the package-level proof script does. */
@@ -48,7 +48,7 @@ describe('A3 platform-neutral type boundaries', () => {
       expect(parsed.compilerOptions.types).toEqual([])
       expect(parsed.compilerOptions.lib).not.toContain('dom')
       if (layer === 'core') {
-        for (const file of coreFiles) expect(parsed.files).toContain(`./${file}`)
+        for (const file of coreFiles) expect(parsed.files).toContain(file)
       } else {
         expect(
           parsed.files.every(

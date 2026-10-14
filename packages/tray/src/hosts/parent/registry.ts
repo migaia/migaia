@@ -160,7 +160,7 @@ export function createRegistry(
     bind(host: string, id: string): string {
       const record = get(id)
       if (record.definition.name !== host) throw createTrayError(TrayErrorCode.hostMismatch)
-      const receipt = globalThis.crypto.randomUUID()
+      const receipt = crypto!.randomUUID!()
       receipts.set(receipt, record)
       record.receipts.add(receipt)
       return receipt
