@@ -221,6 +221,7 @@
         "invokeCaptured",
         "isDefinedPlugin",
         "isPluginHandleCurrent",
+        "readPluginDependencies",
         "readPluginHostDisposalProvenance"
       ],
       "./composition": [
@@ -633,7 +634,6 @@
         "RuntimePluginKey",
         "RuntimeQueryStatus",
         "RuntimeSourceKind",
-        "createCoroutineHost",
         "createCoroutinePlugin",
         "createManagedRuntimePeer",
         "createRemoteHost",
@@ -1510,7 +1510,16 @@
       ".": [
         "TRAY_SOURCE",
         "TrayErrorCode",
-        "createTray"
+        "TrayInstanceEvent",
+        "TrayInstanceState",
+        "TrayRuntime",
+        "createTray",
+        "createTrayGraph",
+        "defineRoutingPolicy",
+        "defineTrayHost",
+        "leastInFlight",
+        "roundRobin",
+        "serveTrayHost"
       ],
       "./host": [
         "TrayHostState",
@@ -1576,6 +1585,7 @@
         "isPrimitive",
         "isSafeIntegerValue",
         "isUint8Array",
+        "isUrlObject",
         "isUtilsAbortError",
         "isUtilsError",
         "isUtilsTimeoutError",
@@ -1595,6 +1605,7 @@
         "raceWithAbort",
         "reachErrorChain",
         "readConfigPath",
+        "readUrlHref",
         "readonlyConfig",
         "retry",
         "safeErrorReason",
