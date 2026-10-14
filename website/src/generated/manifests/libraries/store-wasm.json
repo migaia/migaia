@@ -973,8 +973,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-wasm/getting-started",
-      "architecturePath": "/en/architecture/store-wasm",
+      "guidePath": "/en/docs/store-wasm/getting-started",
+      "architecturePath": "/en/docs/store-wasm",
       "symbols": [
         {
           "name": "array",

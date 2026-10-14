@@ -648,8 +648,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createBrowserPeer",
@@ -1607,8 +1607,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createBroadcastChannelTransport",
@@ -1706,8 +1706,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createRtcDataChannelTransport",
@@ -1865,8 +1865,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createServiceWorkerTransport",
@@ -2201,8 +2201,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createSharedWorkerTransport",
@@ -2360,8 +2360,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createWebTransportDatagramTransport",
@@ -2521,8 +2521,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createWindowMessageTransport",

@@ -2258,8 +2258,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "collect",
@@ -4371,8 +4371,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "base64ToBytes",
@@ -5158,8 +5158,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "combineConfig",
@@ -10809,8 +10809,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "attachErrorIdentity",
@@ -15790,8 +15790,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "assimilateCapturedThen",
@@ -16704,8 +16704,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "createNumberFormatter",
@@ -17618,8 +17618,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "createSafeRecord",
@@ -18735,8 +18735,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "createPathAccessor",
@@ -21227,8 +21227,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "admitAbortSignal",
@@ -23531,8 +23531,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "createManualScheduler",
@@ -24048,8 +24048,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "format",
@@ -24672,8 +24672,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "IDiscriminatedByField",
@@ -24992,8 +24992,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "IPrimitive",

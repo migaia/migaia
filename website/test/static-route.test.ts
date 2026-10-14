@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { copyFor } from '../app/copy.js'
 
 const websiteRoot = fileURLToPath(new URL('../', import.meta.url))
 const buildRoot = join(websiteRoot, 'build/client')
@@ -43,7 +44,7 @@ function artifactPath(path: string): string {
 
 /** Builds the public module URL while hiding the repository root export name. */
 function publicModulePath(locale: string, library: string, moduleName: string): string {
-  return `/${locale}/docs/${library}${moduleName === 'index' ? '' : `/${moduleName}`}`
+  return `/${locale}/docs/${library}/api${moduleName === 'index' ? '' : `/${moduleName}`}`
 }
 
 /** Reduces prerendered markup to reader-visible text so syntax spans do not affect assertions. */
@@ -57,6 +58,36 @@ function renderedText(html: string): string {
     .replace(/&#x27;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/&amp;/g, '&')
+}
+
+/** Collects prose sentences while excluding code, navigation, headings, and metadata values. */
+function mainProseSentences(html: string): readonly string[] {
+  /** Main content owns the page prose; header and rails are shared navigation. */
+  const main = html.match(/<main(?:\s[^>]*)?>([\s\S]*?)<\/main>/i)?.[1]
+  assert.ok(main, 'missing main content')
+  /** Block boundaries preserve separate descriptions without losing inline API names. */
+  const prose = main
+    .replace(/<dl class="option-meta[^"]*"[^>]*>[\s\S]*?<\/dl>/gi, '')
+    .replace(
+      /<span class="library-reference-popover"[^>]*><strong>[\s\S]*?<\/strong><span>[\s\S]*?<\/span><b>[\s\S]*?<\/b><\/span>/gi,
+      ''
+    )
+    .replace(/<(pre|figure|nav|aside|script|style|button|h[1-6])(?:\s[^>]*)?>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(?:dt|th)(?:\s[^>]*)?>[\s\S]*?<\/(?:dt|th)>/gi, '')
+    .replace(/<(dd|td)(?:\s[^>]*)?>\s*<code[^>]*>[\s\S]*?<\/code>\s*<\/\1>/gi, '')
+    .replace(/<\/?(?:article|blockquote|div|dd|li|p|section|td|tr)(?:\s[^>]*)?>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+
+  return renderedText(prose)
+    .split('\n')
+    .flatMap((block) =>
+      block
+        .replace(/\s+/gu, ' ')
+        .trim()
+        .split(/(?<=[。！？])|(?<=[.!?])(?=\s|$)/u)
+        .map((sentence) => sentence.trim())
+    )
+    .filter((sentence) => Array.from(sentence).length >= 12 && /[。！？.!?]$/.test(sentence))
 }
 
 /** Extracts the navigation tree while ignoring the route-specific active marker. */
@@ -99,14 +130,72 @@ test('SITE-T-HOME uses the header language control and explains the documentatio
   )
 })
 
-test('SITE-T-LANGUAGE-HOME presents concrete production library combinations', () => {
+test('SITE-T-LANGUAGE-HOME renders task scenarios and concrete production library combinations', () => {
   assert.doesNotMatch(languageSource, /copy\.chooseGoal|copy\.architecturePreview/)
+  for (const field of [
+    'homeEyebrow',
+    'homeTitle',
+    'homeDescription',
+    'scenarios',
+    'scenarioTitle',
+    'homeScenarios'
+  ])
+    assert.ok(languageSource.includes(`copy.${field}`), `home does not read ${field}`)
   assert.match(languageSource, /copy\.reactiveResource/)
   assert.match(languageSource, /copy\.capabilityPluginHost/)
-  assert.match(languageSource, /copy\.webRpcSerialize/)
+  assert.match(languageSource, /copy\.rpcPeerSerialize/)
+  assert.match(languageSource, /copy\.traySupervision/)
+  assert.doesNotMatch(
+    languageSource,
+    /copy\.(?:capabilityMap|shortestPath|foundation\w*|runtime\w*|stateStorage\w*|integration\w*|webRpcSerialize)/
+  )
+  assert.doesNotMatch(
+    copySource,
+    /^\s+(?:capabilityMap|shortestPath|foundation\w*|runtime\w*|stateStorage\w*|integration\w*|webRpcSerialize\w*):/m,
+    'reviewed home copy retains a retired field'
+  )
   assert.match(copySource, /跟踪变化的输入，取消过期请求/)
   assert.match(copySource, /按策略启用可选能力/)
   assert.match(copySource, /定义类型安全的远程调用/)
+  for (const locale of ['en', 'zh'] as const) {
+    /** The built home must consume the reviewed localized data, including each task's library links. */
+    const copy = copyFor(locale)
+    /** Reader-visible text avoids coupling the oracle to syntax or inline markup. */
+    const html = readFileSync(join(buildRoot, artifactPath(`/${locale}`)), 'utf8')
+    /** One localized landing page owns its hero, task scenarios, and common combinations. */
+    const text = renderedText(html)
+    for (const value of [
+      copy.homeEyebrow,
+      copy.homeTitle,
+      copy.homeDescription,
+      copy.scenarios,
+      copy.scenarioTitle
+    ])
+      assert.ok(text.includes(value), `/${locale} misses reviewed home text: ${value}`)
+    for (const scenario of copy.homeScenarios) {
+      assert.ok(text.includes(scenario.title), `/${locale} misses scenario: ${scenario.title}`)
+      assert.ok(
+        text.includes(scenario.body),
+        `/${locale} misses scenario explanation: ${scenario.title}`
+      )
+      for (const library of scenario.libraries)
+        assert.ok(
+          html.includes(`href="/${locale}/docs/${library}"`),
+          `/${locale} misses ${library} scenario link`
+        )
+    }
+    for (const combination of [
+      copy.reactiveResource,
+      copy.capabilityPluginHost,
+      copy.rpcPeerSerialize,
+      copy.traySupervision
+    ])
+      assert.ok(text.includes(combination), `/${locale} misses combination: ${combination}`)
+    assert.ok(
+      html.includes(`href="/${locale}/docs/tray"`),
+      `/${locale} misses Tray combination link`
+    )
+  }
 })
 
 test('SITE-T-DOCS-NAV classifies public symbols by developer-facing role', () => {
@@ -170,14 +259,45 @@ test('SITE-T-DOCS-RAIL keeps the expanded API navigation visible below the stick
   assert.match(styleSource, /max-height: calc\(100dvh - 6\.5rem\);/)
   assert.match(styleSource, /position: sticky;/)
   assert.match(styleSource, /top: 6\.5rem;/)
-  assert.equal(docsSource.match(/className="left-rail-sticky"/g)?.length, 2)
+  for (const locale of ['zh', 'en']) {
+    for (const route of [
+      'docs/tray',
+      'docs/tray/api/createTray',
+      'docs/rpc-core/getting-started'
+    ]) {
+      /** Every rendered reading shell has one desktop category sidebar. */
+      const html = readFileSync(join(buildRoot, artifactPath(`/${locale}/${route}`)), 'utf8')
+      assert.match(html, /class="left-rail-sticky"[\s\S]*class="left-rail-content"/)
+      assert.equal(html.match(/<aside[^>]*class="left-rail-content"/g)?.length, 1)
+      assert.ok(stableLeftRail(html).includes(`/${locale}/docs/`))
+    }
+  }
 })
 
-test('SITE-T-API-SCENARIOS renders maintained multi-host examples as separate sections', () => {
-  assert.match(docsSource, /guide\?\.examples\?\.length/)
-  assert.match(docsSource, /className="api-scenario-example"/)
-  assert.match(docsSource, /在不同宿主中使用/)
-  assert.match(docsSource, /examples: \['Production scenarios', '场景实战'\]/)
+test('SITE-T-API-STRUCTURE presents a purpose, example, option table, related APIs, then collapsed types', () => {
+  for (const locale of ['zh', 'en']) {
+    /** A maintained callable with configuration exercises the complete reference layout. */
+    const html = readFileSync(
+      join(buildRoot, artifactPath(`/${locale}/docs/tray/api/createTray`)),
+      'utf8'
+    )
+    /** Section anchors expose the reading order independently of translated headings. */
+    const sections = ['overview', 'quick-start', 'configuration', 'related-apis', 'signature']
+    /** Every required section must follow its predecessor. */
+    let previous = -1
+    for (const section of sections) {
+      /** Existing fragment suffixes identify the selected API sections. */
+      const position = html.indexOf(`--${section}"`)
+      assert.ok(position > previous, `${locale} createTray section order: ${section}`)
+      previous = position
+    }
+    /** Configuration reads as one comparison table rather than repeated description cards. */
+    const optionTable = html.match(/<table class="option-reference">([\s\S]*?)<\/table>/)?.[1]
+    assert.ok(optionTable, `${locale} createTray missing options table`)
+    for (const header of locale === 'zh' ? ['名称', '类型', '行为'] : ['Name', 'Type', 'Behavior'])
+      assert.match(optionTable, new RegExp(`<th>${header}</th>`))
+    assert.doesNotMatch(html, /class="api-decision-guide"|class="api-scenario-examples"/)
+  }
 })
 
 test('SITE-T-WEBRPC-CONTRACT-TRANSPORTS documents contract use across host boundaries', () => {
@@ -221,7 +341,12 @@ test('SITE-T-WEBRPC-PING-SCENARIOS documents operational liveness decisions', ()
 })
 
 test('SITE-T01 emits the admitted nested static route set', () => {
-  const routePaths = ['index.html', 'en/index.html', 'zh/index.html', 'en/docs/utils/index.html']
+  const routePaths = [
+    'index.html',
+    'en/index.html',
+    'zh/index.html',
+    'en/docs/utils/api/index.html'
+  ]
 
   for (const routePath of routePaths) {
     assert.ok(existsSync(join(buildRoot, routePath)), `missing artifact: ${routePath}`)
@@ -231,12 +356,12 @@ test('SITE-T01 emits the admitted nested static route set', () => {
 test('SITE-T-NO-INDEX keeps repository entry names out of public docs routes', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
   assert.ok(routes.has('/zh/docs/event-subscriber'))
-  assert.ok(routes.has('/zh/docs/event-subscriber/createEventChannel'))
-  assert.ok(routes.has('/zh/docs/utils/function/assimilateCapturedThen'))
+  assert.ok(routes.has('/zh/docs/event-subscriber/api/createEventChannel'))
+  assert.ok(routes.has('/zh/docs/utils/api/function/assimilateCapturedThen'))
   for (const route of routes) assert.doesNotMatch(route, /^\/(?:en|zh)\/docs\/[^/]+\/index(?:\/|$)/)
-  const html = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/index.html'), 'utf8')
+  const html = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/api/index.html'), 'utf8')
   assert.match(html, /createEventChannel/)
-  assert.doesNotMatch(html, /href=\x22\/zh\/docs\/event-subscriber\/index(?:\/|\x22)/)
+  assert.doesNotMatch(html, /href=\x22\/zh\/docs\/event-subscriber\/api\/index(?:\/|\x22)/)
 
   for (const api of apiManifest.apis.filter((candidate) => candidate.module === 'index')) {
     const rootHtml = readFileSync(
@@ -267,7 +392,7 @@ test('SITE-T-TOC renders only right-rail anchors backed by real page sections', 
     const path = join(libraryRoot, entry.name, 'index.html')
     if (!existsSync(path)) continue
     const html = readFileSync(path, 'utf8')
-    if (!html.includes('id="module-guidance"')) continue
+    if (!html.includes('id="learning-advanced"')) continue
     const rail = html.match(/<aside class="right-rail"[^>]*>([\s\S]*?)<\/aside>/)?.[1]
     assert.ok(rail, `${entry.name}: missing right rail`)
     assert.match(rail, /href="#learning-advanced"[^>]*>高级用法</, `${entry.name}: advanced link`)
@@ -283,21 +408,24 @@ test('SITE-T-TOC renders only right-rail anchors backed by real page sections', 
 
 test('SITE-T-SEMANTIC-ROUTES keeps API links stable, readable, and collision-safe', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
-  assert.ok(routes.has('/zh/docs/event-subscriber/createEventChannel'))
+  assert.ok(routes.has('/zh/docs/event-subscriber/api/createEventChannel'))
   assert.equal(
     routeManifest.entries.some((entry) => /\/[A-Za-z_$][\w$]*-[a-f0-9]{10}$/.test(entry.path)),
     false
   )
   for (const path of [
-    '/en/docs/store-indexed/observableArray-function',
-    '/en/docs/store-indexed/ObservableArray-class',
-    '/en/docs/store-shared/sharedInt32Array-const',
-    '/en/docs/store-shared/SharedInt32Array-class'
+    '/en/docs/store-indexed/api/observableArray-function',
+    '/en/docs/store-indexed/api/ObservableArray-class',
+    '/en/docs/store-shared/api/sharedInt32Array-const',
+    '/en/docs/store-shared/api/SharedInt32Array-class'
   ])
     assert.ok(routes.has(path), `missing semantic collision route: ${path}`)
 
-  const moduleHtml = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/index.html'), 'utf8')
-  assert.match(moduleHtml, /href="\/zh\/docs\/event-subscriber\/createEventChannel"/)
+  const moduleHtml = readFileSync(
+    join(buildRoot, 'zh/docs/event-subscriber/api/index.html'),
+    'utf8'
+  )
+  assert.match(moduleHtml, /href="\/zh\/docs\/event-subscriber\/api\/createEventChannel"/)
   assert.doesNotMatch(moduleHtml, /href="[^"]+-[a-f0-9]{10}"/)
 })
 
@@ -351,12 +479,12 @@ test('SITE-T-LOCALE keeps Chinese navigation and introductions localized', () =>
   const chineseDocs = readFileSync(join(buildRoot, 'zh/docs/index.html'), 'utf8')
 
   assert.match(chineseHome, /<html[^>]+lang="zh"/)
-  assert.match(chineseHome, /选择最短且有效的路径。/)
+  assert.match(chineseHome, /管理应用状态、后台任务与插件进程。/)
+  assert.match(chineseHome, /你的应用现在需要做什么？/)
   assert.match(chineseHome, /开始查文档/)
-  assert.match(chineseHome, /浏览指南/)
   assert.match(chineseHome, /href="\/zh\/docs"/)
   assert.match(chineseHome, /href="\/zh\/docs"[^>]*>文档<\/a>/)
-  assert.match(chineseHome, /href="\/zh\/guides"[^>]*>指南<\/a>/)
+  assert.doesNotMatch(chineseHome, /href="\/zh\/(?:guides|architecture)/)
   assert.match(chineseHome, /跟随时间 · (日出|日落|夜晚|午夜)/)
   assert.doesNotMatch(
     chineseHome,
@@ -401,7 +529,10 @@ test('SITE-T01 embeds route content before JavaScript', () => {
   const apiRoute = artifactPath(
     `${publicModulePath('en', ownerApi.library, ownerApi.module)}/${apiSymbolPath(ownerSymbol, ownerApi.symbols)}`
   )
-  assert.match(readFileSync(join(buildRoot, apiRoute), 'utf8'), /<h2>Purpose<\/h2>/)
+  assert.match(
+    readFileSync(join(buildRoot, apiRoute), 'utf8'),
+    /class="api-overview"[\s\S]*?<p class="lede">/
+  )
 })
 
 test('SITE-T-READABILITY emits semantic symbol lists and labelled code surfaces', () => {
@@ -412,19 +543,19 @@ test('SITE-T-READABILITY emits semantic symbol lists and labelled code surfaces'
   const html = readFileSync(
     join(
       buildRoot,
-      `en/docs/event-subscriber/${apiSymbolPath(symbol, apiManifest.apis.find((api) => api.library === 'event-subscriber' && api.module === 'index')!.symbols)}/index.html`
+      `en/docs/event-subscriber/api/${apiSymbolPath(symbol, apiManifest.apis.find((api) => api.library === 'event-subscriber' && api.module === 'index')!.symbols)}/index.html`
     ),
     'utf8'
   )
 
   assert.match(html, /<figure class="code-frame">/)
-  assert.match(html, /<span>Public type signature<\/span>/)
+  assert.match(html, /<summary>Public type signature<\/summary>/)
   assert.match(html, /<pre class="code-block"><code>/)
   assert.match(html, /class="syntax-keyword">export<\/span>/)
   assert.match(html, /class="syntax-type">IEventApiStyle<\/span>/)
   assert.match(html, /export<\/span> <span class="syntax-keyword">declare<\/span>[\s\S]*?\n/)
   assert.doesNotMatch(html, /Declared shape:/)
-  assert.match(html, /<h2>Purpose<\/h2>/)
+  assert.match(html, /class="api-overview"[\s\S]*?<p class="lede">/)
   assert.doesNotMatch(html, /<h4>介绍<\/h4>/)
   assert.doesNotMatch(html, /when its public contract matches the result you need/)
   assert.doesNotMatch(html, /start with the smallest valid input/i)
@@ -432,12 +563,15 @@ test('SITE-T-READABILITY emits semantic symbol lists and labelled code surfaces'
 })
 
 test('SITE-T-RESOURCE-OPTIONS renders maintained constructor fields omitted by declaration expansion', () => {
-  const resourceHtml = readFileSync(join(buildRoot, 'zh/docs/resource/Resource/index.html'), 'utf8')
+  const resourceHtml = readFileSync(
+    join(buildRoot, 'zh/docs/resource/api/Resource/index.html'),
+    'utf8'
+  )
   const resourceFragment = apiManifest.apis
     .find((api) => api.library === 'resource' && api.module === 'index')
     ?.symbols.find((symbol) => symbol.name === 'Resource')?.fragment
   assert.ok(resourceFragment)
-  assert.match(resourceHtml, />配置参考</)
+  assert.match(resourceHtml, /<h2>选项<\/h2>/)
   for (const option of [
     'debugName',
     'ttl',
@@ -455,21 +589,24 @@ test('SITE-T-RESOURCE-OPTIONS renders maintained constructor fields omitted by d
   assert.match(resourceHtml, /systemScheduler/)
 })
 
-test('SITE-T-RESOURCE-OVERVIEW renders the maintained learning path before its API index', () => {
-  const html = readFileSync(join(buildRoot, 'zh/docs/resource/index.html'), 'utf8')
+test('SITE-T-RESOURCE-OVERVIEW keeps concrete learning content without the generated reading checklist', () => {
+  const html = readFileSync(join(buildRoot, 'zh/docs/resource/api/index.html'), 'utf8')
   const text = renderedText(html)
 
-  assert.match(text, /从场景到生产组合/)
+  assert.doesNotMatch(
+    text,
+    /从场景到生产组合|理解适用场景|完成 Quick Start|组合核心能力|确认高阶边界|按频率选择 API/
+  )
   assert.match(text, /需要缓存过期与后台刷新/)
   assert.match(text, /new Resource/)
   assert.match(text, /userId 写入 → Resource 标脏 → 新请求状态写入 → Effect 重跑/)
   assert.match(text, /generation 校验.*?旧结果/s)
   assert.match(text, /高阶用法教程/)
-  assert.ok(text.indexOf('从场景到生产组合') < text.indexOf('选择一个入口'))
+  assert.ok(text.indexOf('需要缓存过期与后台刷新') < text.indexOf('选择一个入口'))
 })
 
 test('SITE-T-RESOURCE-START explains request generations, observation, and terminal cleanup', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/resource')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /构造函数默认 autoStart: true.*?立即创建第一代请求/s)
@@ -484,7 +621,7 @@ test('SITE-T-RESOURCE-START explains request generations, observation, and termi
 })
 
 test('SITE-T-RESOURCE-REACTIVE shows the complete invalidation and render chain', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/resource')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /const id = userId\.value/)
@@ -500,7 +637,7 @@ test('SITE-T-RESOURCE-REACTIVE shows the complete invalidation and render chain'
 })
 
 test('SITE-T-RESOURCE-DECISION keeps use cases and direct-await tradeoffs above the example', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/resource')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /当异步结果依赖 Signal\/Computed/)
@@ -521,7 +658,7 @@ test('SITE-T-RESOURCE-DECISION keeps use cases and direct-await tradeoffs above 
 
 test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every host capability', () => {
   const loggerHtml = readFileSync(
-    join(buildRoot, 'zh/docs/logger/setLoggerRuntimeManager/index.html'),
+    join(buildRoot, 'zh/docs/logger/api/setLoggerRuntimeManager/index.html'),
     'utf8'
   )
   assert.match(loggerHtml, /进程级 Logger 宿主能力/)
@@ -541,14 +678,17 @@ test('SITE-T-LOGGER-RUNTIME renders the process-wide layer contract and every ho
   }
 })
 
-test('SITE-T-PLUGIN-HOST-ERROR renders identity, cause, and detail as separate contracts', () => {
+test('SITE-T-PLUGIN-HOST-ERROR explains stable codes, original causes, and retained diagnostic detail', () => {
   const errorHtml = readFileSync(
-    join(buildRoot, 'zh/docs/plugin-host/PluginHostError/index.html'),
+    join(buildRoot, 'zh/docs/plugin-host/api/PluginHostError/index.html'),
     'utf8'
   )
-  assert.match(errorHtml, /\(source, code\)/)
-  assert.match(errorHtml, /原始失败通过 cause 保持可达/)
-  assert.match(errorHtml, /不可变结构化诊断放入 detail/)
+  /** The example proves failure identity without relying on the old constructor prose. */
+  const text = renderedText(errorHtml)
+  assert.match(text, /error\.code !== PluginHostErrorCode\.pluginInstallFailed/)
+  assert.match(text, /error\.cause === unavailable/)
+  assert.match(text, /保留触发当前错误的原始失败对象/)
+  assert.match(text, /附加应用需要的诊断数据/)
   for (const option of ['code', 'message', 'options-cause', 'options-detail']) {
     assert.match(errorHtml, new RegExp(`--option-${option}"`))
   }
@@ -556,13 +696,20 @@ test('SITE-T-PLUGIN-HOST-ERROR renders identity, cause, and detail as separate c
 
 test('SITE-T-TRAY-ENTRYPOINTS render distinct static and dynamic ownership paths', () => {
   const staticHtml = readFileSync(
-    join(buildRoot, 'zh/docs/tray/createTrayGraph/index.html'),
+    join(buildRoot, 'zh/docs/tray/api/createTrayGraph/index.html'),
     'utf8'
   )
-  const hostHtml = readFileSync(join(buildRoot, 'zh/docs/tray/host/createHost/index.html'), 'utf8')
-  assert.match(staticHtml, /不可变静态组合根/)
-  assert.match(staticHtml, /await tray\.ready\(\)/)
-  assert.match(staticHtml, /await tray\.dispose\(\)/)
+  const hostHtml = readFileSync(
+    join(buildRoot, 'zh/docs/tray/api/host/createHost/index.html'),
+    'utf8'
+  )
+  /** The fixed graph path starts declared dependencies, consumes a service, and releases the graph. */
+  const staticText = renderedText(staticHtml)
+  assert.match(staticText, /能力集合在启动前固定/)
+  assert.match(staticText, /requires: \[configKey\]/)
+  assert.match(staticText, /await graph\.ready\(\)/)
+  assert.match(staticText, /greeting\.greet\('Migaia'\) === 'Hello, Migaia'/)
+  assert.match(staticText, /await graph\.dispose\(\)/)
   assert.match(staticHtml, /--option-entries-key"/)
   assert.match(hostHtml, /唯一由 Tray 托管的 PluginHost 身份/)
   assert.match(hostHtml, /physicalCompletion/)
@@ -572,23 +719,23 @@ test('SITE-T-TRAY-ENTRYPOINTS render distinct static and dynamic ownership paths
 
 test('SITE-T-CAPABILITY-ENTRYPOINTS render distinct ownership and mutation paths', () => {
   const hostHtml = readFileSync(
-    join(buildRoot, 'zh/docs/capability/createCapabilityHost/index.html'),
+    join(buildRoot, 'zh/docs/capability/api/createCapabilityHost/index.html'),
     'utf8'
   )
   const readinessHtml = readFileSync(
-    join(buildRoot, 'zh/docs/capability/snapshotGraphReadiness/index.html'),
+    join(buildRoot, 'zh/docs/capability/api/snapshotGraphReadiness/index.html'),
     'utf8'
   )
   const staticHtml = readFileSync(
-    join(buildRoot, 'zh/docs/capability/graph/createCapabilityGraph/index.html'),
+    join(buildRoot, 'zh/docs/capability/api/graph/createCapabilityGraph/index.html'),
     'utf8'
   )
   const dynamicHtml = readFileSync(
-    join(buildRoot, 'zh/docs/capability/graph/dynamic/createDynamicCapabilityGraph/index.html'),
+    join(buildRoot, 'zh/docs/capability/api/graph/dynamic/createDynamicCapabilityGraph/index.html'),
     'utf8'
   )
   const topologyHtml = readFileSync(
-    join(buildRoot, 'zh/docs/capability/graph/topology/buildCapabilityTopology/index.html'),
+    join(buildRoot, 'zh/docs/capability/api/graph/topology/buildCapabilityTopology/index.html'),
     'utf8'
   )
   assert.match(hostHtml, /只有 activate 内执行动态 import/)
@@ -604,13 +751,18 @@ test('SITE-T-CAPABILITY-ENTRYPOINTS render distinct ownership and mutation paths
 test('SITE-T-MIDDLEWARE-ENTRYPOINTS render each control algebra and supported adapter', () => {
   /** Reads one maintained middleware API page. */
   const readMiddleware = (symbol: string): string =>
-    readFileSync(join(buildRoot, `zh/docs/middleware-pipeline/${symbol}/index.html`), 'utf8')
+    readFileSync(join(buildRoot, `zh/docs/middleware-pipeline/api/${symbol}/index.html`), 'utf8')
   /** Four execution algebras and stage lifting belong to the single public constructor. */
   const text = renderedText(readMiddleware('createPipeline'))
   for (const mode of ['sync', 'async', 'generator', 'async-generator']) {
     assert.ok(text.includes(mode), `createPipeline must explain ${mode}`)
   }
-  for (const operation of ['lift', 'run()', 'onViolation', 'combineStageAndDownstreamError']) {
+  for (const operation of [
+    'lift',
+    'pipeline.run(',
+    'onViolation',
+    'combineStageAndDownstreamError'
+  ]) {
     assert.ok(text.includes(operation), `createPipeline must explain ${operation}`)
   }
   assert.match(text, /创建时固定.*代数/)
@@ -621,7 +773,7 @@ test('SITE-T-MIDDLEWARE-ENTRYPOINTS render each control algebra and supported ad
 test('SITE-T-WASM-API-ENTRYPOINTS render exact memory and conversion ownership', () => {
   /** Reads one maintained WASM API page. */
   const readWasm = (symbol: string): string =>
-    readFileSync(join(buildRoot, `zh/docs/wasm/${symbol}/index.html`), 'utf8')
+    readFileSync(join(buildRoot, `zh/docs/wasm/api/${symbol}/index.html`), 'utf8')
   assert.match(readWasm('initSync'), /不会发起 fetch/)
   assert.match(readWasm('alloc_bytes'), /稳定非零 allocation id/)
   assert.match(readWasm('ptr_of'), /稳定的是 id/)
@@ -635,7 +787,7 @@ test('SITE-T-WASM-API-ENTRYPOINTS render exact memory and conversion ownership',
 test('SITE-T-STORE-SHARED-API-ENTRYPOINTS render ABI, synchronization, and error identity', () => {
   /** Reads one maintained Store Shared API page. */
   const readShared = (routeSegment: string): string =>
-    readFileSync(join(buildRoot, `zh/docs/store-shared/${routeSegment}/index.html`), 'utf8')
+    readFileSync(join(buildRoot, `zh/docs/store-shared/api/${routeSegment}/index.html`), 'utf8')
   assert.match(readShared('sharedInt32'), /显式 sync 或 watch/)
   assert.match(readShared('sharedInt32'), /--option-initialValue"/)
   assert.match(readShared('SharedInt32Signal'), /dispose 一个 view/)
@@ -671,7 +823,7 @@ test('SITE-T-STORE-WORKER-API-ENTRYPOINTS render compute, streaming, and ownersh
 test('SITE-T-STORE-WASM-API-ENTRYPOINTS render readiness, field layout, and cleanup', () => {
   /** Reads one maintained Store WASM API page. */
   const readStoreWasm = (symbol: string): string =>
-    readFileSync(join(buildRoot, 'zh/docs/store-wasm/' + symbol + '/index.html'), 'utf8')
+    readFileSync(join(buildRoot, 'zh/docs/store-wasm/api/' + symbol + '/index.html'), 'utf8')
   assert.match(readStoreWasm('ensureWasm'), /identity 稳定的 readiness Promise/)
   assert.match(readStoreWasm('number'), /8-byte WASM f64 allocation/)
   assert.match(readStoreWasm('boolean'), /单个 WASM byte/)
@@ -691,11 +843,8 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
     ),
     false
   )
-  const architecture = readFileSync(
-    join(buildRoot, 'zh/architecture/event-subscriber/index.html'),
-    'utf8'
-  )
-  const api = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/index.html'), 'utf8')
+  const architecture = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/index.html'), 'utf8')
+  const api = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/api/index.html'), 'utf8')
   const symbol = apiManifest.apis
     .find((candidate) => candidate.library === 'event-subscriber' && candidate.module === 'index')
     ?.symbols.find((candidate) => candidate.name === 'createEventChannel')
@@ -703,18 +852,25 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
   const apiDetail = readFileSync(
     join(
       buildRoot,
-      `zh/docs/event-subscriber/${apiSymbolPath(symbol, apiManifest.apis.find((api) => api.library === 'event-subscriber' && api.module === 'index')!.symbols)}/index.html`
+      `zh/docs/event-subscriber/api/${apiSymbolPath(symbol, apiManifest.apis.find((api) => api.library === 'event-subscriber' && api.module === 'index')!.symbols)}/index.html`
     ),
     'utf8'
   )
   assert.match(architecture, /适用与不适用场景/)
   assert.match(architecture, /本地、瞬时的事件订阅/)
-  assert.match(api, /何时使用，以及可选择的公开 API/)
+  /** The package introduction reuses its real purpose instead of a generator instruction. */
+  const packagePurpose = api.match(/<meta name="description" content="([^"]+)"/)?.[1]
+  assert.ok(packagePurpose)
+  assert.equal(
+    renderedText(api.match(/<p class="lede">([\s\S]*?)<\/p>/)?.[1] ?? '').trim(),
+    renderedText(packagePurpose).trim()
+  )
+  assert.doesNotMatch(api, /何时使用，以及可选择的公开 API/)
   assert.match(api, /选择一个入口/)
   assert.match(
     api,
     new RegExp(
-      `href="/zh/docs/event-subscriber/${apiSymbolPath(symbol, apiManifest.apis.find((candidate) => candidate.library === 'event-subscriber' && candidate.module === 'index')!.symbols)}"`
+      `href="/zh/docs/event-subscriber/api/${apiSymbolPath(symbol, apiManifest.apis.find((candidate) => candidate.library === 'event-subscriber' && candidate.module === 'index')!.symbols)}"`
     )
   )
   assert.match(apiDetail, /真实场景与组合|签名/)
@@ -727,27 +883,24 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
     'style',
     'valueConfig'
   ]) {
-    assert.match(apiDetail, new RegExp(`<code>${option}</code>`))
+    assert.match(apiDetail, new RegExp(`id="${symbol.fragment}--option-${option}"`))
   }
-  assert.match(apiDetail, /配置参考/)
-  assert.match(apiDetail, /适合这些场景/)
-  assert.match(apiDetail, /不要用于/)
-  assert.match(apiDetail, /何时使用：/)
-  assert.match(apiDetail, /最小可运行示例/)
+  assert.match(apiDetail, /<h2>选项<\/h2>/)
+  assert.match(apiDetail, /<h2>最小示例<\/h2>/)
   assert.match(renderedText(apiDetail), /channel\.subscribe/)
   assert.match(renderedText(apiDetail), /jobs\.publish/)
   assert.match(apiDetail, /style 不改变顺序、调度、错误或生命周期语义/)
   assert.match(apiDetail, /subscribe-publish/)
   assert.match(apiDetail, /defineEventApiStyle/)
-  assert.doesNotMatch(apiDetail, /<h2>错误码<\/h2>|配置与任务指南/)
+  assert.doesNotMatch(apiDetail, /配置与任务指南/)
   assert.match(apiDetail, /<h2>完整类型签名<\/h2>/)
-  assert.ok(apiDetail.indexOf('最小可运行示例') < apiDetail.indexOf('配置参考'))
-  assert.ok(apiDetail.indexOf('配置参考') < apiDetail.indexOf('类型签名'))
+  assert.ok(apiDetail.indexOf('最小示例') < apiDetail.indexOf('<h2>选项</h2>'))
+  assert.ok(apiDetail.indexOf('<h2>选项</h2>') < apiDetail.indexOf('类型签名'))
   assert.match(apiDetail, /<figure class="code-frame">/)
   assert.doesNotMatch(architecture + api, /本节说明|场景 1|打开完整|This section records/)
 
   for (const [name, expectations] of [
-    ['createEventHub', ['按事件键惰性分配 Channel', 'resourceId', 'style 示例']],
+    ['createEventHub', ['按事件键惰性分配 Channel', 'resourceId']],
     ['defineEventApiStyle', ['保留字符串字面量类型', '同一套领域命名', 'handle']]
   ] as const) {
     const candidate = apiManifest.apis
@@ -757,20 +910,32 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
     const candidateHtml = readFileSync(
       join(
         buildRoot,
-        `zh/docs/event-subscriber/${apiSymbolPath(candidate, apiManifest.apis.find((entry) => entry.library === 'event-subscriber' && entry.module === 'index')!.symbols)}/index.html`
+        `zh/docs/event-subscriber/api/${apiSymbolPath(candidate, apiManifest.apis.find((entry) => entry.library === 'event-subscriber' && entry.module === 'index')!.symbols)}/index.html`
       ),
       'utf8'
     )
     for (const expectation of expectations) assert.match(candidateHtml, new RegExp(expectation))
+    if (name === 'createEventHub') {
+      /** The field's authored snippet proves the style projection independently of its caption. */
+      const styleOption = candidateHtml.match(
+        new RegExp(
+          `<tr class="option-entry" id="${candidate.fragment}--option-style">([\\s\\S]*?)</tr>`
+        )
+      )?.[1]
+      assert.ok(styleOption, 'createEventHub must retain its style option')
+      assert.match(styleOption, /<figure class="code-frame">/)
+      for (const behavior of [/style: 'on-emit'/, /events\.on\(/, /events\.emit\(/, /stop\.off\(/])
+        assert.match(renderedText(styleOption), behavior)
+    }
     assert.doesNotMatch(candidateHtml, /配置与任务指南|Declaration:| · [a-f0-9]{8}/)
   }
 })
 
 test('SITE-T-CROSS-LIBRARY makes maintained cross-library references explainable and navigable', () => {
-  const capability = readFileSync(join(buildRoot, 'zh/architecture/capability/index.html'), 'utf8')
-  assert.match(capability, /class="library-reference"[^>]*href="\/zh\/architecture\/plugin-host"/)
-  assert.match(capability, /负责插件定义、安装、管线组合、回滚与释放/)
-  assert.match(capability, /class="library-reference"[^>]*href="\/zh\/architecture\/storage-web"/)
+  const capability = readFileSync(join(buildRoot, 'zh/docs/capability/index.html'), 'utf8')
+  assert.match(capability, /class="library-reference"[^>]*href="\/zh\/docs\/plugin-host"/)
+  assert.match(renderedText(capability), /安装和卸载插件.*配置共享能力与处理步骤.*安装失败时回滚/s)
+  assert.match(capability, /class="library-reference"[^>]*href="\/zh\/docs\/storage-web"/)
 
   for (const path of emittedFiles(buildRoot).filter((file) => file.endsWith('.html'))) {
     const route = path.match(/\/(?:docs|guides|architecture)\/([^/]+)\//)
@@ -792,7 +957,7 @@ test('SITE-T-CROSS-LIBRARY makes maintained cross-library references explainable
 
 test('SITE-T-CODE-EXPLANATIONS keeps example guidance plain and label-free', () => {
   const capabilityArchitecture = readFileSync(
-    join(buildRoot, 'zh/architecture/capability/index.html'),
+    join(buildRoot, 'zh/docs/capability/index.html'),
     'utf8'
   )
 
@@ -803,7 +968,7 @@ test('SITE-T-CODE-EXPLANATIONS keeps example guidance plain and label-free', () 
 
 test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neighboring APIs', () => {
   const capabilityArchitecture = readFileSync(
-    join(buildRoot, 'zh/architecture/capability/index.html'),
+    join(buildRoot, 'zh/docs/capability/index.html'),
     'utf8'
   )
 
@@ -814,7 +979,7 @@ test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neigh
   assert.match(capabilityArchitecture, /data-slot="separator"/)
 
   const storeLightArchitecture = readFileSync(
-    join(buildRoot, artifactPath('/zh/architecture/store-light')),
+    join(buildRoot, artifactPath('/zh/docs/store-light')),
     'utf8'
   )
   assert.match(
@@ -826,7 +991,7 @@ test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neigh
 })
 
 test('SITE-T-CAPABILITY-LIFECYCLE shows when to enable, consume, disable, and dispose', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/capability')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/capability')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /type INotificationCenter = ICapabilityHandle/)
@@ -842,7 +1007,7 @@ test('SITE-T-CAPABILITY-LIFECYCLE shows when to enable, consume, disable, and di
 })
 
 test('SITE-T-PLUGIN-HOST-TRAY explains composition terms in reader language', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/plugin-host')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /这一节只给 Tray.*? 的 Host 适配器维护者看/)
@@ -856,22 +1021,22 @@ test('SITE-T-PLUGIN-HOST-TRAY explains composition terms in reader language', ()
 })
 
 test('SITE-T-PLUGIN-HOST-DEFINE uses definePlugin and consumes the committed view', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/plugin-host')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /import \{ definePlugin, PluginHost \} from '@migaia\/plugin-host'/)
   assert.match(text, /const upper = definePlugin<ICore, \{ upper\(value: string\): string \}>/)
-  assert.match(text, /const view = await host\.use\(upper\)/)
-  assert.match(text, /view\.extensions\.upper\('migaia'\)/)
-  assert.match(text, /await view\.unUse\('upper'\)/)
+  assert.match(text, /const \[handle\] = await host\.use\(upper\)/)
+  assert.match(text, /handle\.extensions\.upper\('migaia'\)/)
+  assert.match(text, /await host\.unUse\('upper'\)/)
   assert.match(text, /函数形 definePlugin\(name, descriptorFactory\)/)
-  assert.match(text, /definePlugin\(\{ name, config, install, shared, update, dispose \}\)/)
-  assert.match(text, /只会校验并保存定义，不会执行 descriptor 或 install\(\)/)
+  assert.match(text, /definePlugin\(\{ name, config, install, update, dispose \}\)/)
+  assert.match(text, /只会校验并保存定义。它不会执行 descriptor 或 install\(\)/)
   assert.match(text, /use\(\) 成功后按输入顺序返回插件句柄.*handle/)
 })
 
 test('SITE-T-PLUGIN-HOST-GENERATOR-CONTINUE explains the control signal and transition', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/plugin-host')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /GENERATOR_CONTINUE 是框架导出的唯一 Symbol 控制信号，不是.*?业务数据/)
@@ -941,7 +1106,7 @@ test('SITE-T-A05/A10 closes every generated route and API body artifact', () => 
           'utf8'
         )
         let previous = -1
-        for (const section of ['overview', 'core-usage', 'signature']) {
+        for (const section of ['overview', 'signature']) {
           const position = detail.indexOf(`--${section}"`)
           assert.ok(
             position > previous,
@@ -969,7 +1134,12 @@ test('SITE-T-A26/A30 closes emitted chunk and terminology boundaries', () => {
   for (const file of emittedFiles(buildRoot).filter((candidate) => candidate.endsWith('.html'))) {
     const html = readFileSync(file, 'utf8')
     const proseHtml = html.replace(/<pre(?:\s[^>]*)?>[\s\S]*?<\/pre>/gi, '')
-    assert.doesNotMatch(renderedText(proseHtml), /\bpackages?\b|\bzh-cn\b|\.\.\/packages/i)
+    // A published package is a valid API concept; only repository paths and stale locales leak internals.
+    assert.doesNotMatch(
+      renderedText(proseHtml),
+      /\bzh-cn\b|\.\.[\\/]packages\b|\bpackages[\\/][a-z0-9-]+/i,
+      `repository path or stale locale in page prose: ${file}`
+    )
     assert.doesNotMatch(
       html,
       /not-applicable:|No additional advanced behavior is declared|source-backed (?:advanced semantics|signature)|Declared shape:|(?:function|type) signature export (?:declare|type)/i
@@ -1029,8 +1199,8 @@ test('SITE-T-A34/A35 closes API ordering and exposes a meaningful next action fo
   }
 })
 
-test('SITE-T-ARCHITECTURE-INDEX keeps the landing page focused on library families', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture')), 'utf8')
+test('SITE-T-ARCHITECTURE-INDEX groups every library by family on the docs home', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs')), 'utf8')
 
   assert.match(html, /class="architecture-stack"/)
   assert.doesNotMatch(html, /阅读架构时先回答三个问题/)
@@ -1038,19 +1208,17 @@ test('SITE-T-ARCHITECTURE-INDEX keeps the landing page focused on library famili
 
 test('SITE-T-LIBRARY-DESCRIPTIONS uses concrete responsibilities instead of slogans', () => {
   const docsIndex = readFileSync(join(buildRoot, artifactPath('/zh/docs')), 'utf8')
-  const utilsArchitecture = readFileSync(
-    join(buildRoot, artifactPath('/zh/architecture/utils')),
-    'utf8'
-  )
-  const loggerEnglish = readFileSync(
-    join(buildRoot, artifactPath('/en/architecture/logger')),
-    'utf8'
-  )
+  const utilsArchitecture = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  /** English library descriptions appear on the docs home library index. */
+  const loggerEnglish = readFileSync(join(buildRoot, artifactPath('/en/docs')), 'utf8')
 
-  assert.match(docsIndex, /utils.*提供取消、并发、错误、集合、字符串等通用基础工具/s)
+  assert.match(renderedText(docsIndex), /utils.*添加超时、取消与错误追踪.*数据转换和对象更新/s)
   assert.match(utilsArchitecture, /多个包共同需要、且不应绑定 Store、DOM 或具体运行时/)
   assert.match(utilsArchitecture, /不是无边界的杂物箱/)
-  assert.match(loggerEnglish, /Structured logging with stable levels.*flush ownership/s)
+  assert.match(
+    renderedText(loggerEnglish),
+    /Send logs to a console or service.*filter and format.*asynchronous output/s
+  )
   for (const html of [docsIndex, utilsArchitecture, loggerEnglish]) {
     assert.doesNotMatch(html, /归属与边界模型/)
     assert.doesNotMatch(html, /源码契约、能力边界与使用入口/)
@@ -1059,53 +1227,60 @@ test('SITE-T-LIBRARY-DESCRIPTIONS uses concrete responsibilities instead of slog
   }
 })
 
-test('SITE-T-ARCHITECTURE-LEDES explain capability, pain, and design for every library', () => {
-  const architectureEntries = routeManifest.entries.filter(
-    (entry) => entry.locale === 'zh' && /^\/zh\/architecture\/[^/]+$/.test(entry.path)
+test('SITE-T-ARCHITECTURE-LEDES explain capability, pain, and design on every package home', () => {
+  const packageHomes = routeManifest.entries.filter(
+    (entry) => entry.locale === 'zh' && /^\/zh\/docs\/[^/]+$/.test(entry.path)
   )
 
-  assert.ok(architectureEntries.length > 20)
-  for (const entry of architectureEntries) {
+  assert.ok(packageHomes.length > 20)
+  for (const entry of packageHomes) {
     const html = readFileSync(join(buildRoot, artifactPath(entry.path)), 'utf8')
-    const lede = renderedText(html.match(/<p class="lede">([\s\S]*?)<\/p>/)?.[1] ?? '')
-    assert.ok(lede.length >= 70, `architecture lede is too thin: ${entry.path}`)
+    /** Journey homes show the positioning paragraph; other homes use it as their lede. */
+    const lede = renderedText(
+      html.match(/<p class="package-position">([\s\S]*?)<\/p>/)?.[1] ??
+        html.match(/<p class="lede">([\s\S]*?)<\/p>/)?.[1] ??
+        ''
+    )
+    assert.ok(lede.length >= 70, `package positioning is too thin: ${entry.path}`)
     assert.doesNotMatch(lede, /归属与边界模型|源码契约|使用入口/)
     assert.match(
       lede,
       /用于|当|核心设计|解决|相比|避免|统一|提供/,
-      `architecture lede lacks reader-facing capability context: ${entry.path}`
+      `package positioning lacks reader-facing capability context: ${entry.path}`
     )
   }
 
-  const lifecycle = readFileSync(
-    join(buildRoot, artifactPath('/zh/architecture/lifecycle')),
-    'utf8'
-  )
+  const lifecycle = readFileSync(join(buildRoot, artifactPath('/zh/docs/lifecycle')), 'utf8')
   assert.match(lifecycle, /一组资源必须随同一 owner 关闭/)
   assert.match(lifecycle, /scope、generation、terminal controller 与 dispose transaction/)
   assert.match(lifecycle, /不负责事件分发、业务排队或依赖图/)
 
-  const tray = readFileSync(join(buildRoot, artifactPath('/zh/architecture/tray')), 'utf8')
-  assert.match(tray, /先准备配置，再用配置创建 logger、API client 或数据库连接/)
-  assert.match(tray, /任一步失败都不会暴露半初始化对象/)
-  assert.match(tray, /dispose\(\) 会逆序释放已启动项/)
-  assert.match(tray, /不是运行期增删服务的 DI 容器/)
+  const tray = readFileSync(join(buildRoot, artifactPath('/zh/docs/tray')), 'utf8')
+  /** Tray supports both fixed startup entries and managed runtime Host instances. */
+  const trayText = renderedText(tray)
+  assert.match(trayText, /createTrayGraph.*ready\(\).*dispose\(\).*按依赖逆序释放/s)
+  assert.match(trayText, /defineTrayHost.*createTray\(\{ hosts \}\)/s)
+  assert.match(trayText, /coroutine、Node Worker 或子进程/)
+  assert.match(trayText, /复用 RPC.*和 supervision/s)
+  assert.match(trayText, /跨机器发现、browser Worker 与持久消息不在当前范围/)
 })
 
-test('SITE-T-ARCHITECTURE-API-NAV exposes library API shortcuts beside architecture content', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+test('SITE-T-ARCHITECTURE-API-NAV shares one library sidebar between guides and API pages', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const apiHtml = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/api')), 'utf8')
 
-  assert.match(html, /class="architecture-reading-layout"/)
-  assert.match(html, /class="architecture-api-rail"/)
-  assert.match(html, /分类导航/)
-  assert.match(html, /href="\/zh\/docs\/utils\/function\/onceAsync"/)
+  assert.match(html, /class="left-rail-content"/)
+  assert.match(html, /<span>指南<\/span>/)
+  assert.match(html, />API 参考<\/a>/)
+  assert.equal(stableLeftRail(html), stableLeftRail(apiHtml))
+  assert.match(html, /href="\/zh\/docs\/utils\/api\/function\/onceAsync"/)
 })
 
-test('SITE-T-CODE-EXPLANATION-PROSE renders explanations without decorative numbering', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+test('SITE-T-CODE-EXPLANATION-PROSE renders authored code without synthesized walkthrough prose', () => {
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
 
-  assert.match(html, /class="code-walkthrough-notes"><p>/)
-  assert.doesNotMatch(html, /class="code-walkthrough"><ol>/)
+  assert.match(html, /<figure class="code-frame">/)
+  assert.doesNotMatch(html, /class="code-walkthrough(?:-notes)?"/)
 })
 
 test('SITE-T-CODE-SURFACES gives inline and block code a consistent themed hierarchy', () => {
@@ -1160,7 +1335,8 @@ test('SITE-T-DOMAIN-INDEX-SPACING keeps catalogue introductions compact', () => 
   )
 })
 
-test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler across every rendered page', () => {
+test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler and repeated prose on every rendered page', () => {
+  /** Synthesized commentary must never become reader-facing copy or example comments. */
   const forbidden = [
     '先从示例标出的公开路径引入',
     '这里先把下一步要用的值放进变量',
@@ -1178,87 +1354,163 @@ test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler across every rend
     "is part of this module's public type contract",
     "is part of this module's public function contract",
     "is part of this module's public const contract",
-    "is part of this module's public class contract"
+    "is part of this module's public class contract",
+    '本例对应的生产场景是',
+    '没有创建可供后续复用的实例',
+    '返回的本次实例',
+    'The production situation shown here is:',
+    'without creating a reusable instance',
+    '输出用于确认上一操作的结果。',
+    'Logs the result of the preceding operation.',
+    '签名、参数、例子和相关类型只在对应页面展开',
+    '先按目标选择 API',
+    '这些符号用于配置、状态比较或错误识别',
+    '用于核对泛型、重载与返回类型',
+    '日常使用应先阅读上面的场景、示例和配置语义',
+    '从场景到生产组合',
+    '理解适用场景',
+    '完成 Quick Start',
+    '组合核心能力',
+    '确认高阶边界',
+    '按频率选择 API',
+    'Choose by outcome first.',
+    'Each group is ordered by use frequency in maintained documentation.',
+    'Signatures, examples, and related types expand on the API page.',
+    'These symbols support configuration, state comparison, or error identification',
+    'Use this to inspect generics, overloads, and return types after reading the scenarios',
+    'From use case to production composition',
+    'Understand the use case',
+    'Complete the Quick Start',
+    'Compose core capabilities',
+    'Check advanced boundaries',
+    'Choose APIs by frequency'
   ]
+  /** Closed-world output scan covers every route in both locales, including the landing page. */
   const htmlFiles = emittedFiles(buildRoot).filter((path) => path.endsWith('.html'))
+  assert.ok(htmlFiles.length > 0, 'expected prerendered pages')
 
   for (const path of htmlFiles) {
+    /** Prerendered document is the evidence for reader-facing output. */
     const html = readFileSync(path, 'utf8')
+    /** Decode syntax spans so prose and authored comments remain searchable. */
     const text = renderedText(html)
     for (const phrase of forbidden)
       assert.ok(!text.includes(phrase), `generated filler remains in ${path}: ${phrase}`)
-  }
-})
-
-test('SITE-T-API-EXAMPLE-COMMENTARY requires concrete guidance on every primary API example', () => {
-  const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
-    path.endsWith('index.html')
-  )
-
-  for (const path of detailPages) {
-    const html = readFileSync(path, 'utf8')
-    for (const section of html.matchAll(
-      /<section[^>]*data-primary-api-example="([^"]+)"[^>]*>([\s\S]*?)<\/section>/g
-    )) {
-      const apiName = section[1]
-      assert.match(
-        section[2],
-        /data-comment-count="[1-9]\d*"/,
-        `${apiName} has no code-specific explanation: ${path}`
-      )
-      assert.match(
-        section[2],
-        /class="code-walkthrough"/,
-        `${apiName} has no reader-visible walkthrough: ${path}`
-      )
+    /** Router's loading shell has metadata but no page body; prose belongs to resolved routes. */
+    if (path.endsWith('/__spa-fallback.html')) continue
+    assert.doesNotMatch(
+      text,
+      /\b[\w$]+ holds this [\w$.]+\(\) result/,
+      `synthesized retained-instance prose remains: ${path}`
+    )
+    assert.doesNotMatch(
+      text,
+      /每组依据[^。]*真实使用频率/,
+      `generated sorting prose remains: ${path}`
+    )
+    assert.doesNotMatch(
+      text,
+      /何时使用：|When to use:/,
+      `duplicate option guidance remains: ${path}`
+    )
+    /** Prose may appear once; navigation and repeatable code fragments do not count as sentences. */
+    const seen = new Set<string>()
+    for (const sentence of mainProseSentences(html)) {
+      assert.ok(!seen.has(sentence), `repeated main-content sentence in ${path}: ${sentence}`)
+      seen.add(sentence)
     }
   }
 })
 
-test('SITE-T-API-SIGNATURE-COMMENTARY explains every public declaration and overload set', () => {
-  const detailPages = emittedFiles(join(buildRoot, 'zh/docs')).filter((path) =>
-    path.endsWith('index.html')
-  )
-
-  for (const path of detailPages) {
+test('SITE-T-PAGE-META gives every rendered page a nonempty title and purpose description', () => {
+  for (const path of emittedFiles(buildRoot).filter((entry) => entry.endsWith('.html'))) {
+    /** Metadata must exist in static HTML before the client starts. */
     const html = readFileSync(path, 'utf8')
-    for (const section of html.matchAll(
-      /<section class="api-signature"[^>]*>([\s\S]*?)<\/section>/g
+    /** Title names the current page rather than relying on browser navigation state. */
+    const title = html.match(/<title>([\s\S]*?)<\/title>/i)?.[1]
+    assert.ok(title && renderedText(title).trim(), `empty or missing title: ${path}`)
+    /** Description carries the existing page purpose for search and previews. */
+    const description = html.match(
+      /<meta\b(?=[^>]*\bname="description")(?=[^>]*\bcontent="([^"]*)")[^>]*>/i
+    )?.[1]
+    assert.ok(
+      description && renderedText(description).trim(),
+      `empty or missing meta description: ${path}`
+    )
+  }
+})
+
+test('SITE-T-API-EXAMPLE-COMMENTARY keeps examples without synthesized walkthroughs', () => {
+  for (const locale of ['zh', 'en']) {
+    for (const path of emittedFiles(join(buildRoot, `${locale}/docs`)).filter((entry) =>
+      entry.endsWith('index.html')
     )) {
-      assert.match(
-        section[1],
-        /data-comment-count="[1-9]\d*"/,
-        `public signature has no explanation: ${path}`
-      )
-      assert.match(
-        section[1],
-        /class="code-walkthrough"/,
-        `public signature has no reader-visible walkthrough: ${path}`
-      )
+      /** Primary examples retain their copyable authored code. */
+      const html = readFileSync(path, 'utf8')
+      for (const section of html.matchAll(
+        /<section[^>]*data-primary-api-example="([^"]+)"[^>]*>([\s\S]*?)<\/section>/g
+      )) {
+        assert.match(section[2], /<figure class="code-frame">/, `missing example code: ${path}`)
+        assert.doesNotMatch(
+          section[2],
+          /class="code-walkthrough"|data-comment-count="[1-9]\d*"/,
+          `synthesized example walkthrough remains: ${path}`
+        )
+      }
+    }
+  }
+})
+
+test('SITE-T-API-SIGNATURE-COMMENTARY collapses complete declarations without synthesized walkthroughs', () => {
+  for (const locale of ['zh', 'en']) {
+    for (const path of emittedFiles(join(buildRoot, `${locale}/docs`)).filter((entry) =>
+      entry.endsWith('index.html')
+    )) {
+      /** Signature sections must stay present but closed until a reader expands them. */
+      const html = readFileSync(path, 'utf8')
+      /** Section navigation follows the article and starts collapsed. */
+      const pageNavigation = html.match(/<details[^>]*class="page-toc"[^>]*>/g) ?? []
+      for (const navigation of pageNavigation) {
+        assert.ok(
+          html.indexOf(navigation) > html.lastIndexOf('</article>'),
+          `section navigation precedes the article: ${path}`
+        )
+        assert.doesNotMatch(navigation, /\bopen(?:=|\s|>)/, `expanded section navigation: ${path}`)
+      }
+      for (const section of html.matchAll(
+        /<section class="api-signature"[^>]*>([\s\S]*?)<\/section>/g
+      )) {
+        assert.match(section[1], /<details(?:\s[^>]*)?>/, `missing signature disclosure: ${path}`)
+        assert.doesNotMatch(section[1], /<details[^>]*\bopen(?:=|\s|>)/, `open signature: ${path}`)
+        assert.doesNotMatch(
+          section[1],
+          /class="code-walkthrough"|data-comment-count="[1-9]\d*"/,
+          `synthesized signature walkthrough remains: ${path}`
+        )
+      }
     }
   }
 })
 
 test('SITE-T-CAPABILITY-HOST-EXAMPLE explains its complete production lifecycle', () => {
   const html = readFileSync(
-    join(buildRoot, 'zh/docs/capability/createCapabilityHost/index.html'),
+    join(buildRoot, 'zh/docs/capability/api/createCapabilityHost/index.html'),
     'utf8'
   )
   const text = renderedText(html)
 
-  assert.match(text, /flags\.persistence 只允许这一项能力启用/)
+  assert.match(text, /flags: \{ persistence: true \}/)
   assert.match(text, /undefined（未配置错误接收回调）/)
   assert.doesNotMatch(text, /诊断 sink/)
-  assert.match(text, /并不会立即下载或打开存储/)
-  assert.match(text, /只有 enabled 才能从 handle\('persistence'\)/)
-  assert.match(text, /作废在途激活并释放已经打开或迟到返回的 handle/)
+  assert.match(text, /host\.register\(/)
+  assert.match(text, /result\.status === CapabilityEnableStatus\.enabled/)
+  assert.match(text, /await host\.handle\('persistence'\)\?\.sync\(\)/)
+  assert.match(text, /finally \{\s*await host\.dispose\(\)/)
+  assert.doesNotMatch(text, /class="code-walkthrough"|输出用于确认上一操作的结果/)
 })
 
 test('SITE-T-EVENT-STYLE explains the exact subscription, delivery, and removal behavior', () => {
-  const html = readFileSync(
-    join(buildRoot, artifactPath('/zh/architecture/event-subscriber')),
-    'utf8'
-  )
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/event-subscriber')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /on\(\) 登记监听器，并返回只属于这次订阅的取消句柄 stop/)
@@ -1269,10 +1521,7 @@ test('SITE-T-EVENT-STYLE explains the exact subscription, delivery, and removal 
 })
 
 test('SITE-T-EVENT-SUBSCRIBER uses its subpath and states the style boundary precisely', () => {
-  const html = readFileSync(
-    join(buildRoot, artifactPath('/zh/architecture/event-subscriber')),
-    'utf8'
-  )
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/event-subscriber')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /from '@migaia\/event-subscriber\/subscriber'/)
@@ -1283,10 +1532,7 @@ test('SITE-T-EVENT-SUBSCRIBER uses its subpath and states the style boundary pre
 })
 
 test('SITE-T-EVENT-SUBSCRIBER-NAME explains why the legacy class event name was removed', () => {
-  const html = readFileSync(
-    join(buildRoot, artifactPath('/zh/architecture/event-subscriber')),
-    'utf8'
-  )
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/event-subscriber')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /const channel = createEventChannel<number>\(\)/)
@@ -1299,10 +1545,7 @@ test('SITE-T-EVENT-SUBSCRIBER-NAME explains why the legacy class event name was 
 })
 
 test('SITE-T-EVENT-TASK defines the channel, registration, payload, and settled result', () => {
-  const html = readFileSync(
-    join(buildRoot, artifactPath('/zh/architecture/event-subscriber')),
-    'utf8'
-  )
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/event-subscriber')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /const tasks = createEventChannel<IEmailJob, IEmailReceipt>\(\)/)
@@ -1315,11 +1558,11 @@ test('SITE-T-EVENT-TASK defines the channel, registration, payload, and settled 
 
 test('SITE-T-API-EXAMPLES import the primary API from its public owner', () => {
   const host = readFileSync(
-    join(buildRoot, 'zh/docs/capability/createCapabilityHost/index.html'),
+    join(buildRoot, 'zh/docs/capability/api/createCapabilityHost/index.html'),
     'utf8'
   )
   const timeout = readFileSync(
-    join(buildRoot, 'zh/docs/utils/promise/withTimeout/index.html'),
+    join(buildRoot, 'zh/docs/utils/api/promise/withTimeout/index.html'),
     'utf8'
   )
 
@@ -1371,7 +1614,7 @@ test('SITE-T-CLASS-EXAMPLE-COVERAGE gives every class detail page a maintained e
 })
 
 test('SITE-T-UTILS-DEFERRED recommends the native Promise.withResolvers API first', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
 
   assert.match(html, /优先使用原生 API/)
   assert.match(html, /Promise\.withResolvers/)
@@ -1379,7 +1622,7 @@ test('SITE-T-UTILS-DEFERRED recommends the native Promise.withResolvers API firs
 })
 
 test('SITE-T-UTILS-TO-PROMISE explains execution timing and identity tradeoffs', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
 
   assert.match(html, /当前调用栈立即执行/)
   assert.match(html, /下一次 microtask/)
@@ -1388,7 +1631,7 @@ test('SITE-T-UTILS-TO-PROMISE explains execution timing and identity tradeoffs',
 })
 
 test('SITE-T-UTILS-MANUAL-SCHEDULER marks repository-only test infrastructure', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
 
   assert.match(html, /本仓测试专用/)
   assert.match(html, /不面向外部业务代码/)
@@ -1396,7 +1639,7 @@ test('SITE-T-UTILS-MANUAL-SCHEDULER marks repository-only test infrastructure', 
 })
 
 test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date.now', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /systemScheduler.*performance\.now\(\).*单调不递减/s)
@@ -1408,7 +1651,7 @@ test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date
 })
 
 test('SITE-T-UTILS-ERROR-CODES renders every code as a described list item', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(html, /<li><code>invalidArgument<\/code>/)
@@ -1419,7 +1662,7 @@ test('SITE-T-UTILS-ERROR-CODES renders every code as a described list item', () 
 })
 
 test('SITE-T-UTILS-BYTE-CONTEXT explains ArrayBuffer storage and Uint8Array views', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /ArrayBuffer.*原始连续内存.*不能按下标读写/s)
@@ -1430,7 +1673,7 @@ test('SITE-T-UTILS-BYTE-CONTEXT explains ArrayBuffer storage and Uint8Array view
 })
 
 test('SITE-T-UTILS-PROBE-PROPERTY shows its input object and all result branches', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /const user = \{.*name: 'Ada'.*get profile\(\): never/s)
@@ -1444,7 +1687,7 @@ test('SITE-T-UTILS-PROBE-PROPERTY shows its input object and all result branches
 })
 
 test('SITE-T-UTILS-IMMUTABLE-SNAPSHOT explains structured clone mechanics and limits', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /globalThis\.structuredClone\(\).*不经过 JSON 字符串/s)
@@ -1456,7 +1699,7 @@ test('SITE-T-UTILS-IMMUTABLE-SNAPSHOT explains structured clone mechanics and li
 })
 
 test('SITE-T-UTILS-DIAGNOSTIC-SNAPSHOT contrasts strict and best-effort cloning', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /原生 structuredClone\(value\).*全有或全无/s)
@@ -1468,7 +1711,7 @@ test('SITE-T-UTILS-DIAGNOSTIC-SNAPSHOT contrasts strict and best-effort cloning'
 })
 
 test('SITE-T-UTILS-IDENTITY-SNAPSHOT documents its only meaningful policy use', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /identitySnapshot.*单独调用它没有运行时收益/s)
@@ -1479,7 +1722,7 @@ test('SITE-T-UTILS-IDENTITY-SNAPSHOT documents its only meaningful policy use', 
 })
 
 test('SITE-T-UTILS-SET explains immutable updates and structural sharing precisely', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /每次 set 都返回新根对象/s)
@@ -1490,7 +1733,7 @@ test('SITE-T-UTILS-SET explains immutable updates and structural sharing precise
 })
 
 test('SITE-T-UTILS-OWN-CONFIG demonstrates admission, isolation, and managed successors', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /ownConfig.*接收外部配置的边界.*独立、可验证所有权/s)
@@ -1502,7 +1745,7 @@ test('SITE-T-UTILS-OWN-CONFIG demonstrates admission, isolation, and managed suc
 })
 
 test('SITE-T-UTILS-COMBINE-CONFIG shows both inputs, merged output, and an explicit diff', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /const defaults = ownConfig\(\{\s*retries: 1/)
@@ -1515,7 +1758,7 @@ test('SITE-T-UTILS-COMBINE-CONFIG shows both inputs, merged output, and an expli
 })
 
 test('SITE-T-UTILS-ONCE explains module scope, singleton limits, and Proxy responsibility', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /export const getRuntime = once/)
@@ -1529,7 +1772,7 @@ test('SITE-T-UTILS-ONCE explains module scope, singleton limits, and Proxy respo
 })
 
 test('SITE-T-UTILS-ONCE-ASYNC explains concrete use cases and shared-failure boundaries', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
 
   assert.match(html, /export const loadAppConfig = onceAsync/)
   assert.match(html, /加载不会刷新的启动配置/)
@@ -1542,7 +1785,7 @@ test('SITE-T-UTILS-ONCE-ASYNC explains concrete use cases and shared-failure bou
 })
 
 test('SITE-T-UTILS-READONLY-CONFIG explains read-only behavior in plain language', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /readonlyConfig.*给已有配置套上只读保护/s)
@@ -1582,7 +1825,7 @@ test('SITE-T-API-TYPING keeps runtime APIs primary and typing subordinate', () =
 
 test('SITE-T-API-TYPING renders legacy type paths inside the subordinate module disclosure', () => {
   const routes = new Set(routeManifest.entries.map((entry) => entry.path))
-  assert.ok(routes.has('/zh/docs/utils/promise/IAbortSignal'))
+  assert.ok(routes.has('/zh/docs/utils/api/promise/IAbortSignal'))
   assert.match(docsSource, /const selectedType = selectedApi\?\.symbols\.find/)
   assert.match(docsSource, /selectedTypeFragment: selectedType\?\.fragment/)
   assert.match(
@@ -1593,10 +1836,24 @@ test('SITE-T-API-TYPING renders legacy type paths inside the subordinate module 
   assert.match(docsSource, /target\.scrollIntoView\(\{ block: 'start' }\)/)
 })
 
-test('SITE-T-NO-ACCORDION keeps all generated content continuously readable', () => {
-  assert.doesNotMatch(docsSource, /<details|<summary/)
-  for (const file of emittedFiles(buildRoot).filter((candidate) => candidate.endsWith('.html')))
-    assert.doesNotMatch(readFileSync(file, 'utf8'), /<details(?:\s|>)|<summary(?:\s|>)/, file)
+test('SITE-T-NO-ACCORDION keeps prose visible while complete signatures stay subordinate', () => {
+  for (const file of emittedFiles(buildRoot).filter((candidate) => candidate.endsWith('.html'))) {
+    /** Signature declarations and the trailing page navigation may start collapsed. */
+    const html = readFileSync(file, 'utf8')
+    /** All remaining prose must be visible outside those two defined disclosures. */
+    const visibleProse = html
+      .replace(/<section class="api-signature"[^>]*>[\s\S]*?<\/details>\s*<\/section>/g, '')
+      .replace(/<details class="page-toc"[^>]*>[\s\S]*?<\/details>/g, (navigation) => {
+        assert.ok(html.indexOf(navigation) > html.lastIndexOf('</article>'), file)
+        assert.doesNotMatch(
+          navigation.match(/^<details[^>]*>/)?.[0] ?? '',
+          /\bopen(?:=|\s|>)/,
+          file
+        )
+        return ''
+      })
+    assert.doesNotMatch(visibleProse, /<details(?:\s|>)|<summary(?:\s|>)/, file)
+  }
 })
 
 test('SITE-T-TYPE-CODE keeps every module type declaration visible with its code', () => {
@@ -1630,1133 +1887,1049 @@ test('SITE-T-TYPE-CODE keeps every module type declaration visible with its code
 
 test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', () => {
   const expectations = [
-    ['/zh/guides/store-react', 'Store React 学习路径', '先按状态来源选择 Hook'],
-    ['/en/guides/store-react', 'Store React learning paths', 'Choose a Hook from the state source'],
+    ['/zh/docs/store-react', 'Store React 学习路径', '先按状态来源选择 Hook'],
+    ['/en/docs/store-react', 'Store React learning paths', 'Choose a Hook from the state source'],
     [
-      '/zh/guides/store-react/getting-started',
+      '/zh/docs/store-react/getting-started',
       '五分钟建立作用域 Store 与精确 Selector',
       '在挂载前注册，在组件中按 Token 读取'
     ],
     [
-      '/en/guides/store-react/getting-started',
+      '/en/docs/store-react/getting-started',
       'Build a scoped Store with a precise Selector in five minutes',
       'Register before mount and read by Token inside components'
     ],
     [
-      '/zh/guides/store-react/provider-ownership-and-readiness',
+      '/zh/docs/store-react/provider-ownership-and-readiness',
       '明确 StoreProvider 所有权与 Ready Barrier',
       '按输入决定默认 dispose 行为'
     ],
     [
-      '/en/guides/store-react/provider-ownership-and-readiness',
+      '/en/docs/store-react/provider-ownership-and-readiness',
       'Define StoreProvider ownership and Ready Barriers',
       'Derive default disposal from supplied ownership'
     ],
     [
-      '/zh/guides/store-react/resources-and-suspense',
+      '/zh/docs/store-react/resources-and-suspense',
       '正确选择 Resource、StoreResource 与 Suspense Hook',
       '从资源来源选择 Hook'
     ],
     [
-      '/en/guides/store-react/resources-and-suspense',
+      '/en/docs/store-react/resources-and-suspense',
       'Choose Resource, StoreResource, and Suspense Hooks correctly',
       'Choose a Hook from the resource source'
     ],
-    ['/zh/guides/store-worker', 'Store Worker 学习路径', '先判断工作是否值得跨线程'],
+    ['/zh/docs/store-worker', 'Store Worker 学习路径', '先判断工作是否值得跨线程'],
     [
-      '/en/guides/store-worker',
+      '/en/docs/store-worker',
       'Store Worker learning paths',
       'First decide whether work deserves a thread boundary'
     ],
     [
-      '/zh/guides/store-worker/getting-started',
+      '/zh/docs/store-worker/getting-started',
       '五分钟建立可取消的 Worker 计算链',
       'Worker 侧建立处理器'
     ],
     [
-      '/en/guides/store-worker/getting-started',
+      '/en/docs/store-worker/getting-started',
       'Build a cancellable Worker computation path in five minutes',
       'Create the Worker-side handler'
     ],
     [
-      '/zh/guides/store-worker/byte-copy-and-transfer-ownership',
+      '/zh/docs/store-worker/byte-copy-and-transfer-ownership',
       '在 copy 安全性与 transfer 零拷贝之间选择',
       '转移前确认输入是独占整块视图'
     ],
     [
-      '/en/guides/store-worker/byte-copy-and-transfer-ownership',
+      '/en/docs/store-worker/byte-copy-and-transfer-ownership',
       'Choose between copy safety and zero-copy transfer',
       'Transfer only an exclusively owned full-buffer view'
     ],
-    ['/zh/guides/store-wasm', 'Store WASM 学习路径', '按数据形状选择最窄字段'],
+    ['/zh/docs/store-wasm', 'Store WASM 学习路径', '按数据形状选择最窄字段'],
     [
-      '/en/guides/store-wasm',
+      '/en/docs/store-wasm',
       'Store WASM learning paths',
       'Choose the narrowest field for the data shape'
     ],
     [
-      '/zh/guides/store-wasm/getting-started',
+      '/zh/docs/store-wasm/getting-started',
       '五分钟建立并释放 WASM 字段 Store',
       '显式完成 Readiness 后创建 Store'
     ],
     [
-      '/en/guides/store-wasm/getting-started',
+      '/en/docs/store-wasm/getting-started',
       'Build and release a WASM-field Store in five minutes',
       'Complete Readiness before creating Store'
     ],
     [
-      '/zh/guides/store-wasm/array-granularity-and-bulk-writes',
+      '/zh/docs/store-wasm/array-granularity-and-bulk-writes',
       '按订阅密度选择 Array Granularity',
       '从读取模式选择分桶'
     ],
     [
-      '/en/guides/store-wasm/array-granularity-and-bulk-writes',
+      '/en/docs/store-wasm/array-granularity-and-bulk-writes',
       'Choose Array Granularity from subscription density',
       'Choose buckets from the read pattern'
     ],
-    ['/zh/guides/store-shared', 'Store Shared 学习路径', '先判断是否真的需要共享内存'],
+    ['/zh/docs/store-shared', 'Store Shared 学习路径', '先判断是否真的需要共享内存'],
     [
-      '/en/guides/store-shared',
+      '/en/docs/store-shared',
       'Store Shared learning paths',
       'First decide whether shared memory is necessary'
     ],
     [
-      '/zh/guides/store-shared/getting-started',
+      '/zh/docs/store-shared/getting-started',
       '五分钟在主线程与 Worker 共享响应式数组',
       '主线程创建并交接 Buffer'
     ],
     [
-      '/en/guides/store-shared/getting-started',
+      '/en/docs/store-shared/getting-started',
       'Share a reactive array between main thread and Worker in five minutes',
       'Create and hand off the Buffer on main'
     ],
     [
-      '/zh/guides/store-shared/seqlock-and-contention',
+      '/zh/docs/store-shared/seqlock-and-contention',
       '理解 Seqlock 一致读写与不可恢复竞争',
       '读写协议避免新值配旧版本'
     ],
     [
-      '/en/guides/store-shared/seqlock-and-contention',
+      '/en/docs/store-shared/seqlock-and-contention',
       'Understand Seqlock consistency and unrecoverable contention',
       'The protocol prevents new value with an old version'
     ],
-    ['/zh/guides/store-devtools', 'Store Devtools 学习路径', '先按要回答的问题选择入口'],
+    ['/zh/docs/store-devtools', 'Store Devtools 学习路径', '先按要回答的问题选择入口'],
     [
-      '/en/guides/store-devtools',
+      '/en/docs/store-devtools',
       'Store Devtools learning paths',
       'Choose an entry from the question'
     ],
     [
-      '/zh/guides/store-devtools/getting-started',
+      '/zh/docs/store-devtools/getting-started',
       '五分钟记录状态、定位 Action 并安全释放',
       '围绕一个 Store 建立有界诊断会话'
     ],
     [
-      '/en/guides/store-devtools/getting-started',
+      '/en/docs/store-devtools/getting-started',
       'Record state, inspect Actions, and release safely in five minutes',
       'Build one bounded diagnostic session around a Store'
     ],
     [
-      '/zh/guides/store-devtools/time-travel-and-side-effects',
+      '/zh/docs/store-devtools/time-travel-and-side-effects',
       '把 jumpTo 当作状态复水，不是事务回滚',
       '明确能恢复与不能恢复的内容'
     ],
     [
-      '/en/guides/store-devtools/time-travel-and-side-effects',
+      '/en/docs/store-devtools/time-travel-and-side-effects',
       'Treat jumpTo as state hydration, not transaction rollback',
       'Know what can and cannot be restored'
     ],
-    ['/zh/guides/store-ssr', 'Store SSR 学习路径', '沿一次请求的生命周期阅读'],
-    ['/en/guides/store-ssr', 'Store SSR learning paths', 'Follow one request lifecycle'],
+    ['/zh/docs/store-ssr', 'Store SSR 学习路径', '沿一次请求的生命周期阅读'],
+    ['/en/docs/store-ssr', 'Store SSR learning paths', 'Follow one request lifecycle'],
     [
-      '/zh/guides/store-ssr/getting-started',
+      '/zh/docs/store-ssr/getting-started',
       '五分钟完成服务端脱水与浏览器复水',
       '服务端：创建、渲染、注入、关闭'
     ],
     [
-      '/en/guides/store-ssr/getting-started',
+      '/en/docs/store-ssr/getting-started',
       'Complete server dehydration and browser hydration in five minutes',
       'Server: create, render, embed, and close'
     ],
     [
-      '/zh/guides/store-ssr/await-resources-and-timeouts',
+      '/zh/docs/store-ssr/await-resources-and-timeouts',
       '用总预算收敛异步 Resource',
       'timeoutMs 是整个等待过程的预算'
     ],
     [
-      '/en/guides/store-ssr/await-resources-and-timeouts',
+      '/en/docs/store-ssr/await-resources-and-timeouts',
       'Converge async Resources under one total budget',
       'timeoutMs budgets the complete wait'
     ],
     [
-      '/zh/guides/store-ssr/validation-security-and-trusted-path',
+      '/zh/docs/store-ssr/validation-security-and-trusted-path',
       '建立载荷边界，再决定是否使用 Trusted 快速路径',
       'assertSSRState 的拒绝边界'
     ],
     [
-      '/en/guides/store-ssr/validation-security-and-trusted-path',
+      '/en/docs/store-ssr/validation-security-and-trusted-path',
       'Establish payload boundaries before choosing the trusted fast path',
       'assertSSRState rejection boundaries'
     ],
-    ['/zh/guides/store-persist', 'Store Persist 学习路径', '先按内存状态模型选择入口'],
+    ['/zh/docs/store-persist', 'Store Persist 学习路径', '先按内存状态模型选择入口'],
     [
-      '/en/guides/store-persist',
+      '/en/docs/store-persist',
       'Store Persist learning paths',
       'Choose the entry from the in-memory state model'
     ],
     [
-      '/zh/guides/store-persist/getting-started',
+      '/zh/docs/store-persist/getting-started',
       '五分钟恢复、修改并落盘用户设置',
       '把 readiness 和物理写入放进调用流程'
     ],
     [
-      '/en/guides/store-persist/getting-started',
+      '/en/docs/store-persist/getting-started',
       'Restore, modify, and persist user settings in five minutes',
       'Place readiness and physical writing in the caller flow'
     ],
     [
-      '/zh/guides/store-persist/hydration-and-startup-races',
+      '/zh/docs/store-persist/hydration-and-startup-races',
       '处理 Hydration 与启动期本地写入竞态',
       'Plain object 使用启动快照三向合并'
     ],
     [
-      '/en/guides/store-persist/hydration-and-startup-races',
+      '/en/docs/store-persist/hydration-and-startup-races',
       'Handle Hydration races with local startup writes',
       'Plain objects use a three-way startup snapshot merge'
     ],
     [
-      '/zh/guides/store-persist/codecs-and-storage-capabilities',
+      '/zh/docs/store-persist/codecs-and-storage-capabilities',
       '让 Codec 输出与 Backend 能力精确匹配',
       '按 codec.output 选择存储通道'
     ],
     [
-      '/en/guides/store-persist/codecs-and-storage-capabilities',
+      '/en/docs/store-persist/codecs-and-storage-capabilities',
       'Match Codec output to Backend capability exactly',
       'Select a storage channel from codec.output'
     ],
-    ['/zh/guides/store-middleware', 'Store Middleware 学习路径', '先判断是否需要 Host'],
+    ['/zh/docs/store-middleware', 'Store Middleware 学习路径', '先判断是否需要 Host'],
     [
-      '/en/guides/store-middleware',
+      '/en/docs/store-middleware',
       'Store Middleware learning paths',
       'Decide whether a Host is necessary'
     ],
     [
-      '/zh/guides/store-middleware/getting-started',
+      '/zh/docs/store-middleware/getting-started',
       '五分钟启用 Actions-only 与日志插件',
       '共享策略实例并显式关闭 Host'
     ],
     [
-      '/en/guides/store-middleware/getting-started',
+      '/en/docs/store-middleware/getting-started',
       'Enable actions-only writes and a logging plugin in five minutes',
       'Share the policy instance and close the Host explicitly'
     ],
     [
-      '/zh/guides/store-middleware/snapshot-clone-policies',
+      '/zh/docs/store-middleware/snapshot-clone-policies',
       '为状态快照选择明确的 Clone Policy',
       '按消费场景选择，而不是统一使用“宽容克隆”'
     ],
     [
-      '/en/guides/store-middleware/snapshot-clone-policies',
+      '/en/docs/store-middleware/snapshot-clone-policies',
       'Choose an explicit Clone Policy for state snapshots',
       'Choose by consumer instead of applying one tolerant clone everywhere'
     ],
     [
-      '/zh/guides/store-middleware/devtools-and-state-commands',
+      '/zh/docs/store-middleware/devtools-and-state-commands',
       '安全接入 Redux DevTools 状态命令',
       '只有提供 applyState 才能接受状态命令'
     ],
     [
-      '/en/guides/store-middleware/devtools-and-state-commands',
+      '/en/docs/store-middleware/devtools-and-state-commands',
       'Integrate Redux DevTools state commands safely',
       'Accept state commands only when applyState exists'
     ],
-    ['/zh/guides/store-indexed', 'Store Indexed 学习路径', '先从访问模式选择集合'],
+    ['/zh/docs/store-indexed', 'Store Indexed 学习路径', '先从访问模式选择集合'],
     [
-      '/en/guides/store-indexed',
+      '/en/docs/store-indexed',
       'Store Indexed learning paths',
       'Choose a collection from the access pattern'
     ],
     [
-      '/zh/guides/store-indexed/getting-started',
+      '/zh/docs/store-indexed/getting-started',
       '五分钟订阅一个大集合中的单个 key',
       '在同一个 Runtime 中创建集合和 Effect'
     ],
     [
-      '/en/guides/store-indexed/getting-started',
+      '/en/docs/store-indexed/getting-started',
       'Subscribe to one key in a large collection in five minutes',
       'Create the collection and Effect in one Runtime'
     ],
     [
-      '/zh/guides/store-indexed/choose-a-collection',
+      '/zh/docs/store-indexed/choose-a-collection',
       '选择 Object、Array、Map 或 Set',
       '类与工厂函数的参数顺序不同'
     ],
     [
-      '/en/guides/store-indexed/choose-a-collection',
+      '/en/docs/store-indexed/choose-a-collection',
       'Choose Object, Array, Map, or Set',
       'Classes and factory functions use different argument order'
     ],
     [
-      '/zh/guides/store-indexed/array-index-semantics',
+      '/zh/docs/store-indexed/array-index-semantics',
       '正确使用 ObservableArray 的纯索引语义',
       '不要把移动后的索引当稳定实体'
     ],
     [
-      '/en/guides/store-indexed/array-index-semantics',
+      '/en/docs/store-indexed/array-index-semantics',
       'Use ObservableArray pure index semantics correctly',
       'Do not treat a shifted index as stable entity identity'
     ],
     [
-      '/zh/guides/store-indexed/mutation-guards-and-runtime',
+      '/zh/docs/store-indexed/mutation-guards-and-runtime',
       '接入 Mutation Guard，并隔离 Runtime',
       '跨 Runtime 追踪必须失败'
     ],
     [
-      '/en/guides/store-indexed/mutation-guards-and-runtime',
+      '/en/docs/store-indexed/mutation-guards-and-runtime',
       'Integrate a Mutation Guard and isolate Runtime',
       'Cross-Runtime tracking must fail'
     ],
-    ['/zh/guides/store-keyed', 'Store Keyed 学习路径', '先判断是否真的需要键控定义'],
+    ['/zh/docs/store-keyed', 'Store Keyed 学习路径', '先判断是否真的需要键控定义'],
     [
-      '/en/guides/store-keyed',
+      '/en/docs/store-keyed',
       'Store Keyed learning paths',
       'Decide whether keyed definitions are necessary'
     ],
     [
-      '/zh/guides/store-keyed/getting-started',
+      '/zh/docs/store-keyed/getting-started',
       '五分钟建立两个互不串状态的作用域',
       '模块顶层定义，作用域边界实例化'
     ],
     [
-      '/en/guides/store-keyed/getting-started',
+      '/en/docs/store-keyed/getting-started',
       'Build two state-isolated scopes in five minutes',
       'Define at module scope and instantiate at the scope boundary'
     ],
     [
-      '/zh/guides/store-keyed/definitions-and-scopes',
+      '/zh/docs/store-keyed/definitions-and-scopes',
       '选择 Definition，并明确实例作用域',
       '按初值与写入契约选择构造器'
     ],
     [
-      '/en/guides/store-keyed/definitions-and-scopes',
+      '/en/docs/store-keyed/definitions-and-scopes',
       'Choose a Definition and name its instance scope',
       'Choose a constructor by initialization and write contract'
     ],
     [
-      '/zh/guides/store-keyed/optics-and-split-lists',
+      '/zh/docs/store-keyed/optics-and-split-lists',
       '用 Optics 聚焦对象并按稳定 key 拆分列表',
       '长期列表必须同时管理源项与 token 缓存'
     ],
     [
-      '/en/guides/store-keyed/optics-and-split-lists',
+      '/en/docs/store-keyed/optics-and-split-lists',
       'Focus objects with Optics and split lists by stable key',
       'A long-lived list owns source items and token cache separately'
     ],
     [
-      '/zh/guides/store-keyed/families-and-cache-identity',
+      '/zh/docs/store-keyed/families-and-cache-identity',
       '按业务 key 建立 Family，并控制缓存 identity',
       '让 key 选择 Definition，而不是共享实例'
     ],
     [
-      '/en/guides/store-keyed/families-and-cache-identity',
+      '/en/docs/store-keyed/families-and-cache-identity',
       'Build a family by business key and control cache identity',
       'Let the key choose a Definition, not a shared instance'
     ],
     [
-      '/zh/guides/store-keyed/preview-and-overrides',
+      '/zh/docs/store-keyed/preview-and-overrides',
       '在并发预览和测试替换中保持契约',
       '只有纯工厂才能在 speculative preview 中执行'
     ],
     [
-      '/en/guides/store-keyed/preview-and-overrides',
+      '/en/docs/store-keyed/preview-and-overrides',
       'Preserve contracts during concurrent preview and test replacement',
       'Only a pure factory may run during speculative preview'
     ],
     [
-      '/zh/guides/store-keyed/release-and-disposal',
+      '/zh/docs/store-keyed/release-and-disposal',
       '释放单个 Definition 或终止整个 AtomStore',
       '按所有权层级选择清理动作'
     ],
     [
-      '/en/guides/store-keyed/release-and-disposal',
+      '/en/docs/store-keyed/release-and-disposal',
       'Release one Definition or terminate the whole AtomStore',
       'Choose cleanup at the owning layer'
     ],
-    ['/zh/guides/store-light', 'Store Light 学习路径', '先判断数据是否适合对象 Store'],
+    ['/zh/docs/store-light', 'Store Light 学习路径', '先判断数据是否适合对象 Store'],
     [
-      '/en/guides/store-light',
+      '/en/docs/store-light',
       'Store Light learning paths',
       'Decide whether the data fits an object Store'
     ],
     [
-      '/zh/guides/store-light/getting-started',
+      '/zh/docs/store-light/getting-started',
       '五分钟创建、订阅并释放对象 Store',
       '直接描述业务对象'
     ],
     [
-      '/en/guides/store-light/getting-started',
+      '/en/docs/store-light/getting-started',
       'Create, subscribe to, and dispose an object Store in five minutes',
       'Describe the business object directly'
     ],
     [
-      '/zh/guides/store-light/object-store-model',
+      '/zh/docs/store-light/object-store-model',
       '理解字段、Computed、Action 与 raw',
       '每一种输入形状只有一个含义'
     ],
     [
-      '/en/guides/store-light/object-store-model',
+      '/en/docs/store-light/object-store-model',
       'Understand fields, Computed values, Actions, and raw',
       'Every input shape has one meaning'
     ],
     [
-      '/zh/guides/store-light/async-fields-and-readiness',
+      '/zh/docs/store-light/async-fields-and-readiness',
       '选择同步、异步或 Legacy Store 创建入口',
       '按 Builder 模式选择入口'
     ],
     [
-      '/en/guides/store-light/async-fields-and-readiness',
+      '/en/docs/store-light/async-fields-and-readiness',
       'Choose synchronous, asynchronous, or legacy Store creation',
       'Choose an entry from Builder mode'
     ],
     [
-      '/zh/guides/store-light/snapshots-and-hydration',
+      '/zh/docs/store-light/snapshots-and-hydration',
       '区分完整快照、持久化数据与宽松 Hydration',
       '不要用一个快照承担所有用途'
     ],
     [
-      '/en/guides/store-light/snapshots-and-hydration',
+      '/en/docs/store-light/snapshots-and-hydration',
       'Separate complete snapshots, persisted data, and tolerant hydration',
       'Do not make one snapshot serve every purpose'
     ],
     [
-      '/zh/guides/store-light/field-builders-and-mutation',
+      '/zh/docs/store-light/field-builders-and-mutation',
       '扩展 FieldBuilder，并保持 Runtime 与写入边界',
       '声明同步或异步构造模式'
     ],
     [
-      '/en/guides/store-light/field-builders-and-mutation',
+      '/en/docs/store-light/field-builders-and-mutation',
       'Extend FieldBuilder while preserving Runtime and mutation boundaries',
       'Declare synchronous or asynchronous construction mode'
     ],
     [
-      '/zh/guides/store-light/resources-and-suspense',
+      '/zh/docs/store-light/resources-and-suspense',
       '用 StoreResource 建立 Suspense 安全异步值',
       '把请求取消和错误观察放进资源'
     ],
     [
-      '/en/guides/store-light/resources-and-suspense',
+      '/en/docs/store-light/resources-and-suspense',
       'Build a Suspense-safe asynchronous value with StoreResource',
       'Place request cancellation and error observation in the resource'
     ],
     [
-      '/zh/guides/store-light/resource-versions-and-lifecycle',
+      '/zh/docs/store-light/resource-versions-and-lifecycle',
       '管理 Resource 版本、Capture 与终态',
       '区分稳定持有与 provisional capture'
     ],
     [
-      '/en/guides/store-light/resource-versions-and-lifecycle',
+      '/en/docs/store-light/resource-versions-and-lifecycle',
       'Manage Resource versions, captures, and terminal state',
       'Separate stable retention from provisional capture'
     ],
-    ['/zh/guides/wasm', 'WASM 学习路径', '按宿主与数据边界进入'],
-    ['/en/guides/wasm', 'WASM learning paths', 'Enter by host and data boundary'],
+    ['/zh/docs/wasm', 'WASM 学习路径', '按宿主与数据边界进入'],
+    ['/en/docs/wasm', 'WASM learning paths', 'Enter by host and data boundary'],
     [
-      '/zh/guides/wasm/getting-started',
+      '/zh/docs/wasm/getting-started',
       '五分钟完成 JSON 到 MessagePack 转码',
       '让每一个分配都有明确释放点'
     ],
     [
-      '/en/guides/wasm/getting-started',
+      '/en/docs/wasm/getting-started',
       'Convert JSON to MessagePack in five minutes',
       'Give every allocation an explicit release point'
     ],
     [
-      '/zh/guides/wasm/initialization-and-hosts',
+      '/zh/docs/wasm/initialization-and-hosts',
       '在浏览器、Node 与预编译宿主中初始化 WASM',
       '按加载权限选择初始化方式'
     ],
     [
-      '/en/guides/wasm/initialization-and-hosts',
+      '/en/docs/wasm/initialization-and-hosts',
       'Initialize WASM in browsers, Node, and precompiled hosts',
       'Choose initialization by loading authority'
     ],
     [
-      '/zh/guides/wasm/arena-memory',
+      '/zh/docs/wasm/arena-memory',
       '正确使用稳定 ID、指针与 8 字节对齐 Arena',
       '读取每个 Arena API 的精确语义'
     ],
     [
-      '/en/guides/wasm/arena-memory',
+      '/en/docs/wasm/arena-memory',
       'Use stable ids, pointers, and the eight-byte-aligned arena correctly',
       'Read the exact semantic of every arena API'
     ],
     [
-      '/zh/guides/wasm/conversion-boundaries',
+      '/zh/docs/wasm/conversion-boundaries',
       '保持单文档转码与独立结果语义',
       '只从当前 ConversionResult 判断成功'
     ],
     [
-      '/en/guides/wasm/conversion-boundaries',
+      '/en/docs/wasm/conversion-boundaries',
       'Preserve single-document conversion and independent result semantics',
       'Determine success only from the current ConversionResult'
     ],
     [
-      '/zh/guides/wasm/ownership-and-cleanup',
+      '/zh/docs/wasm/ownership-and-cleanup',
       '确定性释放 WASM 分配并保留失败事实',
       '为每种结果写出释放矩阵'
     ],
     [
-      '/en/guides/wasm/ownership-and-cleanup',
+      '/en/docs/wasm/ownership-and-cleanup',
       'Release WASM allocations deterministically and preserve failure facts',
       'Write a release matrix for every outcome'
     ],
-    ['/zh/guides/tray', 'Tray 学习路径', '先选择正确的组合根'],
-    ['/en/guides/tray', 'Tray learning paths', 'Choose the correct composition root first'],
-    ['/zh/guides/tray/getting-started', '五分钟创建可释放的静态 Tray', '声明完整集合与显式依赖'],
+    ['/zh/docs/tray', 'Tray 学习路径', '先管理完整 Host 实例'],
+    ['/en/docs/tray', 'Tray learning paths', 'Manage complete Host instances first'],
     [
-      '/en/guides/tray/getting-started',
-      'Create a disposable static Tray in five minutes',
-      'Declare the complete set and explicit dependencies'
+      '/zh/docs/tray/getting-started',
+      '五分钟创建和管理 Host 实例',
+      'defineTrayHost、createTray 与 spawn'
     ],
     [
-      '/zh/guides/tray/static-composition',
-      '设计静态 Entry 图与 admission 边界',
+      '/en/docs/tray/getting-started',
+      'Create and manage Host instances in five minutes',
+      'defineTrayHost, createTray, and spawn'
+    ],
+    [
+      '/zh/docs/tray/static-composition',
+      '静态依赖图：Entry 定义与依赖校验',
       '每个 Entry 只声明自己的边界'
     ],
     [
-      '/en/guides/tray/static-composition',
-      'Design a static entry graph and admission boundary',
+      '/en/docs/tray/static-composition',
+      'Static dependency graph: entries and dependencies',
       'Each entry declares only its own boundary'
     ],
     [
-      '/zh/guides/tray/readiness-and-errors',
+      '/zh/docs/tray/readiness-and-errors',
       '关闭 Readiness gate，并按错误身份恢复',
       '在启动前解释 blocked 与 failed'
     ],
     [
-      '/en/guides/tray/readiness-and-errors',
+      '/en/docs/tray/readiness-and-errors',
       'Close readiness gates and recover by error identity',
       'Explain blocked and failed before startup'
     ],
-    ['/zh/guides/tray/resource-ownership', '让 Graph 唯一拥有 Entry 资源', '把辅助资源绑定到节点'],
+    ['/zh/docs/tray/resource-ownership', '让 Graph 唯一拥有 Entry 资源', '把辅助资源绑定到节点'],
     [
-      '/en/guides/tray/resource-ownership',
+      '/en/docs/tray/resource-ownership',
       'Let the Graph own entry resources exactly once',
       'Bind auxiliary resources to the node'
     ],
     [
-      '/zh/guides/tray/dynamic-host',
+      '/zh/docs/tray/dynamic-host',
       '创建唯一身份的托管 Plugin Host',
       '一次性声明初始 definitions 与时间边界'
     ],
     [
-      '/en/guides/tray/dynamic-host',
+      '/en/docs/tray/dynamic-host',
       'Create one managed Plugin Host identity',
       'Declare initial definitions and time boundaries once'
     ],
     [
-      '/zh/guides/tray/mutation-and-blocking',
+      '/zh/docs/tray/mutation-and-blocking',
       '解释 use、replace、unUse 与 blocked closure',
       '读取结构化 mutation 结果'
     ],
     [
-      '/en/guides/tray/mutation-and-blocking',
+      '/en/docs/tray/mutation-and-blocking',
       'Interpret use, replace, unUse, and blocked closure',
       'Read the structured mutation result'
     ],
     [
-      '/zh/guides/tray/physical-cleanup',
+      '/zh/docs/tray/physical-cleanup',
       '区分逻辑提交与物理清理完成',
       '始终保留同一个 physicalCompletion'
     ],
     [
-      '/en/guides/tray/physical-cleanup',
+      '/en/docs/tray/physical-cleanup',
       'Separate logical commit from physical cleanup completion',
       'Retain and observe the same physicalCompletion'
     ],
-    ['/zh/guides/utils', 'Utils 学习路径', '按问题选择最窄入口'],
-    ['/en/guides/utils', 'Utils learning paths', 'Choose the narrowest entry for the problem'],
+    ['/zh/docs/utils', 'Utils：库代码常用的基础工具', '按子路径查找'],
+    ['/en/docs/utils', 'Utils: everyday building blocks for library code', 'Find tools by subpath'],
+    ['/zh/docs/utils/getting-started', '快速开始：给一个不稳定的请求加上重试', 'retry 的选项'],
     [
-      '/zh/guides/utils/getting-started',
-      '五分钟建立有界、可取消的批处理',
-      '把 deadline 放在最外层'
+      '/en/docs/utils/getting-started',
+      'Quick start: add retries to a flaky request',
+      'retry options'
+    ],
+    ['/zh/docs/utils/deadlines-and-abort', '超时与取消', '选项'],
+    ['/en/docs/utils/deadlines-and-abort', 'Timeouts and cancellation', 'Options'],
+    ['/zh/docs/utils/retry-and-concurrency', '重试与并发限制', '限制同时进行的任务数'],
+    [
+      '/en/docs/utils/retry-and-concurrency',
+      'Retries and concurrency limits',
+      'Cap concurrent tasks'
+    ],
+    ['/zh/docs/utils/error-identity-and-causes', '错误身份与原因链', '本包的错误代码'],
+    [
+      '/en/docs/utils/error-identity-and-causes',
+      'Error identity and causes',
+      'Error codes of this package'
+    ],
+    ['/zh/docs/utils/bytes-and-text', '字节与文本：Base64 和 UTF-8', 'ArrayBuffer 和 Uint8Array'],
+    [
+      '/en/docs/utils/bytes-and-text',
+      'Bytes and text: Base64 and UTF-8',
+      'ArrayBuffer and Uint8Array'
+    ],
+    ['/zh/docs/utils/immutable-objects-and-paths', '对象路径与不可变更新', '路径写法'],
+    [
+      '/en/docs/utils/immutable-objects-and-paths',
+      'Object paths and immutable updates',
+      'Path syntax'
+    ],
+    ['/zh/docs/utils/configuration-ownership', '配置所有权：接收、保护、更新、合并', '选项'],
+    [
+      '/en/docs/utils/configuration-ownership',
+      'Configuration ownership: accept, protect, update, merge',
+      'Options'
+    ],
+    ['/zh/docs/utils/function-and-value-guards', '一次性初始化与值判断', '判断空值和值的种类'],
+    [
+      '/en/docs/utils/function-and-value-guards',
+      'Run once and value checks',
+      'Check empty values and value kinds'
+    ],
+    ['/zh/docs/utils/strings-and-numbers', '字符串模板与数字格式化', '数字格式化'],
+    [
+      '/en/docs/utils/strings-and-numbers',
+      'String templates and number formatting',
+      'Number formatting'
+    ],
+    ['/zh/docs/rpc-core', 'RPC 学习路径', '从实际宿主入口开始'],
+    ['/en/docs/rpc-core', 'RPC learning paths', 'Start from the actual host entry'],
+    [
+      '/zh/docs/rpc-core/getting-started',
+      '从 Runtime Peer 与插件建立首条调用链',
+      '浏览器：createBrowserPeer'
     ],
     [
-      '/en/guides/utils/getting-started',
-      'Build a bounded, cancellable batch in five minutes',
-      'Put the total deadline at the outside'
+      '/en/docs/rpc-core/getting-started',
+      'Build the first call path with Runtime Peers and plugins',
+      'Browser: createBrowserPeer'
     ],
     [
-      '/zh/guides/utils/deadlines-and-abort',
-      '选择 signal composition、abort race 或 deadline',
-      '按结算所有权选择'
+      '/zh/docs/rpc-core/endpoint-composition',
+      '高级组合：精确选择 Endpoint 能力',
+      '选择 Endpoint preset 或显式 Feature 图'
     ],
     [
-      '/en/guides/utils/deadlines-and-abort',
-      'Choose signal composition, an abort race, or a deadline',
-      'Choose by settlement ownership'
+      '/en/docs/rpc-core/endpoint-composition',
+      'Advanced composition: select Endpoint capabilities precisely',
+      'Choose an Endpoint preset or an explicit Feature graph'
     ],
     [
-      '/zh/guides/utils/retry-and-concurrency',
-      '用有限重试与并发准入保护依赖',
-      '明确总预算与单次预算'
-    ],
-    [
-      '/en/guides/utils/retry-and-concurrency',
-      'Protect dependencies with finite retry and concurrency admission',
-      'Define total and per-attempt budgets'
-    ],
-    [
-      '/zh/guides/utils/error-identity-and-causes',
-      '保留错误身份、原始类型与完整因果链',
-      '在包边界附加稳定身份'
-    ],
-    [
-      '/en/guides/utils/error-identity-and-causes',
-      'Preserve error identity, native type, and the complete cause chain',
-      'Attach stable identity at the public boundary'
-    ],
-    ['/zh/guides/utils/bytes-and-text', '在协议边界正确处理 Base64 与 UTF-8', '拒绝非规范 Base64'],
-    [
-      '/en/guides/utils/bytes-and-text',
-      'Handle Base64 and UTF-8 correctly at protocol boundaries',
-      'Reject non-canonical Base64'
-    ],
-    [
-      '/zh/guides/utils/immutable-objects-and-paths',
-      '选择快照语义，并安全更新嵌套路径',
-      '明确你要哪一种快照'
-    ],
-    [
-      '/en/guides/utils/immutable-objects-and-paths',
-      'Choose snapshot semantics and update nested paths safely',
-      'Choose the snapshot you actually mean'
-    ],
-    [
-      '/zh/guides/utils/configuration-ownership',
-      '建立配置所有权、只读边界与合并策略',
-      '在入口取得配置所有权'
-    ],
-    [
-      '/en/guides/utils/configuration-ownership',
-      'Establish configuration ownership, readonly boundaries, and merge policy',
-      'Take configuration ownership at the boundary'
-    ],
-    [
-      '/zh/guides/utils/function-and-value-guards',
-      '正确判断空值，并让初始化只执行一次',
-      '按业务语义选择判断器'
-    ],
-    [
-      '/en/guides/utils/function-and-value-guards',
-      'Classify absent values and run initialization exactly once',
-      'Choose a guard by business semantic'
-    ],
-    [
-      '/zh/guides/utils/strings-and-numbers',
-      '安全插值文本，并统一本地化数字展示',
-      '显式决定缺失值和 nullish 策略'
-    ],
-    [
-      '/en/guides/utils/strings-and-numbers',
-      'Interpolate display text safely and localize numeric output consistently',
-      'Choose missing-value and nullish policy explicitly'
-    ],
-    ['/zh/guides/rpc-core', 'RPC 学习路径', '先决定端点需要公开什么'],
-    ['/en/guides/rpc-core', 'RPC learning paths', 'First decide what the endpoint must expose'],
-    [
-      '/zh/guides/rpc-core/getting-started',
-      '五分钟建立可释放的 RPC 调用链',
-      '先建立 transport，再分别创建两端'
-    ],
-    [
-      '/en/guides/rpc-core/getting-started',
-      'Build a disposable RPC call path in five minutes',
-      'Create the transport first, then construct both endpoints'
-    ],
-    [
-      '/zh/guides/rpc-core/endpoint-composition',
-      '四个 Peer/Plugin 工厂：来源、类型与所有权',
-      '按所有权选择四个工厂'
-    ],
-    [
-      '/en/guides/rpc-core/endpoint-composition',
-      'Four Peer/Plugin factories: sources, types and ownership',
-      'Choose the four factories by ownership'
-    ],
-    [
-      '/zh/guides/rpc-core/calls-and-cancellation',
+      '/zh/docs/rpc-core/calls-and-cancellation',
       '正确选择调用、广播、通知与取消语义',
       '不要用一个方法模拟另一种语义'
     ],
     [
-      '/en/guides/rpc-core/calls-and-cancellation',
+      '/en/docs/rpc-core/calls-and-cancellation',
       'Choose call, fan-out, notification, and cancellation semantics correctly',
       'Do not use one operation to imitate another'
     ],
     [
-      '/zh/guides/rpc-core/providers-and-contracts',
+      '/zh/docs/rpc-core/providers-and-contracts',
       '用 Provider 与 Contract 固定网络边界',
       '为每个公开方法声明参数与结果'
     ],
     [
-      '/en/guides/rpc-core/providers-and-contracts',
+      '/en/docs/rpc-core/providers-and-contracts',
       'Fix the network boundary with providers and contracts',
       'Declare parameters and results for every public method'
     ],
     [
-      '/zh/guides/rpc-core/transports-and-security',
+      '/zh/docs/rpc-core/transports-and-security',
       '按拓扑选择 Transport，并建立真实安全边界',
       '先声明真实拓扑'
     ],
     [
-      '/en/guides/rpc-core/transports-and-security',
+      '/en/docs/rpc-core/transports-and-security',
       'Choose a transport by topology and establish a real security boundary',
       'Declare the real topology first'
     ],
     [
-      '/zh/guides/rpc-core/extension-authoring',
+      '/zh/docs/rpc-core/extension-authoring',
       '扩展 RPC：Feature 边界与自定义 Middleware',
       '编写一个可释放的自定义 Middleware'
     ],
     [
-      '/en/guides/rpc-core/extension-authoring',
+      '/en/docs/rpc-core/extension-authoring',
       'Extend RPC: Feature boundaries and custom middleware',
       'Author disposable custom middleware'
     ],
     [
-      '/zh/guides/rpc-core/discovery-and-control',
+      '/zh/docs/rpc-core/discovery-and-control',
       '发现远端能力，并显式启用控制面',
       '把自动发现与手动发现当成不同策略'
     ],
     [
-      '/en/guides/rpc-core/discovery-and-control',
+      '/en/docs/rpc-core/discovery-and-control',
       'Discover remote capabilities and enable the control plane explicitly',
       'Treat automatic and manual discovery as different policies'
     ],
     [
-      '/zh/guides/rpc-core/chunking-and-backpressure',
+      '/zh/docs/rpc-core/chunking-and-backpressure',
       '在明确容量预算下启用分片',
       '同时选择 chunk Feature 与策略 middleware'
     ],
     [
-      '/en/guides/rpc-core/chunking-and-backpressure',
+      '/en/docs/rpc-core/chunking-and-backpressure',
       'Enable chunking under explicit capacity budgets',
       'Select both the chunk Feature and policy middleware'
     ],
     [
-      '/zh/guides/rpc-core/replay-retry-and-lifecycle',
+      '/zh/docs/rpc-core/replay-retry-and-lifecycle',
       '区分重放保护、业务重试与 Endpoint 终态',
       '按双向请求吞吐配置重放窗口'
     ],
     [
-      '/en/guides/rpc-core/replay-retry-and-lifecycle',
+      '/en/docs/rpc-core/replay-retry-and-lifecycle',
       'Separate replay protection, business retry, and endpoint terminal state',
       'Size the replay window from bidirectional request throughput'
     ],
-    ['/zh/guides/storage-web', 'Storage Web 学习路径', '先根据能力选择存储'],
-    ['/en/guides/storage-web', 'Storage Web learning paths', 'Choose storage by capability first'],
+    ['/zh/docs/storage-web', 'Storage Web 学习路径', '先根据能力选择存储'],
+    ['/en/docs/storage-web', 'Storage Web learning paths', 'Choose storage by capability first'],
     [
-      '/zh/guides/storage-web/getting-started',
+      '/zh/docs/storage-web/getting-started',
       '五分钟选择并使用 Storage Web 后端',
       'Local Storage 异步契约：保持调用模型可替换'
     ],
     [
-      '/en/guides/storage-web/getting-started',
+      '/en/docs/storage-web/getting-started',
       'Choose and use a Storage Web backend in five minutes',
       'Local Storage async contract for a replaceable call model'
     ],
     [
-      '/zh/guides/storage-web/indexeddb-and-transactions',
+      '/zh/docs/storage-web/indexeddb-and-transactions',
       '用 IndexedDB 管理记录与事务',
       '完成一条 record 的创建、读取、更新、删除与遍历'
     ],
     [
-      '/en/guides/storage-web/indexeddb-and-transactions',
+      '/en/docs/storage-web/indexeddb-and-transactions',
       'Manage records and transactions with IndexedDB',
       'Create, read, update, delete, and iterate one record'
     ],
     [
-      '/zh/guides/storage-web/entity-schema-and-codecs',
+      '/zh/docs/storage-web/entity-schema-and-codecs',
       '组合 Entity、Schema、Codec 与迁移',
       '用一个定义产生 repository'
     ],
     [
-      '/en/guides/storage-web/entity-schema-and-codecs',
+      '/en/docs/storage-web/entity-schema-and-codecs',
       'Compose Entity, Schema, Codec, and migrations',
       'Produce a repository from one definition'
     ],
     [
-      '/zh/guides/storage-web/host-and-plugins',
+      '/zh/docs/storage-web/host-and-plugins',
       '用 Storage Host 组合多个后端',
       '整个 plugins 数组全部成功后'
     ],
     [
-      '/en/guides/storage-web/host-and-plugins',
+      '/en/docs/storage-web/host-and-plugins',
       'Compose several backends with Storage Host',
       'The Host exposes backends only after the whole plugin array succeeds'
     ],
     [
-      '/zh/guides/storage-web/reactive-live-queries',
+      '/zh/docs/storage-web/reactive-live-queries',
       '创建可取消的 Reactive live query',
       'Live Query 解决“数据变了，读取结果何时重算”'
     ],
     [
-      '/en/guides/storage-web/reactive-live-queries',
+      '/en/docs/storage-web/reactive-live-queries',
       'Create a cancellable reactive live query',
       'Live Query answers when a read must rerun after data changes'
     ],
     [
-      '/zh/guides/storage-web/cookies-and-security',
+      '/zh/docs/storage-web/cookies-and-security',
       '正确处理 Cookie scope 与安全边界',
       '把 scope 当作 Cookie 持久身份的一部分'
     ],
     [
-      '/en/guides/storage-web/cookies-and-security',
+      '/en/docs/storage-web/cookies-and-security',
       'Handle cookie scope and security boundaries correctly',
       'Treat scope as part of persistent Cookie identity'
     ],
     [
-      '/zh/guides/storage-web/cancellation-errors-and-shutdown',
+      '/zh/docs/storage-web/cancellation-errors-and-shutdown',
       '处理取消、错误与 Storage 终态',
       '用户不再需要结果时，用 AbortController 主动取消'
     ],
     [
-      '/en/guides/storage-web/cancellation-errors-and-shutdown',
+      '/en/docs/storage-web/cancellation-errors-and-shutdown',
       'Handle cancellation, errors, and Storage terminal state',
       'Use AbortController when the user no longer needs a result'
     ],
-    ['/zh/guides/logger', 'Logger 学习路径', '按你要解决的问题进入'],
-    ['/en/guides/logger', 'Logger learning paths', 'Enter through the problem you need to solve'],
+    ['/zh/docs/logger', 'Logger：按需组合能力的日志库', '内置插件'],
+    ['/en/docs/logger', 'Logger: a logging library you assemble from plugins', 'Built-in plugins'],
+    ['/zh/docs/logger/getting-started', '快速开始：第一个 Logger', '常用方法'],
+    ['/en/docs/logger/getting-started', 'Quick start: your first Logger', 'Common methods'],
+    ['/zh/docs/logger/entries-hooks-and-sinks', 'Entry、Hook 与 Sink', '输出端出错时'],
     [
-      '/zh/guides/logger/getting-started',
-      '五分钟建立可关闭的结构化 Logger',
-      '构造、输出并观察失败'
+      '/en/docs/logger/entries-hooks-and-sinks',
+      'Entries, hooks, and sinks',
+      'When an output fails'
+    ],
+    ['/zh/docs/logger/plugins-and-batching', '内置插件与批量上报', '其他插件'],
+    ['/en/docs/logger/plugins-and-batching', 'Built-in plugins and batching', 'Other plugins'],
+    ['/zh/docs/logger/custom-plugin', '编写自定义插件', '编写插件时注意'],
+    ['/en/docs/logger/custom-plugin', 'Write a custom plugin', 'Rules for plugins'],
+    ['/zh/docs/logger/pipelines', '处理步骤：在输出之前修改或拦截日志', '选择模式'],
+    [
+      '/en/docs/logger/pipelines',
+      'Pipelines: modify or drop entries before output',
+      'Choose a mode'
+    ],
+    ['/zh/docs/logger/flush-and-shutdown', 'Flush 与关闭：退出前确认日志都写完', '例子'],
+    [
+      '/en/docs/logger/flush-and-shutdown',
+      'Flush and shutdown: confirm logs are written before exit',
+      'Example'
+    ],
+    ['/zh/docs/logger/runtime-and-forwarding', '转发与运行环境', '替换底层能力'],
+    [
+      '/en/docs/logger/runtime-and-forwarding',
+      'Forwarding and runtime',
+      'Replace low-level capabilities'
+    ],
+    ['/zh/docs/logger/troubleshooting', '排错与常见问题', '常见错误代码'],
+    ['/en/docs/logger/troubleshooting', 'Troubleshooting and FAQ', 'Common error codes'],
+    ['/zh/docs/plugin-host', 'Plugin Host：让你的库可以被插件扩展', 'API 一览'],
+    [
+      '/en/docs/plugin-host',
+      'Plugin Host: make your library extensible with plugins',
+      'API at a glance'
+    ],
+    ['/zh/docs/plugin-host/getting-started', '快速开始：安装第一个插件', 'defineHost 的选项'],
+    [
+      '/en/docs/plugin-host/getting-started',
+      'Quick start: install your first plugin',
+      'defineHost options'
+    ],
+    ['/zh/docs/plugin-host/install-and-compose', '插件之间共享能力', '依赖关系受到保护'],
+    [
+      '/en/docs/plugin-host/install-and-compose',
+      'Share capabilities between plugins',
+      'Dependencies are protected'
+    ],
+    ['/zh/docs/plugin-host/configuration', '插件配置', '配置的规则'],
+    ['/en/docs/plugin-host/configuration', 'Plugin configuration', 'Configuration rules'],
+    [
+      '/zh/docs/plugin-host/pipelines',
+      '处理链：让插件参与处理每一个请求',
+      '选择模式并使用对应的注册方法'
     ],
     [
-      '/en/guides/logger/getting-started',
-      'Build a shutdown-safe structured Logger in five minutes',
-      'Construct, emit, and observe failures'
+      '/en/docs/plugin-host/pipelines',
+      'Pipelines: let plugins process every request',
+      'Choose a mode and the matching registration method'
     ],
+    ['/zh/docs/plugin-host/removal-and-rollback', '卸载、禁用与替换', '禁用：暂停而不释放'],
     [
-      '/zh/guides/logger/entries-hooks-and-sinks',
-      '组织 entry、hook 与 sink',
-      '需要字段语义时使用 dispatchRaw'
+      '/en/docs/plugin-host/removal-and-rollback',
+      'Remove, disable, and replace',
+      'Disable: pause without releasing'
     ],
+    ['/zh/docs/capability', 'Capability 学习路径', '从变化发生在哪里开始'],
+    ['/en/docs/capability', 'Capability learning paths', 'Start with where change occurs'],
     [
-      '/en/guides/logger/entries-hooks-and-sinks',
-      'Organize entries, hooks, and sinks',
-      'Use dispatchRaw when fields carry meaning'
-    ],
-    ['/zh/guides/logger/plugins-and-batching', '组合内置插件与有界批处理', '按 provider'],
-    [
-      '/en/guides/logger/plugins-and-batching',
-      'Compose built-in plugins and bounded batching',
-      'Order plugins from provider to consumer'
-    ],
-    ['/zh/guides/logger/pipelines', '为 Logger 选择 pipeline 模式', '不要把四种控制流混用'],
-    [
-      '/en/guides/logger/pipelines',
-      'Choose a Logger pipeline mode',
-      'Do not mix the four control flows'
-    ],
-    ['/zh/guides/logger/flush-and-shutdown', '正确 flush 并进入终态', '按所有权边界选择操作'],
-    [
-      '/en/guides/logger/flush-and-shutdown',
-      'Flush correctly and enter terminal state',
-      'Choose an operation from the ownership boundary'
-    ],
-    [
-      '/zh/guides/logger/runtime-and-forwarding',
-      '跨运行时适配并组合多个 Logger',
-      '只在平台边界替换 runtime manager'
-    ],
-    [
-      '/en/guides/logger/runtime-and-forwarding',
-      'Adapt runtimes and compose multiple Loggers',
-      'Replace the runtime manager only at a platform boundary'
-    ],
-    ['/zh/guides/plugin-host', 'Plugin Host 学习路径', '先按任务选择入口'],
-    ['/en/guides/plugin-host', 'Plugin Host learning paths', 'Choose an entry by task'],
-    ['/zh/guides/plugin-host/getting-started', '创建并使用第一个 Plugin Host', '定义领域 core'],
-    [
-      '/en/guides/plugin-host/getting-started',
-      'Create and use your first Plugin Host',
-      'Define a domain core'
-    ],
-    ['/zh/guides/plugin-host/install-and-compose', '安装与组合插件', '先排序，再交给 Host 安装'],
-    [
-      '/en/guides/plugin-host/install-and-compose',
-      'Install and compose plugins',
-      'Order first, then install'
-    ],
-    [
-      '/zh/guides/plugin-host/configuration-and-shared',
-      '配置与 shared 能力',
-      '配置更新成功后才提交'
-    ],
-    [
-      '/en/guides/plugin-host/configuration-and-shared',
-      'Configuration and shared capabilities',
-      'Commit configuration only after successful updates'
-    ],
-    ['/zh/guides/plugin-host/pipelines', '选择并运行 pipeline', '按控制流选择模式'],
-    [
-      '/en/guides/plugin-host/pipelines',
-      'Choose and run a pipeline',
-      'Choose a mode from control flow'
-    ],
-    ['/zh/guides/plugin-host/removal-and-rollback', '卸载、回滚与物理清理', '按依赖反向卸载'],
-    [
-      '/en/guides/plugin-host/removal-and-rollback',
-      'Removal, rollback, and physical cleanup',
-      'Remove in reverse dependency order'
-    ],
-    ['/zh/guides/capability', 'Capability 学习路径', '从变化发生在哪里开始'],
-    ['/en/guides/capability', 'Capability learning paths', 'Start with where change occurs'],
-    [
-      '/zh/guides/capability/getting-started',
+      '/zh/docs/capability/getting-started',
       '五分钟建立可回退的运行时能力',
       '登记惰性能力并保留释放句柄'
     ],
     [
-      '/en/guides/capability/getting-started',
+      '/en/docs/capability/getting-started',
       'Build a revocable runtime capability in five minutes',
       'Register a lazy capability with an owned release handle'
     ],
     [
-      '/zh/guides/capability/graph',
+      '/zh/docs/capability/graph',
       '启动一个封闭的静态 Capability Graph',
       '声明直接 provider，而不是在 start 内隐式查找'
     ],
     [
-      '/en/guides/capability/graph',
+      '/en/docs/capability/graph',
       'Start a closed static Capability Graph',
       'Declare direct providers instead of discovering them inside start'
     ],
     [
-      '/zh/guides/capability/graph-dynamic',
+      '/zh/docs/capability/graph-dynamic',
       '在运行中安全替换 Capability Graph 节点',
       '把一次变更当作受影响闭包事务'
     ],
     [
-      '/en/guides/capability/graph-dynamic',
+      '/en/docs/capability/graph-dynamic',
       'Replace Capability Graph nodes safely at runtime',
       'Treat one mutation as an affected-closure transaction'
     ],
     [
-      '/zh/guides/capability/graph-topology',
+      '/zh/docs/capability/graph-topology',
       '为组合层构建不可变拓扑快照',
       '只在你已经拥有 lifecycle 时使用'
     ],
     [
-      '/en/guides/capability/graph-topology',
+      '/en/docs/capability/graph-topology',
       'Build an immutable topology snapshot for a composition layer',
       'Use it only when you already own lifecycle'
     ],
-    ['/zh/guides/middleware-pipeline', 'Middleware Pipeline 学习路径', '按控制流选择 runner'],
     [
-      '/en/guides/middleware-pipeline',
-      'Middleware Pipeline learning paths',
-      'Choose a runner by control flow'
+      '/zh/docs/middleware-pipeline',
+      'Middleware Pipeline：把一次处理拆成按顺序执行的步骤',
+      '一个函数，三个成员'
     ],
     [
-      '/zh/guides/middleware-pipeline/getting-started',
-      '五分钟建立异步洋葱 Pipeline',
-      '把下游 Promise 当作当前 stage 的生命周期'
+      '/en/docs/middleware-pipeline',
+      'Middleware Pipeline: split one operation into ordered stages',
+      'One function, three members'
     ],
     [
-      '/en/guides/middleware-pipeline/getting-started',
-      'Build an asynchronous onion Pipeline in five minutes',
-      'Treat the downstream Promise as the current stage lifetime'
+      '/zh/docs/middleware-pipeline/getting-started',
+      '快速开始：第一个 pipeline',
+      '一个步骤最多调用一次 next'
     ],
     [
-      '/zh/guides/middleware-pipeline/sync-and-async',
-      '在同步链和异步洋葱之间做出明确选择',
-      '不要用 async stage 填进同步 runner'
+      '/en/docs/middleware-pipeline/getting-started',
+      'Quick start: your first pipeline',
+      'A stage calls next at most once'
     ],
     [
-      '/en/guides/middleware-pipeline/sync-and-async',
-      'Choose explicitly between a synchronous chain and an async onion',
-      'Do not place an async stage in the synchronous runner'
+      '/zh/docs/middleware-pipeline/sync-and-async',
+      '同步、异步与洋葱模型',
+      '在异步 pipeline 里复用同步步骤'
     ],
     [
-      '/zh/guides/middleware-pipeline/generators',
-      '用 generator 明确区分候选值与控制信号',
-      '阅读 return，而不是只看 yield'
+      '/en/docs/middleware-pipeline/sync-and-async',
+      'Sync, async and the onion model',
+      'Reuse a sync stage in an async pipeline'
     ],
     [
-      '/en/guides/middleware-pipeline/generators',
-      'Separate candidate values from control signals with generators',
-      'Read the return value, not only each yield'
+      '/zh/docs/middleware-pipeline/generators',
+      'Generator 模式：用 return 决定下一步',
+      '和 sync 模式的区别'
     ],
     [
-      '/zh/guides/middleware-pipeline/cancellation-and-errors',
-      '组合协作取消与双失败，而不丢失原始错误',
-      '把 signal 当作共享只读上下文'
+      '/en/docs/middleware-pipeline/generators',
+      'Generator modes: return decides what happens next',
+      'How it differs from sync mode'
     ],
     [
-      '/en/guides/middleware-pipeline/cancellation-and-errors',
-      'Compose cooperative cancellation and dual failures without losing causes',
-      'Treat signal as shared read-only context'
-    ],
-    ['/zh/guides/resource', 'Resource 学习路径', '把可见状态与传输状态分开'],
-    [
-      '/en/guides/resource',
-      'Resource learning paths',
-      'Separate visible state from transport state'
+      '/zh/docs/middleware-pipeline/cancellation-and-errors',
+      '取消一次运行，并处理错误',
+      '两个错误同时出现'
     ],
     [
-      '/zh/guides/resource/getting-started',
-      '五分钟建立响应式异步 Resource',
-      '建立依赖追踪与 latest-wins 请求'
+      '/en/docs/middleware-pipeline/cancellation-and-errors',
+      'Cancel a run and handle errors',
+      'Two errors at once'
+    ],
+    ['/zh/docs/resource', 'Resource：会随输入自动刷新、可取消的异步数据', 'API 一览'],
+    [
+      '/en/docs/resource',
+      'Resource: async data that refreshes with its inputs and can be cancelled',
+      'API at a glance'
+    ],
+    ['/zh/docs/resource/getting-started', '快速开始：加载一个用户', '构造选项'],
+    ['/en/docs/resource/getting-started', 'Quick start: load a user', 'Constructor options'],
+    ['/zh/docs/resource/caching-and-refresh', '缓存与刷新', '什么时候会重新请求'],
+    ['/en/docs/resource/caching-and-refresh', 'Caching and refresh', 'When a new request starts'],
+    ['/zh/docs/resource/suspense-and-ssr', 'Suspense 与服务端渲染', '服务端渲染：把数据带到浏览器'],
+    [
+      '/en/docs/resource/suspense-and-ssr',
+      'Suspense and server rendering',
+      'Server rendering: carry data to the browser'
+    ],
+    ['/zh/docs/resource/cancellation-and-retry', '取消与重试', '失败后自动重试'],
+    ['/en/docs/resource/cancellation-and-retry', 'Cancellation and retry', 'Retry after failure'],
+    ['/zh/docs/resource/troubleshooting', '排错与常见问题', '错误代码'],
+    ['/en/docs/resource/troubleshooting', 'Troubleshooting and FAQ', 'Error codes'],
+    ['/zh/docs/reactive', 'Reactive：值变了，依赖它的计算和副作用自动更新', 'API 一览'],
+    [
+      '/en/docs/reactive',
+      'Reactive: when a value changes, dependent computations and effects update',
+      'API at a glance'
+    ],
+    ['/zh/docs/reactive/getting-started', '快速开始：第一张依赖图', '释放'],
+    ['/en/docs/reactive/getting-started', 'Quick start: your first dependency graph', 'Disposal'],
+    ['/zh/docs/reactive/reactive', 'Signal、Computed、Effect', '读取但不建立依赖'],
+    ['/en/docs/reactive/reactive', 'Signal, Computed, Effect', 'Read without a dependency'],
+    ['/zh/docs/reactive/runtime', 'Runtime 与调度', '每个场景使用自己的 Runtime'],
+    ['/en/docs/reactive/runtime', 'Runtime and scheduling', 'Give each context its own Runtime'],
+    ['/zh/docs/reactive/troubleshooting', '排错与常见问题', '错误代码'],
+    ['/en/docs/reactive/troubleshooting', 'Troubleshooting and FAQ', 'Error codes'],
+    ['/zh/docs/event-subscriber', 'Event Subscriber：通知所有关心这件事的模块', 'API 一览'],
+    [
+      '/zh/docs/event-subscriber/getting-started',
+      '快速开始：第一次订阅和发布',
+      'createEventChannel 的选项'
     ],
     [
-      '/en/guides/resource/getting-started',
-      'Build a reactive asynchronous Resource in five minutes',
-      'Connect dependency tracking to latest-wins requests'
+      '/en/docs/event-subscriber',
+      'Event Subscriber: notify every module that cares',
+      'API at a glance'
     ],
     [
-      '/zh/guides/resource/caching-and-refresh',
-      '设计 Resource 缓存新鲜度与后台刷新',
-      '分别选择时间、展示和保活策略'
+      '/en/docs/event-subscriber/getting-started',
+      'Quick start: your first subscribe and publish',
+      'createEventChannel options'
     ],
+    ['/zh/docs/event-subscriber/subscriptions', '订阅与退订', '三种结束订阅的方式'],
     [
-      '/en/guides/resource/caching-and-refresh',
-      'Design Resource cache freshness and background refresh',
-      'Choose time, presentation, and retention separately'
+      '/en/docs/event-subscriber/subscriptions',
+      'Subscribing and unsubscribing',
+      'Three ways to end a subscription'
     ],
+    ['/zh/docs/event-subscriber/async-invocation', '等待 listener 的结果', '六个函数怎么选'],
     [
-      '/zh/guides/resource/suspense-and-ssr',
-      '把 Resource 接入 Suspense 与 SSR 快照',
-      '三种结果进入正确边界'
+      '/en/docs/event-subscriber/async-invocation',
+      'Waiting for listener results',
+      'Choosing among six functions'
     ],
+    ['/zh/docs/lifecycle', 'Lifecycle 学习路径', '按所有权问题选择原语'],
+    ['/zh/docs/lifecycle/getting-started', '五分钟建立资源 Scope', '登记资源并统一释放'],
+    ['/en/docs/lifecycle', 'Lifecycle learning paths', 'Choose a primitive by ownership problem'],
     [
-      '/en/guides/resource/suspense-and-ssr',
-      'Integrate Resource with Suspense and SSR snapshots',
-      'outcome to the right boundary'
-    ],
-    [
-      '/zh/guides/resource/cancellation-and-retry',
-      '控制 Resource 取消、重试与退避',
-      '让重试策略受错误和次数约束'
-    ],
-    [
-      '/en/guides/resource/cancellation-and-retry',
-      'Control Resource cancellation, retries, and backoff',
-      'Bound retry by both error and attempt count'
-    ],
-    ['/zh/guides/reactive', 'Reactive 学习路径', '先理解三个角色'],
-    ['/zh/guides/reactive/getting-started', '五分钟建立响应式状态', '建立第一张图'],
-    ['/zh/guides/reactive/reactive', '组合 Signal、Computed 与 Effect', '区分 value 与 peek'],
-    ['/zh/guides/reactive/runtime', '隔离 Runtime 与宿主能力', '每个隔离域创建一个 Runtime'],
-    ['/en/guides/reactive', 'Reactive learning paths', 'Start with three roles'],
-    [
-      '/en/guides/reactive/getting-started',
-      'Build reactive state in five minutes',
-      'Build the first graph'
-    ],
-    [
-      '/en/guides/reactive/reactive',
-      'Compose Signal, Computed, and Effect',
-      'Distinguish value from peek'
-    ],
-    [
-      '/en/guides/reactive/runtime',
-      'Isolate Runtime and host capabilities',
-      'Create one Runtime per isolation domain'
-    ],
-    ['/zh/guides/event-subscriber', 'Event Subscriber 学习路径', '先选择事件边界'],
-    [
-      '/zh/guides/event-subscriber/getting-started',
-      '五分钟建立类型安全的 Channel',
-      '创建并拥有一个 Channel'
-    ],
-    [
-      '/en/guides/event-subscriber',
-      'Event Subscriber learning paths',
-      'Choose the event boundary first'
-    ],
-    [
-      '/en/guides/event-subscriber/getting-started',
-      'Build a type-safe Channel in five minutes',
-      'Create and own one Channel'
-    ],
-    [
-      '/zh/guides/event-subscriber/subscriptions',
-      '把订阅寿命交给明确的所有者',
-      '先选择订阅何时结束'
-    ],
-    [
-      '/en/guides/event-subscriber/subscriptions',
-      'Give every subscription an explicit lifetime owner',
-      'Choose when the subscription ends first'
-    ],
-    [
-      '/zh/guides/event-subscriber/async-invocation',
-      '显式选择异步 listener 的顺序与失败结果',
-      '用两条轴选择 API'
-    ],
-    [
-      '/en/guides/event-subscriber/async-invocation',
-      'Choose async listener ordering and failure shape explicitly',
-      'Choose an API on two axes'
-    ],
-    ['/zh/guides/lifecycle', 'Lifecycle 学习路径', '按所有权问题选择原语'],
-    ['/zh/guides/lifecycle/getting-started', '五分钟建立资源 Scope', '登记资源并统一释放'],
-    ['/en/guides/lifecycle', 'Lifecycle learning paths', 'Choose a primitive by ownership problem'],
-    [
-      '/en/guides/lifecycle/getting-started',
+      '/en/docs/lifecycle/getting-started',
       'Build a resource Scope in five minutes',
       'Own resources and release them together'
     ],
-    ['/zh/guides/lifecycle/scope', '用 Scope 表达资源所有权', 'Scope 是所有权边界'],
+    ['/zh/docs/lifecycle/scope', '用 Scope 表达资源所有权', 'Scope 是所有权边界'],
     [
-      '/en/guides/lifecycle/scope',
+      '/en/docs/lifecycle/scope',
       'Express resource ownership with Scope',
       'A Scope is an ownership boundary'
     ],
-    ['/zh/guides/lifecycle/disposal', '组合可追踪的释放事务', '先归一化释放意图'],
+    ['/zh/docs/lifecycle/disposal', '组合可追踪的释放事务', '先归一化释放意图'],
     [
-      '/en/guides/lifecycle/disposal',
+      '/en/docs/lifecycle/disposal',
       'Compose traceable disposal transactions',
       'Normalize release intent first'
     ],
-    ['/zh/guides/lifecycle/abort', '让取消由明确的 owner 驱动', '组合外部 signal 与本地取消'],
+    ['/zh/docs/lifecycle/abort', '让取消由明确的 owner 驱动', '组合外部 signal 与本地取消'],
     [
-      '/en/guides/lifecycle/abort',
+      '/en/docs/lifecycle/abort',
       'Let one explicit owner drive cancellation',
       'Compose an external signal with local cancellation'
     ],
-    ['/zh/guides/lifecycle/quiescence', '证明任务与 lease 已经归零', '先登记，再封闭，最后等待'],
+    ['/zh/docs/lifecycle/quiescence', '证明任务与 lease 已经归零', '先登记，再封闭，最后等待'],
     [
-      '/en/guides/lifecycle/quiescence',
+      '/en/docs/lifecycle/quiescence',
       'Prove that tasks and leases reached zero',
       'Retain first, seal admission, then wait'
     ],
     [
-      '/zh/guides/lifecycle/scheduler',
+      '/zh/docs/lifecycle/scheduler',
       '统一生命周期时间与调度',
       '生产使用系统时间，测试使用手动时间'
     ],
     [
-      '/en/guides/lifecycle/scheduler',
+      '/en/docs/lifecycle/scheduler',
       'Unify lifecycle time and scheduling',
       'Use system time in production and manual time in tests'
     ],
-    ['/zh/guides/lifecycle/generation', '只接纳最新一代异步结果', '为每次启动捕获独立 token'],
+    ['/zh/docs/lifecycle/generation', '只接纳最新一代异步结果', '为每次启动捕获独立 token'],
     [
-      '/en/guides/lifecycle/generation',
+      '/en/docs/lifecycle/generation',
       'Adopt only the latest asynchronous generation',
       'Capture a distinct token for every start'
     ],
     [
-      '/zh/guides/lifecycle/errors',
+      '/zh/docs/lifecycle/errors',
       '选择错误策略，而不是吞掉 cleanup 失败',
       '按调用边界选择四种结果'
     ],
     [
-      '/en/guides/lifecycle/errors',
+      '/en/docs/lifecycle/errors',
       'Choose an error policy instead of swallowing cleanup failures',
       'Choose one of four outcomes at the call boundary'
     ]
@@ -2770,7 +2943,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   }
 
   const gettingStarted = readFileSync(
-    join(buildRoot, artifactPath('/en/guides/reactive/getting-started')),
+    join(buildRoot, artifactPath('/en/docs/reactive/getting-started')),
     'utf8'
   )
   assert.match(gettingStarted, /createRuntime[\s\S]*?@migaia\/reactive/)
@@ -2780,7 +2953,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
 
   const capabilityTopics = ['getting-started', 'graph', 'graph-dynamic', 'graph-topology']
     .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/capability/${topic}`)), 'utf8')
+      readFileSync(join(buildRoot, artifactPath(`/en/docs/capability/${topic}`)), 'utf8')
     )
     .join('\n')
   assert.match(capabilityTopics, /createCapabilityHost/)
@@ -2802,24 +2975,25 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'cancellation-and-errors'
   ]
     .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/middleware-pipeline/${topic}`)), 'utf8')
+      readFileSync(join(buildRoot, artifactPath(`/en/docs/middleware-pipeline/${topic}`)), 'utf8')
     )
     .join('\n')
-  assert.match(middlewareTopics, /runAsyncMiddleware/)
-  assert.match(middlewareTopics, /runSyncMiddleware/)
-  assert.match(middlewareTopics, /runGeneratorMiddleware/)
+  assert.match(middlewareTopics, /createPipeline/)
+  assert.match(middlewareTopics, /pipeline\.lift\(/)
+  assert.match(middlewareTopics, /GENERATOR_HALT/)
   assert.match(middlewareTopics, /AggregateError/)
-  assert.match(guideSource, /await next\(\{ \.\.\.request, authenticated: true \}\)/)
+  assert.match(guideSource, /await next\(\{ \.\.\.request, user: 'ada' \}\)/)
   assert.doesNotMatch(guideSource, /Promise\.race\([^)]*signal/)
 
   const resourceTopics = [
     'getting-started',
     'caching-and-refresh',
     'suspense-and-ssr',
-    'cancellation-and-retry'
+    'cancellation-and-retry',
+    'troubleshooting'
   ]
     .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/resource/${topic}`)), 'utf8')
+      readFileSync(join(buildRoot, artifactPath(`/en/docs/resource/${topic}`)), 'utf8')
     )
     .join('\n')
   const resourceText = renderedText(resourceTopics)
@@ -2831,9 +3005,9 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(resourceText, /dehydrate|hydrate/)
   assert.match(resourceText, /retryDelay/)
   assert.match(guideSource, /const id = userId\.value/)
-  assert.match(guideSource, /fetch\(`\/api\/users\/\$\{id\}`.*\{ signal \}/)
-  assert.match(guideSource, /const payload = JSON\.stringify\(snapshot\)/)
-  assert.match(guideSource, /initialSnapshot,\\n  ttl: 30_000/)
+  assert.match(guideSource, /signal as AbortSignal/)
+  assert.match(guideSource, /JSON\.stringify\(onServer\.dehydrate\(\)\)/)
+  assert.match(guideSource, /initialSnapshot: JSON\.parse\(json\)/)
 
   const serializeTopics = [
     'getting-started',
@@ -2843,7 +3017,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'shutdown-and-errors'
   ]
     .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/serialize/${topic}`)), 'utf8')
+      readFileSync(join(buildRoot, artifactPath(`/en/docs/serialize/${topic}`)), 'utf8')
     )
     .join('\n')
   const serializeText = renderedText(serializeTopics)
@@ -2869,7 +3043,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'codecs-and-errors'
   ]
     .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/storage-contract/${topic}`)), 'utf8')
+      readFileSync(join(buildRoot, artifactPath(`/en/docs/storage-contract/${topic}`)), 'utf8')
     )
     .join('\n')
   const storageContractText = renderedText(storageContractTopics)
@@ -2889,30 +3063,39 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   const pluginHostTopics = [
     'getting-started',
     'install-and-compose',
-    'configuration-and-shared',
+    'configuration',
     'pipelines',
-    'removal-and-rollback'
+    'removal-and-rollback',
+    'troubleshooting'
   ]
     .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/plugin-host/${topic}`)), 'utf8')
+      readFileSync(join(buildRoot, artifactPath(`/en/docs/plugin-host/${topic}`)), 'utf8')
     )
     .join('\n')
   const pluginHostText = renderedText(pluginHostTopics)
-  assert.match(pluginHostText, /new AppHost/)
-  assert.match(pluginHostText, /view\.extensions/)
-  assert.match(pluginHostText, /provider before its consumer/)
-  assert.match(pluginHostText, /queueAdmissionTimeoutMs/)
-  assert.match(pluginHostText, /disposeStepTimeoutMs/)
-  assert.match(pluginHostText, /Register installation resources with core\.onDispose/)
-  assert.match(pluginHostText, /Expose a domain entry point from the Host subclass/)
+  assert.match(pluginHostText, /defineHost/)
+  assert.match(pluginHostText, /const \[upperHandle\] = await host\.use\(upper\)/)
+  assert.match(pluginHostText, /upperHandle\.extensions\.upper/)
+  assert.match(pluginHostText, /dependencies, holds the dependency outputs/)
+  assert.match(
+    pluginHostText,
+    /the Host orders by dependency: even with greeter first, formatter installs first/i
+  )
+  assert.match(pluginHostText, /Handles still follow the input order/)
+  assert.match(pluginHostText, /core\.config\.get\(\)/)
+  assert.match(pluginHostText, /handle\.config\.update/)
+  assert.match(pluginHostText, /core\.onDispose/)
+  assert.match(pluginHostText, /host\.runPipeline/)
   assert.match(pluginHostText, /pipelineDrainTimeoutMs/)
-  assert.match(pluginHostText, /VIEW_REVOKED/)
+  assert.match(pluginHostText, /REGISTRATION_REVOKED/)
   assert.match(pluginHostText, /physicalCompletion/)
-  assert.match(guideSource, /mutationTimeoutMs: 5_000/)
-  assert.match(guideSource, /satisfies IPlugin<IAppCore, IGreetingExtension, IGreetingConfig>/)
-  assert.match(guideSource, /installed\.config\.update\('greeting'/)
-  assert.match(guideSource, /core\.usePipeline\(\(value, next\)/)
-  assert.match(guideSource, /consumer first/)
+  assert.match(pluginHostText, /DEPENDENCY_BLOCKED/)
+  assert.match(pluginHostText, /PLUGIN_INSTALL_FAILED/)
+  assert.match(guideSource, /mutationTimeoutMs: 5000/)
+  assert.match(guideSource, /const \[greeterHandle\] = await host\.use\(greeter, formatter\)/)
+  assert.match(guideSource, /await handle\.config\.update\(\(previous\) =>/)
+  assert.match(guideSource, /core\.useAsyncPipeline\(async \(request, next\)/)
+  assert.match(guideSource, /dependencies\.casing\.upper\(name\)/)
 
   const loggerTopics = [
     'getting-started',
@@ -2921,29 +3104,26 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'custom-plugin',
     'pipelines',
     'flush-and-shutdown',
-    'runtime-and-forwarding'
+    'runtime-and-forwarding',
+    'troubleshooting'
   ]
-    .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/logger/${topic}`)), 'utf8')
-    )
+    .map((topic) => readFileSync(join(buildRoot, artifactPath(`/en/docs/logger/${topic}`)), 'utf8'))
     .join('\n')
   const loggerText = renderedText(loggerTopics)
   assert.match(loggerText, /onFailure/)
-  assert.match(loggerText, /systemScheduler/)
-  assert.match(loggerText, /core\.ctx\.options/)
   assert.match(loggerText, /dispatchRaw/)
-  assert.match(loggerText, /batch must precede http/)
+  assert.match(loggerText, /batch must come before http/)
   assert.match(loggerText, /BATCH_OVERFLOW/)
-  assert.match(loggerText, /PIPELINE_NEXT_DUPLICATE/)
-  assert.match(loggerText, /shutdown-safe|terminal state/)
+  assert.match(loggerText, /PIPELINE_MODE_MISMATCH/)
+  assert.match(loggerText, /a closed Logger cannot be reopened/)
   assert.match(loggerText, /setLoggerRuntimeManager/)
-  assert.match(guideSource, /plugins: \[level\(\{ level: 'info' \}\), color\(\)\]/)
+  assert.match(guideSource, /level\(\{ level: 'info' \}\)/)
   assert.match(guideSource, /log\.usePipeline\(\(entry, next\)/)
-  assert.match(guideSource, /const restore = setLoggerRuntimeManager/)
-  assert.match(guideSource, /requestLog\.extends\(appLog, auditLog\)/)
+  assert.match(guideSource, /setLoggerRuntimeManager\(\{/)
+  assert.match(guideSource, /api\.extends\(audit\)/)
 
   const storageWebStart = readFileSync(
-    join(buildRoot, artifactPath('/en/guides/storage-web/getting-started')),
+    join(buildRoot, artifactPath('/en/docs/storage-web/getting-started')),
     'utf8'
   )
   const storageWebStartText = renderedText(storageWebStart)
@@ -2964,7 +3144,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'cancellation-errors-and-shutdown'
   ]
     .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/storage-web/${topic}`)), 'utf8')
+      readFileSync(join(buildRoot, artifactPath(`/en/docs/storage-web/${topic}`)), 'utf8')
     )
     .join('\n')
   const storageWebText = renderedText(storageWebTopics)
@@ -2979,20 +3159,27 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(guideSource, /await db\.transaction\(async \(tx\)/)
   assert.match(guideSource, /plugins: \[indexedDbReactive\(\{[\s\S]*?id: 'primary'/)
 
-  const webRpcStart = readFileSync(
-    join(buildRoot, artifactPath('/en/guides/rpc-core/getting-started')),
+  /** The first RPC task teaches Runtime Peers and Host connection plugins. */
+  const rpcStart = readFileSync(
+    join(buildRoot, artifactPath('/en/docs/rpc-core/getting-started')),
     'utf8'
   )
-  const webRpcStartText = renderedText(webRpcStart)
-  assert.match(webRpcStartText, /createClientEndpoint/)
-  assert.match(webRpcStartText, /createProviderEndpoint/)
-  assert.match(webRpcStartText, /createMemoryTransportPair/)
-  assert.match(webRpcStartText, /provider\.provide/)
-  assert.match(webRpcStartText, /client\.send/)
-  assert.match(webRpcStartText, /construction\.timeoutMs/)
-  assert.match(webRpcStartText, /4096 \/ 310000 ms/)
-  assert.match(webRpcStartText, /OVERLOADED/)
-  assert.match(webRpcStartText, /dispatch is a one-way notification/)
+  /** Actual task results and ownership replace the old low-level Endpoint introduction. */
+  const rpcStartText = renderedText(rpcStart)
+  assert.match(rpcStartText, /createBrowserPeer/)
+  assert.match(rpcStartText, /peer\.request\('double', 21\) === 42/)
+  assert.match(rpcStartText, /provide: \{/)
+  assert.match(rpcStartText, /await peer\.close\(\)/)
+  assert.match(rpcStartText, /createProcessPlugin/)
+  assert.match(rpcStartText, /createThreadPlugin/)
+  assert.match(rpcStartText, /host\.process!\.request\('service', 'math\.double', 21\) === 42/)
+  assert.match(rpcStartText, /host\.thread!\.request\('worker', 'math\.double', 21\) === 42/)
+  assert.match(rpcStartText, /createCoroutinePlugin/)
+  assert.match(rpcStartText, /host\.coroutine!\.request\('math', 'math\.double', 21\) === 42/)
+  assert.match(rpcStartText, /finally \{\s+await host\.dispose\(\)/)
+  assert.match(rpcStartText, /connect and listen own only the local connection/)
+  assert.match(rpcStartText, /cannot be forcibly stopped/)
+  assert.match(rpcStartText, /Choose advanced Endpoint composition afterwards/)
   assert.match(guideSource, /middlewares: \[\\n\s+contract\(\{ version: '1' \}\),/)
   assert.match(guideSource, /await Promise\.all\(\[client\.dispose\(\), provider\.dispose\(\)\]\)/)
   assert.match(guideSource, /path: 'endpoint-composition'/)
@@ -3006,7 +3193,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(guideSource, /A terminal endpoint cannot be revived/)
 
   const eventStart = readFileSync(
-    join(buildRoot, artifactPath('/en/guides/event-subscriber/getting-started')),
+    join(buildRoot, artifactPath('/en/docs/event-subscriber/getting-started')),
     'utf8'
   )
   assert.match(eventStart, /createEventChannel[\s\S]*?@migaia\/event-subscriber/)
@@ -3014,7 +3201,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
 
   const eventTopics = ['subscriptions', 'async-invocation']
     .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/event-subscriber/${topic}`)), 'utf8')
+      readFileSync(join(buildRoot, artifactPath(`/en/docs/event-subscriber/${topic}`)), 'utf8')
     )
     .join('\n')
   assert.match(eventTopics, /subscribeUntil/)
@@ -3022,7 +3209,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(eventTopics, /EventSubscriberState/)
 
   const lifecycleStart = readFileSync(
-    join(buildRoot, artifactPath('/en/guides/lifecycle/getting-started')),
+    join(buildRoot, artifactPath('/en/docs/lifecycle/getting-started')),
     'utf8'
   )
   assert.match(lifecycleStart, /createLifecycleScope[\s\S]*?@migaia\/lifecycle/)
@@ -3038,7 +3225,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'errors'
   ]
     .map((topic) =>
-      readFileSync(join(buildRoot, artifactPath(`/en/guides/lifecycle/${topic}`)), 'utf8')
+      readFileSync(join(buildRoot, artifactPath(`/en/docs/lifecycle/${topic}`)), 'utf8')
     )
     .join('\n')
   assert.doesNotMatch(guideSource, /scope\.own\(\(\)|createAbortController\(\{|advanceBy\(/)
@@ -3055,20 +3242,20 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
 test('SITE-T-REACTIVE-START flushes the queued rerun before disposing the Effect', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/reactive/getting-started`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/reactive/getting-started`)),
       'utf8'
     )
     const flush = page.indexOf('runtime.flush')
     const stop = page.indexOf('stop()')
 
-    assert.ok(flush >= 0, `/${locale}/guides/reactive/getting-started misses runtime.flush()`)
-    assert.ok(stop > flush, `/${locale}/guides/reactive/getting-started disposes before flush`)
-    assert.ok(page.includes('total: 36'))
+    assert.ok(flush >= 0, `/${locale}/docs/reactive/getting-started misses runtime.flush()`)
+    assert.ok(stop > flush, `/${locale}/docs/reactive/getting-started disposes before flush`)
+    assert.ok(page.includes(locale === 'zh' ? '总价: 30' : 'total: 30'))
   }
 })
 
 test('SITE-T-REACTIVE-START explains graph tracking, scheduling, and exact cleanup', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/reactive')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/reactive')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /Effect → Computed → Signal.*?依赖自动登记/s)
@@ -3080,33 +3267,33 @@ test('SITE-T-REACTIVE-START explains graph tracking, scheduling, and exact clean
   assert.match(text, /Scope.*?统一释放/s)
 })
 
-test('SITE-T-MIDDLEWARE-ADAPTERS documents every supported conversion and the forbidden direction', () => {
+test('SITE-T-MIDDLEWARE-ADAPTERS documents every supported lift direction and the forbidden one', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/middleware-pipeline/sync-and-async`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/middleware-pipeline/sync-and-async`)),
       'utf8'
     )
 
     for (const fragment of [
-      'adaptSyncStageToAsync',
-      'adaptSyncStageToGenerator',
-      'adaptGeneratorStageToAsyncGenerator',
-      'adaptSyncStageToAsyncGenerator',
-      'GENERATOR_HALT',
+      'pipeline.lift(trim, MiddlewarePipelineMode.sync)',
+      'sync, async',
+      'sync, generator',
+      'sync, generator, async-generator',
+      'INVALID_OPTION',
       'onViolation'
     ])
       assert.ok(
         page.includes(fragment),
-        `/${locale}/guides/middleware-pipeline adapters misses ${fragment}`
+        `/${locale}/docs/middleware-pipeline lift guide misses ${fragment}`
       )
-    assert.ok(locale === 'en' ? page.includes('Unsupported') : page.includes('不支持'))
+    assert.ok(locale === 'en' ? /unsupported/i.test(page) : page.includes('不支持'))
   }
 })
 
 test('SITE-T-EVENT-STYLE teaches aliases while preserving the canonical Channel contract', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/event-subscriber/getting-started`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/event-subscriber/getting-started`)),
       'utf8'
     )
 
@@ -3116,7 +3303,6 @@ test('SITE-T-EVENT-STYLE teaches aliases while preserving the canonical Channel 
       'on-trigger',
       'listen-fire',
       'defineEventApiStyle',
-      'saved',
       'on',
       'emit',
       'subscribe',
@@ -3126,7 +3312,7 @@ test('SITE-T-EVENT-STYLE teaches aliases while preserving the canonical Channel 
     ])
       assert.ok(
         page.includes(fragment),
-        `/${locale}/guides/event-subscriber style misses ${fragment}`
+        `/${locale}/docs/event-subscriber style misses ${fragment}`
       )
   }
 })
@@ -3148,7 +3334,7 @@ test('SITE-T-WEBRPC-LINKS keeps every maintained RPC continuation resolvable', (
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/rpc-core${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/rpc-core${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3177,7 +3363,7 @@ test('SITE-T-WEBRPC-TRANSPORTS renders every adapter tutorial in both locales', 
     'createWebTransportDatagramTransport'
   ]
   for (const locale of ['en', 'zh']) {
-    const path = `/${locale}/guides/rpc-core/transports-and-security`
+    const path = `/${locale}/docs/rpc-core/transports-and-security`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     for (const factory of factories) assert.ok(page.includes(factory), `${path} misses ${factory}`)
     assert.ok(!page.includes('createMessagePortTransport'))
@@ -3199,10 +3385,10 @@ test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left 
         assert.ok(docsPage.includes(`>${endpoint}</a>`), `${docsPath} hides ${endpoint}`)
     }
     const corePage = readFileSync(join(buildRoot, artifactPath(`/${locale}/docs/rpc-core`)), 'utf8')
-    assert.ok(corePage.includes(`/${locale}/guides/rpc-core/transports-and-security`))
-    assert.ok(corePage.includes(`/${locale}/guides/rpc-core/endpoint-composition`))
+    assert.ok(corePage.includes(`/${locale}/docs/rpc-core/transports-and-security`))
+    assert.ok(corePage.includes(`/${locale}/docs/rpc-core/endpoint-composition`))
 
-    const guidePath = `/${locale}/guides/rpc-core/transports-and-security`
+    const guidePath = `/${locale}/docs/rpc-core/transports-and-security`
     const guidePage = readFileSync(join(buildRoot, artifactPath(guidePath)), 'utf8')
     for (const anchor of [
       'window-transport',
@@ -3224,35 +3410,44 @@ test('SITE-T-WEBRPC-NAV exposes primary endpoints and every guide from the left 
       'chunking-and-backpressure',
       'replay-retry-and-lifecycle'
     ])
-      assert.ok(guidePage.includes(`/${locale}/guides/rpc-core/${topic}`))
+      assert.ok(guidePage.includes(`/${locale}/docs/rpc-core/${topic}`))
     assert.ok(guidePage.includes('href="#memory-transport"'))
     assert.ok(guidePage.includes('href="#web-transport-datagram-transport"'))
   }
 })
 
-test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains four factories and source ownership', () => {
+test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains advanced factories and the lower-level call boundary', () => {
   for (const locale of ['en', 'zh']) {
-    const path = `/${locale}/guides/rpc-core/endpoint-composition`
+    const path = `/${locale}/docs/rpc-core/endpoint-composition`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     for (const factory of [
-      'createProcessPeer',
-      'createProcessPlugin',
-      'createThreadPeer',
-      'createThreadPlugin'
+      'createClientEndpoint',
+      'createProviderEndpoint',
+      'createFullEndpoint',
+      'createComposedEndpoint'
     ])
       assert.ok(page.includes(factory), `${path} misses ${factory}`)
-    for (const source of ['spawn', 'connect', 'listen', 'provide', 'expose'])
-      assert.ok(page.includes(source), `${path} misses ${source}`)
-    assert.match(page, locale === 'zh' ? /所有权/ : /ownership/)
-    assert.match(page, /createPeerPair/)
-    assert.match(page, /createComposedEndpoint/)
-    assert.ok(page.includes(`/${locale}/guides/rpc-core/extension-authoring`))
+    /** The lower-level example supplies both endpoints and consumes a typed result. */
+    const text = renderedText(page)
+    for (const contract of [
+      'createMemoryTransportPair',
+      'context.success',
+      'client.send<number>',
+      'client.dispose()',
+      'provider.dispose()'
+    ])
+      assert.ok(text.includes(contract), `${path} misses ${contract}`)
+    assert.match(text, /=== 42/)
+    assert.match(text, /send\(targetId, method, payload\)/)
+    assert.match(text, /request\(method, payload\)/)
+    assert.match(text, /createCanonicalChunkFeature/)
+    assert.ok(page.includes(`/${locale}/docs/rpc-core/extension-authoring`))
   }
 })
 
 test('SITE-T-WEBRPC-EXTENSIONS documents the public Feature boundary and custom middleware', () => {
   for (const locale of ['en', 'zh']) {
-    const path = `/${locale}/guides/rpc-core/extension-authoring`
+    const path = `/${locale}/docs/rpc-core/extension-authoring`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     for (const contract of [
       'IRpcPlugin',
@@ -3262,26 +3457,29 @@ test('SITE-T-WEBRPC-EXTENSIONS documents the public Feature boundary and custom 
       'defineEndpointModule'
     ])
       assert.ok(page.includes(contract), `${path} misses ${contract}`)
-    assert.ok(page.includes(`/${locale}/guides/rpc-core/endpoint-composition`))
+    assert.ok(page.includes(`/${locale}/docs/rpc-core/endpoint-composition`))
   }
 })
 
-test('SITE-T-WEBRPC-GUIDE-NAV separates APIs, plugins, specifications, adapters, and errors', () => {
-  const expectations = {
-    en: ['APIs', 'Plugins', 'Specifications', 'Host adapters', 'Errors and diagnostics'],
-    zh: ['API', '插件', '规范', '宿主适配器', '错误与诊断']
-  } as const
+test('SITE-T-WEBRPC-GUIDE-NAV keeps guide topics, primary endpoints, and plugins in one rail', () => {
   for (const locale of ['en', 'zh'] as const) {
-    const path = `/${locale}/guides/rpc-core/extension-authoring`
+    const path = `/${locale}/docs/rpc-core/extension-authoring`
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
-    for (const heading of expectations[locale])
-      assert.ok(page.includes(`<h3>${heading}</h3>`), `${path} misses ${heading}`)
-    assert.ok(!page.includes('公开入口、插件与规范'))
-    assert.ok(!page.includes('APIs, plugins, and contracts'))
-    assert.match(page, /<h3>插件<\/h3>|<h3>Plugins<\/h3>/)
-    assert.match(page, /<code>connect<\/code>/)
-    assert.match(page, /<h3>规范<\/h3>|<h3>Specifications<\/h3>/)
-    assert.match(page, /<code>RpcTransportTopology<\/code>/)
+    const rail = stableLeftRail(page)
+    assert.ok(rail.includes(locale === 'zh' ? '<span>指南</span>' : '<span>Guides</span>'))
+    assert.ok(rail.includes(locale === 'zh' ? '常用 Endpoint' : 'Primary endpoints'))
+    assert.ok(rail.includes(locale === 'zh' ? '中间件插件' : 'Middleware plugins'))
+    assert.match(rail, />connect<\/a>/)
+    assert.match(rail, /href="\/(?:en|zh)\/docs\/rpc-core\/api\/[^"]*RpcTransportTopology"/)
+    assert.equal(
+      rail,
+      stableLeftRail(
+        readFileSync(
+          join(buildRoot, artifactPath(`/${locale}/docs/rpc-core/api/createEndpoint`)),
+          'utf8'
+        )
+      )
+    )
   }
 })
 
@@ -3302,7 +3500,7 @@ test('SITE-T-UTILS-LINKS keeps every maintained Utils continuation resolvable', 
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/utils${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/utils${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3332,7 +3530,7 @@ test('SITE-T-TRAY-LINKS keeps every maintained Tray continuation resolvable', ()
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/tray${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/tray${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3350,15 +3548,15 @@ test('SITE-T-TRAY-LINKS keeps every maintained Tray continuation resolvable', ()
 test('SITE-T-TRAY-RUNTIME explains Host options, managed reads, and every mutation outcome', () => {
   const expectations = [
     [
-      '/zh/guides/tray/dynamic-host',
+      '/zh/docs/tray/dynamic-host',
       ['mutationAdmissionMs', 'quiescenceMs', 'shutdown.mode', 'readyPlugins', 'pluginState']
     ],
     [
-      '/en/guides/tray/dynamic-host',
+      '/en/docs/tray/dynamic-host',
       ['mutationAdmissionMs', 'quiescenceMs', 'shutdown.mode', 'readyPlugins', 'pluginState']
     ],
     [
-      '/zh/guides/tray/mutation-and-blocking',
+      '/zh/docs/tray/mutation-and-blocking',
       [
         'ok:true, committed:true',
         'ok:false, committed:false',
@@ -3367,7 +3565,7 @@ test('SITE-T-TRAY-RUNTIME explains Host options, managed reads, and every mutati
       ]
     ],
     [
-      '/en/guides/tray/mutation-and-blocking',
+      '/en/docs/tray/mutation-and-blocking',
       [
         'ok:true, committed:true',
         'ok:false, committed:false',
@@ -3397,7 +3595,7 @@ test('SITE-T-WASM-LINKS keeps every maintained WASM continuation resolvable', ()
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/wasm${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/wasm${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3415,11 +3613,11 @@ test('SITE-T-WASM-LINKS keeps every maintained WASM continuation resolvable', ()
 test('SITE-T-WASM-OWNERSHIP releases both arena ids and ConversionResult wrappers', () => {
   for (const locale of ['en', 'zh']) {
     const gettingStarted = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/wasm/getting-started`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/wasm/getting-started`)),
       'utf8'
     )
     const ownership = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/wasm/ownership-and-cleanup`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/wasm/ownership-and-cleanup`)),
       'utf8'
     )
 
@@ -3445,7 +3643,7 @@ test('SITE-T-STORE-LIGHT-LINKS keeps every maintained Store Light continuation r
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-light${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-light${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3473,7 +3671,7 @@ test('SITE-T-STORE-LIGHT-CONFIG explains Store, hydration, and Resource option d
   for (const locale of ['en', 'zh']) {
     for (const [topic, fragments] of expectations) {
       const html = readFileSync(
-        join(buildRoot, artifactPath(`/${locale}/guides/store-light/${topic}`)),
+        join(buildRoot, artifactPath(`/${locale}/docs/store-light/${topic}`)),
         'utf8'
       )
       for (const fragment of fragments) {
@@ -3481,7 +3679,7 @@ test('SITE-T-STORE-LIGHT-CONFIG explains Store, hydration, and Resource option d
           locale === 'en' && fragment === 'ignore（默认）' ? 'ignore (default)' : fragment
         assert.ok(
           html.includes(localized),
-          `/${locale}/guides/store-light/${topic} misses ${localized}`
+          `/${locale}/docs/store-light/${topic} misses ${localized}`
         )
       }
     }
@@ -3503,7 +3701,7 @@ test('SITE-T-STORE-KEYED-LINKS keeps every maintained Store Keyed continuation r
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-keyed${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-keyed${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3521,11 +3719,11 @@ test('SITE-T-STORE-KEYED-LINKS keeps every maintained Store Keyed continuation r
 test('SITE-T-STORE-KEYED-FAMILY explains key domain, cache bounds, and split ownership', () => {
   for (const locale of ['en', 'zh']) {
     const family = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/store-keyed/families-and-cache-identity`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/store-keyed/families-and-cache-identity`)),
       'utf8'
     )
     const split = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/store-keyed/optics-and-split-lists`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/store-keyed/optics-and-split-lists`)),
       'utf8'
     )
 
@@ -3537,12 +3735,9 @@ test('SITE-T-STORE-KEYED-FAMILY explains key domain, cache bounds, and split own
       'FinalizationRegistry',
       'store.release'
     ])
-      assert.ok(
-        family.includes(fragment),
-        `/${locale}/guides/store-keyed family misses ${fragment}`
-      )
+      assert.ok(family.includes(fragment), `/${locale}/docs/store-keyed family misses ${fragment}`)
     for (const fragment of ['splitDef', 'prune', 'store.release'])
-      assert.ok(split.includes(fragment), `/${locale}/guides/store-keyed split misses ${fragment}`)
+      assert.ok(split.includes(fragment), `/${locale}/docs/store-keyed split misses ${fragment}`)
   }
 })
 
@@ -3561,7 +3756,7 @@ test('SITE-T-STORE-INDEXED-LINKS keeps every maintained Store Indexed continuati
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-indexed${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-indexed${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3579,7 +3774,7 @@ test('SITE-T-STORE-INDEXED-LINKS keeps every maintained Store Indexed continuati
 test('SITE-T-STORE-INDEXED-CONFIG explains construction defaults and mutation boundaries', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/store-indexed/choose-a-collection`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/store-indexed/choose-a-collection`)),
       'utf8'
     )
 
@@ -3593,10 +3788,7 @@ test('SITE-T-STORE-INDEXED-CONFIG explains construction defaults and mutation bo
       'ObservableMap',
       'ObservableSet'
     ])
-      assert.ok(
-        page.includes(fragment),
-        `/${locale}/guides/store-indexed config misses ${fragment}`
-      )
+      assert.ok(page.includes(fragment), `/${locale}/docs/store-indexed config misses ${fragment}`)
   }
 })
 
@@ -3616,7 +3808,7 @@ test('SITE-T-STORE-MIDDLEWARE-LINKS keeps every maintained Store Middleware cont
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-middleware${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-middleware${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3634,7 +3826,7 @@ test('SITE-T-STORE-MIDDLEWARE-LINKS keeps every maintained Store Middleware cont
 test('SITE-T-STORE-MIDDLEWARE-CONFIG makes every binding default and ownership edge explicit', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/store-middleware/binding-and-shared-policy`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/store-middleware/binding-and-shared-policy`)),
       'utf8'
     )
 
@@ -3648,7 +3840,7 @@ test('SITE-T-STORE-MIDDLEWARE-CONFIG makes every binding default and ownership e
     ])
       assert.ok(
         page.includes(fragment),
-        `/${locale}/guides/store-middleware config misses ${fragment}`
+        `/${locale}/docs/store-middleware config misses ${fragment}`
       )
   }
 })
@@ -3669,7 +3861,7 @@ test('SITE-T-STORE-PERSIST-LINKS keeps every maintained Store Persist continuati
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-persist${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-persist${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3687,18 +3879,18 @@ test('SITE-T-STORE-PERSIST-LINKS keeps every maintained Store Persist continuati
 test('SITE-T-STORE-PERSIST-KEYED exposes the real handle and post-hydration read path', () => {
   for (const locale of ['en', 'zh']) {
     const adapter = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/store-persist/choose-an-adapter`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/store-persist/choose-an-adapter`)),
       'utf8'
     )
     const keyed = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/guides/store-persist/keyed-families-and-clear`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/store-persist/keyed-families-and-clear`)),
       'utf8'
     )
 
     for (const fragment of ['IPersistHandle', 'ready', 'retryHydrate', 'flush', 'clear'])
       assert.ok(
         `${adapter}${keyed}`.includes(fragment),
-        `/${locale}/guides/store-persist keyed misses ${fragment}`
+        `/${locale}/docs/store-persist keyed misses ${fragment}`
       )
     for (const fragment of [
       'await handle.ready',
@@ -3710,7 +3902,7 @@ test('SITE-T-STORE-PERSIST-KEYED exposes the real handle and post-hydration read
       if (locale === 'en')
         assert.ok(
           keyed.includes(fragment),
-          `/${locale}/guides/store-persist keyed misses ${fragment}`
+          `/${locale}/docs/store-persist keyed misses ${fragment}`
         )
     }
     assert.ok(!keyed.includes('handle.value is the current restored value'))
@@ -3733,7 +3925,7 @@ test('SITE-T-STORE-REACT-LINKS keeps every maintained Store React continuation r
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-react${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-react${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3765,7 +3957,7 @@ test('SITE-T-STORE-SSR-LINKS keeps every maintained Store SSR continuation resol
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-ssr${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-ssr${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3796,7 +3988,7 @@ test('SITE-T-STORE-DEVTOOLS-LINKS keeps every maintained Store Devtools continua
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-devtools${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-devtools${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3828,7 +4020,7 @@ test('SITE-T-STORE-WORKER-LINKS keeps every maintained Store Worker continuation
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-worker${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-worker${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3860,7 +4052,7 @@ test('SITE-T-STORE-WASM-LINKS keeps every maintained Store WASM continuation res
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-wasm${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-wasm${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3893,7 +4085,7 @@ test('SITE-T-STORE-SHARED-LINKS keeps every maintained Store Shared continuation
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/store-shared${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/store-shared${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3922,7 +4114,7 @@ test('SITE-T-STORAGE-CONTRACT-LINKS keeps every maintained Storage Contract cont
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/storage-contract${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/storage-contract${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3950,7 +4142,7 @@ test('SITE-T-SERIALIZE-LINKS keeps every maintained Serialize continuation resol
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/serialize${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/serialize${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -3971,14 +4163,15 @@ test('SITE-T-PLUGIN-HOST-LINKS keeps every maintained Plugin Host continuation r
     '',
     'getting-started',
     'install-and-compose',
-    'configuration-and-shared',
+    'configuration',
     'pipelines',
-    'removal-and-rollback'
+    'removal-and-rollback',
+    'troubleshooting'
   ]
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/plugin-host${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/plugin-host${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -4005,7 +4198,7 @@ test('SITE-T-RESOURCE-LINKS keeps every maintained Resource continuation resolva
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/resource${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/resource${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -4035,7 +4228,7 @@ test('SITE-T-LOGGER-LINKS keeps every maintained Logger continuation resolvable'
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/logger${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/logger${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -4065,7 +4258,7 @@ test('SITE-T-STORAGE-WEB-LINKS keeps every maintained Storage Web continuation r
 
   for (const locale of ['en', 'zh']) {
     for (const topic of topics) {
-      const path = `/${locale}/guides/storage-web${topic ? `/${topic}` : ''}`
+      const path = `/${locale}/docs/storage-web${topic ? `/${topic}` : ''}`
       const html = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
       const internalLinks = [
         ...html.matchAll(/href="(\/(?:en|zh)\/(?:docs|guides|architecture)[^"#?]*)/g)
@@ -4081,7 +4274,7 @@ test('SITE-T-STORAGE-WEB-LINKS keeps every maintained Storage Web continuation r
 })
 
 test('SITE-T-STORAGE-WEB-STRUCTURED-CODEC explains selection and the real clone boundary', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/architecture/storage-web')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/storage-web')), 'utf8')
 
   assert.match(html, /四者不是同一种格式的别名/)
   assert.match(html, /真正的复制发生在 IndexedDB\/Memory 的 structured clone/)

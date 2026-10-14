@@ -1314,7 +1314,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "轻量、runtime-neutral 的 transient event fan-out 原语：登记 listener，在发布入口取得稳定快照，把同一个事件可靠地分发给目标 listener。零运行时依赖，`sideEffects: false`。"
+                  "text": "轻量、runtime-neutral 的 transient event fan-out 原语：登记 listener，在发布入口取得稳定快照，把同一个事件可靠地分发给目标 listener。唯一的运行时依赖是 `@migaia/utils`，`sideEffects: false`。"
                 }
               ]
             },
@@ -1343,7 +1343,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "只有 root 导出，没有子路径导出，零 workspace 运行时依赖。"
+                  "text": "提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。"
                 }
               ]
             },
@@ -1398,7 +1398,9 @@
                     "`terminalReport?: (error: unknown) => void | PromiseLike<void>` —— `report` 缺失/失败时的兜底诊断出口",
                     "`dispatchPolicy?: EventDispatchPolicy` —— `recursive`（默认）保持 canonical nested publish 的同步递归顺序；只有需要“当前快照全部完成后再交付重入值”的消费者才显式使用 `queued`",
                     "`admissionPolicy?: EventAdmissionPolicy` —— `multiple`（默认）为每次订阅建立独立 registration；显式 `unique` 时，同一 listener 函数在一个 channel 内只保留一份，重复订阅得到绑定同一代 registration 的 disposer。重复订阅的 `taskId` 必须与现有 registration 相同，否则抛 `INVALID_OPTIONS` `TypeError`；旧 disposer 不会移除退订或 `clear()` 后的新订阅。Hub 与以 wrapper 注册的 helper 不按原始 listener 去重",
-                    "`publishBudget?: number` —— 单次顶层同步发布事务最多调用的 listener 数，默认 `100_000`；必须是正安全整数。预算耗尽时停止继续展开并抛 `PUBLISH_FAILED`，防止递归或重入发布无限占用线程"
+                    "`publishBudget?: number` —— 单次顶层同步发布事务最多调用的 listener 数，默认 `100_000`；必须是正安全整数。预算耗尽时停止继续展开并抛 `PUBLISH_FAILED`，防止递归或重入发布无限占用线程",
+                    "`removalPolicy?: 'handle' | 'listener-all'` —— 调用订阅句柄时解除多少登记。默认 `handle` 只解除这个句柄自己的那次登记；`listener-all` 同时解除同一 listener 在该 channel 上的全部登记",
+                    "`throwOnAborted?: boolean` —— 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，返回空操作的 unsubscribe；设为 `true` 时改为抛 `ABORTED` `TypeError`"
                   ]
                 },
                 {
@@ -1702,11 +1704,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -1825,7 +1827,7 @@
                     "异步调用模块：`invokeParallel`/`invokeParallelSettled`、`invokeSerial`/`invokeSerialSettled`、`invokeTask`/`invokeTaskSettled`",
                     "Hub 模块：`createEventHub`",
                     "订阅句柄：`IEventChannelSubscription`、`IEventHubSubscription`",
-                    "错误码：`EventSubscriberErrorCode`（16 个码）逐条语义",
+                    "错误码：`EventSubscriberErrorCode`（17 个码）逐条语义",
                     "诊断消息：内部稳定文本与公开使用边界",
                     "状态常量：`EventSubscriberState`",
                     "高阶组合示例",
@@ -1845,7 +1847,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "只有 root 导出，没有子路径导出，零 workspace 运行时依赖。"
+                  "text": "提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。"
                 }
               ]
             },
@@ -1856,7 +1858,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+                  "code": "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -1890,6 +1892,10 @@
                 {
                   "type": "paragraph",
                   "text": "`removalPolicy` 决定调用一个订阅句柄时解除多少登记。默认 `handle` 只解除该句柄所属的单次登记；`listener-all` 会同时解除同一 listener 在该 channel 上的全部登记。需要精确管理重复订阅时保持默认值；只有兼容“按函数整体移除”的调用方才选择 `listener-all`。其他值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
                 },
                 {
                   "type": "paragraph",
@@ -2302,7 +2308,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -2346,6 +2352,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -2394,7 +2405,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "内部文本与 16 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`。"
+                  "text": "内部文本与 17 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`。"
                 }
               ]
             },
@@ -6345,7 +6356,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "适用：你在写一个库（logger、状态管理器、网络客户端……），希望核心保持精简，把颜色输出、批量发送、退出前 flush 这类可选能力做成独立插件，按需装卸；需要插件之间共享能力（比如\"批处理\"插件的调度器被\"HTTP 上报\"插件复用）；需要统一的安装失败回滚、卸载资源清理、按插件维度的配置管理；需要一套 sync/async/generator 三选一的处理管线机制。`@migaia/logger` 就是用这套机制实现插件化的真实例子。"
+                  "text": "适用：你在写一个库（logger、状态管理器、网络客户端……），希望核心保持精简，把颜色输出、批量发送、退出前 flush 这类可选能力做成独立插件，按需装卸；需要插件之间共享能力（比如\"批处理\"插件的调度器被\"HTTP 上报\"插件复用）；需要统一的安装失败回滚、卸载资源清理、按插件维度的配置管理；需要一套 sync/async/generator/async-generator 四种模式的处理管线机制。`@migaia/logger` 就是用这套机制实现插件化的真实例子。"
                 },
                 {
                   "type": "paragraph",
@@ -6364,7 +6375,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "包公开根入口 `@migaia/plugin-host`，另有稳定的 `@migaia/plugin-host/composition` 子路径。根入口 提供 `PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、 `GENERATOR_*` 信号量与 dispose symbol；composition 子路径仅提供 opaque `IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist` 内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。"
+                  "text": "包公开根入口 `@migaia/plugin-host`，另有稳定的 `@migaia/plugin-host/composition` 子路径。根入口 提供 `PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、 `GENERATOR_*` 信号量与 dispose symbol；composition 子路径提供 opaque `IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist` 内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。托管组合 owner 可使用该子路径的 `openComposition()` 协议。"
                 }
               ]
             },
@@ -6425,15 +6436,15 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, descriptorFactory) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>('upper', (core) => ({\n  install: () => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}))\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst view = await host.use(upper)\nview.extensions.upper('migaia') // 扩展只出现在成功安装后返回的 committed view 上\nawait view.unUse('upper')\nawait host.dispose()"
+                  "code": "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\n// 第一步：定义你的领域能力——这是你的库真正想暴露的核心功能\ntype ICore = { emit(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { emit: (value) => console.log(value) }\n  }\n}\n\n// 第二步：definePlugin(name, descriptorFactory) 定义插件；这里只定义，不会立刻安装\nconst upper = definePlugin<ICore, { upper(value: string): string }>('upper', (core) => ({\n  install: () => ({\n    upper: (value: string) => {\n      const result = value.toUpperCase()\n      core.emit(result) // 插件可以调用领域能力\n      return result\n    }\n  })\n}))\n\n// 第三步：安装、使用、卸载\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst [handle] = await host.use(upper)\nhandle.extensions.upper('migaia') // 从成功安装后返回的插件句柄读取扩展\nawait host.unUse('upper')\nawait host.dispose()"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`definePlugin()` 有两种写法。上面是函数形 `definePlugin(name, descriptorFactory)`：每次安装先同步创建一个 descriptor，再由其 `install`、`expose`、`featureExpose`、`shared` hooks 提供这次安装的能力。需要 `config`、`update`、`dispose` 等长期定义字段时使用保留对象形：`definePlugin({ name, config, install, shared, update, dispose })`。调用 `definePlugin()` 只会校验并保存定义，不会执行 descriptor 或 `install()`；真正的安装发生在 `host.use(plugin)`。"
+                  "text": "`definePlugin()` 有两种写法。上面使用函数形 `definePlugin(name, descriptorFactory)`。每次安装先同步创建一个 descriptor。descriptor 通过 `install`、`expose`、`featureExpose` hooks 提供这次安装的能力。需要 `config`、`update`、`dispose` 等定义字段时，使用对象形 `definePlugin({ name, config, install, update, dispose })`。`shared` 已删除，插件通过 Feature 共享能力。调用 `definePlugin()` 只会校验并保存定义。它不会执行 descriptor 或 `install()`。真正的安装发生在 `host.use(plugin)`。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`PluginHost<TDomainCore, TValue>` 子类唯一必须实现的是 `createPluginDomainCore()`——每次插件安装都会调用一次，产出一份独立的领域 core。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后按输入顺序返回插件句柄，业务代码从 `handle.extensions` 调用这些方法；`host.unUse(name)` 卸载插件，`host.dispose()` 关闭整个宿主。"
+                  "text": "需要领域能力时，`PluginHost<TDomainCore, TValue>` 子类重写 `createPluginDomainCore()`。它每次插件安装都会调用一次，产出一份独立的领域 core。默认实现返回空对象。插件通过 `install(core)` 拿到“领域能力 + 通用 core 能力”，返回扩展方法。`use()` 成功后按输入顺序返回插件句柄。业务代码从 `handle.extensions` 调用这些方法。`host.unUse(name)` 卸载插件。`host.dispose()` 关闭整个宿主并返回清理结果。"
                 }
               ]
             },
@@ -6480,7 +6491,13 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`new Host(options?)` —— 构造函数，`TValue` 泛型不为 `never` 时才需要用到 pipeline。全部选项字段（`IPluginHostOptions`）："
+                  "text": "`new Host(options)` —— `options` 必填。`TValue` 泛型不为 `never` 时才需要用到 pipeline。全部选项字段（`IPluginHostOptions`）："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`execution: { mutationTimeoutMs: number | false; pipelineDrainTimeoutMs: number | false }`（必填）—— 分别限制一次 mutation 的执行时间和 pipeline 租约排空时间。两项均须显式提供。`false` 表示无限等待。"
+                  ]
                 },
                 {
                   "type": "list",
@@ -6509,8 +6526,8 @@
                     [
                       "`host.use(...plugins)`",
                       "至少 1 个插件定义",
-                      "`Promise<PluginHandle[]>`",
-                      "按 Feature 依赖拓扑安装；返回与输入同序的名称句柄。"
+                      "`Promise<IPluginHandleTuple<TPlugins>>`",
+                      "按 Feature 依赖拓扑安装；返回与输入同序的插件句柄 tuple。"
                     ],
                     [
                       "`host.unUse(name)`",
@@ -6521,15 +6538,15 @@
                     [
                       "`host.dispose()`",
                       "无",
-                      "`Promise<void>`",
-                      "卸载全部插件并永久关闭宿主；重复调用复用同一 Promise。"
+                      "`Promise<IPluginHostDisposalResult>`",
+                      "永久关闭宿主并返回清理结果；重复调用复用同一 Promise。"
                     ],
                     [
                       "`host.config.get(path)`",
                       "`path: string`——插件名，或 `插件名.键` / `插件名.[下标].键`",
                       "`unknown \\",
                       "undefined`",
-                      "同步读取；对象/数组返回 Readonly 懒代理；未知插件或路径返回 `undefined`。见下方说明。"
+                      "同步读取；对象/数组返回冻结的只读快照；未知插件或路径返回 `undefined`。见下方说明。"
                     ],
                     [
                       "`host.config.update(name, recipe)`",
@@ -6626,7 +6643,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`install()` 返回值只有可枚举的 data property 会被挂载到 host；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。保留键不能作为 extension key：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object."
+                  "text": "`install()` 返回值只有可枚举的 data property 会通过 `handle.extensions` 发布；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。保留键不能作为 extension key：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object."
                 },
                 {
                   "type": "paragraph",
@@ -6641,10 +6658,10 @@
                   "headers": ["API", "参数", "返回", "说明"],
                   "rows": [
                     [
-                      "`core.config.get<T>()`",
+                      "`core.config.get()`",
                       "无运行时参数",
-                      "`IReadonlyConfig<T>`",
-                      "当前插件已提交配置的只读懒代理；嵌套对象/数组按访问路径缓存代理。"
+                      "`IReadonlyConfig<TConfig>`",
+                      "当前插件已提交配置的只读快照；嵌套对象和数组也已冻结。"
                     ],
                     [
                       "`core.onDispose(resource)`",
@@ -6712,7 +6729,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\nconst host = new PluginHost<Record<string, never>>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst prepared = definePlugin({\n  name: 'prepared',\n  setup: async (context) => {\n    const resource = { closed: false }\n    context.onDispose(() => { resource.closed = true })\n    await Promise.resolve()\n    return { resource }\n  },\n  install: (_core, { resource }) => ({ isOpen: () => !resource.closed })\n})\nconst [handle] = await host.use(prepared)\nhandle.extensions.isOpen() // true\nawait host.dispose()"
+                  "code": "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\nconst host = new PluginHost<Record<string, never>>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst prepared = definePlugin({\n  name: 'prepared',\n  setup: async (context) => {\n    const resource = { closed: false }\n    context.onDispose(() => {\n      resource.closed = true\n    })\n    await Promise.resolve()\n    return { resource }\n  },\n  install: (_core, { resource }) => ({ isOpen: () => !resource.closed })\n})\nconst [handle] = await host.use(prepared)\nhandle.extensions.isOpen() // true\nawait host.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -6731,7 +6748,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const host = new Host({ pipeline: { mode: 'sync' } })\nhost.usePipeline((value, next) => next(value.trim()))"
+                  "code": "import { PluginHost } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<Record<string, never>, string> {}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'sync' }\n})\nhost.usePipeline((value, next) => next(value.trim()))"
                 },
                 {
                   "type": "paragraph",
@@ -6740,7 +6757,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { GENERATOR_CONTINUE } from '@migaia/plugin-host'\n\nconst host = new Host({ pipeline: { mode: 'async-generator' } })\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await Promise.resolve() // 可以在 yield 之间做任意异步工作\n  yield value.trim()\n  yield value.trim().toUpperCase()\n  return GENERATOR_CONTINUE // 下一 stage 收到最后一次 yield 的大写字符串\n})\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  return `[${value}]` // 收到上一个 stage 的最后一次 yield，继续产生最终结果\n})"
+                  "code": "import { GENERATOR_CONTINUE, PluginHost } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<Record<string, never>, string> {}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async-generator' }\n})\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await Promise.resolve() // 可以在 yield 之间做任意异步工作\n  yield value.trim()\n  yield value.trim().toUpperCase()\n  return GENERATOR_CONTINUE // 下一 stage 收到最后一次 yield 的大写字符串\n})\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  return `[${value}]` // 收到上一个 stage 的最后一次 yield，继续产生最终结果\n})"
                 },
                 {
                   "type": "paragraph",
@@ -6818,7 +6835,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`ERROR_TEXT`（默认导出）：本包内置的中/英双语错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
+                    "`ERROR_TEXT`（根入口的命名导出）：本包内置的中/英双语错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHost.setLocale(locale: ILocaleKey)`：静态方法，`ILocaleKey = 'en' | 'zh'`，切换 `ERROR_TEXT` 与后续抛出错误的默认语言，默认 `'zh'`，全局生效（不是每个 Host 实例独立）。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
                     "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
@@ -6857,7 +6874,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(text: string): void }\ntype IFormatterConfig = { prefix?: string }\nconst format = defineFeature(\n  (core: { featureExpose: { format(value: string): string } }) => core.featureExpose.format\n)\nconst formatter = definePlugin(\n  'formatter',\n  (core: ICore & { config: { get(): IFormatterConfig } }) => ({\n    install: () => ({}),\n    featureExpose: () => ({ format: (value: string) => `${core.config.get().prefix} ${value}` })\n  }),\n  { format }\n)\nconst writer = definePlugin(\n  'writer',\n  (core: ICore & { features: { format: (value: string) => string } }) => ({\n    install: () => ({ log: (msg: string) => core.write(core.features.format(msg)) })\n  }),\n  { format: formatter.getFeature('format') }\n)\n\nclass Host extends PluginHost<ICore, never> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (text) => console.log(text) }\n  }\n}\n\nconst [, writerHandle] = await new Host().use(formatter, writer)\nwriterHandle.extensions.log('server started') // \"[app] server started\"\n\nawait host.config.update('formatter', () => ({ prefix: '[api]' }))\nhost.log('request handled') // \"[api] request handled\"\n\nawait host.dispose()"
+                  "code": "import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(text: string): void }\ntype IFormatterConfig = { prefix?: string }\nconst format = defineFeature((core: { featureExpose: { format(value: string): string } }) => ({\n  format: core.featureExpose.format\n}))\nconst formatter = definePlugin({\n  name: 'formatter',\n  config: { prefix: '[app]' },\n  features: { format },\n  install: () => ({}),\n  featureExpose: (core: { config: { get(): IFormatterConfig } }) => ({\n    format: (value: string) => `${core.config.get().prefix} ${value}`\n  })\n})\nconst writerFormat = defineFeature(\n  (_core, dependencies) => ({ format: dependencies.formatter.format }),\n  { formatter: formatter.getFeature('format') }\n)\nconst writer = definePlugin<\n  ICore,\n  { log(msg: string): void },\n  never,\n  'writer',\n  { format: typeof writerFormat }\n>(\n  'writer',\n  (core) => ({\n    install: () => ({ log: (msg: string) => core.write(core.features.format.format(msg)) })\n  }),\n  { format: writerFormat }\n)\n\nclass Host extends PluginHost<ICore, never> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (text) => console.log(text) }\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst [, writerHandle] = await host.use(formatter, writer)\nwriterHandle.extensions.log('server started') // \"[app] server started\"\n\nawait host.config.update('formatter', () => ({ prefix: '[api]' }))\nwriterHandle.extensions.log('request handled') // \"[api] request handled\"\n\nawait host.dispose()"
                 }
               ]
             },
@@ -6868,7 +6885,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost } from '@migaia/plugin-host'\n\ntype IRequest = { path: string; startedAt?: number }\n\nclass Host extends PluginHost<{}, IRequest> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  handle(request: IRequest): Promise<void> {\n    return this.runPipeline(request, (final) => console.log('handled', final.path)) as Promise<void>\n  }\n}\n\nconst host = new Host({ pipeline: { mode: 'async' } })\nhost.useAsyncPipeline(async (value, next) => {\n  const startedAt = Date.now()\n  await next({ ...value, startedAt }) // 前置：给下游打时间戳\n  console.log(`${value.path} took ${Date.now() - startedAt}ms`) // 后置：下游跑完才执行\n})\n\nawait host.handle({ path: '/users' })"
+                  "code": "import { PluginHost } from '@migaia/plugin-host'\n\ntype IRequest = { path: string; startedAt?: number }\n\nclass Host extends PluginHost<{}, IRequest> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  handle(request: IRequest): Promise<void> {\n    return this.runPipeline(request, (final) => console.log('handled', final.path)) as Promise<void>\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async' }\n})\nhost.useAsyncPipeline(async (value, next) => {\n  const startedAt = Date.now()\n  await next({ ...value, startedAt }) // 前置：给下游打时间戳\n  console.log(`${value.path} took ${Date.now() - startedAt}ms`) // 后置：下游跑完才执行\n})\n\nawait host.handle({ path: '/users' })"
                 }
               ]
             },
@@ -6879,7 +6896,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst events: { message: string; code?: IPluginHostErrorCode }[] = []\nconst host = new Host({\n  diagnostic: (message, code) => events.push({ message, code }),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  queueAdmissionDiagnosticMs: 200, // 排队超过 200ms 先打一条诊断\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒\n})\n\nawait host.use({\n  name: 'slow',\n  install: (core) => {\n    core.onDispose(async () => new Promise((resolve) => setTimeout(resolve, 10)))\n    return {}\n  }\n})\nawait host.dispose()\n// events 里可能包含排队等待、非枚举扩展被忽略等诊断，取决于实际时序"
+                  "code": "import { PluginHost, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst events: { message: string; code?: IPluginHostErrorCode }[] = []\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  diagnostic: (message, code) => events.push({ message, code }),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  queueAdmissionDiagnosticMs: 200, // 未配置拒绝阈值时才使用；本例不会触发该诊断\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒\n})\n\nawait host.use({\n  name: 'slow',\n  install: (core) => {\n    core.onDispose(async () => new Promise((resolve) => setTimeout(resolve, 10)))\n    return {}\n  }\n})\nawait host.dispose()\n// events 里可能包含非枚举扩展被忽略等诊断，取决于实际时序"
                 }
               ]
             },
@@ -6890,7 +6907,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, PluginHostError, type IPlugin } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst broken: IPlugin<{}, {}> = {\n  name: 'broken',\n  install: () => {\n    throw new Error('boom')\n  }\n}\n\ntry {\n  await new Host().use(broken)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') {\n    console.error('安装失败，原始错误:', (error.cause as Error).message) // 'boom'\n  }\n}"
+                  "code": "import { PluginHost, PluginHostError, type IPlugin } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst broken: IPlugin<{}, {}> = {\n  name: 'broken',\n  install: () => {\n    throw new Error('boom')\n  }\n}\n\ntry {\n  await new Host({\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n  }).use(broken)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') {\n    console.error('安装失败，原始错误:', (error.cause as Error).message) // 'boom'\n  }\n}"
                 }
               ]
             },
@@ -6901,7 +6918,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, GENERATOR_HALT } from '@migaia/plugin-host'\n\ntype IEvent = { level: 'info' | 'debug'; message: string }\n\nclass Host extends PluginHost<{}, IEvent> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  emit(event: IEvent): void {\n    this.runPipeline(event, (final) => console.log(final.level, final.message))\n  }\n}\n\nconst host = new Host({ pipeline: { mode: 'generator' } })\nhost.useGeneratorPipeline(function* (value) {\n  if (value.level === 'debug') return GENERATOR_HALT // 直接丢弃 debug 事件，后续 stage 不再执行\n  return value\n})\n\nhost.emit({ level: 'info', message: 'ready' }) // 打印\nhost.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印"
+                  "code": "import { PluginHost, GENERATOR_HALT } from '@migaia/plugin-host'\n\ntype IEvent = { level: 'info' | 'debug'; message: string }\n\nclass Host extends PluginHost<{}, IEvent> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  emit(event: IEvent): void {\n    this.runPipeline(event, (final) => console.log(final.level, final.message))\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'generator' }\n})\nhost.useGeneratorPipeline(function* (value) {\n  if (value.level === 'debug') return GENERATOR_HALT // 直接丢弃 debug 事件，后续 stage 不再执行\n  return value\n})\n\nhost.emit({ level: 'info', message: 'ready' }) // 打印\nhost.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印"
                 }
               ]
             },
@@ -6912,7 +6929,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, GENERATOR_CONTINUE } from '@migaia/plugin-host'\n\nclass FetchHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(url: string): Promise<string> {\n    let result = url\n    return Promise.resolve(\n      this.runPipeline(url, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new FetchHost({ pipeline: { mode: 'async-generator' } })\nhost.useAsyncGeneratorPipeline(async function* (url) {\n  yield url // 中间 yield 仅用于观测，不会提前进入下一 stage\n  const response = await fetch(url)\n  return await response.text()\n})\n\nconst text = await host.run('https://example.com/data')"
+                  "code": "import { PluginHost, GENERATOR_CONTINUE } from '@migaia/plugin-host'\n\nclass FetchHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(url: string): Promise<string> {\n    let result = url\n    return Promise.resolve(\n      this.runPipeline(url, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new FetchHost({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async-generator' }\n})\nhost.useAsyncGeneratorPipeline(async function* (url) {\n  yield url // 中间 yield 仅用于观测，不会提前进入下一 stage\n  const response = await fetch(url)\n  return await response.text()\n})\n\nconst text = await host.run('https://example.com/data')"
                 },
                 {
                   "type": "paragraph",
@@ -6927,7 +6944,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHost,\n  GENERATOR_CONTINUE,\n  type IGeneratorMiddlewareStage\n} from '@migaia/plugin-host'\n\n// 已有的一个同步 generator stage（比如从 generator 模式的 Host 上迁移过来的）\nconst trimStage: IGeneratorMiddlewareStage<string> = function* (value) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n}\n\nclass TextHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(value: string): Promise<string> {\n    let result = value\n    return Promise.resolve(\n      this.runPipeline(value, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new TextHost({ pipeline: { mode: 'async-generator' } })\n\n// 不用重写或手工适配：Host runner 直接提升 generator stage\nhost.useGeneratorPipeline(trimStage)\n\n// 第二个 stage 真正做异步工作\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await new Promise((resolve) => setTimeout(resolve, 0))\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\n\nawait host.run('  migaia  ') // 'MIGAIA'"
+                  "code": "import { PluginHost, GENERATOR_CONTINUE, type IGeneratorMiddlewareStage } from '@migaia/plugin-host'\n\n// 已有的一个同步 generator stage（比如从 generator 模式的 Host 上迁移过来的）\nconst trimStage: IGeneratorMiddlewareStage<string> = function* (value) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n}\n\nclass TextHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(value: string): Promise<string> {\n    let result = value\n    return Promise.resolve(\n      this.runPipeline(value, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new TextHost({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async-generator' }\n})\n\n// 不用重写或手工适配：Host runner 直接提升 generator stage\nhost.useGeneratorPipeline(trimStage)\n\n// 第二个 stage 真正做异步工作\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await new Promise((resolve) => setTimeout(resolve, 0))\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\n\nawait host.run('  migaia  ') // 'MIGAIA'"
                 },
                 {
                   "type": "paragraph",
@@ -6984,7 +7001,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 适用范围与设计定位 2. Host 公开 API 参考 3. 插件对象 API 参考 4. 插件 core API 参考 5. 配置系统 6. shared 共享能力 7. Pipeline 处理管线 8. 生命周期与错误 9. 错误码完整参考 10. 资源清理协议 11. 底层适配器与信号量 12. 完整示例 13. 构建、测试与常见问题排查"
+                  "text": "1. 适用范围与设计定位 2. Host 公开 API 参考 3. 插件对象 API 参考 4. 插件 core API 参考 5. 配置系统 6. Feature 跨插件能力 7. Pipeline 处理管线 8. 生命周期与错误 9. 错误码完整参考 10. 资源清理协议 11. 底层适配器与信号量 12. 完整示例 13. 构建、测试与常见问题排查"
                 }
               ]
             },
@@ -6994,24 +7011,24 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`PluginHost<TDomainCore, TValue, TInstalled>` 是一个抽象基类，本身不知道任何业务领域概念——它不实现日志、网络、状态管理，也不替你决定插件应该长什么样。它只负责\"插件系统\"这一层通用机制：安装顺序、生命周期、配置、资源清理、共享能力、处理管线。"
+                  "text": "`PluginHost<TDomainCore, TValue, TInstalled>` 是运行时中立的插件宿主。它负责安装顺序、生命周期、配置、资源清理、Feature 和处理管线。领域方法由应用提供。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "管线执行算法已经抽到 `@migaia/middleware-pipeline`；本包只负责把插件注册的 stage 接入执行器，并叠加 plugin-host 自己的 violation、active 状态与错误策略。不要从 plugin-host 的内部 wrapper（`src/pipeline.ts`）复制 runner 实现，也不要依赖 `src`/`dist` 内部文件——包只公开根入口 `@migaia/plugin-host`，没有稳定的深层子路径。"
+                  "text": "管线执行算法由 `@migaia/middleware-pipeline` 提供。本包把插件 stage 接入执行器，并管理宿主状态与错误。公开入口为 `@migaia/plugin-host` 和 `@migaia/plugin-host/composition`。不要依赖 `src` 或 `dist` 内部文件。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ICore = { publish(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { publish: (value) => console.log(value) }\n  }\n}"
+                  "code": "import { PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { publish(value: string): void }\n\nclass Host extends PluginHost<ICore, string> {\n  protected createPluginDomainCore(): ICore {\n    return { publish: (value) => console.log(value) }\n  }\n}"
                 },
                 {
                   "type": "paragraph",
-                  "text": "三个类型参数：`TDomainCore` 是子类提供给插件的领域能力形状；`TValue` 是 pipeline 处理的值类型（不需要 pipeline 时传 `never`，默认值即 `never`）；`TInstalled`（默认 `readonly []`）是内部用于随 `use()` 累加已安装插件类型的元组，一般不需要手写。子类唯一必须实现的是受保护方法 `createPluginDomainCore(): TDomainCore`，每次插件安装都会调用它一次，产出一份独立的领域 core 实例（不在插件之间共享同一个对象引用）。领域 core 的返回值必须是普通对象（原型为 `Object."
+                  "text": "`TDomainCore` 描述领域能力。`TValue` 描述 pipeline 的值，不需要 pipeline 时使用默认的 `never`。`TInstalled` 默认是 `readonly []`。它描述类型层声明的插件清单，参与安装约束和 Host 配置类型。运行期 `use()` 返回独立的 handle tuple，不改变 Host 变量的类型。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "prototype` 或 `null`），且字段都是可枚举 data property，否则在安装时抛出携带 `code: 'INVALID_OPTION'` 的 `TypeError`；同时不能定义与 core 保留键同名的字段（见 §4）。"
+                  "text": "需要领域能力时，子类重写 `createPluginDomainCore(): TDomainCore`。默认实现返回空对象。每次插件安装都会调用一次该方法。领域 core 必须是普通对象，并只包含可枚举的 data property。它也不能使用 core 保留键（见 §4）。不符合这些约束时，安装抛携带 `code: 'INVALID_OPTION'` 的原生 `TypeError`。"
                 }
               ]
             },
@@ -7032,7 +7049,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`new Host(options?: IPluginHostOptions)`"
+                  "text": "`new Host(options: IPluginHostOptions)`"
                 },
                 {
                   "type": "paragraph",
@@ -7042,6 +7059,20 @@
                   "type": "table",
                   "headers": ["字段", "类型", "默认值", "说明"],
                   "rows": [
+                    [
+                      "`identity?`",
+                      "`{ name?: string }`",
+                      "未命名",
+                      "宿主的可读名称；运行时另分配唯一 id。"
+                    ],
+                    [
+                      "`execution`",
+                      "`{ mutationTimeoutMs: number \\",
+                      "false; pipelineDrainTimeoutMs: number \\",
+                      "false }`",
+                      "必填，无默认值",
+                      "分别限制变更 hook 和 pipeline 排空的等待时间。传 `false` 表示无限等待。"
+                    ],
                     [
                       "`pipeline?`",
                       "`{ mode?: 'sync' \\",
@@ -7111,7 +7142,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const host = new Host({\n  diagnostic: (message, code) => console.debug(message, code),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒，超过记为失败但不阻断其余清理\n})"
+                  "code": "import { PluginHost } from '@migaia/plugin-host'\n\nconst Host = PluginHost<Record<string, never>>\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  diagnostic: (message, code) => console.debug(message, code),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒，超过记为失败但不阻断其余清理\n})"
                 },
                 {
                   "type": "paragraph",
@@ -7129,9 +7160,9 @@
                   "rows": [
                     [
                       "`host.use(...plugins)`",
-                      "至少 1 个 `IPlugin`，按顺序安装",
-                      "`Promise<Host & Extensions>`",
-                      "运行期安装插件；批次内任一失败按逆序回滚整批，见 §8。"
+                      "至少 1 个符合公开约束的插件描述符",
+                      "`Promise<IPluginHandleTuple<TPlugins>>`",
+                      "按 Feature 依赖拓扑安装。按输入顺序返回 handle tuple。批次失败时逆序回滚。"
                     ],
                     [
                       "`host.unUse(name)`",
@@ -7142,15 +7173,15 @@
                     [
                       "`host.dispose()`",
                       "无",
-                      "`Promise<void>`",
-                      "卸载全部插件并永久关闭宿主；重复调用复用同一 Promise。"
+                      "`Promise<IPluginHostDisposalResult>`",
+                      "关闭宿主并返回清理结果。重复调用复用同一 Promise。"
                     ],
                     [
                       "`host.config.get(path)`",
                       "`path: string`——插件名，或 `插件名.键` / `插件名.[下标].键`",
                       "`unknown \\",
                       "undefined`",
-                      "同步读取；对象/数组返回 Readonly 懒代理；未知插件或路径返回 `undefined`。"
+                      "同步读取；对象/数组返回冻结的只读快照；未知插件或路径返回 `undefined`。"
                     ],
                     [
                       "`host.config.update(name, recipe)`",
@@ -7211,6 +7242,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "`dispose()` 的 `cleanupErrors` 保存逻辑清理错误。`cleanupComplete: false` 表示物理清理尚未完成。此时继续等待 `physicalCompletion`，并读取其 `cleanupErrors`。逻辑清理错误仍须由调用方处理。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "跨插件能力由 Feature 引用表达；Host 依据引用拓扑排序安装，并在 provider 缺失、禁用或移除时给出对应的前置条件错误。"
                 },
                 {
@@ -7231,7 +7266,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IPluginConfig = { prefix?: string }\ntype IPluginCore = { emit(value: string): void }\n\nconst prefix: IPlugin<IPluginCore, { greet(name: string): void }, IPluginConfig> = {\n  name: 'prefix',\n  config: { prefix: 'hello' },\n  install(core) {\n    const config = core.config.get()\n    return { greet: (name) => core.emit(`${config.prefix} ${name}`) }\n  },\n  update(next) {},\n  dispose() {}\n}"
+                  "code": "import { definePlugin } from '@migaia/plugin-host'\n\ntype IPrefixConfig = { prefix?: string }\ntype IPluginCore = { emit(value: string): void }\n\nconst prefixDefinition: IPlugin<IPluginCore, { greet(name: string): void }, IPrefixConfig> = {\n  name: 'prefix',\n  config: { prefix: 'hello' },\n  install(core) {\n    const config = core.config.get()\n    return { greet: (name) => core.emit(`${config.prefix} ${name}`) }\n  },\n  update(next) {},\n  dispose() {}\n}\nconst prefix = definePlugin(prefixDefinition)"
                 },
                 {
                   "type": "paragraph",
@@ -7315,17 +7350,13 @@
                       "`void \\",
                       "Promise<void>`",
                       "视情况",
-                      "未声明 `dispose` 时的清理兜底；同步安装（`useSync`）的插件不支持这个异步形式，见 §4。"
+                      "未声明 `dispose` 时的清理兜底。同步安装也可提供异步清理钩子。"
                     ]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`install()` 返回的 extension 对象上，只有可枚举的 data property 会被挂载到 host——非枚举 key 会被有意忽略并经 `diagnostic` 回调上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性、或非 `configurable` 的属性直接抛 `TypeError`（`INVALID_OPTION`）。extension 对象本身必须是普通对象（`null`/`Object.prototype` 原型），否则抛 `TypeError`。保留键不能作为 extension key：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object.prototype` 成员（如 `toString`）冲突抛 `EXTENSION_OBJECT_PROTOTYPE`。`catch`、`finally` 可以正常使用（不在保留键集合内）。"
+                  "text": "`install()` 返回的可枚举 data property 通过 `handle.extensions` 发布。非枚举 key 被忽略，并经 `diagnostic` 上报 `EXTENSION_NON_ENUMERABLE_IGNORED`。extension 对象必须是普通对象。getter、setter 和不可配置的属性会被拒绝为 `INVALID_OPTION`。`then`、dispose symbols 等保留键会被拒绝为 `EXTENSION_RESERVED`。已占用的 extension key 会被拒绝为 `EXTENSION_DUPLICATE`。`Object.prototype` 成员会被拒绝为 `EXTENSION_OBJECT_PROTOTYPE`。`catch` 和 `finally` 可以正常使用。"
                 }
               ]
             },
@@ -7344,7 +7375,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "第一种是函数形 `definePlugin(name, descriptorFactory)`：descriptor factory 为每次安装同步返回可选的 `install`、`expose`、`featureExpose` hooks；第二种对象形可提供 `config`、`features`、`featureExpose`、`update`、`dispose`。两者都只创建定义，不执行 descriptor 或生命周期代码；`install()` 要到 `host.use(plugin)` 时才运行。`defineHost()` 与 `PluginHost` 都只接收这类由 `definePlugin()` 创建的定义，借此在执行任何插件代码前完成可信准入和类型推导。"
+                  "text": "函数形 `definePlugin(name, descriptorFactory)` 为每次安装创建 descriptor。它可提供 `install`、`expose`、`featureExpose` hooks。对象形可提供 `config`、`features`、`featureExpose`、`update`、`dispose`。两者只创建定义，不执行生命周期代码。`install()` 在安装时运行。推荐使用 `definePlugin()` 创建定义。`PluginHost` 与 `defineHost()` 复用同一准入路径。它们也接受符合公开约束的原始描述符。"
                 },
                 {
                   "type": "paragraph",
@@ -7355,12 +7386,12 @@
                   "headers": ["API / 签名", "参数", "必填性", "返回值", "同步/异步", "作用"],
                   "rows": [
                     [
-                      "`core.config.get<T>()`",
-                      "可选泛型 `T`，通常由插件 `config` 推导",
+                      "`core.config.get()`",
+                      "无",
                       "无运行时参数",
-                      "`IReadonlyConfig<T>`",
+                      "`IReadonlyConfig<TConfig>`",
                       "同步",
-                      "当前插件已提交配置的只读懒代理；嵌套对象/数组按访问路径缓存代理，不允许修改。"
+                      "返回当前插件已提交配置。配置类型由定义推导。"
                     ],
                     [
                       "`core.onDispose(resource)`",
@@ -7411,7 +7442,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`onDispose` 接受函数、`{ Symbol.dispose }` 或 `{ Symbol.asyncDispose }`。同步安装（构造函数期通过 `useSync` 安装）的插件也可注册 async disposer：Host 会先同步撤销可见状态，再通过 `PLUGIN_INSTALL_FAILED.detail.completion` 提供包含完整 rollback identities 的冻结结果；需要完整 secondary identity 的错误转换必须 await completion。资源、shared、pipeline stage 和 extension 都由这次安装记录拥有；`unUse()` 时会按逆序撤销它们（见 §10）。"
+                  "text": "`onDispose` 接受函数、`{ Symbol.dispose }` 或 `{ Symbol.asyncDispose }`。同步安装也可注册 async disposer。同步安装失败时，Host 先撤销可见状态。完整回滚结果通过 `PLUGIN_INSTALL_FAILED.detail.completion` 提供。资源、Feature、pipeline stage 和 extension 由本次注册拥有。`unUse()` 按 §10 的顺序释放它们。"
                 },
                 {
                   "type": "paragraph",
@@ -7434,7 +7465,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\nconst host = new PluginHost<Record<string, never>>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst plugin = definePlugin({\n  name: 'prepared',\n  setup: async (context) => {\n    const resource = { closed: false }\n    context.onDispose(() => { resource.closed = true })\n    await Promise.resolve()\n    return { resource }\n  },\n  featureExpose: (_core, output) => ({ isOpen: () => !output.resource.closed }),\n  install: (_core, output) => ({ isOpen: () => !output.resource.closed })\n})\nconst [handle] = await host.use(plugin)\nhandle.extensions.isOpen() // true\nawait host.dispose()"
+                  "code": "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\nconst host = new PluginHost<Record<string, never>>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst plugin = definePlugin({\n  name: 'prepared',\n  setup: async (context) => {\n    const resource = { closed: false }\n    context.onDispose(() => {\n      resource.closed = true\n    })\n    await Promise.resolve()\n    return { resource }\n  },\n  featureExpose: (_core, output) => ({ isOpen: () => !output.resource.closed }),\n  install: (_core, output) => ({ isOpen: () => !output.resource.closed })\n})\nconst [handle] = await host.use(plugin)\nhandle.extensions.isOpen() // true\nawait host.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -7450,7 +7481,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "TypeScript 的\"已安装插件\"类型（`TInstalled` 元组）只会随 `use()` 累加，不会因 `unUse()` 递减；卸载后的类型仍应视为静态能力记录，这是当前 API 的已知限制，不是 bug——运行时行为是正确的（方法确实被移除了），只是类型层面不会收窄。"
+                  "text": "`use()` 返回的句柄按名称读取当前注册。卸载后访问该句柄会抛 `PLUGIN_NOT_INSTALLED`。已取出的旧 extension 方法绑定原注册；原注册撤销后调用它会抛 `REGISTRATION_REVOKED`。"
                 }
               ]
             },
@@ -7473,7 +7504,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "1. `createPluginAdmission()` 快照插件；`createDataOrderSlot()` 分配 opaque definition lane。 2. `prepareAdmissions()` 可执行异步 setup，但 candidate extension/config/shared/stage 仍不可见。 3. `commitPreparedAdmissions()` 是同步、无用户代码的发布点；若 capsule 创建后的 Host revision 已变化， commit fail closed，随后 `discardPreparedAdmissions()` 执行 exactly-once rollback。 4."
+                  "text": "1. `createPluginAdmission()` 快照插件；`createDataOrderSlot()` 分配 opaque definition lane。 2. `prepareAdmissions()` 可执行异步 setup，但 candidate extension/config/Feature/stage 仍不可见。 3. `commitPreparedAdmissions()` 是同步、无用户代码的发布点；若 capsule 创建后的 Host revision 已变化， commit fail closed，随后 `discardPreparedAdmissions()` 执行 exactly-once rollback。 4."
                 },
                 {
                   "type": "paragraph",
@@ -7496,7 +7527,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await host.config.update('prefix', (previous) => ({\n  prefix: `${previous.prefix ?? 'hello'}!`\n}))"
+                  "code": "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\nconst prefix = definePlugin({\n  name: 'prefix',\n  config: { prefix: 'hello' },\n  install: () => ({})\n})\nconst host = new PluginHost<Record<string, never>>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nawait host.use(prefix)\nawait host.config.update('prefix', (previous) => ({\n  prefix: `${previous.prefix ?? 'hello'}!`\n}))\nawait host.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -7509,16 +7540,12 @@
               ]
             },
             {
-              "id": "readonly-懒代理与-copy-on-write",
-              "heading": "Readonly 懒代理与 Copy-on-Write",
+              "id": "readonly-快照与-copy-on-write",
+              "heading": "Readonly 快照与 Copy-on-Write",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Host 在插件 admission（安装/`update`）时取得配置所有权快照，防止调用方之后修改原始配置反向影响插件；深拷贝时会正确处理 `Date`/`RegExp`/`Map`/`Set`（构造对应新实例而非展开字段）与循环引用（内部用 `WeakMap` 保留同一图结构）。读取对象或数组时才通过 `WeakMap` 缓存创建只读代理；代理上的 `set`、`delete`、`defineProperty`、以及 `Map`/`Set`/`Date` 上的变更方法（`.set()`/`.add()`/`.setFullYear()` 等）都会抛出 `TypeError`（`code: 'INVALID_OPTION'`，文案固定为 `config is readonly`）。`config."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "update()` 的 recipe 和插件 `update(next)` hook 都只能读取只读视图，patch 在提交前被复制，因此 patch 后续被调用方修改也不会污染已提交配置。"
+                  "text": "Host 在准入时复制配置，并递归冻结普通对象和数组。原始配置后续修改不会影响已安装插件。`Date`、`RegExp`、`Map`、`Set` 等非普通对象会被拒绝为 `INVALID_CONFIG_VALUE`。循环引用会被拒绝为 `CONFIG_CYCLE_REJECTED`。读取直接返回冻结快照，不创建 Proxy。`config.update()` 复制新分支，并复用未改变的冻结分支。recipe 和 `update(next)` 只能读取快照。修改冻结属性遵循 JavaScript 原生行为，不保证 PluginHost 错误码或固定文案。"
                 }
               ]
             },
@@ -7529,7 +7556,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const formatFeature = defineFeature(\n  (core: { featureExpose: { format(value: string): string } }) => core.featureExpose.format\n)\n\nconst provider = definePlugin(\n  'provider',\n  () => ({\n    install: () => ({}),\n    featureExpose: () => ({ format: (value: string) => value.trim() })\n  }),\n  { format: formatFeature }\n)\n\nconst consumer = definePlugin(\n  'consumer',\n  (core) => ({\n    install: () => ({ formatValue: (value: string) => core.features.format(value) })\n  }),\n  { format: provider.getFeature('format') }\n)\n\nconst [, consumerHandle] = await host.use(consumer, provider)\nconsumerHandle.extensions.formatValue(' value ')"
+                  "code": "import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'\n\nconst formatFeature = defineFeature(\n  (core: { featureExpose: { format(value: string): string } }) => ({\n    format: core.featureExpose.format\n  })\n)\n\nconst provider = definePlugin(\n  'provider',\n  () => ({\n    install: () => ({}),\n    featureExpose: () => ({ format: (value: string) => value.trim() })\n  }),\n  { format: formatFeature }\n)\n\nconst consumerFormat = defineFeature((_core, dependencies) => dependencies.format, {\n  format: provider.getFeature('format')\n})\nconst consumer = definePlugin(\n  'consumer',\n  (core) => ({\n    install: () => ({ formatValue: (value: string) => core.features.format.format(value) })\n  }),\n  { format: consumerFormat }\n)\n\nconst host = new PluginHost<Record<string, never>>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst [consumerHandle] = await host.use(consumer, provider)\nconsumerHandle.extensions.formatValue(' value ')"
                 },
                 {
                   "type": "paragraph",
@@ -7561,7 +7588,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const host = new Host({ pipeline: { mode: 'sync' } })\nhost.usePipeline((value, next) => next(value.trim()))"
+                  "code": "import { PluginHost } from '@migaia/plugin-host'\n\nconst host = new PluginHost<Record<string, never>, string>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'sync' }\n})\nhost.usePipeline((value, next) => next(value.trim()))"
                 },
                 {
                   "type": "table",
@@ -7639,15 +7666,11 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. `use()` 逐个安装批次内的插件；任一安装失败会把这次批次里已安装的插件按逆序回滚。 2. `unUse()` 先调用已安装该代注册的可选 `beforeRelease(context)`；此时发布与已有调用仍可用。钩子结束后才排空租约，再依次移除 pipeline stage → 插件自身的 `dispose()`/`Symbol.dispose`/`Symbol.asyncDispose` → 释放 shared key → `onDispose()` 登记的资源 disposer → 移除已挂载的 extension 属性。`context.signal` 是该代生命周期信号，`deadlineAt` 与 `remainingMs()` 使用 Host 调度器和 `disposeStepTimeoutMs`；每代最多调用一次，钩子错误或超时被收集但不阻止后续释放。 3."
+                  "text": "1. `use()` 逐个安装批次内的插件；任一安装失败会把这次批次里已安装的插件按逆序回滚。 2. `unUse()` 先运行该代可选的 `beforeRelease(context)`。钩子运行时发布仍可用。随后等待 pipeline 租约，并撤销注册与 stage 可见性。最后运行插件 disposer，再逆序释放资源。`context.signal` 表示该代生命周期。`deadlineAt` 与 `remainingMs()` 使用 Host 调度器和 `disposeStepTimeoutMs`。每代最多运行一次钩子。钩子失败不会阻止后续释放。 3. 插件 lifecycle hook（包括 setup、beforeRelease）内禁止调用当前 Host 的 `use`、`unUse`、`config."
                 },
                 {
                   "type": "paragraph",
-                  "text": "插件 lifecycle hook（包括 setup、beforeRelease）内禁止调用当前 Host 的 `use`、`unUse`、`config.update` 或 `dispose`；setup 或 beforeRelease 等待期间外部代码调用 Host mutation 或 `config.update` 也同步抛 `LIFECYCLE_MUTATION`。应用组合层负责维护插件之间的安装/卸载拓扑。 4. cleanup 报错时，Host 仍会移除该插件的可发现状态（从注册表移除、撤销 extension），随后返回的 Promise 才 reject——错误上报和状态清理是分离的两件事，一个失败不会阻塞另一个。 5."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "Host 被 dispose 后，所有访问/变更 API 都会以 `PluginHostError` reject 或抛出；入口守卫（如内部的 `#assertActive()`）同步抛出，队列内运行时失败以 rejected Promise 返回。"
+                  "text": "update` 或 `dispose`；setup 或 beforeRelease 等待期间外部代码调用 Host mutation 或 `config.update` 也同步抛 `LIFECYCLE_MUTATION`。应用组合层负责维护插件之间的安装/卸载拓扑。 4. cleanup 报错时，Host 仍会撤销该插件的可发现状态。`unUse()` 返回 `{ ok: false, errors, affected }`。`dispose()` 在 `cleanupErrors` 中返回错误。两者都继续清理剩余资源。 5. Host 被 dispose 后，所有访问/变更 API 都会以 `PluginHostError` reject 或抛出；入口守卫（如内部的 `#assertActive()`）同步抛出，队列内运行时失败以 rejected Promise 返回。"
                 },
                 {
                   "type": "paragraph",
@@ -7862,7 +7885,7 @@
                     ],
                     [
                       "`CLEANUP_INCOMPLETE`",
-                      "逻辑清理已提交但仍有物理 cleanup 未完成；调用方应观察 `physicalCompletion`。"
+                      "逻辑关闭已提交，但清理发生错误或尚未完成。读取 `cleanupErrors`。`cleanupComplete: false` 时继续观察 `physicalCompletion`。"
                     ],
                     [
                       "`INVALID_CONFIG_VALUE`",
@@ -7900,7 +7923,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "core.onDispose(() => cleanup()) // 普通函数\ncore.onDispose({ [Symbol.dispose]: () => cleanup() }) // 同步 disposable\ncore.onDispose({ [Symbol.asyncDispose]: async () => await cleanup() }) // 异步 disposable"
+                  "code": "import { definePlugin, disposeKey, asyncDisposeKey } from '@migaia/plugin-host'\n\nconst resources = definePlugin('resources', (core) => ({\n  install: () => {\n    const cleanup = () => console.log('resource released')\n    core.onDispose(() => cleanup()) // 普通函数\n    core.onDispose({ [disposeKey]: () => cleanup() }) // 同步 disposable\n    core.onDispose({ [asyncDisposeKey]: async () => cleanup() }) // 异步 disposable\n    return {}\n  }\n}))"
                 },
                 {
                   "type": "paragraph",
@@ -7912,7 +7935,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`unUse()`/`dispose()` 清理某个插件时，先运行该代可选的 `beforeRelease`，随后按以下顺序逆序执行：pipeline disposer → 插件自身的 `dispose()`/`Symbol.dispose`/`Symbol.asyncDispose` → 释放 shared key → 通过 `onDispose()` 登记的资源 disposer → 移除已挂载的 extension 属性。每一步都以自己的 `disposeStepTimeoutMs` 为界（见 §8）；任何一步失败都会被收集而不是让后续步骤中断，最终如果同一次卸载/dispose 有多个失败会聚合成 `AggregateError`（单个失败则直接是携带该 `cause` 的 `Error`）。"
+                  "text": "`unUse()`/`dispose()` 先运行该代可选的 `beforeRelease`。随后撤销注册与 stage 可见性，再运行插件 disposer，最后释放资源 disposer。资源按登记的逆序释放。每个 disposer 受 `disposeStepTimeoutMs` 限制。失败不会中断后续清理。`unUse()` 把失败收集到结果的 `errors`，`dispose()` 把失败收集到 `cleanupErrors`。`cleanupComplete: false` 表示仍有物理清理未完成；调用方应继续等待 `physicalCompletion`。"
                 }
               ]
             },
@@ -7947,7 +7970,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(text: string): void }\ntype IFormatterConfig = { prefix?: string }\nconst format = defineFeature(\n  (core: { featureExpose: { format(value: string): string } }) => core.featureExpose.format\n)\nconst formatter = definePlugin(\n  'formatter',\n  (core: ICore & { config: { get(): IFormatterConfig } }) => ({\n    install: () => ({}),\n    featureExpose: () => ({ format: (value: string) => `${core.config.get().prefix} ${value}` })\n  }),\n  { format }\n)\nconst writer = definePlugin(\n  'writer',\n  (core: ICore & { features: { format(value: string): string } }) => ({\n    install: () => ({ log: (msg: string) => core.write(core.features.format(msg)) })\n  }),\n  { format: formatter.getFeature('format') }\n)\n\nclass Host extends PluginHost<ICore, never> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (text) => console.log(text) }\n  }\n}\n\nconst host = new Host()\nconst [, writerHandle] = await host.use(formatter, writer)\nwriterHandle.extensions.log('server started') // \"[app] server started\"\n\nawait host.config.update('formatter', () => ({ prefix: '[api]' }))\nwriterHandle.extensions.log('request handled') // \"[api] request handled\"\n\nawait host.dispose()"
+                  "code": "import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(text: string): void }\nconst format = defineFeature((core: { featureExpose: { format(value: string): string } }) => ({\n  format: core.featureExpose.format\n}))\nconst formatter = definePlugin({\n  name: 'formatter',\n  config: { prefix: '[app]' },\n  features: { format },\n  featureExpose: (core: { config: { get(): { prefix?: string } } }) => ({\n    format: (value: string) => `${core.config.get().prefix} ${value}`\n  }),\n  install: () => ({})\n})\nconst writerFormat = defineFeature((_core, dependencies) => dependencies.format, {\n  format: formatter.getFeature('format')\n})\nconst writer = definePlugin<\n  ICore,\n  { log(msg: string): void },\n  never,\n  'writer',\n  { format: typeof writerFormat }\n>(\n  'writer',\n  (core) => ({\n    install: () => ({ log: (msg: string) => core.write(core.features.format.format(msg)) })\n  }),\n  { format: writerFormat }\n)\n\nclass Host extends PluginHost<ICore, never> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (text) => console.log(text) }\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst [, writerHandle] = await host.use(formatter, writer)\nwriterHandle.extensions.log('server started') // \"[app] server started\"\n\nawait host.config.update('formatter', () => ({ prefix: '[api]' }))\nwriterHandle.extensions.log('request handled') // \"[api] request handled\"\n\nawait host.dispose()"
                 }
               ]
             },
@@ -7958,7 +7981,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost } from '@migaia/plugin-host'\n\ntype IRequest = { path: string; startedAt?: number }\n\nclass Host extends PluginHost<{}, IRequest> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  handle(request: IRequest): Promise<void> {\n    return this.runPipeline(request, (final) => {\n      console.log('handled', final.path)\n    }) as Promise<void>\n  }\n}\n\nconst host = new Host({ pipeline: { mode: 'async' } })\nhost.useAsyncPipeline(async (value, next) => {\n  const startedAt = Date.now()\n  await next({ ...value, startedAt }) // 前置：给下游打时间戳\n  console.log(`${value.path} took ${Date.now() - startedAt}ms`) // 后置：下游跑完才执行\n})\n\nawait host.handle({ path: '/users' })"
+                  "code": "import { PluginHost } from '@migaia/plugin-host'\n\ntype IRequest = { path: string; startedAt?: number }\n\nclass Host extends PluginHost<{}, IRequest> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  handle(request: IRequest): Promise<void> {\n    return this.runPipeline(request, (final) => {\n      console.log('handled', final.path)\n    }) as Promise<void>\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async' }\n})\nhost.useAsyncPipeline(async (value, next) => {\n  const startedAt = Date.now()\n  await next({ ...value, startedAt }) // 前置：给下游打时间戳\n  console.log(`${value.path} took ${Date.now() - startedAt}ms`) // 后置：下游跑完才执行\n})\n\nawait host.handle({ path: '/users' })"
                 }
               ]
             },
@@ -7969,7 +7992,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst events: { message: string; code?: IPluginHostErrorCode }[] = []\nconst host = new Host({\n  diagnostic: (message, code) => events.push({ message, code }),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  queueAdmissionDiagnosticMs: 200, // 未配置拒绝阈值时才会用到；这里已配置拒绝阈值，实际不会走这一条\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒\n})\n\nawait host.use({\n  name: 'slow',\n  install: (core) => {\n    core.onDispose(async () => new Promise((resolve) => setTimeout(resolve, 10)))\n    return {}\n  }\n})\nawait host.dispose()\n// events 里可能包含非枚举扩展被忽略等诊断，取决于实际时序"
+                  "code": "import { definePlugin, PluginHost, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst events: { message: string; code?: IPluginHostErrorCode }[] = []\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  diagnostic: (message, code) => events.push({ message, code }),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  queueAdmissionDiagnosticMs: 200, // 未配置拒绝阈值时才会用到；这里已配置拒绝阈值，实际不会走这一条\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒\n})\n\nawait host.use(\n  definePlugin({\n    name: 'slow',\n    install: (core) => {\n      core.onDispose(() => new Promise<void>((resolve) => setTimeout(resolve, 10)))\n      return {}\n    }\n  })\n)\nawait host.dispose()\n// events 里可能包含非枚举扩展被忽略等诊断，取决于实际时序"
                 }
               ]
             },
@@ -7980,7 +8003,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, PluginHostError, type IPlugin } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst broken: IPlugin<{}, {}> = {\n  name: 'broken',\n  install: () => {\n    throw new Error('boom')\n  }\n}\n\ntry {\n  await new Host().use(broken)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') {\n    console.error('安装失败，原始错误:', (error.cause as Error).message) // 'boom'\n    console.error('失败插件:', error.detail?.failedName)\n    console.error('回滚错误身份:', error.detail?.rollbackErrors)\n  }\n}"
+                  "code": "import { definePlugin, PluginHost, PluginHostError } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst broken = definePlugin({\n  name: 'broken',\n  install: () => {\n    throw new Error('boom')\n  }\n})\n\ntry {\n  await new Host({\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n  }).use(broken)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') {\n    console.error('安装失败，原始错误:', (error.cause as Error).message) // 'boom'\n    console.error('失败插件:', error.detail?.failedName)\n    console.error('回滚错误身份:', error.detail?.rollbackErrors)\n  }\n}"
                 }
               ]
             },
@@ -7991,7 +8014,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, GENERATOR_HALT } from '@migaia/plugin-host'\n\ntype IEvent = { level: 'info' | 'debug'; message: string }\n\nclass Host extends PluginHost<{}, IEvent> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  emit(event: IEvent): void {\n    this.runPipeline(event, (final) => console.log(final.level, final.message))\n  }\n}\n\nconst host = new Host({ pipeline: { mode: 'generator' } })\nhost.useGeneratorPipeline(function* (value) {\n  if (value.level === 'debug') return GENERATOR_HALT // 直接丢弃 debug 事件，后续 stage 不再执行\n  return value\n})\n\nhost.emit({ level: 'info', message: 'ready' }) // 打印\nhost.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印"
+                  "code": "import { PluginHost, GENERATOR_HALT } from '@migaia/plugin-host'\n\ntype IEvent = { level: 'info' | 'debug'; message: string }\n\nclass Host extends PluginHost<{}, IEvent> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  emit(event: IEvent): void {\n    this.runPipeline(event, (final) => console.log(final.level, final.message))\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'generator' }\n})\nhost.useGeneratorPipeline(function* (value) {\n  if (value.level === 'debug') return GENERATOR_HALT // 直接丢弃 debug 事件，后续 stage 不再执行\n  return value\n})\n\nhost.emit({ level: 'info', message: 'ready' }) // 打印\nhost.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印"
                 }
               ]
             },
@@ -8010,7 +8033,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`await host.use(plugin)` 卡住不返回。 检查插件的 `install()` 是否在自己内部同步等待了当前宿主的另一个 `use()`/`unUse()`/`config.update()` 调用——这会形成自等待死锁，见 §8。默认情况下这种自依赖只会持续触发诊断（打开 `diagnostic` 回调观察排队等待提示）而不会自动解开；如果需要一个明确的上限，构造 Host 时显式传入 `queueAdmissionTimeoutMs`，超时会以 `MUTATION_QUEUE_TIMEOUT` 结束这次等待。"
+                  "text": "Q：`await host.use(plugin)` 卡住不返回。 检查 `install()` 等待的 Promise 是否能够完成。`execution.mutationTimeoutMs` 限制本次 hook 的等待时间。插件 lifecycle hook 调用当前 Host 的 mutation 会被 `LIFECYCLE_MUTATION` 拒绝。排队等待另由 `queueAdmissionTimeoutMs` 控制。"
                 },
                 {
                   "type": "paragraph",
@@ -8018,15 +8041,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：TypeScript 报 extension 方法不存在，但运行时明明有。 检查该插件是否是\"运行期动态安装\"（`await host.use(plugin)`）——TypeScript 需要能静态分析到这次 `use()` 调用并把返回值赋值给一个新的变量/重新赋值给 `host`，才能推导出扩展后的类型；如果插件是根据运行时条件动态选择安装的，类型系统无法推导，需要手动标注类型。"
+                  "text": "Q：TypeScript 报 extension 方法不存在，但运行时明明有。 从 `use()` 的结果中解构句柄，例如 `const [handle] = await host.use(plugin)`。调用 `handle.extensions` 上的方法。`use()` 不返回扩展后的 Host。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`core.onDispose(asyncFn)` 在构造期插件里直接抛错。 构造函数同步安装的插件不允许注册 async disposer，见 §4。要么把这个资源的清理逻辑改成同步，要么把这个插件改成运行期通过 `await host.use(plugin)` 安装。"
+                  "text": "Q：`core.onDispose(asyncFn)` 在构造期插件里直接抛错。 同步安装也允许登记 async disposer。检查登记是否发生在有效的安装窗口内。窗口外登记会先释放有效资源，再抛 `RESOURCE_OUTSIDE_INSTALL`。同步安装失败的异步回滚详情可通过 `detail.completion` 取得。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`config.get()` 读出来的嵌套对象不能修改。 这是预期行为：配置通过 Readonly 懒代理保护，写操作会抛携带 `code: 'INVALID_OPTION'` 的 `TypeError`。需要修改配置时，使用 `config.update()` 返回新的 patch，不要直接修改 `get()` 或 `update(next)` 收到的对象。"
+                  "text": "Q：`config.get()` 读出来的嵌套对象不能修改。 配置是递归冻结的只读快照。使用 `config.update()` 返回新的 patch。不要直接修改 `get()` 或 `update(next)` 收到的对象。"
                 },
                 {
                   "type": "paragraph",
@@ -33580,7 +33603,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
+                  "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -33599,7 +33622,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -33659,7 +33682,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(definePlugin({\n  name: 'late',\n  features: {\n    value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n  },\n  install: () => ({ late: true })\n}))\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
+                  "code": "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(\n  definePlugin({\n    name: 'late',\n    features: {\n      value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n    },\n    install: () => ({ late: true })\n  })\n)\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
                 },
                 {
                   "type": "paragraph",
@@ -33741,7 +33764,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -33815,12 +33838,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             },
@@ -33922,7 +33954,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const trayKey = (value: string): ITrayKey => value as ITrayKey\nexport const AppTrayKey = {\n  config: trayKey('config'),\n  api: trayKey('api')\n} as const"
+                  "code": "import type { ITrayKey } from '@migaia/tray'\n\nconst trayKey = (value: string): ITrayKey => value as ITrayKey\nexport const AppTrayKey = {\n  config: trayKey('config'),\n  api: trayKey('api')\n} as const"
                 }
               ]
             },
@@ -33933,7 +33965,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
+                  "code": "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
                 },
                 {
                   "type": "list",
@@ -33966,7 +33998,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph"
+                  "code": "import type { ITrayEntryDefinition, ITrayGraph } from '@migaia/tray'\n\ndeclare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph"
                 },
                 {
                   "type": "paragraph",
@@ -34008,7 +34040,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
+                  "code": "import type { ICapabilityGraphNodeState as IGraphNodeState } from '@migaia/capability/graph'\nimport type { ITrayKey, ITrayState } from '@migaia/tray'\n\ntype ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): IGraphNodeState\n  dispose(): Promise<void>\n}"
                 },
                 {
                   "type": "list",
@@ -34264,12 +34296,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "callback context 的 `self` 是当前 run/name/generation 专属 mutation capability："
+                  "text": "callback context 的 `self` 是当前 run/name/generation 专属 mutation capability。 下面的函数接收已有的 Runtime；其中 `search` 必须已 ready："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())\nawait ticket.completion"
+                  "code": "import type { IRuntime } from '@migaia/tray/runtime'\n\n/** 等待 callback 结束，再观察当前 search generation 的卸载结果。 */\nasync function unloadSearch(runtime: IRuntime): Promise<void> {\n  /** completion 只在 callback 结束后读取。 */\n  const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())\n  await ticket.completion\n}"
                 },
                 {
                   "type": "paragraph",

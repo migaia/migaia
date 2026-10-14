@@ -2,7 +2,7 @@ import { StorageError, StorageErrorCode } from '../types/errors.js'
 import type { ICodec } from './types.js'
 import { StorageCodecOutput } from '../constants.js'
 
-/** 默认 codec：零依赖，全后端可用。 */
+/** Provides the default codec without external dependencies. Works on every backend. */
 export const jsonCodec: ICodec<unknown, string> = Object.freeze({
   name: 'json',
   output: StorageCodecOutput.text,

@@ -55,8 +55,10 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
 })
 
 /**
- * 纯内存实现。用于测试、SSR 服务端、以及其他后端不可用时的显式降级目标。 每个实例持有独立存储，天然隔离，不需要命名空间参数。 实现全部 L0 + L1 接口（record 使用
- * structured clone），v1 不提供原生二级索引。
+ * Provides an in-memory backend for tests, server-side SSR, and explicit fallback when other
+ * backends are unavailable. Each instance owns isolated storage and needs no namespace. Supplies
+ * all L0 and L1 operations, with structured cloning for records. The v1 backend does not supply
+ * native secondary indexes.
  */
 export const memoryStorageHost = <TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>> &
   IChangeFeedStore => {

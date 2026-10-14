@@ -2,22 +2,26 @@
 
 README 负责快速上手；本文给出静态 Graph 和 Hosts 层的公开契约、失败语义与生产边界。Graph、PluginHost、RPC 与 supervision 分别保留原有生命周期与执行所有权。
 
-
 ## Hosts：实例发现与生命周期
 
 根入口的 `defineTrayHost` / `createTray({ hosts })` 管理完整 PluginHost 实例；
 `createTrayGraph(entries)` 继续管理静态 capability 集合。每个实例与父 Host 独立。
 
-```ts
+```ts doc-test=check
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createTray, defineTrayHost } from '@migaia/tray'
 
 const echo = defineFeature(() => ({ echo: (value: string) => value }))
 const agent = defineTrayHost({
   name: 'agent',
-  plugins: () => [definePlugin({
-    name: 'node', features: { svc: echo }, install: () => ({})
-  })] as const,
+  plugins: () =>
+    [
+      definePlugin({
+        name: 'node',
+        features: { svc: echo },
+        install: () => ({})
+      })
+    ] as const,
   exposes: ['node.svc']
 })
 const tray = createTray({ hosts: [agent] })
@@ -44,15 +48,15 @@ try {
 `exposes` 是只读的 `plugin.feature` 路径数组；方法调用使用 `plugin.feature.method`。
 结构复制品不具备原定义的身份，不能传给 registry 或 `instance()`。
 
-| 字段 | 类型与默认值 | 使用条件 |
-| --- | --- | --- |
-| `runtime` | `'coroutine' \| 'thread' \| 'process'`；默认 `'coroutine'` | 选择实例运行方式 |
-| `entry` | `string \| URL` | thread / process 必填；coroutine 禁止 |
-| `config` | `(input: unknown) => TConfig`；默认无验证器 | 每次初始化时验证并转换配置，输出交给 `plugins` |
-| `supervisor` | `ITraySupervisorPolicy`；默认使用运行时策略 | `restart` 支持 `mode`、`maxRestarts`、`windowMs`、`initialDelayMs`；另支持 `startupTimeoutMs` |
-| `limits` | `Readonly<{ heapBytes?: number }>`；默认未指定 | 仅 thread 可用 |
-| `sandbox` | `ITraySandbox`；默认未指定 | 仅 process 可用；包含 `name` 与同步 `wrap(command)` |
-| `routing` | `TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定 | 声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing） |
+| 字段         | 类型与默认值                                               | 使用条件                                                                                                 |
+| ------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `runtime`    | `'coroutine' \| 'thread' \| 'process'`；默认 `'coroutine'` | 选择实例运行方式                                                                                         |
+| `entry`      | `string \| URL`                                            | thread / process 必填；coroutine 禁止                                                                    |
+| `config`     | `(input: unknown) => TConfig`；默认无验证器                | 每次初始化时验证并转换配置，输出交给 `plugins`                                                           |
+| `supervisor` | `ITraySupervisorPolicy`；默认使用运行时策略                | `restart` 支持 `mode`、`maxRestarts`、`windowMs`、`initialDelayMs`；另支持 `startupTimeoutMs`            |
+| `limits`     | `Readonly<{ heapBytes?: number }>`；默认未指定             | 仅 thread 可用                                                                                           |
+| `sandbox`    | `ITraySandbox`；默认未指定                                 | 仅 process 可用；包含 `name` 与同步 `wrap(command)`                                                      |
+| `routing`    | `TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定      | 声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing） |
 
 `supervisor.restart.mode` 接收 `'never' | 'on-failure' | 'always'`。
 `sandbox.wrap` 的输入与输出均为 RPC Process 的 `IProcessLaunchCommand`：
@@ -66,10 +70,24 @@ try {
 `serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm
 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。
 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。
-Worker 或子进程入口与父 registry 应导入同一个定义模块，例如：
+Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host：
 
-```ts
-// worker.mjs：共享定义模块已由应用提供。
+```ts doc-test=check group=worker-entry file=hosts.ts
+import { defineTrayHost } from '@migaia/tray'
+
+/** 父 registry 与 Worker 入口共用的 Host 定义。 */
+export const worker = defineTrayHost({
+  name: 'worker',
+  runtime: 'thread',
+  entry: new URL('./worker.js', import.meta.url),
+  plugins: () => [] as const,
+  exposes: []
+})
+```
+
+`worker.ts` 编译后连接父 registry：
+
+```ts doc-test=check group=worker-entry file=worker.ts
 import { serveTrayHost } from '@migaia/tray'
 import { worker } from './hosts.js'
 
@@ -121,10 +139,9 @@ Tray 验证和 start 错误使用自己的稳定 code，并保留原错误于 ca
 定义时不调用 `pick`。名称必须符合 `^[a-z][A-Za-z0-9]*$`，不能是 `roundRobin`、
 `leastInFlight` 或函数、对象的保留属性名；名称或回调非法时抛 `TRAY_ROUTING_INVALID`。
 
-
 ## 1. 公开入口与类型
 
-```ts
+```ts doc-test=check
 import {
   createTrayGraph,
   TRAY_SOURCE,
@@ -143,7 +160,9 @@ import {
 
 `ITrayKey` 是带品牌的非空字符串。包不猜测或生成业务 key；应用应在自己的契约文件集中声明并复用：
 
-```ts
+```ts doc-test=check
+import type { ITrayKey } from '@migaia/tray'
+
 const trayKey = (value: string): ITrayKey => value as ITrayKey
 export const AppTrayKey = {
   config: trayKey('config'),
@@ -153,7 +172,14 @@ export const AppTrayKey = {
 
 ## 2. Entry 定义
 
-```ts
+```ts doc-test=check
+import type {
+  IGraphReadinessSnapshot,
+  ITrayEntryContext,
+  ITrayEntryInstance,
+  ITrayKey
+} from '@migaia/tray'
+
 type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'
 
 type ITrayEntryDefinition<T> = {
@@ -181,8 +207,10 @@ type ITrayEntryDefinition<T> = {
 
 ## 3. `createTrayGraph()` 与 admission
 
-```ts
-function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph
+```ts doc-test=check
+import type { ITrayEntryDefinition, ITrayGraph } from '@migaia/tray'
+
+declare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph
 ```
 
 构造阶段只做同步 admission，不启动 entry。数组、entry 字段、kind、key、requires 与 readiness 外形不合法时立即抛 `TRAY_INVALID_ENTRY`；重复 key 抛 `TRAY_DUPLICATE_ENTRY`。任何 admission 失败都发生在第一个 `start()` 之前，不会留下半启动组合根。
@@ -202,14 +230,17 @@ function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITr
 
 ## 5. `ITrayGraph` API
 
-```ts
+```ts doc-test=check
+import type { ICapabilityGraphNodeState as IGraphNodeState } from '@migaia/capability/graph'
+import type { ITrayKey, ITrayState } from '@migaia/tray'
+
 type ITrayGraph = {
   readonly keys: readonly ITrayKey[]
   readonly state: ITrayState
   readonly error: unknown | undefined
   ready(): Promise<void>
   get<T>(key: ITrayKey): T
-  entryState(key: ITrayKey): string
+  entryState(key: ITrayKey): IGraphNodeState
   dispose(): Promise<void>
 }
 ```
@@ -275,7 +306,7 @@ pnpm --filter @migaia/tray build
 
 ## 10. `@migaia/tray/host` 托管组合
 
-```ts
+```ts doc-test=check
 import { createHost, type ICreateHostOptions, type ITrayResolvedHost } from '@migaia/tray/host'
 ```
 
@@ -316,7 +347,7 @@ publication receipt。
 
 能力边界通过显式子路径保持隔离：
 
-```ts
+```ts doc-test=check
 import { defineLoader, loadIntoHost } from '@migaia/tray/loader'
 import { defineAdapter } from '@migaia/tray/adapter'
 import { createRuntime } from '@migaia/tray/runtime'
@@ -334,11 +365,18 @@ Promise 与 foreign thenable 都在 callback settle 后释放 lease；caller sig
 和 timeout 只 abort cooperative signal，不伪造任务已终止。`strict-drain` 等待真实 settlement，
 `bounded` 可返回未完成的物理观察结果。
 
-callback context 的 `self` 是当前 run/name/generation 专属 mutation capability：
+callback context 的 `self` 是当前 run/name/generation 专属 mutation capability。
+下面的函数接收已有的 Runtime；其中 `search` 必须已 ready：
 
-```ts
-const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())
-await ticket.completion
+```ts doc-test=check
+import type { IRuntime } from '@migaia/tray/runtime'
+
+/** 等待 callback 结束，再观察当前 search generation 的卸载结果。 */
+async function unloadSearch(runtime: IRuntime): Promise<void> {
+  /** completion 只在 callback 结束后读取。 */
+  const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())
+  await ticket.completion
+}
 ```
 
 ticket 不可 thenable，且只在 callback 已 settle 并释放 generation lease 后才调度 canonical
@@ -349,7 +387,6 @@ managed Host mutation。callback 内等待 `ticket.completion` 会 fail fast 并
 Loader/Adapter/Runtime 契约错误分别使用 `LOADER_*`、`ADAPTER_*`、`RUNTIME_*` 码；原始 native
 error 保留 identity、type、stack 与 cause。artifact secondary cleanup 使用
 `ARTIFACT_CLEANUP_FAILED` 作为观察码，不能替换更早 mutation primary。
-
 
 ## Routing
 

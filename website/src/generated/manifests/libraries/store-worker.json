@@ -1143,8 +1143,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-worker/getting-started",
-      "architecturePath": "/en/architecture/store-worker",
+      "guidePath": "/en/docs/store-worker/getting-started",
+      "architecturePath": "/en/docs/store-worker",
       "symbols": [
         {
           "name": "createStoreWorkerAggregateError",
@@ -2830,8 +2830,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-worker/getting-started",
-      "architecturePath": "/en/architecture/store-worker",
+      "guidePath": "/en/docs/store-worker/getting-started",
+      "architecturePath": "/en/docs/store-worker",
       "symbols": [
         {
           "name": "createSerializeWorkerHandler",

@@ -20,7 +20,10 @@ export type IMutationQueueOptions = {
     readonly owner: string | undefined
     readonly waitedMs: number
   }) => void
-  /** Runtime-neutral scheduler（默认 `systemScheduler`）；watchdog 计时与时钟都经它，不直接用宿主 timer。 */
+  /**
+   * Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers.
+   * Defaults to `systemScheduler`.
+   */
   readonly scheduler?: IScheduler
 }
 

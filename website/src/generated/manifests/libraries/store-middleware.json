@@ -946,8 +946,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-middleware/getting-started",
-      "architecturePath": "/en/architecture/store-middleware",
+      "guidePath": "/en/docs/store-middleware/getting-started",
+      "architecturePath": "/en/docs/store-middleware",
       "symbols": [
         {
           "name": "bindStoreMiddleware",
@@ -3576,8 +3576,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-middleware/getting-started",
-      "architecturePath": "/en/architecture/store-middleware",
+      "guidePath": "/en/docs/store-middleware/getting-started",
+      "architecturePath": "/en/docs/store-middleware",
       "symbols": [
         {
           "name": "ClonePolicy",

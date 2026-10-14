@@ -35,7 +35,10 @@ import {
 import { transferablesOf } from './transferables.js'
 import { CursorQueue } from '../cursor-queue.js'
 
-/** Worker 出事的三种途径，全都得监听，否则请求会永久悬挂。 */
+/**
+ * Identifies the `error` and `messageerror` worker failure events. Both must be observed so
+ * requests do not remain pending indefinitely.
+ */
 export type IWorkerFailureEvent = 'error' | 'messageerror'
 
 export type IWorkerLike = IWebWorkerLikePort & {
@@ -229,10 +232,11 @@ function createWorkerFrameQueue(
 }
 
 /**
- * 字节过界的所有权语义。
+ * Defines byte ownership across the worker boundary.
  *
- * Transfer 是**破坏性**的：底层 ArrayBuffer 连同指向它的所有别名视图一起被 detach。调用方交出去之后，一旦 worker 崩溃或请求被取消，就既没有结果、
- * 也失去了输入——原地数据丢失。所以默认是 copy，转移必须显式要求。
+ * Transfer detaches the underlying `ArrayBuffer` and every aliasing view. If the worker fails or
+ * the request is cancelled, callers lose both the result and their input. The default is `copy`;
+ * callers must explicitly request transfer.
  */
 /** Encodes one worker input using the canonical byte brand without copying its payload. */
 export function encodeWorkerValue(value: unknown): ISerializeChunk {
@@ -246,11 +250,17 @@ export function decodeWorkerValue(value: unknown): ISerializeChunk {
 
 export type IWorkerPluginOptions = {
   readonly worker: IWorkerLike
-  /** 注册到 registry 的格式标签，需与 worker 侧实际使用的编码一致。 */
+  /** Names the format registered in the registry. It must match the encoding used by the worker. */
   readonly type?: string
-  /** 卸载时是否顺带终止 worker。外部传入的 worker 默认归调用方所有。 */
+  /**
+   * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by
+   * default.
+   */
   readonly terminateOnDispose?: boolean
-  /** 默认 'copy'：安全但要复制一遍。只有当调用方确认这段字节独占、且交出去之后 不再使用时，才该选 'transfer' 换取零拷贝。 */
+  /**
+   * Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes
+   * are exclusively owned and no longer used after handoff.
+   */
   readonly ownership?: IByteOwnership
   /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */
   readonly clientId?: string
@@ -275,17 +285,23 @@ function assertWorkerParserOptions(options: unknown): asserts options is IWorker
 }
 
 /**
- * 只有当视图恰好覆盖整个 buffer 时，转移才不会波及别人。
+ * Only views covering the complete buffer are eligible for transfer.
  *
- * `subarray()` 出来的视图与原 buffer 共享底层内存，转移它会把整个 buffer 连同 所有其他视图一起 detach —— 调用方只想交出一小段，结果整块没了。这种情况必须
- * 退回复制。
+ * A `subarray()` shares memory with the original buffer. Transferring it would detach the whole
+ * buffer and every other view. Partial views therefore fall back to copying.
  */
 /**
- * 把编解码放到 worker 里做。
+ * Moves encoding and decoding into a worker.
  *
- * 实测结论决定了它的正确用法（1M 条 / 71.5MB，主线程阻塞时长）： - 字节进、字节出，结果不还原成主线程对象图 → 主线程 1.4ms，比主线程直接做 JSON 的 65ms 少约
- * 46 倍，墙钟基本持平。这是唯一真正划算的形态。 - 把对象图 postMessage 进 worker → 主线程 126ms，比直接在主线程做还慢一倍。
- * 结构化克隆是在调用方线程同步完成的，成本只是从 stringify 换成 clone。 所以：用它承接落盘/传输这类「拿到字节就结束」的活，不要用它加速 hydrate。
+ * A documented measurement with one million records and 71.5 MB reports 1.4 ms of main-thread
+ * blocking for byte input and output. The result remains bytes instead of being restored into a
+ * main-thread object graph. This is about 46 times lower than the 65 ms for direct main-thread
+ * JSON, with similar wall time. Sending the object graph through `postMessage` instead blocks the
+ * main thread for 126 ms, about twice the direct JSON time. Structured cloning runs synchronously
+ * on the caller thread, replacing stringify cost with clone cost.
+ *
+ * Use this parser for persistence or transport that finishes with bytes, rather than to accelerate
+ * hydration.
  */
 export function workerParser(options: IWorkerPluginOptions): ISerializeParser {
   assertWorkerParserOptions(options)
@@ -540,10 +556,11 @@ export const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin =>
 }
 
 /**
- * Worker 侧的对端。把一个普通 parser 装进 worker，按上面的报文协议应答。
+ * Installs an ordinary parser on the worker side and responds through the serialization message
+ * protocol.
  *
- * 与 core/worker.ts 里的 createWorkerHandler 同一手法：错误一律转成回包，绝不让 异常逃逸成 worker 的 unhandled
- * error——那会静默吞掉请求方的 Promise。
+ * Like `createWorkerHandler` in `core/worker.ts`, it converts operation failures into replies. This
+ * prevents unhandled worker errors from leaving the caller's request promise unresolved.
  */
 export function createSerializeWorkerHandler(
   parser: ISerializeParser,

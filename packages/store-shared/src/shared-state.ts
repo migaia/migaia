@@ -382,9 +382,10 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   }
 
   /**
-   * Pull remote writes into this Runtime.
+   * Pulls remote writes into this `Runtime`.
    *
-   * `watch()` 起了回路之后就不必手动调它；没有 waitAsync 的环境仍可从自己的消息 循环里 pump。
+   * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can
+   * poll from their own message loop.
    */
   sync(): boolean {
     this.#assertActive()
@@ -396,9 +397,10 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   }
 
   /**
-   * 起一条 waitAsync 回路：远端写入直接推到本 Runtime，不必再 pump `sync()`。
+   * Starts an `Atomics.waitAsync` loop that publishes remote writes to this `Runtime` without
+   * manual `sync()` polling.
    *
-   * 返回停止函数；`dispose()` 也会停。
+   * Returns a stop function. `dispose()` also stops the loop.
    */
   watch(): IDisposer {
     this.#assertActive()
@@ -688,10 +690,13 @@ export class SharedInt32Array implements IDisposable {
   }
 
   /**
-   * 读-改-写。
+   * Reads, updates, and writes one cell.
    *
-   * 用户回调**在锁外**执行：持锁期间调用别人的代码，一旦它抛错就留下一把奇数的 死锁，之后所有读者都会自旋到上限然后抛。所以先一致读、锁外算、再带期望值写， 值被别人改掉就重来。 因此
-   * `update` 回调必须纯且可重复执行；不要在回调中埋点、发请求或产生不可逆副作用。
+   * The callback runs outside the lock so a thrown exception cannot leave readers spinning on an
+   * odd locked version. The operation reads a consistent value, computes outside the lock, and
+   * writes with that value as its expectation. It retries if another writer changes the value. The
+   * `update` callback must be pure and repeatable. Avoid telemetry, requests, and irreversible side
+   * effects in the callback.
    */
   update(index: number, update: (current: number) => number): number {
     this.#assertIndex(index)
@@ -722,9 +727,10 @@ export class SharedInt32Array implements IDisposable {
   }
 
   /**
-   * Scan for remote writes and notify only affected index observers.
+   * Scans remote writes and notifies only affected index observers.
    *
-   * `watch()` 起了回路之后不必手动调；没有 waitAsync 的环境仍可从消息循环 pump。
+   * An active `watch()` loop performs this automatically. Without `Atomics.waitAsync`, callers can
+   * poll from their message loop.
    */
   sync(index?: number): number {
     this.assertActive()
@@ -759,9 +765,10 @@ export class SharedInt32Array implements IDisposable {
   }
 
   /**
-   * 起一条 waitAsync 回路覆盖整片。
+   * Starts an `Atomics.waitAsync` loop for the whole array.
    *
-   * 等的是 epoch 而不是逐格的 seq：一格一个 waiter 在长数组上不可行。醒来后 `sync()` 扫描，只有真正变了的格会通知它自己的观察者。
+   * It waits on the generation epoch instead of creating a waiter for every cell. After waking,
+   * `sync()` scans cells and notifies observers only for cells that changed.
    */
   watch(): IDisposer {
     this.assertActive()
@@ -826,7 +833,7 @@ export class SharedInt32Array implements IDisposable {
     }
   }
 
-  /** 一致读某一格：value 与 version 同源。 */
+  /** Reads one cell consistently, with its value and version from the same observation. */
   readCell(index: number): {
     readonly value: number
     readonly version: bigint
@@ -834,7 +841,10 @@ export class SharedInt32Array implements IDisposable {
     return readConsistent(this.#valueView, this.#versionView, this.#valueSlot(index), index)
   }
 
-  /** 写某一格；返回新版本，或 undefined 表示没写（值未变或期望值不符）。 */
+  /**
+   * Writes one cell and returns its new version. Returns `undefined` when the value is unchanged or
+   * the expected value does not match.
+   */
   writeCell(index: number, value: number, expected?: number): bigint | undefined {
     const version = writeLocked(
       this.#valueView,

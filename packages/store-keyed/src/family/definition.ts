@@ -14,35 +14,36 @@ import { StoreKeyedErrorText } from '../error-text.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /**
- * 按键产出**定义**的 family。
+ * Creates a family of definitions keyed by identity.
  *
- * 旧的 `atomFamily` 缓存的是已经绑死 Runtime 的实例，所以同一个 key 在两个 Scope 下拿到的是同一份状态——这正是「family 返回的东西不能跨 Scope
- * 复用」的原因。
+ * The legacy `atomFamily` caches instances bound to a `Runtime`. The same key therefore shares
+ * state across scopes and its instances cannot be reused across scopes.
  *
- * 定义化之后分工清楚：
- *
- * - **family 缓存定义**（纯 token，无状态、无 Runtime）
- * - **Scope 缓存实例**（真正的图节点与值） 于是 `chatFamily('conv-1')` 在任何 Scope 里都是同一个 token，但每个 Scope 各有 一份值。AI 对话里
- *   per-conversation 的状态正是这个形状。
+ * A definition family caches pure tokens without state or a runtime. Each scope caches its own
+ * graph nodes and values. `chatFamily('conv-1')` returns the same token in every scope, while each
+ * scope has its own value. This supports per-conversation state.
  */
 
 export type IFamilyKey = string | number | symbol
 
 export type IFamilyDefOptions = {
   /**
-   * 定义强缓存的上限。达到上限后按最久未取用降级为弱引用。
+   * Limits the strong definition cache. Entries least recently accessed become weak references when
+   * the limit is exceeded.
    *
-   * 仍被 AtomStore/组件持有的 token 会保持同 key 的 canonical identity；只有 token 已不可达且被 GC 后，后续 lookup 才可能创建新定义。
+   * Tokens retained by an `AtomStore` or component keep canonical identity for their key. A later
+   * lookup can create a new definition only after the old token becomes unreachable and is
+   * collected.
    */
   readonly maxSize?: number
   readonly debugLabel?: string
 }
 
 /**
- * D 是这个 family 产出的定义类型。
+ * Preserves the definition type produced by this family.
  *
- * 不能写死成 IAtomDefinition：familyDef 产出的是**可写**定义，写死会让 `scope.set(family(key), ...)`
- * 在类型层被拒——类型在这里必须如实说话。
+ * `familyDef` produces writable definitions. Widening them to `IAtomDefinition` would reject
+ * `scope.set(family(key), ...)`.
  */
 export type IFamilyDef<
   K extends IFamilyKey,
@@ -50,9 +51,12 @@ export type IFamilyDef<
   D extends IAtomDefinition<T> = IAtomDefinition<T>
 > = {
   (key: K): D
-  /** 已缓存的定义数。 */
+  /** Reports the number of strongly cached definitions. */
   readonly size: number
-  /** 显式破坏某个键的 canonical identity。已建实例不受影响；同 key 后续 lookup 会得到新 token，因此调用方必须先停止使用旧 token。 */
+  /**
+   * Explicitly breaks canonical identity for a key. Existing instances remain unchanged. Later
+   * lookups return a new token, so callers must stop using the old token first.
+   */
   forget(key: K): boolean
   clear(): void
 }
@@ -139,7 +143,7 @@ function createDefinitionCache<K extends IFamilyKey, D extends object>(
   }
 }
 
-/** 按键产出可写源定义。 */
+/** Creates writable source definitions by key. */
 export function familyDef<K extends IFamilyKey, T>(
   initial: (key: K) => T,
   options: IFamilyDefOptions = {}
@@ -194,7 +198,7 @@ export function familyDef<K extends IFamilyKey, T>(
   return family
 }
 
-/** 按键产出只读派生定义。 */
+/** Creates read-only derived definitions by key. */
 export function derivedFamilyDef<K extends IFamilyKey, T>(
   read: (key: K) => (get: IAtomGet) => T,
   options: IFamilyDefOptions = {}

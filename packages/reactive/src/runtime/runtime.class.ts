@@ -43,13 +43,13 @@ import { Signal } from '../reactive/signal.class.js'
 import { Computed, type IComputedConfig } from '../reactive/computed.class.js'
 import { Effect } from '../reactive/effect.class.js'
 
-// 一个 Runtime = 一套独立的版本时钟 + 依赖追踪上下文 + 冲刷调度器 + 节点工厂。
-// 同一个 Runtime 内的节点共享一张依赖图、一条单调版本时钟；不同 Runtime 之间完全隔离。
-// 这是去全局单例化的核心：解决 SSR 每请求状态串线、单测互相污染、多 React root 互相影响、
-// 每个 Runtime 独立 scheduler、Worker Runtime、DevTools 无法区分 Store 等一系列问题。
+// Each `Runtime` owns an independent version clock, tracking context, flush scheduler, and node factories.
+// Nodes share a dependency graph and monotonic clock within one runtime. Different runtimes are isolated.
+// Isolation prevents state leaking across SSR requests, tests, and React roots.
+// It also supports independent schedulers, worker runtimes, and distinct stores in DevTools.
 //
-// 节点工厂放在 Runtime 上（runtime.signal/computed/effect），保证「谁创建的节点属于谁的图」。
-// 全局 signal()/computed()/effect()（kernel.ts）只是委派给 defaultRuntime 的便捷别名。
+// Runtime factories (`runtime.signal`, `computed`, and `effect`) assign nodes to their creator's graph.
+// Global `signal()`, `computed()`, and `effect()` convenience calls delegate to `defaultRuntime`.
 export class Runtime implements IRuntime {
   readonly [RUNTIME_BRAND] = true as const
   #onError: (error: unknown, context: IRuntimeErrorContext) => unknown
@@ -369,7 +369,7 @@ export class Runtime implements IRuntime {
   }
 }
 
-/** 新建一个隔离运行时——SSR 每请求一个、每个测试用例一个、Worker 一个… */
+/** Creates an isolated runtime, for example for one SSR request, test case, or worker. */
 export function createRuntime(options?: IRuntimeOptions): Runtime {
   // 双实例自检（copy-check.ts）：创建 Runtime 是首个正确性边界，登记本副本，使
   // runtimeCopyCount()/assertSingleRuntimeCopy() 能发现「两份模块副本」的部署错误。

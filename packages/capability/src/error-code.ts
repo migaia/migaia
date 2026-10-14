@@ -1,85 +1,98 @@
 /**
- * `@migaia/capability` 错误码的唯一声明处。
+ * The single declaration site for `@migaia/capability` error codes.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/capability'`。抛出点必须引用本文件的常量，不得内联字面量。
+ * See `docs/contracts/error-codes.md`. The pair `(source, code)` uniquely identifies an error.
+ * `source` is always `'@migaia/capability'`. Throw sites use these constants instead of inline
+ * values.
  *
- * 迁移背景（`docs/lifecycle/migration.sdd.md` §3.7.3）：本表把包内原本裸 `throw new Error('…')`
- * 的字符串归纳成码。`INVALID_NAME` / `INVALID_ACTIVATE` / `INVALID_HANDLE` 必须保持抛出值是 `TypeError`
- * ——码只作为附加字段挂上，不替换类型。
+ * The migration in `docs/lifecycle/migration.sdd.md` §3.7.3 assigns codes to previously untagged
+ * errors. `INVALID_NAME`, `INVALID_ACTIVATE`, and `INVALID_HANDLE` retain their native `TypeError`
+ * identity. Codes are attached as properties without replacing the error type.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更。
+ * Code values are public API. Renaming a code is a breaking change.
  */
 export const CapabilityErrorCode = {
   /**
-   * 在已 `dispose()` 的 host 上调用**变更方法**（register/setFlag/setFlags/enable/disable 等）时抛出。
+   * Thrown when a mutation method such as `register`, `setFlag`, `setFlags`, `enable`, or `disable`
+   * is called after the host is disposed.
    *
-   * 落实 `docs/lifecycle/migration.sdd.md` §3.7.3 的 host
-   * 终态门禁。**只读终态诊断**（`names`/`state`/`handle`/`error`） 在 disposed 后仍可用，用于观测最终落点；调用方要重新启用必须新建
-   * host，不要复活已释放的闸门。
+   * Enforces the terminal host boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. Read-only
+   * diagnostics (`names`, `state`, `handle`, and `error`) remain available after disposal. Create a
+   * new host to enable capabilities again. A disposed host cannot be revived.
    */
   hostDisposed: 'HOST_DISPOSED',
 
   /**
-   * 在某个 disposer/reporter 的重入窗口内（`transitionDepth > 0`）尝试
-   * `register`/`setFlag`/`setFlags`/`enable`/`disable`/`dispose`，或在首次 `dispose()` 完成前再次 调用
-   * `dispose()` 时抛出/拒绝。
+   * Thrown or rejected when `register`, `setFlag`, `setFlags`, `enable`, `disable`, or `dispose`
+   * reenters a disposer or reporter while `transitionDepth > 0`. Also rejects repeated `dispose()`
+   * calls before the first disposal completes.
    *
-   * 落实 `docs/lifecycle/migration.sdd.md` §3.7.3 的重入门禁；防止一个正在运行的回退回调把外层正在进行的开关快照重写掉。调用方应把 mutation
-   * 移到生命周期回调之外。
+   * Enforces the reentrancy boundary in `docs/lifecycle/migration.sdd.md` §3.7.3. A rollback
+   * callback cannot rewrite the flag snapshot during the surrounding transition. Move mutations
+   * outside lifecycle callbacks.
    */
   hostTransitioning: 'HOST_TRANSITIONING',
 
   /**
-   * `state`/`handle`/`error`/`enable`/`disable` 等按名字查询/操作一个从未 `register()` 过的能力时抛出。
+   * Thrown when `state`, `handle`, `error`, `enable`, or `disable` references an unregistered
+   * capability.
    *
-   * 落实 `docs/lifecycle/migration.sdd.md` §3.7.3。调用方通常是名字写错或注册时序错位，应先 `register()`。
+   * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Check the name and register the capability
+   * first.
    */
   notRegistered: 'NOT_REGISTERED',
 
   /**
-   * `register()` 传入的 `name` 已经登记过时抛出。同名重复登记视为编程错误，不做静默覆盖。
+   * Thrown when `register()` receives an existing `name`. Duplicate registration is a programming
+   * error and never silently replaces the existing entry.
    *
-   * 落实 `docs/lifecycle/migration.sdd.md` §3.7.3。调用方应改名或先移除旧登记。
+   * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. Use a different name or create a new host.
    */
   alreadyRegistered: 'ALREADY_REGISTERED',
 
   /**
-   * `register()` 传入的 `name` 不是非空字符串时抛出（`TypeError`）。
+   * Thrown as a `TypeError` when `register()` receives a name that is not a nonempty string.
    *
-   * 落实 `docs/lifecycle/migration.sdd.md` §3.7.3 的参数校验。调用方修正 name 后重试。
+   * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Correct `name` before
+   * retrying.
    */
   invalidName: 'INVALID_NAME',
 
   /**
-   * `register()` 传入的 `activate` 不是函数时抛出（`TypeError`）。
+   * Thrown as a `TypeError` when `register()` receives a non-function `activate`.
    *
-   * 落实 `docs/lifecycle/migration.sdd.md` §3.7.3 的参数校验。调用方提供可调用的 activate。
+   * Enforces input validation in `docs/lifecycle/migration.sdd.md` §3.7.3. Provide a callable
+   * `activate`.
    */
   invalidActivate: 'INVALID_ACTIVATE',
 
   /**
-   * `activate()` 的返回值缺少可调用的 `dispose` 时抛出（`TypeError`）——「半开」比明确失败更危险。
+   * Thrown as a `TypeError` when the result of `activate()` lacks a callable `dispose`. Rejects
+   * incomplete activation instead of leaving a partially enabled capability.
    *
-   * 落实 `docs/lifecycle/migration.sdd.md` §3.7.3 的 handle 契约。调用方确保 activate 返回 `{ dispose }`。
+   * Enforces the handle contract in `docs/lifecycle/migration.sdd.md` §3.7.3. Ensure `activate`
+   * returns a handle with `dispose`.
    */
   invalidHandle: 'INVALID_HANDLE',
 
   /**
-   * 闸门拒绝启用。当前没有抛出点——`enable()`/`enableResult()` 用 `{status: 'gated'}` 结构化返回，从不抛错；这个码
-   * 保留给诊断/事件通道（未来接入 `onError`/事件总线时使用），不改变「拒绝不抛错」的既有行为。
+   * Reserved for diagnostics or events when the gate denies activation. No current throw site uses
+   * it. `enable()` and `enableResult()` return `{ status: 'gated' }` for a denied activation
+   * without throwing. Reserving this code for an `onError` or event channel does not change that
+   * behavior.
    *
-   * 落实 `docs/lifecycle/migration.sdd.md` §3.7.3（`gated` 与 graph 的 `blocked` 语义分离）。调用方按返回值分支，不要
-   * catch。
+   * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability
+   * `blocked`. Branch on the return value instead of catching an error.
    */
   gated: 'GATED',
 
   /**
-   * `flags`/`definition` 快照时宿主对象（如 hostile Proxy）的 ownKeys/getOwnPropertyDescriptor/getter
-   * 抛错，无法读取配置。
+   * Thrown when an `ownKeys`, `getOwnPropertyDescriptor`, or getter operation fails while
+   * snapshotting `flags` or `definition`, for example on a hostile proxy.
    *
-   * Fail-closed 后抛出，原始 Proxy 异常经 `cause` 保持 `===` 可达（`docs/contracts/error-codes.md` §2）；调用方应修复传入的
-   * flags/definition 对象，不要对同一份 hostile 输入重试。
+   * The gate fails closed before throwing. `cause` retains the original proxy exception by
+   * identity. See `docs/contracts/error-codes.md` §2. Correct the `flags` or `definition` object
+   * before retrying.
    */
   invalidOption: 'INVALID_OPTION'
 } as const

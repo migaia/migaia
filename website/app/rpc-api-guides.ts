@@ -63,9 +63,10 @@ function endpointGuide(input: {
   readonly useZh: string
 }): Readonly<Record<IGuideLocale, IApiGuide>> {
   return guide({
-    purposeEn: `Creates an endpoint that can ${input.surfaceEn}. Setup is all-or-nothing: if one installation step fails, RPC removes the listeners and resources installed by earlier steps.`,
-    purposeZh: `创建可${input.surfaceZh}的端点。初始化会整体成功或整体失败；如果中途出错，RPC 会清理此前已经安装的监听器和资源。`,
-    quickStart: `import { ${input.name} } from '${input.importPath}'
+    purposeEn: `Call a service with ${input.name}, verify its returned value, and release both sides. An Endpoint addresses a target id and method name. This factory selects ${input.surfaceEn}. Run this complete main.ts example in Node.js. Its handler and consumer share a memory transport. If installation fails, RPC cleans up the earlier installation steps.`,
+    purposeZh: `你将用 ${input.name} 调用服务、验证返回值并释放两端。Endpoint 是通过目标 id 与 method（方法名）调用的端点。这个工厂选择${input.surfaceZh}。在 Node.js 中运行完整的 main.ts 示例。处理端与调用端使用 memory transport（内存通道）。安装失败时，RPC 清理此前的安装步骤。`,
+    quickStart: `import assert from 'node:assert/strict'
+import { ${input.name} } from '${input.importPath}'
 import { connect, createEndpoint as createServiceEndpoint } from '@migaia/rpc-core'
 import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
@@ -80,7 +81,7 @@ const endpoint = await ${input.name}({
   middlewares: [connect({ transport })] as const
 })
 try {
-  console.log(await endpoint.send<number>('service', 'double', 21)) // 42
+  assert.equal(await endpoint.send<number>('service', 'double', 21), 42)
 } finally {
   await Promise.all([endpoint.dispose(), service.dispose()])
 }`,
@@ -91,11 +92,13 @@ try {
     useZh: [input.useZh, '当初始化被取消或失败时，需要自动清理已经安装的监听器和连接资源。'],
     avoidEn: [
       'You only send one-way notifications and never wait for a returned result; use the host messaging API directly.',
-      'The preset includes operations the application does not use; choose a client/provider preset or compose only the needed features.'
+      'Choose a narrower preset when this factory includes operations the application does not use.',
+      'Next task: add a waiting limit in Calls and cancellation (calls-and-cancellation).'
     ],
     avoidZh: [
       '只发送单向通知且从不等待返回结果；这时直接使用宿主环境的消息 API 更清楚。',
-      '该预设包含应用不会使用的操作；应改用 client/provider 预设，或只组合需要的功能。'
+      '这个工厂包含应用不需要的操作时，选择更窄的预设。',
+      '下一任务：按“调用与取消”（calls-and-cancellation）设置等待上限。'
     ]
   })
 }
@@ -780,56 +783,82 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
   'rpc-core:index:createEndpoint': endpointGuide({
     name: 'createEndpoint',
     importPath: '@migaia/rpc-core',
-    surfaceEn:
-      'call remote methods, provide local methods, discover peers, send control messages, and transfer chunked payloads',
-    surfaceZh: '调用远端方法、提供本地方法、发现对端、发送控制消息，并传输需要分片的大数据',
+    surfaceEn: 'remote calls, local handlers, discovery, control and chunked-message handling',
+    surfaceZh: '远端调用、本端处理函数、发现、控制与分片消息处理',
     useEn: 'Use the root preset only when one endpoint needs all five operations listed above.',
     useZh: '只有同一个 endpoint 确实需要上面五类操作时，才使用根入口的完整预设。'
   }),
   'rpc-core:full:createFullEndpoint': endpointGuide({
     name: 'createFullEndpoint',
     importPath: '@migaia/rpc-core/full',
-    surfaceEn: 'the explicit full outbound, provider, discovery, control, and chunk surface',
-    surfaceZh: '显式完整的 outbound、provider、discovery、control 与 chunk surface',
+    surfaceEn:
+      'the full set of remote calls, local handlers, discovery, control and chunked-message handling',
+    surfaceZh: '完整的远端调用、本端处理函数、发现、控制与分片消息处理',
     useEn: 'The full preset is intentional and the import should make that choice visible.',
     useZh: '明确选择 full preset，并希望 import 直接表达该意图。'
   }),
   'rpc-core:client:createClientEndpoint': endpointGuide({
     name: 'createClientEndpoint',
     importPath: '@migaia/rpc-core/client',
-    surfaceEn: 'kernel and outbound call capabilities only',
-    surfaceZh: '仅 kernel 与 outbound call capability',
-    useEn: 'This endpoint only calls or dispatches to remote providers.',
-    useZh: '该 endpoint 只调用远端 provider 或发送单向 dispatch。'
+    surfaceEn: 'remote calls without publishing local handlers',
+    surfaceZh: '只发起远端调用、不公开本端处理函数的能力',
+    useEn: 'The application only calls remote handlers or sends one-way messages.',
+    useZh: '应用只调用远端处理函数，或发送单向消息。'
   }),
   'rpc-core:provider:createProviderEndpoint': endpointGuide({
     name: 'createProviderEndpoint',
     importPath: '@migaia/rpc-core/provider',
-    surfaceEn: 'outbound calls plus provider registration',
-    surfaceZh: 'outbound call 与 provider registration',
+    surfaceEn: 'remote calls and local handler registration',
+    surfaceZh: '远端调用与本端处理函数注册',
     useEn: 'This endpoint exposes methods and may also call its peer.',
-    useZh: '该 endpoint 需要暴露 method，并且也可能回调 peer。'
+    useZh: '应用公开本端方法，并且需要调用对端。'
   }),
   'rpc-core:composed:createComposedEndpoint': guide({
     purposeEn:
-      'Builds the smallest endpoint from an explicit Feature root record. Private Feature dependencies are installed and deduplicated without silently widening the public root surface.',
+      'Advanced composition: pass an object of required Features to build an Endpoint. Internally used Features install once. Only selected Features add public methods. Run this complete main.ts in Node.js. The included handler and consumer verify one result over a memory transport.',
     purposeZh:
-      '从显式、原生 Feature root record 构造最小 endpoint。私有 Feature dependency 会被安装并去重，但不会静默扩大 public root surface。',
-    quickStart:
-      "import { connect } from '@migaia/rpc-core'\nimport { createComposedEndpoint } from '@migaia/rpc-core/composed'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createOutboundFeature } from '@migaia/rpc-core/features/outbound'\nimport { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'\n\nconst [transport] = createMemoryTransportPair()\nconst chunks = createCanonicalChunkFeature()\nconst outbound = createOutboundFeature(chunks)\nconst endpoint = await createComposedEndpoint(\n  { id: 'client', transport, middlewares: [connect({ transport })] },\n  { 'first-party-outbound': outbound }\n)\n\ntry {\n  console.log('outbound capability installed:', typeof endpoint.send)\n} finally {\n  await endpoint.dispose()\n}",
+      'Advanced composition：用对象列出 Endpoint（按目标 id 调用的端点）需要的 Features（可组合功能）。内部使用的 Features 只安装一次。只有选定的 Features 增加公开方法。在 Node.js 中运行完整的 main.ts。示例包含处理端与调用端，并通过 memory transport（内存通道）验证一个返回值。',
+    quickStart: `import assert from 'node:assert/strict'
+import { connect } from '@migaia/rpc-core'
+import { createComposedEndpoint } from '@migaia/rpc-core/composed'
+import { createProviderEndpoint } from '@migaia/rpc-core/provider'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { createOutboundFeature } from '@migaia/rpc-core/features/outbound'
+import { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'
+
+/** Both sides of main.ts use the same in-memory connection. */
+const [clientTransport, serviceTransport] = createMemoryTransportPair()
+/** The service side handles double. */
+const service = await createProviderEndpoint({
+  id: 'service', transport: serviceTransport,
+  middlewares: [connect({ transport: serviceTransport })] as const
+})
+service.provide('double', (context) => context.success(Number(context.data) * 2))
+/** The client selects the public call methods it needs. */
+const chunks = createCanonicalChunkFeature()
+const outbound = createOutboundFeature(chunks)
+const client = await createComposedEndpoint(
+  { id: 'client', transport: clientTransport, middlewares: [connect({ transport: clientTransport })] as const },
+  { 'first-party-outbound': outbound }
+)
+try {
+  assert.equal(await client.send<number>('service', 'double', 21), 42)
+} finally { await Promise.all([client.dispose(), service.dispose()]) }`,
     useEn: [
-      'Bundle custody or least-authority design requires an exact capability surface.',
-      'A custom endpoint combines only selected first-party Features.'
+      'An advanced integration needs to choose exactly which methods its Endpoint exposes.',
+      'The application supplies its connection and combines existing Features.'
     ],
-    useZh: [
-      'bundle custody 或 least-authority design 需要精确 capability surface。',
-      'custom endpoint 只组合选定的 first-party Feature。'
-    ],
+    useZh: ['高级集成需要精确选择 Endpoint 公开的方法。', '应用提供连接，并组合现有 Features。'],
     avoidEn: [
-      'The complete preset is genuinely required.',
-      'Passing an retired iterable roots or duplicated owners.'
+      'Ordinary application RPC can use the Runtime Peer or plugin factories.',
+      'The complete Endpoint preset already covers the required methods.',
+      'Next task: configure the connection in Transport and security (transports-and-security).'
     ],
-    avoidZh: ['确实需要 complete preset。', '传入旧 iterable roots 或重复 Feature owner。']
+    avoidZh: [
+      '普通业务 RPC 可以直接使用 Runtime Peer 或 plugin 工厂。',
+      '完整 Endpoint 预设已经提供需要的方法。',
+      '下一任务：按“载体与安全”（transports-and-security）配置连接。'
+    ]
   }),
   'rpc-core:index:defineFeature': guide({
     purposeEn:
@@ -1545,13 +1574,13 @@ const rpcContractGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, I
  * Public root middleware routes and feature routes share one complete composition guide. The
  * Website flattens feature URLs, so both identities must explain the same Host workflow.
  */
-const webRpcCoreGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> =
+const rpcCoreModuleGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> =
   Object.freeze({
     ...rpcCoreGuideEntries
   })
 
 /** Cross-realm error utilities and stable failure contracts. */
-const webRpcErrorGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
+const rpcErrorModuleGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
   'rpc-contract:errors:classifyRpcContractError': guide({
     purposeEn:
       'Queries disclosure code and display message for the exact local Contract error without reading its properties. The immutable summary is presentation policy; message wording is not a public recovery contract.',
@@ -2167,99 +2196,100 @@ const rpcPublicErrorGuides = {
 }
 
 /** Stable protocol discriminants used by adapters, diagnostics, and tests. */
-const webRpcConstantGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> = {
-  'rpc:protocol-constants:RpcMessageKind': constantGuide({
-    name: 'RpcMessageKind',
-    roleEn: 'wire-envelope kind set',
-    roleZh: 'wire-envelope kind 集合',
-    member: 'request',
-    value: 'request envelope'
-  }),
-  'rpc:protocol-constants:RpcVariation': constantGuide({
-    name: 'RpcVariation',
-    roleEn: 'control variation set',
-    roleZh: 'control variation 集合',
-    member: 'abort',
-    value: 'abort control frame'
-  }),
-  'rpc-core:transport-constants:RpcPlatform': constantGuide({
-    name: 'RpcPlatform',
-    roleEn: 'transport platform labels',
-    roleZh: 'transport platform label',
-    member: 'worker',
-    value: 'Worker transport'
-  }),
-  'rpc-core:transport-constants:RpcTransportOwnership': constantGuide({
-    name: 'RpcTransportOwnership',
-    roleEn: 'transport custody modes',
-    roleZh: 'transport custody mode',
-    member: 'borrowed',
-    value: 'remove listeners without closing the host resource'
-  }),
-  'rpc-core:transport-constants:RpcTransportEncoding': constantGuide({
-    name: 'RpcTransportEncoding',
-    roleEn: 'transport encoding capabilities',
-    roleZh: 'transport encoding capability',
-    member: 'uint8Array',
-    value: 'binary encoded frames'
-  }),
-  'rpc-core:transport-constants:RpcTransportTopology': constantGuide({
-    name: 'RpcTransportTopology',
-    roleEn: 'peer fan-out and trust topology labels',
-    roleZh: 'peer fan-out 与 trust topology label',
-    member: 'multiplexed',
-    value: 'several logical peers share a channel'
-  }),
-  'rpc-core:transport-constants:RpcEndpointStatus': constantGuide({
-    name: 'RpcEndpointStatus',
-    roleEn: 'discovery-visible endpoint states',
-    roleZh: 'discovery-visible endpoint state',
-    member: 'active',
-    value: 'endpoint accepts work'
-  }),
-  'rpc-core:transport-constants:RpcOperation': constantGuide({
-    name: 'RpcOperation',
-    roleEn: 'single-target operation labels',
-    roleZh: 'single-target operation label',
-    member: 'send',
-    value: 'request and response operation'
-  }),
-  'rpc:protocol-constants:RpcControlKind': constantGuide({
-    name: 'RpcControlKind',
-    roleEn: 'provider-control admission kinds',
-    roleZh: 'provider-control admission kind',
-    member: 'request',
-    value: 'provider request work'
-  }),
-  'rpc-core:transport-constants:RpcCandidateStatus': constantGuide({
-    name: 'RpcCandidateStatus',
-    roleEn: 'discovery candidate states',
-    roleZh: 'discovery candidate state',
-    member: 'stale',
-    value: 'candidate is known but not currently active'
-  }),
-  'rpc:protocol-constants:RpcContractFailureKind': constantGuide({
-    name: 'RpcContractFailureKind',
-    roleEn: 'structured contract failure kinds',
-    roleZh: 'structured contract failure kind',
-    member: 'schemaValidation',
-    value: 'schema rejected boundary data'
-  }),
-  'rpc:protocol-constants:RpcDebugPhase': constantGuide({
-    name: 'RpcDebugPhase',
-    roleEn: 'test-only endpoint lifecycle snapshot phases',
-    roleZh: 'test-only endpoint lifecycle snapshot phase',
-    member: 'disposed',
-    value: 'endpoint reached terminal disposal'
-  }),
-  'rpc:protocol-constants:RpcChunkEvent': constantGuide({
-    name: 'RpcChunkEvent',
-    roleEn: 'chunk admission and expiry hook names',
-    roleZh: 'chunk admission 与 expiry hook name',
-    member: 'rejected',
-    value: 'chunk admission was rejected'
-  })
-}
+const rpcConstantModuleGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> =
+  {
+    'rpc:protocol-constants:RpcMessageKind': constantGuide({
+      name: 'RpcMessageKind',
+      roleEn: 'wire-envelope kind set',
+      roleZh: 'wire-envelope kind 集合',
+      member: 'request',
+      value: 'request envelope'
+    }),
+    'rpc:protocol-constants:RpcVariation': constantGuide({
+      name: 'RpcVariation',
+      roleEn: 'control variation set',
+      roleZh: 'control variation 集合',
+      member: 'abort',
+      value: 'abort control frame'
+    }),
+    'rpc-core:transport-constants:RpcPlatform': constantGuide({
+      name: 'RpcPlatform',
+      roleEn: 'transport platform labels',
+      roleZh: 'transport platform label',
+      member: 'worker',
+      value: 'Worker transport'
+    }),
+    'rpc-core:transport-constants:RpcTransportOwnership': constantGuide({
+      name: 'RpcTransportOwnership',
+      roleEn: 'transport custody modes',
+      roleZh: 'transport custody mode',
+      member: 'borrowed',
+      value: 'remove listeners without closing the host resource'
+    }),
+    'rpc-core:transport-constants:RpcTransportEncoding': constantGuide({
+      name: 'RpcTransportEncoding',
+      roleEn: 'transport encoding capabilities',
+      roleZh: 'transport encoding capability',
+      member: 'uint8Array',
+      value: 'binary encoded frames'
+    }),
+    'rpc-core:transport-constants:RpcTransportTopology': constantGuide({
+      name: 'RpcTransportTopology',
+      roleEn: 'peer fan-out and trust topology labels',
+      roleZh: 'peer fan-out 与 trust topology label',
+      member: 'multiplexed',
+      value: 'several logical peers share a channel'
+    }),
+    'rpc-core:transport-constants:RpcEndpointStatus': constantGuide({
+      name: 'RpcEndpointStatus',
+      roleEn: 'discovery-visible endpoint states',
+      roleZh: 'discovery-visible endpoint state',
+      member: 'active',
+      value: 'endpoint accepts work'
+    }),
+    'rpc-core:transport-constants:RpcOperation': constantGuide({
+      name: 'RpcOperation',
+      roleEn: 'single-target operation labels',
+      roleZh: 'single-target operation label',
+      member: 'send',
+      value: 'request and response operation'
+    }),
+    'rpc:protocol-constants:RpcControlKind': constantGuide({
+      name: 'RpcControlKind',
+      roleEn: 'provider-control admission kinds',
+      roleZh: 'provider-control admission kind',
+      member: 'request',
+      value: 'provider request work'
+    }),
+    'rpc-core:transport-constants:RpcCandidateStatus': constantGuide({
+      name: 'RpcCandidateStatus',
+      roleEn: 'discovery candidate states',
+      roleZh: 'discovery candidate state',
+      member: 'stale',
+      value: 'candidate is known but not currently active'
+    }),
+    'rpc:protocol-constants:RpcContractFailureKind': constantGuide({
+      name: 'RpcContractFailureKind',
+      roleEn: 'structured contract failure kinds',
+      roleZh: 'structured contract failure kind',
+      member: 'schemaValidation',
+      value: 'schema rejected boundary data'
+    }),
+    'rpc:protocol-constants:RpcDebugPhase': constantGuide({
+      name: 'RpcDebugPhase',
+      roleEn: 'test-only endpoint lifecycle snapshot phases',
+      roleZh: 'test-only endpoint lifecycle snapshot phase',
+      member: 'disposed',
+      value: 'endpoint reached terminal disposal'
+    }),
+    'rpc:protocol-constants:RpcChunkEvent': constantGuide({
+      name: 'RpcChunkEvent',
+      roleEn: 'chunk admission and expiry hook names',
+      roleZh: 'chunk admission 与 expiry hook name',
+      member: 'rejected',
+      value: 'chunk admission was rejected'
+    })
+  }
 
 /**
  * Canonical examples and decision boundaries are shared only by the protocol operations they
@@ -3975,37 +4005,83 @@ await pool.close()`,
 } satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
 
 /** SharedWorker examples use one listener and one independently accepted connection per page. */
-const browserSharedWorkerPeerCode = `import { createBrowserPeer } from '@migaia/rpc-browser'
+const browserSharedWorkerPeerCode = `import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'
 
-// shared.worker.ts, running inside the actual SharedWorker:
-const server = await createBrowserPeer({
-  listen: self,
-  provide: { ping: () => 'pong' },
-  report: (error) => console.error(error)
-})
-server.on('ready', (event) => console.log(event.instanceId))
+// Handler file: shared.worker.ts, compiled to shared.worker.js.
+declare const self: IRuntimeBrowserListen
+const server = await createBrowserPeer({ listen: self, provide: { ping: () => 'pong' } })
+/** Call when the SharedWorker application stops serving pages. */
+export async function stopSharedWorkerRpc() { await server.close() }
 
-// page.ts, in each page using that worker:
+// Consumer file: page.ts, running in each browser page.
 const worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module' })
 const shared = await createBrowserPeer<{ ping(): string }>({ connect: { sharedWorker: worker } })
-console.log(await shared.request('ping'))
-await shared.close()
-worker.port.close()`
+try { console.assert(await shared.request('ping') === 'pong', 'SharedWorker returned pong') }
+finally { await shared.close(); worker.port.close() }`
 
-/** RTC examples require the caller's actual already-open, ordered and reliable DataChannel. */
+/** RTC examples name both sides while the application supplies their already-open channels. */
 const browserRtcPeerCode = `import { createBrowserPeer } from '@migaia/rpc-browser'
 
-/** Signaling and the channel's native lifetime remain owned by the application. */
+/** Handler browser: pass its opened channel and call close() on the returned service when done. */
+export async function serveRtc(channel: RTCDataChannel) {
+  return await createBrowserPeer({
+    connect: { rtcDataChannel: channel }, provide: { echo: (value: string) => value }
+  })
+}
+/** Consumer browser: pass its opened channel after the handler also starts serveRtc. */
 export async function callRtc(channel: RTCDataChannel) {
   const peer = await createBrowserPeer<{ echo(value: string): string }>({
     connect: { rtcDataChannel: channel }
   })
-  try {
-    console.log(await peer.request('echo', 'hello'))
-  } finally {
-    await peer.close()
-  }
+  try { console.assert(await peer.request('echo', 'hello') === 'hello', 'RTC echo matches') }
+  finally { await peer.close() }
 }`
+
+/** The iframe handler is paired with the parent quickstart and complete call example. */
+const browserFrameProviderCode = `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+/** Store the first notification so readNote confirms that the handler ran. */
+let receiveNote: (value: string) => void = () => undefined
+const receivedNote = new Promise<string>((resolve) => { receiveNote = resolve })
+/** Handler file: billing.ts, loaded by https://billing.example/billing.html. */
+const parent = await createBrowserPeer({
+  connect: { window: window.parent, origin: 'https://app.example' },
+  provide: {
+    calculateTotal: (input: { prices: number[]; taxRate: number }) =>
+      input.prices.reduce((total, price) => total + price, 0) * (1 + input.taxRate),
+    note: (message: string) => receiveNote(message),
+    readNote: () => receivedNote,
+    count: async function* (limit: number) {
+      for (let value = 1; value <= limit; value++) yield value
+    }
+  }
+})
+/** Call when the iframe application stops serving its parent. */
+export async function closeFrameRpc() { await parent.close() }`
+
+/** The parent validates results produced by the matching billing.ts handler. */
+const browserFrameConsumerCode = `import { createBrowserPeer } from '@migaia/rpc-browser'
+
+type IBillingApi = {
+  calculateTotal(input: { prices: number[]; taxRate: number }): number
+  note(message: string): void
+  readNote(): Promise<string>
+  count(limit: number): AsyncIterableIterator<number>
+}
+/** Consumer file: app.ts, loaded by https://app.example with iframe#billing. */
+const iframe = document.querySelector<HTMLIFrameElement>('#billing')!
+const billing = await createBrowserPeer<IBillingApi>({
+  connect: { window: iframe.contentWindow!, origin: 'https://billing.example' }
+})
+try {
+  console.assert(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0 }) === 42, 'Total is 42')
+  await billing.notify('note', 'hello')
+  console.assert(await billing.request('readNote') === 'hello', 'Notification reached its handler')
+  /** Collect every item before checking the complete stream. */
+  const values: number[] = []
+  for await (const value of billing.stream('count', 3)) values.push(value)
+  console.assert(values.join(',') === '1,2,3', 'Stream yields 1, 2, 3')
+} finally { await billing.close() }`
 
 /** Both browser error exports share the same diagnostic boundary and retain original causes. */
 const browserPeerErrorGuide = guide({
@@ -4047,68 +4123,98 @@ const rpcBrowserPeerGuides = {
   'rpc-browser:index:createBrowserPeer': guide({
     quickStart: `import { createBrowserPeer } from '@migaia/rpc-browser'
 
-/** The iframe provides calculateTotal through createBrowserPeer({ connect, provide }). */
 type IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): number }
+/** app.ts runs at https://app.example after iframe#billing loads billing.html. */
 const iframe = document.querySelector<HTMLIFrameElement>('#billing')!
 const billing = await createBrowserPeer<IBillingApi>({
   connect: { window: iframe.contentWindow!, origin: 'https://billing.example' }
 })
 try {
-  console.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 }))
-} finally {
-  await billing.close()
-}`,
+  console.assert(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0 }) === 42, 'Total is 42')
+} finally { await billing.close() }`,
     purposeEn:
-      'Creates a typed Runtime Peer over a borrowed window with explicit origin, a SharedWorker connection port, or an open reliable ordered RTCDataChannel. Core owns handshake, method directory, request/notify/stream, group/outcome and logical cleanup; carrier modules load only when selected.',
+      'Call an iframe with createBrowserPeer and verify the returned total. A Runtime Peer provides request, notify and stream without manually assembling an Endpoint. Build app.ts and the billing.ts handler below with the project bundler. Serve the parent at https://app.example with iframe#billing loading https://billing.example/billing.html. The parent loads the built app entry. The iframe loads the built billing entry. origin is the exact scheme, host and port expected for the remote page. close() releases the logical connection while the application retains its window, port or channel.',
     purposeZh:
-      '在显式 origin 的借用窗口、SharedWorker 独立连接端口或已打开的可靠有序 RTCDataChannel 上创建带类型的 Runtime Peer。Core 统一拥有握手、方法目录、request/notify/stream、group/outcome 与逻辑清理；所选载体模块才会延迟加载。',
+      '你将用 createBrowserPeer 调用 iframe，并验证返回的总额。Runtime Peer 提供 request、notify 与 stream，无需自行组装 Endpoint（按目标 id 调用的端点）。用项目的 bundler（打包工具）构建 app.ts 与下方处理端 billing.ts。父页面运行于 https://app.example，iframe#billing 加载 https://billing.example/billing.html。父页面加载构建后的 app 入口。iframe 加载构建后的 billing 入口。origin 是预期对端的精确协议、域名与端口。close() 释放逻辑连接，window、port 或 channel 仍由应用持有。',
     examplesEn: [
       {
-        id: 'shared-worker-peer',
-        title: 'One SharedWorker serves several pages',
+        id: 'iframe-provider',
+        title: 'Handler: billing.ts in the iframe',
         description:
-          'Run the worker and page portions in their respective hosts. Each connect event gets a separate Core Peer; ready reports accepted identity, and describe().connections shows listener connections. Closing the listener releases logical Peers while leaving borrowed ports open.',
+          'Load this handler from billing.html in the iframe. provide publishes the functions the parent calls. note saves its first input. readNote waits for that input before returning it. Call closeFrameRpc when the iframe application ends.',
+        code: browserFrameProviderCode
+      },
+      {
+        id: 'iframe-calls',
+        title: 'Consumer: app.ts checks request, notify and stream',
+        description:
+          'Run this parent file with the same iframe and origins as the quickstart. request returns a result. notify waits only for sending. readNote confirms that the notification handler ran. stream returns one item at a time. Browser assertions check all results.',
+        code: browserFrameConsumerCode
+      },
+      {
+        id: 'shared-worker-peer',
+        title: 'SharedWorker: named handler and page files',
+        description:
+          'Compile shared.worker.ts to shared.worker.js beside page.js. Run the handler portion inside the SharedWorker and the consumer portion in each page. Each page has a separate connection. The page checks the ping result and closes its own port.',
         code: browserSharedWorkerPeerCode
       },
       {
         id: 'rtc-peer',
-        title: 'Borrow an ordered reliable RTCDataChannel',
+        title: 'RTC: handler and consumer on opened channels',
         description:
-          'Complete signaling and wait for open first. ordered must be true and maxRetransmits/maxPacketLifeTime must both be null. peer.close() detaches the logical connection; the application retains native channel ownership.',
+          'The application completes signaling and opens both native channels first. In the handler browser, call serveRtc with its channel. In the consumer browser, call callRtc with its channel. ordered must be true. maxRetransmits and maxPacketLifeTime must be null. The consumer checks the echo result. Close the returned handler Peer when serving ends. Each browser still owns its native channel.',
         code: browserRtcPeerCode
       }
     ],
     examplesZh: [
       {
-        id: 'shared-worker-peer',
-        title: '一个 SharedWorker 服务多个页面',
+        id: 'iframe-provider',
+        title: '处理端：iframe 内的 billing.ts',
         description:
-          'Worker 与页面片段分别在对应宿主运行。每个 connect 事件获得独立 Core Peer；ready 报告已接纳身份，describe().connections 查询监听器连接。关闭监听器释放逻辑 Peer，借用端口仍保持打开。',
+          '在 iframe 的 billing.html 中加载处理端。provide 发布父页面调用的函数。note 保存首次输入。readNote 等待这个输入后再返回。iframe 应用结束时调用 closeFrameRpc。',
+        code: browserFrameProviderCode
+      },
+      {
+        id: 'iframe-calls',
+        title: '调用端：app.ts 验证 request、notify 与 stream',
+        description:
+          '父页面使用与快速开始相同的 iframe 和 origins。request 等待结果。notify 只等待发送。readNote 确认通知处理函数已执行。stream 逐项返回结果。浏览器 assertions（断言）检查所有结果。',
+        code: browserFrameConsumerCode
+      },
+      {
+        id: 'shared-worker-peer',
+        title: 'SharedWorker：处理端与页面文件',
+        description:
+          '将 shared.worker.ts 编译为 page.js 旁的 shared.worker.js。处理端片段运行在 SharedWorker，调用端片段运行在每个页面。每个页面持有独立连接。页面验证 ping 结果，并关闭自己的 port（消息端口）。',
         code: browserSharedWorkerPeerCode
       },
       {
         id: 'rtc-peer',
-        title: '借用可靠有序的 RTCDataChannel',
+        title: 'RTC：已打开 channel 上的处理端与调用端',
         description:
-          '先完成信令并等待 open。ordered 必须为 true，maxRetransmits/maxPacketLifeTime 都必须为 null。peer.close() 清理逻辑连接；原生频道仍由应用持有和关闭。',
+          '应用先完成信令并打开两端原生 channels（数据通道）。处理端浏览器将自己的 channel 传入 serveRtc。调用端浏览器将自己的 channel 传入 callRtc。ordered 必须为 true。maxRetransmits 与 maxPacketLifeTime 必须为 null。调用端验证 echo 结果。服务结束时关闭返回的处理端 Peer。两端浏览器仍各自持有原生 channel。',
         code: browserRtcPeerCode
       }
     ],
     useEn: [
-      'A parent page calls an iframe through a fixed window and explicit origin using the same request API as Worker and process Peers.',
-      'A SharedWorker accepts several page ports, or two browsers already hold an open ordered reliable RTCDataChannel.'
+      'A parent page needs typed calls to an iframe with a fixed origin.',
+      'The application uses SharedWorker ports or already-open reliable ordered RTCDataChannels.'
     ],
     useZh: [
-      '父页面通过固定窗口与显式 origin 调用 iframe，并使用与 Worker、进程 Peer 相同的 request API。',
-      'SharedWorker 接纳多个页面端口，或两个浏览器已持有打开的可靠有序 RTCDataChannel。'
+      '父页面需要有类型地调用固定 origin 的 iframe。',
+      '应用使用 SharedWorker ports，或已打开的可靠有序 RTCDataChannels。'
     ],
     avoidEn: [
-      'The carrier is BroadcastChannel, an idle-terminable Service Worker, or unreliable WebTransport datagrams; use the existing Endpoint transports.',
-      'The application needs automatic spawning, signaling, restart supervision or immediate detection of window unload or silent port closure; this factory borrows resources and pending calls use Core deadlines.'
+      'BroadcastChannel, Service Worker and WebTransport datagrams use the existing Endpoint transports.',
+      'The application must create its carriers and RTC signaling itself.',
+      'Silent window or port closure does not immediately end pending calls. They retain their configured waiting limit.',
+      'Next task: configure origin and carrier ownership in Transport and security (transports-and-security).'
     ],
     avoidZh: [
-      '载体是 BroadcastChannel、可空闲终止的 Service Worker 或不可靠的 WebTransport datagram；继续使用现有 Endpoint transport。',
-      '需要自动创建载体、信令、重启监督或立即检测窗口卸载/静默端口关闭；工厂借用资源，在途调用按 Core deadline 结束。'
+      'BroadcastChannel、Service Worker 与 WebTransport datagrams 使用现有 Endpoint transports。',
+      '应用需要自行创建载体，并完成 RTC 信令。',
+      'window 或 port 静默关闭不会立即结束在途调用。调用仍使用已配置的等待上限。',
+      '下一任务：按“载体与安全”（transports-and-security）配置 origin 与资源归属。'
     ]
   }),
   'rpc-browser:index:RPC_BROWSER_ERROR_SOURCE': browserPeerErrorGuide,
@@ -4981,8 +5087,8 @@ export const rpcApiGuides = {
   ...rpcDxRoadmapGuides,
   ...rpcProtocolToolkitGuides,
   ...rpcContractGuides,
-  ...webRpcCoreGuides,
-  ...webRpcErrorGuides,
+  ...rpcCoreModuleGuides,
+  ...rpcErrorModuleGuides,
   ...rpcPublicErrorGuides,
-  ...webRpcConstantGuides
+  ...rpcConstantModuleGuides
 } as const

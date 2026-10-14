@@ -20,8 +20,8 @@ import {
   createStorageTypeError
 } from '../types/errors.js'
 
-// key 域纯校验（`KEY_DOMAIN_LIMITS`/`assertStorageKey`/`assertStringStorageKey`/`compareStorageKeys`）
-// 已迁往 `@migaia/storage-contract`；re-export 保持既有 import 路径不变。
+// Pure key validation (`KEY_DOMAIN_LIMITS`, `assertStorageKey`, `assertStringStorageKey`, and `compareStorageKeys`)
+// belongs to `@migaia/storage-contract`. Re-exports preserve existing import paths.
 export {
   KEY_DOMAIN_LIMITS,
   assertStorageKey,

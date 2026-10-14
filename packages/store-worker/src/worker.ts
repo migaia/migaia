@@ -126,14 +126,18 @@ export class WorkerAdapter {
     })
   }
 
-  /** 同步标记不可用：仅置 `disposed = true`，不释放底层 endpoint。幂等。 */
+  /**
+   * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release
+   * the endpoint. Repeated calls have no additional effect.
+   */
   close(): void {
     this.#disposed = true
   }
 
   /**
-   * 唯一异步释放入口：先 `close()`，再等待 endpoint 初始化并执行 `endpoint.dispose()`。 不吞清理错误（失败会 reject），重复调用复用同一个
-   * Promise。
+   * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is
+   * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls
+   * return the same promise.
    */
   dispose(): Promise<void> {
     if (this.#disposePromise === undefined) {

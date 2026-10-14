@@ -995,8 +995,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "defaultRuntime",
@@ -1980,8 +1980,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "assertNoForeignOwnershipBrand",
@@ -2578,8 +2578,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "internalsOf",
@@ -2993,8 +2993,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "IInternalRuntime",
@@ -3292,8 +3292,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "mutableDeps",
@@ -4094,8 +4094,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "assertOwnedBy",
@@ -4475,8 +4475,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "Computed",
@@ -4756,7 +4756,7 @@
               "name": "debugName",
               "type": "string",
               "optional": true,
-              "description": "一个会去读取 IObservable、需要在其变化时收到通知的一端——Computed/Effect 都实现它。 */ export type IObserver = { readonly runtime: IRuntime readonly disposed: boolean debugName?: string readonly deps: ReadonlySet<IObservable> readonly depVersions: ReadonlyMap<IObservable, number> markDirty(): void onDependencyDisconnected(observable: IObservable): void } /** Effect/自定义响应式来源的收尾回调——对应它们建立时留下的、需要在重跑或销毁前撤销的副作用 （取消订阅、清定时器、释放资源……），命名对应 Effect 已有的 dispose() 语义。 */ export type IDisposer = () => void /** 有明确所有权/生命周期的资源：能被显式释放，且可查询是否已释放。 Computed/Effect/Scope（以及未来的 wasm 字段、worker 订阅）都实现它，交给 Scope 统一按 LIFO 释放。 / export type IDisposable = { dispose(): void readonly disposed: boolean } /** 冲刷触发策略——决定\"待处理的响应式副作用什么时候真正执行\"。默认是微任务合并， 可换成 rAF/idle/优先级队列等；Scheduler 类持有一个策略实例，而不是自己是策略。 */ export type ISchedulerStrategy = (flush: () => void) => void /** 显式 flush 的完成状态；判别字符串避免 boolean truthiness 隐藏重入语义。 */ export type IFlushResult = 'completed' | 'deferred' /** 冲刷队列里一项的最小形状：只要求\"一次冲刷时如何处理我\"。Effect 是目前唯一的实现者， 但这里刻意不直接引用 Effect 类——如果引用了，Scheduler 所在文件就要 import Effect， Effect 所在文件又要 import Scheduler，形成循环依赖。用结构类型断开这个环。 / export type IFlushable = { tick(): void /** 环保护触发时要如实报出被丢弃的待办，靠这个名字定位。"
+              "description": "Reads `IObservable` values and receives change notifications. `Computed` and `Effect` implement this observer role. / export type IObserver = { readonly runtime: IRuntime readonly disposed: boolean debugName?: string readonly deps: ReadonlySet<IObservable> readonly depVersions: ReadonlyMap<IObservable, number> markDirty(): void onDependencyDisconnected(observable: IObservable): void } /** Cleanup callback for an effect or custom source. Reverses side effects before rerun or disposal, such as subscriptions, timers, or resource ownership. / export type IDisposer = () => void /** Resource with explicit ownership and lifecycle, supporting disposal and a disposal-state query. `Computed`, `Effect`, and scopes use this contract for LIFO release by the owning scope. It also serves future Wasm fields or worker subscriptions. / export type IDisposable = { dispose(): void readonly disposed: boolean } /** Controls when pending reactive effects execute. Defaults to merged microtasks and can use animation frames, idle callbacks, or priority queues. `Scheduler` owns a strategy instance. / export type ISchedulerStrategy = (flush: () => void) => void /** Outcome of an explicit flush. Distinct strings expose reentrancy instead of hiding it behind boolean truthiness. / export type IFlushResult = 'completed' | 'deferred' /** Minimal queued-item contract describing how a flush processes the item. `Effect` is the current implementation, but this structural view avoids a direct class reference. Otherwise importing `Effect` from `Scheduler` would create a circular dependency. / export type IFlushable = { tick(): void /** Identifies discarded pending work when loop protection triggers."
             }
           ],
           "identity": "packages/reactive/dist/reactive/computed.class.d.ts:Computed:export declare class Computed<T> implements IObservable, IObserver, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; get version(): number; readonly runtime: IRuntime; debugName?: string; constructor(fn: () => T, runtime: IRuntime, config?: IComputedConfig<T>); get disposed(): boolean; get observed(): boolean; dispose(): void; markDirty(): void; isStale(): boolean; onObserved(): void; onUnobserved(): void; onDependencyDisconnected(): void; get value(): T; peek(): T; /** * Evaluate a speculative snapshot without publishing a cache or dependency edges. React may * abandon getSnapshot renders; those reads must not warm a Computed that was never committed. A * committed subscription still uses `value`/`peek` and receives the normal cached reactive path. */ preview(): T; pull(): void; }",
@@ -4904,7 +4904,7 @@
               "type": "string",
               "optional": true,
               "description": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。",
-              "descriptionEn": "",
+              "descriptionEn": "Reads `IObservable` values and receives change notifications. `Computed` and `Effect` implement this observer role. / export type IObserver = { readonly runtime: IRuntime readonly disposed: boolean debugName?: string readonly deps: ReadonlySet<IObservable> readonly depVersions: ReadonlyMap<IObservable, number> markDirty(): void onDependencyDisconnected(observable: IObservable): void } /** Cleanup callback for an effect or custom source. Reverses side effects before rerun or disposal, such as subscriptions, timers, or resource ownership. / export type IDisposer = () => void /** Resource with explicit ownership and lifecycle, supporting disposal and a disposal-state query. `Computed`, `Effect`, and scopes use this contract for LIFO release by the owning scope. It also serves future Wasm fields or worker subscriptions. / export type IDisposable = { dispose(): void readonly disposed: boolean } /** Controls when pending reactive effects execute. Defaults to merged microtasks and can use animation frames, idle callbacks, or priority queues. `Scheduler` owns a strategy instance. / export type ISchedulerStrategy = (flush: () => void) => void /** Outcome of an explicit flush. Distinct strings expose reentrancy instead of hiding it behind boolean truthiness. / export type IFlushResult = 'completed' | 'deferred' /** Minimal queued-item contract describing how a flush processes the item. `Effect` is the current implementation, but this structural view avoids a direct class reference. Otherwise importing `Effect` from `Scheduler` would create a circular dependency. / export type IFlushable = { tick(): void /** Identifies discarded pending work when loop protection triggers.",
               "descriptionZh": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。"
             }
           ],
@@ -5110,7 +5110,7 @@
               "name": "debugName",
               "type": "string",
               "optional": true,
-              "description": "环保护触发时要如实报出被丢弃的待办，靠这个名字定位。"
+              "description": "Identifies discarded pending work when loop protection triggers."
             }
           ],
           "identity": "packages/reactive/dist/reactive/effect.class.d.ts:Effect:export declare class Effect implements IObserver, IDisposable { #private; readonly deps: ReadonlySet<IObservable>; readonly depVersions: ReadonlyMap<IObservable, number>; readonly runtime: IRuntime; debugName?: string; constructor(fn: () => void | IDisposer, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; markDirty(): void; tick(): void; onDependencyDisconnected(): void; /** * Runs cleanup and the effect body as one terminal-aware transaction. Cleanup may synchronously * dispose this effect; that terminal transition must prevent both a rerun and dependency commit. */ run(): void; dispose(): void; }",
@@ -5174,7 +5174,7 @@
               "type": "string",
               "optional": true,
               "description": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。",
-              "descriptionEn": "",
+              "descriptionEn": "Identifies discarded pending work when loop protection triggers.",
               "descriptionZh": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。"
             }
           ],
@@ -5548,7 +5548,7 @@
               "name": "debugName",
               "type": "string",
               "optional": true,
-              "description": "环保护触发时要如实报出被丢弃的待办，靠这个名字定位。"
+              "description": "Identifies discarded pending work when loop protection triggers."
             }
           ],
           "identity": "packages/reactive/dist/reactive/signal.class.d.ts:Signal:export declare class Signal<T> implements IObservable, IDisposable { #private; readonly subs: ReadonlySet<IObserver>; get version(): number; get onObserved(): (() => void) | undefined; get onUnobserved(): (() => void) | undefined; readonly runtime: IRuntime; debugName?: string; constructor(v: T, runtime: IRuntime, options?: IReactiveNodeOptions); get disposed(): boolean; get observed(): boolean; get value(): T; set value(next: T); peek(): T; /** * 释放：断开全部下游边。 * * Computed 与 Effect 一直有 dispose，Signal 没有——于是任何「我建的源节点用完了」 的场景（collections 的 per-cell、AtomStore * 的实例释放）只能去 import `runtime/internals` 拿 tracker 自己断边，也就是为了一个本该公开的操作而拿到 * 整张图的权限。补齐这个对称性之后，那些豁免就不必要了。 * * 语义与 Computed 一致：释放是终态。先标记 disposed 再通知下游，强制重跑的 Effect 因此会读到明确错误，而不会重新订阅这个已释放节点。 */ dispose(): void; /** Compose an owner lifecycle callback without silently replacing one. */ addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void; }): () => void; }",
@@ -5680,7 +5680,7 @@
               "type": "string",
               "optional": true,
               "description": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。",
-              "descriptionEn": "",
+              "descriptionEn": "Identifies discarded pending work when loop protection triggers.",
               "descriptionZh": "`flush()`：同步冲刷当前队列。重入语义：observer `tick()` 内部再次调用 `flush()` 返回 `'deferred'`（外层 flush 仍在跑，本次调用不会真正冲刷）；最外层调用完成并排空队列后返回 `'completed'`。单次冲刷内的重算轮数超过 `maxFlushPasses` 抛 `FLUSH_LOOP`（见错误码表），并清空剩余队列，错误信息列出被丢弃的最多 8 个 `debugName`。"
             }
           ],
@@ -5702,8 +5702,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "createObserverBinding",
@@ -9764,8 +9764,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "createFieldSource",

@@ -82,7 +82,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
+                "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
               },
               {
                 "type": "paragraph",
@@ -101,7 +101,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
               },
               {
                 "type": "paragraph",
@@ -161,7 +161,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(definePlugin({\n  name: 'late',\n  features: {\n    value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n  },\n  install: () => ({ late: true })\n}))\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
+                "code": "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(\n  definePlugin({\n    name: 'late',\n    features: {\n      value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n    },\n    install: () => ({ late: true })\n  })\n)\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
               },
               {
                 "type": "paragraph",
@@ -243,7 +243,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
               },
               {
                 "type": "paragraph",
@@ -313,12 +313,21 @@
               },
               {
                 "type": "paragraph",
-                "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+              },
+              {
+                "type": "paragraph",
+                "text": "`worker.ts` 编译后连接父 registry："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
               }
             ]
           },
@@ -420,7 +429,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const trayKey = (value: string): ITrayKey => value as ITrayKey\nexport const AppTrayKey = {\n  config: trayKey('config'),\n  api: trayKey('api')\n} as const"
+                "code": "import type { ITrayKey } from '@migaia/tray'\n\nconst trayKey = (value: string): ITrayKey => value as ITrayKey\nexport const AppTrayKey = {\n  config: trayKey('config'),\n  api: trayKey('api')\n} as const"
               }
             ]
           },
@@ -431,7 +440,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
+                "code": "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
               },
               {
                 "type": "list",
@@ -464,7 +473,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph"
+                "code": "import type { ITrayEntryDefinition, ITrayGraph } from '@migaia/tray'\n\ndeclare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph"
               },
               {
                 "type": "paragraph",
@@ -506,7 +515,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
+                "code": "import type { ICapabilityGraphNodeState as IGraphNodeState } from '@migaia/capability/graph'\nimport type { ITrayKey, ITrayState } from '@migaia/tray'\n\ntype ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): IGraphNodeState\n  dispose(): Promise<void>\n}"
               },
               {
                 "type": "list",
@@ -760,12 +769,12 @@
               },
               {
                 "type": "paragraph",
-                "text": "callback context 的 `self` 是当前 run/name/generation 专属 mutation capability："
+                "text": "callback context 的 `self` 是当前 run/name/generation 专属 mutation capability。 下面的函数接收已有的 Runtime；其中 `search` 必须已 ready："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())\nawait ticket.completion"
+                "code": "import type { IRuntime } from '@migaia/tray/runtime'\n\n/** 等待 callback 结束，再观察当前 search generation 的卸载结果。 */\nasync function unloadSearch(runtime: IRuntime): Promise<void> {\n  /** completion 只在 callback 结束后读取。 */\n  const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())\n  await ticket.completion\n}"
               },
               {
                 "type": "paragraph",
@@ -847,8 +856,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "createTray",
@@ -871,7 +880,7 @@
           "errors": ["No documented errors are declared for createTray."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createTray.",
           "examples": [
-            "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+            "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
           ],
           "members": [],
           "aliasOf": "createTray",
@@ -937,7 +946,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1011,12 +1020,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             },
@@ -1031,7 +1049,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1172,7 +1190,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1200,7 +1218,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1349,7 +1367,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1426,7 +1444,8 @@
           "errors": ["No documented errors are declared for defineTrayHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineTrayHost.",
           "examples": [
-            "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+            "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}",
+            "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
           ],
           "members": [],
           "aliasOf": "defineTrayHost",
@@ -1492,7 +1511,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1566,12 +1585,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             },
@@ -1586,7 +1614,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1636,7 +1664,7 @@
               ]
             }
           ],
-          "usageScore": 40,
+          "usageScore": 54,
           "configuration": [],
           "fragment": "tray-index--defineTrayHost"
         },
@@ -1817,12 +1845,40 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                }
+              ]
+            },
+            {
+              "id": "错误处理",
+              "heading": "错误处理",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "所有 Tray 自有边界错误都带 `source: '@migaia/tray'` 与稳定 `code`。生产代码按 `(source, code)` 分支，不依赖 message："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 USEGUIDE.md。"
                 }
               ]
             },
@@ -1837,7 +1893,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1961,7 +2017,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -2085,7 +2141,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -2209,7 +2265,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -2279,7 +2335,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayEntryContext.",
           "examples": [
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
+            "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
           "members": [],
           "aliasOf": "ITrayEntryContext",
@@ -2326,7 +2382,7 @@
           "declaredConfiguration": [],
           "identity": "packages/tray/dist/contract.d.ts:ITrayEntryContext:export type ITrayEntryContext = { readonly signal: IAbortSignal; get<T>(key: ITrayKey): T; own<T>(resource: T, descriptor: IReleaseDescriptor): T; };",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "tray-index--ITrayEntryContext"
         },
@@ -2346,8 +2402,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayEntryDefinition.",
           "examples": [
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}",
-            "function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph",
+            "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}",
+            "import type { ITrayEntryDefinition, ITrayGraph } from '@migaia/tray'\n\ndeclare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph",
             "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
           ],
           "members": [],
@@ -2395,7 +2451,7 @@
           "declaredConfiguration": [],
           "identity": "packages/tray/dist/contract.d.ts:ITrayEntryDefinition:export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };",
           "guidance": [],
-          "usageScore": 40,
+          "usageScore": 44,
           "configuration": [],
           "fragment": "tray-index--ITrayEntryDefinition"
         },
@@ -2415,7 +2471,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayEntryInstance.",
           "examples": [
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
+            "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
           "members": [],
           "aliasOf": "ITrayEntryInstance",
@@ -2462,7 +2518,7 @@
           "declaredConfiguration": [],
           "identity": "packages/tray/dist/contract.d.ts:ITrayEntryInstance:export type ITrayEntryInstance<T> = { readonly value: T; readonly release: (context: IGraphReleaseContext) => void | PromiseLike<void>; };",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "tray-index--ITrayEntryInstance"
         },
@@ -2482,7 +2538,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayEntryKind.",
           "examples": [
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
+            "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}"
           ],
           "members": [],
           "aliasOf": "ITrayEntryKind",
@@ -2678,8 +2734,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayGraph.",
           "examples": [
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph",
-            "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
+            "import type { ITrayEntryDefinition, ITrayGraph } from '@migaia/tray'\n\ndeclare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[]): ITrayGraph",
+            "import type { ICapabilityGraphNodeState as IGraphNodeState } from '@migaia/capability/graph'\nimport type { ITrayKey, ITrayState } from '@migaia/tray'\n\ntype ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): IGraphNodeState\n  dispose(): Promise<void>\n}",
+            "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
           ],
           "members": [],
           "aliasOf": "ITrayGraph",
@@ -2725,8 +2782,28 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/tray/dist/contract.d.ts:ITrayGraph:export type ITrayGraph = { readonly keys: readonly ITrayKey[]; readonly state: ITrayState; readonly error: unknown | undefined; ready(): Promise<void>; get<T>(key: ITrayKey): T; entryState(key: ITrayKey): IGraphNodeState; dispose(): Promise<void>; };",
-          "guidance": [],
-          "usageScore": 42,
+          "guidance": [
+            {
+              "id": "错误处理",
+              "heading": "错误处理",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "所有 Tray 自有边界错误都带 `source: '@migaia/tray'` 与稳定 `code`。生产代码按 `(source, code)` 分支，不依赖 message："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 USEGUIDE.md。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 56,
           "configuration": [],
           "fragment": "tray-index--ITrayGraph"
         },
@@ -2846,12 +2923,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             }
@@ -3191,10 +3277,11 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayKey.",
           "examples": [
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "const trayKey = (value: string): ITrayKey => value as ITrayKey\nexport const AppTrayKey = {\n  config: trayKey('config'),\n  api: trayKey('api')\n} as const",
-            "type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}",
-            "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}",
-            "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}"
+            "import type { ITrayKey } from '@migaia/tray'\n\nconst trayKey = (value: string): ITrayKey => value as ITrayKey\nexport const AppTrayKey = {\n  config: trayKey('config'),\n  api: trayKey('api')\n} as const",
+            "import type {\n  IGraphReadinessSnapshot,\n  ITrayEntryContext,\n  ITrayEntryInstance,\n  ITrayKey\n} from '@migaia/tray'\n\ntype ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'\n\ntype ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey\n  readonly kind: ITrayEntryKind\n  readonly requires?: readonly ITrayKey[]\n  readonly readiness?: IGraphReadinessSnapshot\n  readonly start: (\n    context: ITrayEntryContext\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>\n}",
+            "import type { ICapabilityGraphNodeState as IGraphNodeState } from '@migaia/capability/graph'\nimport type { ITrayKey, ITrayState } from '@migaia/tray'\n\ntype ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): IGraphNodeState\n  dispose(): Promise<void>\n}",
+            "import { createTrayGraph, type ITrayEntryDefinition, type ITrayKey } from '@migaia/tray'\n\nconst key = (value: string): ITrayKey => value as ITrayKey\nconst configKey = key('config')\nconst apiKey = key('api')\n\nconst entries: readonly ITrayEntryDefinition<unknown>[] = [\n  {\n    key: configKey,\n    kind: 'value',\n    start: () => ({ value: { baseUrl: '/api' }, release: () => undefined })\n  },\n  {\n    key: apiKey,\n    kind: 'service',\n    requires: [configKey],\n    start: (context) => {\n      const config = context.get<{ baseUrl: string }>(configKey)\n      const client = { baseUrl: config.baseUrl }\n      return { value: client, release: () => undefined }\n    }\n  }\n]\n\nconst tray = createTrayGraph(entries)\nawait tray.ready()\nconst api = tray.get<{ baseUrl: string }>(apiKey)\n\ntry {\n  console.log(api.baseUrl)\n} finally {\n  await tray.dispose()\n}",
+            "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
           ],
           "members": [],
           "aliasOf": "ITrayKey",
@@ -3240,8 +3327,28 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/tray/dist/contract.d.ts:ITrayKey:export type ITrayKey = string & { readonly __trayKey: unique symbol; };",
-          "guidance": [],
-          "usageScore": 74,
+          "guidance": [
+            {
+              "id": "错误处理",
+              "heading": "错误处理",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "所有 Tray 自有边界错误都带 `source: '@migaia/tray'` 与稳定 `code`。生产代码按 `(source, code)` 分支，不依赖 message："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 USEGUIDE.md。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 96,
           "configuration": [],
           "fragment": "tray-index--ITrayKey"
         },
@@ -3739,12 +3846,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             }
@@ -3934,12 +4050,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             }
@@ -4190,12 +4315,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             }
@@ -4283,7 +4417,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayState.",
           "examples": [
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "type ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): string\n  dispose(): Promise<void>\n}"
+            "import type { ICapabilityGraphNodeState as IGraphNodeState } from '@migaia/capability/graph'\nimport type { ITrayKey, ITrayState } from '@migaia/tray'\n\ntype ITrayGraph = {\n  readonly keys: readonly ITrayKey[]\n  readonly state: ITrayState\n  readonly error: unknown | undefined\n  ready(): Promise<void>\n  get<T>(key: ITrayKey): T\n  entryState(key: ITrayKey): IGraphNodeState\n  dispose(): Promise<void>\n}"
           ],
           "members": [],
           "aliasOf": "ITrayState",
@@ -4328,7 +4462,7 @@
           "declaredConfiguration": [],
           "identity": "packages/tray/dist/contract.d.ts:ITrayState:export type ITrayState = 'open' | ICapabilityGraphState;",
           "guidance": [],
-          "usageScore": 20,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "tray-index--ITrayState"
         },
@@ -4448,12 +4582,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             }
@@ -4683,7 +4826,7 @@
           "errors": ["No documented errors are declared for serveTrayHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for serveTrayHost.",
           "examples": [
-            "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+            "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
           ],
           "members": [],
           "aliasOf": "serveTrayHost",
@@ -4754,7 +4897,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -4828,12 +4971,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             },
@@ -4848,7 +5000,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () => [definePlugin({\n    name: 'node', features: { svc: echo }, install: () => ({})\n  })] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
+                  "code": "import { defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createTray, defineTrayHost } from '@migaia/tray'\n\nconst echo = defineFeature(() => ({ echo: (value: string) => value }))\nconst agent = defineTrayHost({\n  name: 'agent',\n  plugins: () =>\n    [\n      definePlugin({\n        name: 'node',\n        features: { svc: echo },\n        install: () => ({})\n      })\n    ] as const,\n  exposes: ['node.svc']\n})\nconst tray = createTray({ hosts: [agent] })\ntry {\n  const alice = await tray.spawn('agent', { id: 'alice' })\n  console.log(await alice.request('node.svc.echo', 'hello'))\n  await tray.restart('alice')\n} finally {\n  await tray.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -4918,7 +5070,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TRAY_SOURCE.",
           "examples": [
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
+            "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
           ],
           "members": [],
           "aliasOf": "TRAY_SOURCE",
@@ -5084,7 +5236,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
+                  "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -5113,7 +5265,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for TrayErrorCode.",
           "examples": [
             "import {\n  createTrayGraph,\n  TRAY_SOURCE,\n  TrayErrorCode,\n  type IGraphReadinessSnapshot,\n  type ITrayGraph,\n  type ITrayEntryContext,\n  type ITrayEntryDefinition,\n  type ITrayEntryInstance,\n  type ITrayEntryKind,\n  type ITrayErrorCode,\n  type ITrayKey,\n  type ITrayState\n} from '@migaia/tray'",
-            "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
+            "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
           ],
           "members": [],
           "aliasOf": "TrayErrorCode",
@@ -5281,7 +5433,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { TRAY_SOURCE, TrayErrorCode } from '@migaia/tray'\n\ntry {\n  tray.get(apiKey)\n} catch (error) {\n  const diagnostic = error as { source?: string; code?: string }\n  if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n    // 等待 ready()，或处理启动/就绪门失败。\n  } else {\n    throw error\n  }\n}"
+                  "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -5631,8 +5783,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "defineAdapter",
@@ -5858,8 +6010,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "createHost",
@@ -5882,7 +6034,7 @@
           "errors": ["No documented errors are declared for createHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createHost.",
           "examples": [
-            "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(definePlugin({\n  name: 'late',\n  features: {\n    value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n  },\n  install: () => ({ late: true })\n}))\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
+            "import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'\nimport { createHost } from '@migaia/tray/host'\n\nclass AppHost extends PluginHost<Record<string, never>, string> {}\n\nconst provider = definePlugin({\n  name: 'provider',\n  features: { value: defineFeature(() => ({ value: 1 })) },\n  install: () => ({ providerValue: 1 })\n})\n\nawait using host = await createHost({\n  create: () =>\n    new AppHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 100 } }),\n  plugins: [provider] as const,\n  mutationAdmissionMs: 100,\n  quiescenceMs: 100,\n  shutdown: { mode: 'bounded' }\n})\n\nawait host.use(\n  definePlugin({\n    name: 'late',\n    features: {\n      value: defineFeature(() => ({}), { provider: provider.getFeature('value') })\n    },\n    install: () => ({ late: true })\n  })\n)\nawait host.unUse('provider') // `late` 保留为 blocked definition，不再留在 Host 可见面。"
           ],
           "members": [],
           "aliasOf": "createHost",
@@ -6480,12 +6632,21 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块，例如："
+                  "text": "`serveTrayHost(host, { probe?, report? })` 返回 `Promise<void>`。它只接受本 realm 导入的可信 thread / process 定义；coroutine 由 registry 的任务运行器服务。 `probe` 与 `report` 使用上述相同类型，默认 reporter 也是 `console.error`。 Worker 或子进程入口与父 registry 应导入同一个定义模块。下面的 `hosts.ts` 定义 Worker Host："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.mjs：共享定义模块已由应用提供。\nimport { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
+                  "code": "import { defineTrayHost } from '@migaia/tray'\n\n/** 父 registry 与 Worker 入口共用的 Host 定义。 */\nexport const worker = defineTrayHost({\n  name: 'worker',\n  runtime: 'thread',\n  entry: new URL('./worker.js', import.meta.url),\n  plugins: () => [] as const,\n  exposes: []\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`worker.ts` 编译后连接父 registry："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { serveTrayHost } from '@migaia/tray'\nimport { worker } from './hosts.js'\n\nawait serveTrayHost(worker)"
                 }
               ]
             }
@@ -7470,8 +7631,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "defineLoader",
@@ -8034,9 +8195,9 @@
               "name": "mutation",
               "type": "'use' | 'replace'",
               "optional": false,
-              "description": "",
+              "description": "callback context 的 `self` 是当前 run/name/generation 专属 mutation capability。 下面的函数接收已有的 Runtime；其中 `search` 必须已 ready：",
               "descriptionEn": "",
-              "descriptionZh": ""
+              "descriptionZh": "callback context 的 `self` 是当前 run/name/generation 专属 mutation capability。 下面的函数接收已有的 Runtime；其中 `search` 必须已 ready："
             },
             {
               "name": "signal",
@@ -8081,8 +8242,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "createRuntime",
@@ -8219,7 +8380,9 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IRuntime."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntime.",
-          "examples": [],
+          "examples": [
+            "import type { IRuntime } from '@migaia/tray/runtime'\n\n/** 等待 callback 结束，再观察当前 search generation 的卸载结果。 */\nasync function unloadSearch(runtime: IRuntime): Promise<void> {\n  /** completion 只在 callback 结束后读取。 */\n  const ticket = await runtime.run('search', { timeoutMs: false }, ({ self }) => self.unUse())\n  await ticket.completion\n}"
+          ],
           "members": [],
           "aliasOf": "IRuntime",
           "exportPath": "./runtime",
@@ -8265,7 +8428,7 @@
           "declaredConfiguration": [],
           "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntime:export type IRuntime<TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ readonly state: 'active' | 'closing' | 'terminal'; readonly activeRuns: number; run<TName extends string, TResult>(name: TName, options: IRuntimeRunOptions, execute: (context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>>) => TResult | PromiseLike<TResult>): Promise<TResult>; dispose(): Promise<IRuntimeDisposalResult>; readonly [Symbol.asyncDispose]: () => Promise<void>; }>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "tray-runtime--IRuntime"
         },

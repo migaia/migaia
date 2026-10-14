@@ -431,8 +431,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-devtools/getting-started",
-      "architecturePath": "/en/architecture/rpc-devtools",
+      "guidePath": "/en/docs/rpc-devtools/getting-started",
+      "architecturePath": "/en/docs/rpc-devtools",
       "symbols": [
         {
           "name": "createRpcDevtools",
@@ -692,8 +692,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-devtools/getting-started",
-      "architecturePath": "/en/architecture/rpc-devtools",
+      "guidePath": "/en/docs/rpc-devtools/getting-started",
+      "architecturePath": "/en/docs/rpc-devtools",
       "symbols": [
         {
           "name": "decodeRpcDevtoolsRecord",
@@ -1918,8 +1918,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-devtools/getting-started",
-      "architecturePath": "/en/architecture/rpc-devtools",
+      "guidePath": "/en/docs/rpc-devtools/getting-started",
+      "architecturePath": "/en/docs/rpc-devtools",
       "symbols": [
         {
           "name": "createRpcDevtoolsHub",
@@ -2461,8 +2461,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-devtools/getting-started",
-      "architecturePath": "/en/architecture/rpc-devtools",
+      "guidePath": "/en/docs/rpc-devtools/getting-started",
+      "architecturePath": "/en/docs/rpc-devtools",
       "symbols": [
         {
           "name": "createRpcLogProbe",

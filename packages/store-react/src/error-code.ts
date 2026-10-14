@@ -1,65 +1,68 @@
 /**
- * `@migaia/store-react` 错误码的唯一声明处。
+ * Declares the public error codes for `@migaia/store-react` in one place.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/store-react'`。抛出点必须引用本文件的常量，不得内联字面量。
+ * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
+ * `source` is always `'@migaia/store-react'`. Throw sites use these constants instead of inline
+ * literals.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
+ * Code values are public API. Renaming a code is a breaking change
+ * (`docs/contracts/error-code-rollout.sdd.md` §1.2).
  */
 export const StoreReactErrorCode = {
   /**
-   * Provider registry 已 `dispose()` 后继续注册/读取。
+   * A provider registry is registered with or read after `dispose()`.
    *
-   * 调用方应新建 registry，不要复用已释放实例。
+   * Create a new registry instead of reusing the disposed instance.
    */
   registryDisposed: 'REGISTRY_DISPOSED',
 
   /**
-   * Provider registry 释放失败（`AggregateError` 外壳）。
+   * Provider registry disposal fails and exposes an `AggregateError`.
    *
-   * 调用方展开 `error.errors` 逐条处理；这是释放路径的不可恢复失败。
+   * Inspect each entry in `error.errors`. This failure is unrecoverable within the disposal path.
    */
   registryDisposalFailed: 'REGISTRY_DISPOSAL_FAILED',
 
   /**
-   * Hook 在缺少 `StoreProvider` 时被调用。
+   * A hook is called without `StoreProvider`.
    *
-   * 调用方把子树包进 `StoreProvider`，或改用不依赖 Provider 的 protocol hook。
+   * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider.
    */
   providerRequired: 'PROVIDER_REQUIRED',
 
   /**
-   * API 需要某个 feature，但它在 Provider 配置里未显式启用。
+   * An API requires a feature that is not explicitly enabled in the provider configuration.
    *
-   * 调用方在 `StoreProvider` 的 `features` 里显式开启该 path。
+   * Enable that path in the `StoreProvider` `features` configuration.
    */
   featureDisabled: 'FEATURE_DISABLED',
 
   /**
-   * 注册表里没有对应 token 的 store。
+   * The registry has no store for the requested token.
    *
-   * 调用方确认该 store 已在 registry `register`，且 token 一致。
+   * Confirm that the store is registered and uses the same token.
    */
   storeMissing: 'STORE_MISSING',
 
   /**
-   * 同一个 token 被注册了两次。
+   * The same token is registered twice.
    *
-   * 调用方去重注册，或让两个 Provider 拥有各自的 registry。
+   * Remove duplicate registration or give each provider its own registry.
    */
   storeDuplicate: 'STORE_DUPLICATE',
 
   /**
-   * Provider store 属于另一个 Runtime。
+   * A provider store belongs to another `Runtime`.
    *
-   * 调用方让 store 与 registry 使用同一 Runtime；跨 Runtime 注入被拒绝。
+   * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected.
    */
   crossRuntime: 'CROSS_RUNTIME',
 
   /**
-   * Provider/token 配置非法（缺 debug name、features.wasm 与 ready 组合矛盾等）。
+   * Provider or token configuration is invalid, for example a missing debug name or incompatible
+   * `features.wasm` and `ready`.
    *
-   * 调用方修正配置后重试；这是永久性配置错误。
+   * Correct the configuration before retrying. This is a permanent configuration error.
    */
   invalidConfig: 'INVALID_CONFIG',
 

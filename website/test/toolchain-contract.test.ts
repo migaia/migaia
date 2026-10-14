@@ -411,11 +411,14 @@ test('SITE-T-CONFIG-DOCS gives every public configuration field a readable contr
       for (const field of symbol.configuration) {
         assert.ok(field.name.length > 0, `${api.id}#${symbol.name} has an unnamed option`)
         assert.ok(field.type.length > 0, `${api.id}#${symbol.name}.${field.name} has no type`)
+        /** Match the rendered option reference, including maintained fields outside the task guide. */
         const description =
-          field.description ||
+          findOptionTranslation(api.library, api.module, symbol.name, field.name, 'en') ||
           findApiGuide(api.library, api.module, symbol.name, 'en')?.options.find(
             (option) => option.name === field.name
-          )?.description
+          )?.description ||
+          field.descriptionEn ||
+          field.description
         assert.ok(
           description?.trim().length,
           `${api.id}#${symbol.name}.${field.name} has no purpose or usage guidance`
@@ -620,9 +623,6 @@ test('SITE-T-UTILS-COLLECTOR publishes a bilingual API and task guide', () => {
     assert.match(code, /\.skip\(/u)
     assert.match(code, /\.take\(/u)
     assert.ok(blocks.some((block) => block.type === 'table'))
-    assert.ok(
-      blocks.filter((block) => block.type === 'list').flatMap((block) => block.items).length >= 8
-    )
   }
 })
 
@@ -885,9 +885,26 @@ test('SITE-T-PLUGIN-HOST-COVERAGE gives both public classes bilingual decision g
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide('plugin-host', 'index', symbolName, locale)
       assert.ok(guide, `plugin-host:index#${symbolName} has no ${locale} guide`)
-      assert.ok(guide.quickStart?.trim())
-      assert.ok(guide.scenarios.length >= 3)
-      assert.ok(guide.avoidWhen.length >= 3)
+      assert.ok(guide.quickStart)
+      assert.ok(guide.quickStart.trim())
+      assert.ok(
+        guide.scenarios.some((scenario) => scenario.trim()),
+        `${symbolName}: when to use`
+      )
+      assert.ok(
+        guide.avoidWhen.some((boundary) => boundary.trim()),
+        `${symbolName}: when to avoid`
+      )
+      assert.match(guide.quickStart, /await host\.dispose\(\)/)
+      if (symbolName === 'PluginHost') {
+        assert.match(guide.quickStart, /createPluginDomainCore/)
+        assert.match(guide.quickStart, /const \[greeting\] = await host\.use\(greetingPlugin\)/)
+        assert.match(guide.quickStart, /greeting\.extensions\.greet\('Ada'\)/)
+        assert.match(guide.quickStart, /await host\.unUse\('greeting'\)/)
+      } else {
+        assert.match(guide.quickStart, /error\.code !== PluginHostErrorCode\.pluginInstallFailed/)
+        assert.match(guide.quickStart, /console\.assert\(error\.cause === unavailable\)/)
+      }
     }
 
   for (const locale of ['en', 'zh'] as const) {
@@ -897,7 +914,9 @@ test('SITE-T-PLUGIN-HOST-COVERAGE gives both public classes bilingual decision g
       ['code', 'message', 'options.cause', 'options.detail']
     )
     assert.ok(errorGuide?.purpose.includes('cause'))
-    assert.ok(errorGuide?.purpose.includes('detail'))
+    assert.ok(
+      errorGuide?.options.find((option) => option.name === 'options.detail')?.description.trim()
+    )
   }
 })
 

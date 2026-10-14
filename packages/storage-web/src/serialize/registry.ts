@@ -12,7 +12,7 @@ import { snapshotStorageCapabilities, type IStorageCapabilities } from '../types
 import { isUint8Array } from '../core/bytes.js'
 import { reportCleanupError } from '../core/operation-reporter.js'
 
-// codec 描述符 guard 已迁往 `@migaia/storage-contract`；re-export 保持既有 import 路径不变。
+// Codec descriptor guards belong to `@migaia/storage-contract`. Re-exports preserve existing import paths.
 export { snapshotCodec, assertCodec }
 
 const toBinaryBytes = (value: unknown): Uint8Array => {
@@ -37,7 +37,7 @@ const fromBase64 = (value: unknown): Uint8Array => {
 }
 
 export type ISelectedCodec = {
-  /** 选路后实际要写入存储的字符串或字节。 */
+  /** Produces the string, bytes, or structured value that the selected route writes to storage. */
   encode(
     value: unknown,
     ctx?: { signal?: NonNullable<IOperationContext['signal']> }
@@ -49,12 +49,12 @@ export type ISelectedCodec = {
 }
 
 /**
- * 选路规则：
- *
- * 1. Codec.output 与后端 capabilities 匹配 → 直连。
- * 2. Binary codec 遇 text-only 后端 → 自动 base64 包装，体积 +33%， 通过 onDiagnostic 报一次，不是静默发生。
- * 3. Structured codec 遇 text-only 后端 → 抛 UNSUPPORTED_CAPABILITY。 structured clone
- *    的能力（Blob/Map/Set/循环引用）无法用 JSON 表达， 静默降级会丢数据，这里不做隐式转换。
+ * Selects a codec route from backend capabilities. A matching `codec.output` uses the codec
+ * directly. A binary codec on a text-only backend uses a base64 wrapper with about 33% larger
+ * output. When supplied, `onDiagnostic` reports that fallback once per route selection. A
+ * structured codec on a text-only backend throws `UNSUPPORTED_CAPABILITY`. JSON cannot preserve
+ * structured clone values such as `Blob`, `Map`, `Set`, or cycles, so this function does not
+ * silently convert them and lose data.
  */
 export const selectCodec = (
   codec: ICodec,

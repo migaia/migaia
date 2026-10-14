@@ -118,8 +118,10 @@ export type IPluginSetup<TConfig extends IPluginConfig, TSetup> = (
 ) => TSetup | PromiseLike<TSetup>
 
 /**
- * 错误码已迁至 `./error-code.ts`（`docs/contracts/error-codes.md` §3.5 要求每包在 `src/error-code.ts` 单点声明）。此处
- * re-export 仅为保持既有导入路径可用，码值未变；新代码请直接从 `./error-code` 导入。
+ * Reexports error codes from their canonical `./error-code.ts` declaration site.
+ * `docs/contracts/error-codes.md` §3.5 requires one `src/error-code.ts` per package. This preserves
+ * the existing import path without changing code values. New code imports directly from
+ * `./error-code.js`.
  */
 export { PluginHostErrorCode, type IPluginHostErrorCode } from './error-code.js'
 
@@ -143,7 +145,7 @@ export type IPipelineConfig = { mode?: IMiddlewarePipelineMode }
  * identity.
  */
 export { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED }
-/** 通用插件契约；具体应用通过 TCore 暴露自己的领域能力。 */
+/** Common plugin contract. Applications expose their domain capabilities through `TCore`. */
 export type IPluginCommon<
   TCore,
   TConfig extends IPluginConfig,
@@ -260,7 +262,7 @@ export type IPlugin<
   IPluginHooks<TCore, TExt, TConfig, TFeatures, TExpose, TSetup> &
   (TShared extends object ? unknown : never)
 
-/** 用于约束插件元组，同时保留每个插件自身的精确泛型。 */
+/** Constrains a plugin tuple while preserving each plugin's precise generic arguments. */
 export type IPluginConstraint<
   TCore,
   TFeatures extends IFeatureRecord = Record<never, never>,
@@ -589,17 +591,16 @@ type IUnionToIntersection<T> = (T extends unknown ? (value: T) => void : never) 
   ? I
   : never
 
-/** 把一组插件提供的实例扩展合并成交叉类型。 */
+/** Combines the instance extensions supplied by a plugin group into an intersection. */
 export type IMergePluginExts<TPlugins extends readonly unknown[]> = IUnionToIntersection<
   IExtractPluginExt<TPlugins[number]>
 >
 
 /**
- * Interface required so fluent capabilities can use polymorphic `this` returns.
+ * Interface semantics allow fluent capabilities to return polymorphic `this`.
  *
- * PluginHost 向插件和业务宿主提供的通用能力。
- *
- * 业务侧只需将自己的领域字段与此类型做交叉，避免重复声明资源清理、配置和 pipeline 等宿主约定。
+ * Common capabilities that PluginHost supplies to plugins and domain hosts. Intersect domain fields
+ * with this interface to reuse resource cleanup, configuration, and pipeline contracts.
  */
 export interface IPluginHostCore<
   TValue = never,
@@ -640,13 +641,25 @@ export type IPluginHostOptions = {
    * `globalThis.reportError` if one exists. Never affects Host control flow.
    */
   onDiagnosticFailure?: (error: unknown) => void
-  /** 时间域与排程来源（默认 lifecycle `systemScheduler`）；queue watchdog / dispose timeout 共用。 */
+  /**
+   * Clock and scheduling source shared by the queue watchdog and disposal timeouts. Defaults to
+   * lifecycle `systemScheduler`.
+   */
   scheduler?: IScheduler
-  /** 队列 admission 阈值。`undefined`：只诊断不拒绝；`false`：不建 timer、不诊断、不拒绝；`number`：超时出队并 reject。 */
+  /**
+   * Admission wait limit. `undefined` reports without rejecting; `false` disables timers, reports,
+   * and rejection; a number rejects and removes timed-out work.
+   */
   queueAdmissionTimeoutMs?: number | false
-  /** `queueAdmissionTimeoutMs` 未配置时的诊断阈值；`false` 关闭诊断 timer。 */
+  /**
+   * Diagnostic wait threshold when `queueAdmissionTimeoutMs` is omitted. `false` disables its
+   * timer.
+   */
   queueAdmissionDiagnosticMs?: number | false
-  /** 单个 disposer 步的最大等待时间；`false` 表示永久等待（不触发 force）。 */
+  /**
+   * Maximum wait for one disposal step. `false` waits indefinitely without triggering forced
+   * release.
+   */
   disposeStepTimeoutMs?: number | false
 }
 

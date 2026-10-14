@@ -93,8 +93,8 @@ const nodeLabel = (node: object): string =>
   node.constructor?.name ??
   StoreDevtoolsLabel.anonymousReactiveNode
 
-// 环判定按「当前这条路径」，不是全局访问集：菱形里的共享节点会被两条路径各展开一次——
-// 那是共享，不是环。只有重新踩到仍在当前路径上的节点才是环，因此进入时入栈、返回时出栈。
+// Detects cycles on the current path rather than through a global visited set. Shared diamond nodes expand once per path.
+// Only revisiting a node still on that path is a cycle. Push on entry and remove on return.
 export function getDependencyTree(observer: IObserver, maxDepth = 20): IDependencyTreeNode {
   assertDepth(maxDepth, 'dependency tree')
   const path = new Set<object>()

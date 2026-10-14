@@ -1037,8 +1037,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-shared/getting-started",
-      "architecturePath": "/en/architecture/store-shared",
+      "guidePath": "/en/docs/store-shared/getting-started",
+      "architecturePath": "/en/docs/store-shared",
       "symbols": [
         {
           "name": "createStoreSharedError",

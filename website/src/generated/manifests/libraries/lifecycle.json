@@ -2180,8 +2180,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "boundedWait",
@@ -7024,8 +7024,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createAbortController",
@@ -7451,8 +7451,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createDisposeTransaction",
@@ -8535,8 +8535,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "containAsyncRejection",
@@ -11187,8 +11187,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createGenerationController",
@@ -11629,8 +11629,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createObjectLeaseRegistry",
@@ -12196,8 +12196,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "addSchedulerTime",
@@ -12825,8 +12825,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createLifecycleScope",

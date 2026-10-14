@@ -6,7 +6,7 @@ export type ILogLevel = (typeof LoggerLevel)[keyof typeof LoggerLevel]
 export type ILevelPluginConfig = {
   level?: ILogLevel
   filters?: ILogFilter[]
-  /** 是否把该插件发起的日志推迟到当前同步调用栈之后处理；默认 false。 */
+  /** Defers entries from this plugin until after the current synchronous stack. Defaults to `false`. */
   asyncOutput?: boolean
 }
 
@@ -17,14 +17,14 @@ export type ILevelPluginExt = {
   error(...args: unknown[]): void
   fatal(...args: unknown[]): void
   setLevel(level: ILogLevel): void
-  /** 添加过滤器；返回 off 句柄，重复调用安全。 */
+  /** Adds a filter and returns an idempotent removal handle. */
   addFilter(filter: ILogFilter): IOff
   removeFilter(filter: ILogFilter): void
 }
 
 /**
- * 插件自己的名字，导出成常量而不是散落的字符串字面量——install() 里用 这个常量去 core.config.get()，也是构造插件对象时 `readonly name` 的来源，
- * 两处只要有一处打错字，TS 都会因为类型不匹配而报错，不会静默失配。
+ * Canonical level plugin name used by its `readonly name` property. The exported constant avoids
+ * repeated name literals and keeps registration identity consistent.
  */
 export const LEVEL_PLUGIN_NAME = 'level' as const
 
