@@ -4,10 +4,11 @@ import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.js'
 import { StoreKeyedErrorText } from '../error-text.js'
 
 /**
- * Atom 协议：只有形状与跨 Runtime 校验，没有实现。
+ * Defines the atom protocol and cross-runtime validation without an atom implementation.
  *
- * 实例式的 `PrimitiveAtom`/`DerivedAtom` 已经搬到 `atom/legacy.ts`——它们建立在 Definition + AtomStore 之上，属于
- * facade 层。这个文件留在内核目录里，因为 async / family / react 都只需要这套类型，不该为此认识实例化层。
+ * `PrimitiveAtom` and `DerivedAtom` live in `atom/legacy.ts` as facades over definitions and
+ * `AtomStore`. Async, family, and React extensions use this protocol without depending on the
+ * instantiation layer.
  */
 
 export type IReadableAtom<T> = IDisposable & {
@@ -18,10 +19,10 @@ export type IReadableAtom<T> = IDisposable & {
   readonly observed: boolean
   read(): T
   /**
-   * 非追踪读。
+   * Reads without tracking dependencies.
    *
-   * React 适配层的 getSnapshot 可能在任意时刻被调用，包括另一个组件正在 捕获依赖的窗口内。用 `.value` 会把这次读记进别人的依赖集合，造成串边；
-   * 必须有一条明确不建边的读法。
+   * React can call `getSnapshot` while another component captures dependencies. Reading `.value`
+   * would add the atom to that component's dependencies, so this path creates no graph edge.
    */
   peek(): T
 }
@@ -54,9 +55,10 @@ function assertSameRuntime(runtime: IRuntime, atom: IReadableAtom<unknown>): voi
 }
 
 /**
- * 构造一个绑定到指定 Runtime 的 getter。
+ * Creates a getter bound to the specified `Runtime`.
  *
- * 导出是因为它属于 atom 协议本身：async / family 这类扩展层要在自己的节点里 复用同一套跨 runtime 校验，不该各写一份。
+ * Async and family extensions reuse the atom protocol's cross-runtime validation instead of
+ * implementing their own.
  */
 export function atomGetter(runtime: IRuntime): IAtomGetter {
   return <T>(atom: IReadableAtom<T>): T => {

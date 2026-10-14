@@ -25,11 +25,11 @@ export type IWasmArrayField = IDisposable & {
   at(index: number): number
   setAt(index: number, value: number): void
   setRange(lo: number, hi: number, values: ArrayLike<number>): void
-  // 返回当前内容的拷贝；直接写不会触发响应式通知，适合需要独立快照的调用方。
+  // Returns a copy for an independent snapshot. Writing to that copy does not emit reactive notifications.
   view(): Float64Array
 }
 
-// item 目前只支持 number()。granularity：每桶覆盖多少 index 共享一个 Source（默认 64，=1 即逐格追踪）。
+// Currently supports only `number()` items. `granularity` sets indices per shared `Source`; it defaults to 64, and 1 tracks each index.
 export function array(
   _item: ReturnType<typeof numberBuilder>,
   length: number,

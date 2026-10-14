@@ -93,9 +93,12 @@ function mergePersistedPlainState<TState>(
 }
 
 /**
- * 持久化核心引擎：给任意满足 `IPersistUnit<TState>` 的东西接上 hydrate（读 storage → 写回 unit） 与防抖写回（unit 变化 → 写
- * storage）。`persist()`/`persistCollection()`/`persistKeyed()` 内部 各自把自己的原生 API 适配成
- * `IPersistUnit`，然后调这一个函数——debounce、dispose、hydrate 竞态 只在这里实现一遍。
+ * Connects an `IPersistUnit` to storage hydration and debounced writes. Hydration reads storage and
+ * restores the unit. Unit changes trigger storage writes.
+ *
+ * `persist()`, `persistCollection()`, and `persistKeyed()` adapt their native APIs to
+ * `IPersistUnit` and call this engine. Debouncing, disposal, and hydration races are implemented
+ * here once.
  */
 export function persistUnit<TState>(
   unit: IPersistUnit<TState>,

@@ -119,9 +119,12 @@ export type ISSRResourceFailure = {
 }
 
 export type IDehydrateAsyncOptions = {
-  /** 覆盖默认的「报给 Runtime.onError」行为。 */
+  /** Overrides the default resource failure reporting through `Runtime.onError`. */
   readonly onResourceError?: (failure: ISSRResourceFailure) => void
-  /** 整个等待过程的总预算；超时的 resource 各记一条 failure，不无限期挂起渲染。 */
+  /**
+   * Sets the total wait budget. Each timed-out resource becomes a failure instead of blocking
+   * rendering indefinitely.
+   */
   readonly timeoutMs?: number
 }
 
@@ -184,14 +187,15 @@ async function raceOutcome<T>(
 }
 
 /**
- * 一个请求一个 Runtime 与一份注册表。
+ * Owns a runtime and registry for one request.
  *
- * 请求态**全部**是实例字段：没有模块级快照、没有模块级注册表，所以并发的两条流 看不见对方。但这不等于整个库没有模块级状态，那句话过去写得太满：
+ * All request snapshots and registries are instance state, so independently created request scopes
+ * do not share them. The library still has module state.
  *
- * - `defaultRuntime` 是模块级的。它进不来——`register()` 校验 `store.$runtime === this.runtime`，落在默认 Runtime 上的
- *   store 会被当场拒绝， 这条断言才是隔离的实际保证；
- * - `activeTracker` 是模块级的，但它只在**同步**求值期间被换入换出，跨 await 不留驻，所以两个请求的异步片段不会互相看到；
- * - 所有权表与内核内部面是两张 WeakMap，按对象身份查，不按请求身份查。
+ * A scope creates its own runtime by default or uses the supplied runtime. `register()` requires
+ * `store.$runtime === this.runtime`, rejecting stores owned by a different runtime. The active
+ * dependency tracker is shared only during synchronous evaluation and does not remain active across
+ * `await`. Ownership and internal graph maps use object identity instead of request identity.
  */
 export class SSRRequestScope {
   readonly runtime: IRuntime
@@ -450,9 +454,12 @@ export class SSRRequestScope {
   }
 
   /**
-   * 逐轮等待已注册的异步派生，返回失败清单，允许调用方选择整页失败或客户端重取。 新注册的瀑布式 resource 也参与后续轮次；按 Promise 身份去重，同一个 key 的
-   * retry/refetch 新 Promise 仍会被等待。单个 resource 失败不会阻断其他预取。 Promise getter 抛错与超时均计入清单。等待期间 scope 被
-   * dispose 时返回已有结果， 不把剩余 resource 算作失败。
+   * Waits for registered asynchronous resources in rounds and returns their failures. Callers can
+   * fail the page or refetch on the client. New waterfall registrations participate in later
+   * rounds. Promises are deduplicated by identity, so a new retry or refetch promise for the same
+   * key is awaited. One resource failure does not block other prefetches. Thrown promise getters
+   * and timeouts are included in the failure list. Disposal during the wait returns results already
+   * collected without marking remaining resources as failures.
    */
   async awaitResources(
     options: IAwaitResourcesOptions = {}
@@ -527,10 +534,12 @@ export class SSRRequestScope {
   }
 
   /**
-   * 预取后取快照。失败的 resource 不进 payload，其余照常。
+   * Takes a snapshot after prefetching. Failed resources are omitted from the payload; other
+   * resources remain included.
    *
-   * 缺省把失败报给 Runtime 的 onError（phase `ssr-resource`）——静默吞掉会让 「客户端为什么又发了一遍请求」无从查起。给了 onResourceError
-   * 就以它为准。
+   * Reports failures to the runtime's `onError` with phase `ssr-resource` by default, so client
+   * refetches remain diagnosable. When `onResourceError` is provided, it handles reporting
+   * instead.
    */
   async dehydrateAsync(options: IDehydrateAsyncOptions = {}): Promise<ISSRState> {
     let onResourceError: IDehydrateAsyncOptions['onResourceError']
@@ -768,11 +777,13 @@ export type ISSRScriptOptions = {
 }
 
 /**
- * Same as createSSRStateScript but routed through a serialize registry, so the payload format is
- * the caller's choice.
+ * Creates an inline state script through a serialize registry, allowing the caller to choose the
+ * payload format.
  *
- * 内联进 HTML 的转义是**传输层**要求，与格式无关，但转义手法不能一刀切： `<` 这类转义只在 JSON 语法内有效，套到 YAML 或二进制上就是破坏数据。 所以只有 json
- * 走那条便宜的转义；其余格式一律 base64——base64 字母表里根本 不含 `<` `>` `&` 与行分隔符，天然可安全内联，代价是体积涨三分之一。
+ * Safe HTML embedding is required for every format, but escaping must preserve the payload syntax.
+ * JSON text uses JSON-compatible escapes for characters such as `<`. Applying those escapes to YAML
+ * or binary data would corrupt it. Other payloads use base64, whose alphabet excludes `<`, `>`,
+ * `&`, and line separators. Base64 increases payload size by approximately one third.
  */
 export async function createSSRStateScriptWith(
   state: ISSRState,

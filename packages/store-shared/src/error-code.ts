@@ -1,58 +1,64 @@
 /**
- * `@migaia/store-shared` 错误码的唯一声明处。
+ * Declares the public error codes for `@migaia/store-shared` in one place.
  *
- * 契约见 `docs/contracts/error-codes.md`：错误由 `(source, code)` 二元组唯一定位，`source` 恒为
- * `'@migaia/store-shared'`。抛出点必须引用本文件的常量，不得内联字面量。
+ * The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The
+ * `source` is always `'@migaia/store-shared'`. Throw sites use these constants instead of inline
+ * literals.
  *
- * 码值是公开 API 的一部分，改名等同破坏性变更（`docs/contracts/error-code-rollout.sdd.md` §1.2）。
+ * Code values are public API. Renaming a code is a breaking change
+ * (`docs/contracts/error-code-rollout.sdd.md` §1.2).
  */
 export const StoreSharedErrorCode = {
   /**
-   * `SharedInt32Array` 已 `dispose()` 后继续读写。
+   * `SharedInt32Array` is read or written after `dispose()`.
    *
-   * 调用方应新建数组，不要复用已释放实例。
+   * Create a new array instead of reusing the disposed instance.
    */
   arrayDisposed: 'ARRAY_DISPOSED',
 
   /**
-   * `SharedInt32Signal` 已 `dispose()` 后继续读写。
+   * `SharedInt32Signal` is read or written after `dispose()`.
    *
-   * 调用方应新建 signal，不要复用已释放实例。
+   * Create a new signal instead of reusing the disposed instance.
    */
   signalDisposed: 'SIGNAL_DISPOSED',
 
   /**
-   * 传入的 SharedArrayBuffer 太小，放不下要求的 cell 布局。
+   * The supplied `SharedArrayBuffer` cannot hold the required cell layout.
    *
-   * 调用方应分配更大的 buffer；这是构造期参数错误，不要重试同一 buffer。
+   * Allocate a larger buffer. This is a construction input error; do not retry the same buffer.
    */
   bufferTooSmall: 'BUFFER_TOO_SMALL',
 
   /**
-   * `SharedInt32Array` 下标越界。
+   * A `SharedInt32Array` index is outside `[0, length)`.
    *
-   * 调用方检查下标是否在 `[0, length)`；这是永久性参数错误。
+   * Correct the index. This is a permanent input error.
    */
   indexOutOfRange: 'INDEX_OUT_OF_RANGE',
 
   /**
-   * Seqlock 在自旋上限内未 settle（cell 未稳定 / 锁未获取 / update 持续失败）。
+   * A seqlock does not settle within the spin limit because a cell is unstable, a lock cannot be
+   * acquired, or updates keep failing.
    *
-   * 通常是某个写者持锁期间崩溃留下的死锁，无法自愈；调用方应重建 buffer。
+   * A writer may have crashed while holding the lock, leaving a deadlock that cannot recover.
+   * Rebuild the buffer.
    */
   contentionLimit: 'CONTENTION_LIMIT',
 
   /**
-   * `Atomics.waitAsync` 在当前环境不可用。
+   * `Atomics.waitAsync` is unavailable in the current environment.
    *
-   * 调用方用 `sync()` 自己拉取，或换支持 waitAsync 的运行时；库不做静默降级。
+   * Poll with `sync()` or use a runtime that supports `waitAsync`. The library does not silently
+   * fall back.
    */
   envUnsupported: 'ENV_UNSUPPORTED',
 
   /**
-   * 构造/写入口参非法（长度非负整数、int32 范围）。
+   * Construction or write input is invalid, such as a length that is not a non-negative integer or
+   * a value outside the int32 range.
    *
-   * 调用方修正入参；这是永久性参数错误。
+   * Correct the input. This is a permanent input error.
    */
   invalidOption: 'INVALID_OPTION'
 } as const

@@ -1,8 +1,8 @@
 /**
- * 存档信封：version（schema 版本，供 migrate() 用）+ state。
+ * Stores state with a schema `version` for `migrate()`.
  *
- * 不再像旧实现那样自己维护 revision/双通道冲突判定——storage-web 的 `ICodec`/`selectCodec` 已经把 "codec 产出形态 vs
- * 后端能力"这层路由做掉了，store-persist 不需要在同一个 key 上同时维护文本和字节两个 物理位置，也就没有"两个通道各自解码后按 revision 取新"这个问题存在的前提。
+ * Codec routing already matches output formats to backend capabilities. Persistence does not
+ * maintain separate text and byte locations for one key or resolve channel conflicts by revision.
  */
 export type IEnvelope<TState> = {
   version: number
