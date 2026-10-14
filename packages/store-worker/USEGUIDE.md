@@ -109,7 +109,7 @@ class WorkerAdapter {
 
 ```ts
 function createWorkerHandler<Input, Output>(
-  compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>,
+  compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,
   postMessage: (message: unknown) => void,
   options?: { readonly timeoutMs?: number }
 ): ManagedRpcHandler;

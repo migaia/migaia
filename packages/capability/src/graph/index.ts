@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   assimilateCapturedThen,
   createGenerationController,
@@ -5,7 +6,6 @@ import {
   createProvisionalScope,
   probeThenable,
   ThenableProbeKind,
-  type IAbortSignal,
   type IGenerationController,
   type IGenerationToken,
   type IReleaseContext,

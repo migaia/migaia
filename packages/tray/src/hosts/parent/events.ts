@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createEventHub } from '@migaia/event-subscriber'
 import { TrayInstanceEvent } from '../constants.js'
 import type { ITrayInstanceEventRecord, ITrayInstanceEventRecord as IRecord } from '../typing.js'
@@ -25,7 +26,7 @@ export function createTrayEvents(report: (error: unknown) => void) {
     on(event: TrayInstanceEvent, listener: (event: IRecord) => void): () => void {
       return hub.subscribe(event, (value) => listener(value.value))
     },
-    watch(options?: { signal?: AbortSignal }): AsyncIterableIterator<ITrayInstanceEventRecord> {
+    watch(options?: { signal?: IAbortSignal }): AsyncIterableIterator<ITrayInstanceEventRecord> {
       /** The view retains the latest 100 unread observations; it is not a durable event journal. */
       const queue: IRecord[] = []
       /** Each waiting caller receives the next event in arrival order. */

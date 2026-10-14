@@ -30,7 +30,7 @@ export type IAdapterJsonRpcChannelOptions = Readonly<{
   scheduler: IScheduler
   wallClock: IWallClock
   ipc: IRuntimeConnectionOptions['ipc']
-  signal?: import('../../core/typing.js').IRpcAbortSignal
+  signal?: import('@migaia/utils/promise').IAbortSignal
   handshakeTimeoutMs?: number
   report(error: unknown): void
 }>

@@ -1,10 +1,10 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js'
 import { connected } from './fixture.js'
 import type { IRemoteCallOptions } from '../../dist/remote/types.js'
-import type { IRpcAbortSignal } from '../../dist/core/typing.js'
 import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.js'
 import { EndpointOwnerKey } from '../../dist/core/endpoint-kernel.js'
 import type { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
@@ -201,7 +201,7 @@ it('[A67][A69] notify send completion precedes business completion while its bef
   const blocked = new Promise<void>((resolve) => {
     complete = resolve
   })
-  let signal: IRpcAbortSignal | undefined
+  let signal: IAbortSignal | undefined
   const selected = [
     ...capabilities,
     RpcCapability.order,
@@ -211,7 +211,7 @@ it('[A67][A69] notify send completion precedes business completion while its bef
   const fixture = await connected(
     {},
     {
-      hold: async (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+      hold: async (_payload: unknown, context: { signal: IAbortSignal }) => {
         signal = context.signal
         await blocked
         return 42
@@ -364,11 +364,11 @@ it('[A59][A66] real ordered requests share provider leases; queued cancel wins a
     complete = resolve
   })
   const effects: string[] = []
-  let signal: IRpcAbortSignal | undefined
+  let signal: IAbortSignal | undefined
   const fixture = await connected(
     {},
     {
-      hold: async (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+      hold: async (_payload: unknown, context: { signal: IAbortSignal }) => {
         effects.push('hold')
         signal = context.signal
         await blocked

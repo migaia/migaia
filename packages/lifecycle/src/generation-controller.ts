@@ -8,7 +8,8 @@ import {
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { type IAbortController, type IAbortSignal } from './abort.js'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import { type IAbortController } from './abort.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import {
   observeAbortSubscription,

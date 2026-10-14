@@ -1,9 +1,9 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRemotePluginOptions } from '../remote/plugin.js'
 import type { IRemotePluginDefinition } from '../remote/plugin.js'
 import { createRemoteBindingDrain } from '../remote/internal/binding-drain.js'
 import { assembleRemotePluginDefinition } from '../remote/internal/assemble-plugin.js'
 import { createRemoteGenerationHolder, createRemoteRegistration } from '../remote/proxy.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRemoteBindingDrain } from '../remote/internal/binding-drain.js'
 
 /** Only factory-created drain identities may supply their actual endpoint attachment operation. */

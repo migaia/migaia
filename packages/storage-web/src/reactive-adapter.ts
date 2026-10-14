@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { defineNativeReactiveFeature } from './host/contracts.js'
 import { createStorageTypeError, StorageErrorCode } from './types/errors.js'
 import { StorageErrorText } from './error-text.js'
@@ -6,7 +7,6 @@ import type {
   IStorageReactiveFeatureMetadata,
   IStorageReactiveSourceDisposer
 } from './host/types.js'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IStorageChange, IKeyValueStore } from '@migaia/storage-contract'
 import type { IStorageNativeFeatureExpose } from './host/contracts.js'

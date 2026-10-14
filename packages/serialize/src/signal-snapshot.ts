@@ -1,10 +1,10 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createSerializeTypeError,
   SerializeErrorCode,
   SerializeErrorText,
   SERIALIZE_SOURCE
 } from './errors.js'
-import type { ISerializeAbortSignal } from './types.js'
 import { tryReadProperty } from '@migaia/utils/error'
 
 /** Keep tagged serialize failures intact while wrapping hostile signal accessors. */
@@ -21,7 +21,7 @@ export const isSerializeTaggedError = (
 }
 
 /** Read dynamic `aborted` state and convert accessor/shape failures to package-owned errors. */
-export const readAborted = (signal: ISerializeAbortSignal): boolean => {
+export const readAborted = (signal: IAbortSignal): boolean => {
   try {
     const value = signal.aborted
     if (typeof value !== 'boolean') throw new TypeError(SerializeErrorText.signalInvalid)
@@ -37,7 +37,7 @@ export const readAborted = (signal: ISerializeAbortSignal): boolean => {
 }
 
 /** Read abort reason once at the point it wins arbitration. */
-export const readReason = (signal: ISerializeAbortSignal): unknown => {
+export const readReason = (signal: IAbortSignal): unknown => {
   /** Keep serialize-tagged getter failures intact at this boundary. */
   const read = tryReadProperty(signal, 'reason')
   if (read.threw) {
@@ -52,12 +52,12 @@ export const readReason = (signal: ISerializeAbortSignal): unknown => {
 }
 
 /** Capture a structural source for stream operations without importing lifecycle runtime code. */
-export const snapshotSerializeSignal = (value: unknown): ISerializeAbortSignal => {
+export const snapshotSerializeSignal = (value: unknown): IAbortSignal => {
   try {
     if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
       throw new TypeError(SerializeErrorText.signalInvalid)
     }
-    const source = value as ISerializeAbortSignal
+    const source = value as IAbortSignal
     const initialAborted = readAborted(source)
     if (
       typeof source.addEventListener !== 'function' ||

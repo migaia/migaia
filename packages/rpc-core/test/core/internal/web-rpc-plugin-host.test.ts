@@ -1,8 +1,8 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { RpcAbortError, RpcTimeoutError } from '../../../dist/core/errors.js'
 import type { IRpcTransport } from '../../../dist/core/transport.js'
-import type { IRpcAbortSignal } from '../../../dist/core/typing.js'
 import {
   createConstructionControl,
   runConstructionInstall
@@ -20,7 +20,7 @@ import {
 } from '../../../dist/core/internal/web-rpc-plugin-host.js'
 
 const transport = {} as IRpcTransport
-const signal = new AbortController().signal as IRpcAbortSignal
+const signal = new AbortController().signal as IAbortSignal
 
 /**
  * Exercises the host's synchronous primitive without restoring a WebRPC wrapper.
@@ -179,7 +179,7 @@ describe('B12a WebRPC PluginHost shell', () => {
           transport,
           control: createConstructionControl({
             time: createEndpointTimePort(systemScheduler),
-            signal: controller.signal as IRpcAbortSignal
+            signal: controller.signal as IAbortSignal
           }),
           hooks: () => undefined,
           registerScope: () => undefined
@@ -198,7 +198,7 @@ describe('B12a WebRPC PluginHost shell', () => {
       aborted: false,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn()
-    } as unknown as IRpcAbortSignal
+    } as unknown as IAbortSignal
 
     expect(() =>
       createConstructionControl({
@@ -224,7 +224,7 @@ describe('B12a WebRPC PluginHost shell', () => {
       aborted: false,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn()
-    } as unknown as IRpcAbortSignal
+    } as unknown as IAbortSignal
 
     expect(() => createConstructionControl({ signal: source, timeoutMs: 10, time })).toThrow(
       clockFailure
@@ -250,7 +250,7 @@ describe('B12a WebRPC PluginHost shell', () => {
       aborted: false,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn()
-    } as unknown as IRpcAbortSignal
+    } as unknown as IAbortSignal
     const control = createConstructionControl({ signal: source, timeoutMs: 10, time })
     let registeredScope: { dispose(): Promise<readonly unknown[]> } | undefined
     let started = false

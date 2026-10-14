@@ -429,9 +429,6 @@ importers:
 
   packages/rpc-process:
     dependencies:
-      '@migaia/lifecycle':
-        specifier: workspace:^
-        version: link:../lifecycle
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host
@@ -561,9 +558,6 @@ importers:
 
   packages/storage-contract:
     dependencies:
-      '@migaia/lifecycle':
-        specifier: workspace:^
-        version: link:../lifecycle
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils

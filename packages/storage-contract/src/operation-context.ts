@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import type { IConflictPolicy, IOperationContext } from './context.js'
 

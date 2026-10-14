@@ -24,7 +24,7 @@ export {
   type IDisposeTransactionKind
 } from './state-constants.js'
 
-export { createAbortController, type IAbortSignal, type IAbortController } from './abort.js'
+export { createAbortController, type IAbortController } from './abort.js'
 
 export {
   createSyncStartedDisposalLedger,

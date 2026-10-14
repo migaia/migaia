@@ -1,4 +1,5 @@
-import type { IAbortSignal, ILifecycleScope, IProvisionalScope } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import type { ILifecycleScope, IProvisionalScope } from '@migaia/lifecycle'
 import type { IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
 import { createPluginCore, type IPluginRuntimeIntegration } from './core.js'

@@ -1,12 +1,12 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createSerializeRegistry } from '../src/index.js'
 import { composeSerializeSignal } from '../src/signal.js'
-import type { ISerializeAbortSignal } from '../src/types.js'
 
 describe('composeSerializeSignal registration races', () => {
   it('disposes caller and closing registrations in strict reverse install order exactly once', () => {
     const removalOrder: string[] = []
-    const caller: ISerializeAbortSignal = {
+    const caller: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {},
@@ -14,7 +14,7 @@ describe('composeSerializeSignal registration races', () => {
         removalOrder.push('caller')
       }
     }
-    const closing: ISerializeAbortSignal = {
+    const closing: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {},
@@ -34,7 +34,7 @@ describe('composeSerializeSignal registration races', () => {
     const reason = new Error('caller stopped during registration')
     let aborted = false
     let removeCalls = 0
-    const caller: ISerializeAbortSignal = {
+    const caller: IAbortSignal = {
       get aborted() {
         return aborted
       },
@@ -48,7 +48,7 @@ describe('composeSerializeSignal registration races', () => {
         removeCalls++
       }
     }
-    const closing: ISerializeAbortSignal = {
+    const closing: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {},
@@ -67,7 +67,7 @@ describe('composeSerializeSignal registration races', () => {
   it('rolls back first listener when second registration throws', () => {
     const registrationFailure = new Error('closing listener rejected')
     const removalOrder: string[] = []
-    const caller: ISerializeAbortSignal = {
+    const caller: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {},
@@ -75,7 +75,7 @@ describe('composeSerializeSignal registration races', () => {
         removalOrder.push('caller')
       }
     }
-    const closing: ISerializeAbortSignal = {
+    const closing: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {
@@ -107,7 +107,7 @@ describe('composeSerializeSignal registration races', () => {
     const registrationFailure = new Error('caller listener rejected')
     let encodeCalls = 0
     let removeCalls = 0
-    const caller: ISerializeAbortSignal = {
+    const caller: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {
@@ -152,7 +152,7 @@ describe('composeSerializeSignal registration races', () => {
     const closingRemovalFailure = new Error('closing removal failed')
     const reported: unknown[] = []
     const removalOrder: string[] = []
-    const caller: ISerializeAbortSignal = {
+    const caller: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {},
@@ -161,7 +161,7 @@ describe('composeSerializeSignal registration races', () => {
         throw callerRemovalFailure
       }
     }
-    const closing: ISerializeAbortSignal = {
+    const closing: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {},
@@ -206,7 +206,7 @@ describe('composeSerializeSignal registration races', () => {
     vi.stubGlobal('AbortController', FakeAbortController)
     try {
       let callerListener: (() => void) | undefined
-      const caller: ISerializeAbortSignal = {
+      const caller: IAbortSignal = {
         aborted: false,
         reason: abortReason,
         addEventListener(_type, listener) {
@@ -214,7 +214,7 @@ describe('composeSerializeSignal registration races', () => {
         },
         removeEventListener() {}
       }
-      const closing: ISerializeAbortSignal = {
+      const closing: IAbortSignal = {
         aborted: false,
         reason: undefined,
         addEventListener() {},
@@ -277,18 +277,14 @@ describe('composeSerializeSignal registration races', () => {
         }
       }
     })
-    const closing: ISerializeAbortSignal = {
+    const closing: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {},
       removeEventListener() {}
     }
 
-    const composed = composeSerializeSignal(
-      caller as unknown as ISerializeAbortSignal,
-      closing,
-      () => {}
-    )
+    const composed = composeSerializeSignal(caller as unknown as IAbortSignal, closing, () => {})
     aborted = true
     reason = 'second reason'
     callerListener?.()
@@ -306,7 +302,7 @@ describe('composeSerializeSignal registration races', () => {
     const cause = new Error('reason getter failed')
     let callerListener: (() => void) | undefined
     let removeCalls = 0
-    const caller: ISerializeAbortSignal = {
+    const caller: IAbortSignal = {
       aborted: false,
       get reason() {
         throw cause
@@ -318,7 +314,7 @@ describe('composeSerializeSignal registration races', () => {
         removeCalls += 1
       }
     }
-    const closing: ISerializeAbortSignal = {
+    const closing: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {},

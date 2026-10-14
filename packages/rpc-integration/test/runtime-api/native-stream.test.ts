@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
@@ -20,7 +21,6 @@ import { RUNTIME_API_FIXTURE_BASE_CAPABILITIES as RUNTIME_API_CAPABILITIES } fro
 import { readEndpointOwner } from '../../../rpc-core/dist/core/internal/endpoint-projection.js'
 import { EndpointOwnerKey } from '../../../rpc-core/dist/core/endpoint-kernel.js'
 import type { ProviderAdmissionRegistry } from '../../../rpc-core/dist/core/internal/provider-admission.js'
-import type { IRpcAbortSignal } from '../../../rpc-core/dist/core/typing.js'
 
 it('[A59][A67][A69] authenticated native stream retains its shared lease through discard and seals real final outcome', async () => {
   /** Fixture source offers are independent from unadvertised production U25 defaults. */
@@ -36,7 +36,7 @@ it('[A59][A67][A69] authenticated native stream retains its shared lease through
   /** Only actual provider invocations contribute business effects. */
   const effects: string[] = []
   /** The native context exposes final-provider cancellation rather than caller in-flight state. */
-  let signal: IRpcAbortSignal | undefined
+  let signal: IAbortSignal | undefined
   /** Fixture business work can pause inside the original producer iterator. */
   let finish!: () => void
   /** The finite generator reaches real terminal after this promise settles. */
@@ -51,7 +51,7 @@ it('[A59][A67][A69] authenticated native stream retains its shared lease through
       self: { name: 'native-stream-provider', instanceId: 'native-stream-provider' },
       provide: {
         baseline: () => 42,
-        values: async function* (_payload: unknown, context: { signal: IRpcAbortSignal }) {
+        values: async function* (_payload: unknown, context: { signal: IAbortSignal }) {
           signal = context.signal
           effects.push('first')
           yield 1

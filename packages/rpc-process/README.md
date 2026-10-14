@@ -25,7 +25,7 @@
 pnpm add @migaia/rpc-process @migaia/rpc-core @migaia/rpc-contract
 ```
 
-`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。
+`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。
 
 两个可选 peer，只在用到对应子路径时才需要：
 

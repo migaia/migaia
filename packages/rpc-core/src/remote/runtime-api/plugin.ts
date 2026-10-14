@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcError } from '../../core/errors.js'
 import { runtimeReadyEvent, runtimeSupervisorEvent } from './events.js'
 import {
@@ -11,7 +12,7 @@ import {
 import { defaultRpcId } from '../../core/internal/id.js'
 import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from '../../core/plugins/reporter-context.js'
-import { RpcCoreErrorCode, type IRpcAbortSignal } from '../../core/index.js'
+import { RpcCoreErrorCode } from '../../core/index.js'
 import {
   createRuntimeOutlet,
   readRuntimeOutletConnection,
@@ -100,7 +101,7 @@ function closedCatalogMethod(): never {
 }
 
 /** The existing Host commit and lifecycle signal settle one shared local Feature admission gate. */
-function createCommitGate(lifecycle: IRpcAbortSignal): ICommitGate & { open(): void } {
+function createCommitGate(lifecycle: IAbortSignal): ICommitGate & { open(): void } {
   /** Fulfilled failure data avoids an unobserved rejection when an install has no held calls. */
   const completion = deferred<ReturnType<typeof createRpcError> | undefined>()
   /** Only the original slot commit opens admission; later generations reuse the open gate. */

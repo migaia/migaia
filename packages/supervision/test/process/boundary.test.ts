@@ -27,7 +27,9 @@ describe('A1 process profile boundary', () => {
       '@migaia/lifecycle',
       '@migaia/lifecycle/scheduler',
       '@migaia/utils/scheduler',
-      '@migaia/utils/error'
+      '@migaia/utils/error',
+      // Type-only: the structural abort signal is owned by utils.
+      '@migaia/utils/promise'
     ])
     const allowedParent = new Set([
       '../index.js',

@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   ReactiveErrorPhase,
   type IDisposable,
@@ -22,7 +23,7 @@ import {
   type IGenerationToken
 } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
-import { observeAbortSubscription, type IAbortSignal } from '@migaia/lifecycle/abort'
+import { observeAbortSubscription } from '@migaia/lifecycle/abort'
 import {
   createResourceError,
   RESOURCE_SOURCE,
@@ -39,7 +40,11 @@ export type IResourceState<T> =
   | { status: typeof ResourceStatus.pending }
   | { status: typeof ResourceStatus.success; data: T; refreshing?: boolean }
   | { status: typeof ResourceStatus.error; error: unknown }
-  | { status: typeof ResourceStatus.cancelled; error: DOMException }
+  /**
+   * `error` is a native `DOMException` at runtime; typed as `Error` so declarations need no DOM
+   * types.
+   */
+  | { status: typeof ResourceStatus.cancelled; error: Error }
 
 export type IResourceFetchStatus = typeof ResourceStatus.idle | typeof ResourceStatus.fetching
 

@@ -1,8 +1,8 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
 import { RpcCoreErrorCode } from '../../dist/core/errors.js'
-import type { IRpcAbortSignal } from '../../dist/core/typing.js'
 import { readEndpointOwner } from '../../dist/core/internal/endpoint-projection.js'
 import type { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
 import { readRuntimePeerConnection } from '../../dist/remote/runtime-api/peer.js'
@@ -39,11 +39,11 @@ it.each([
     /** Real handler order detects overlapping execution rather than only caller settlement. */
     const effects: string[] = []
     /** Only the original provider signal proves that the authenticated cancellation arrived. */
-    let providerSignal: IRpcAbortSignal | undefined
+    let providerSignal: IAbortSignal | undefined
     const fixture = await connected(
       {},
       {
-        held: async (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+        held: async (_payload: unknown, context: { signal: IAbortSignal }) => {
           providerSignal = context.signal
           effects.push('started')
           await held

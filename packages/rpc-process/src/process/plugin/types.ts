@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IProcessHandle, IProcessSupervisorOptions } from '@migaia/supervision/process'
 import type { IProcessSpec } from '@migaia/supervision/process'
 import type { ISupervisorBaseOptions } from '@migaia/supervision'

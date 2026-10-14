@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IDisposer } from '@migaia/reactive'
 import { readEnvelope, removeEnvelope, writeEnvelope } from '../storage/codec.js'
 import { defaultJsonCodec } from '../storage/codec.js'
@@ -280,7 +281,7 @@ export function persistUnit<TState>(
   }
 
   async function runAdapterOperation<T>(
-    operation: (signal: AbortSignal) => T | Promise<T>
+    operation: (signal: IAbortSignal) => T | Promise<T>
   ): Promise<T> {
     assertActive()
     const controller = new AbortController()

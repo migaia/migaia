@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createEndpointTimePort } from '../../../dist/core/internal/time-port.js'
 import { describe, expect, it, vi } from 'vitest'
@@ -12,7 +13,6 @@ import { createMemoryTransportPair } from '../../../dist/core/adapters/memory.js
 import { createConstructionControl } from '../../../dist/core/internal/construction-install.js'
 import { createEndpointProjection } from '../../../dist/core/internal/endpoint-projection.js'
 import type { IRpcPluginConstraint } from '../../../dist/core/internal/plugin-contract.js'
-import type { IRpcAbortSignal } from '../../../dist/core/typing.js'
 
 /** Native output with an undefined public value must fail closed at the projection boundary. */
 const hostileProjectionFeature = defineFeature(() => Object.freeze({ forged: undefined }))
@@ -211,7 +211,7 @@ describe('canonical endpoint projection', () => {
       transport,
       createConstructionControl({
         time: createEndpointTimePort(systemScheduler),
-        signal: new AbortController().signal as IRpcAbortSignal
+        signal: new AbortController().signal as IAbortSignal
       }),
       () => undefined,
       { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },

@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
 import type { IRpcFeature } from '../feature.js'
 import type { IEndpointCapabilitiesFeatureExpose } from '../internal/endpoint-capabilities-plugin.js'
@@ -9,7 +10,6 @@ import type {
   IStreamInstallation
 } from '../internal/feature-contract.js'
 import { RpcStreamOwner } from '../internal/stream/owner.js'
-import type { IAbortSignal } from '../internal/async-control.js'
 import type { IRpcContext } from '../typing.js'
 
 /** Connection owner answers whether a particular peer negotiated stream@1. */

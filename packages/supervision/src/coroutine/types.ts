@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { ISupervisor, ISupervisorBaseOptions, IUnitBudget, IUnitHandle } from '../types.js'
 
 /** Cooperative task context; the exposed port may be published once. */

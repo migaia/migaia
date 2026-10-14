@@ -1,9 +1,9 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   SerializeCodecError,
   encodeSerializeTextChunk,
   validateSerializeChunk,
-  type ISerializeAbortSignal,
   type ISerializeChunk,
   type ISerializeRegistry,
   type ITextEncoder
@@ -30,7 +30,7 @@ type IFrameBudgetSnapshot = {
   readonly maxItems: number
   readonly initialItems: number
   readonly yieldTo?: () => Promise<void>
-  readonly signal?: ISerializeAbortSignal
+  readonly signal?: IAbortSignal
   readonly scheduler: IScheduler
 }
 
@@ -45,7 +45,7 @@ type IEncodeStreamSnapshot = IFrameBudgetSnapshot & {
 type IDecodeStreamSnapshot = {
   readonly type?: string
   readonly context: string
-  readonly signal?: ISerializeAbortSignal
+  readonly signal?: IAbortSignal
 }
 
 /** Invoke one captured method with its original protocol receiver. */
@@ -150,7 +150,7 @@ const translateTaskCancelFailure = (error: unknown): unknown =>
       )
 
 /** Read an operation signal's current state while keeping failures at serialize's boundary. */
-const readSerializeSignalAborted = (signal: ISerializeAbortSignal): boolean => {
+const readSerializeSignalAborted = (signal: IAbortSignal): boolean => {
   try {
     if (typeof signal.aborted !== 'boolean') throw new TypeError(SerializeErrorText.signalInvalid)
     return signal.aborted
@@ -165,7 +165,7 @@ const readSerializeSignalAborted = (signal: ISerializeAbortSignal): boolean => {
 }
 
 /** Read an operation abort reason only when cancellation wins the owned-yield race. */
-const readSerializeSignalReason = (signal: ISerializeAbortSignal): unknown => {
+const readSerializeSignalReason = (signal: IAbortSignal): unknown => {
   /** Stream cancellation wraps every getter failure, including serialize-tagged values. */
   const read = tryReadProperty(signal, 'reason')
   if (read.threw)
@@ -184,7 +184,7 @@ const readSerializeSignalReason = (signal: ISerializeAbortSignal): unknown => {
  */
 const scheduleOwnedYield = (
   scheduler: IScheduler,
-  signal: ISerializeAbortSignal | undefined
+  signal: IAbortSignal | undefined
 ): Promise<void> => {
   let resolveYield!: () => void
   let rejectYield!: (error: unknown) => void
@@ -483,7 +483,7 @@ export type IFrameBudgetOptions = {
    * requestIdleCallback（更保守）。
    */
   readonly yieldTo?: () => Promise<void>
-  readonly signal?: ISerializeAbortSignal
+  readonly signal?: IAbortSignal
   /**
    * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主
    * `setTimeout`/`performance`/`Date.now`）。
@@ -668,7 +668,7 @@ export type IEncodeStreamOptions = IFrameBudgetOptions & {
 
 /** Captured policy for one collector operation; getters are read before iterator acquisition. */
 export type ICollectStreamOptions = {
-  readonly signal?: ISerializeAbortSignal
+  readonly signal?: IAbortSignal
   /** Chooses whether an empty stream returns empty text or rejects; defaults to `text`. */
   readonly empty?: 'text' | 'reject'
   readonly context?: string
@@ -777,7 +777,7 @@ export async function* decodeStream(
   options: {
     readonly type?: string
     readonly context?: string
-    readonly signal?: ISerializeAbortSignal
+    readonly signal?: IAbortSignal
   } = {}
 ): AsyncGenerator<unknown, void, undefined> {
   const { type, context, signal } = snapshotDecodeStreamOptions(options)
@@ -996,7 +996,7 @@ export async function collectStream(
 
 /** Captures collector options and rejects malformed values before touching the source iterator. */
 function snapshotCollectOptions(options: unknown): {
-  readonly signal?: ISerializeAbortSignal
+  readonly signal?: IAbortSignal
   readonly empty: 'text' | 'reject'
   readonly context: string
 } {
@@ -1128,7 +1128,7 @@ function getCollectIterator(
 }
 
 /** Checks cooperative cancellation at each collector admission boundary. */
-function checkCollectAbort(signal: ISerializeAbortSignal | undefined): void {
+function checkCollectAbort(signal: IAbortSignal | undefined): void {
   if (signal !== undefined && readSerializeSignalAborted(signal))
     throw createSerializeError(SerializeErrorCode.aborted, 'serialize aborted', {
       cause: readSerializeSignalReason(signal)

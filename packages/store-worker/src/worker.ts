@@ -1,7 +1,8 @@
+import type { IWorkerMessageEvent } from './worker-message-event.js'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRuntime } from '@migaia/reactive'
 import { defaultRuntime } from '@migaia/reactive'
 import { Resource, type IResourceOptions } from '@migaia/resource'
-import type { IRpcAbortSignal } from '@migaia/rpc-core'
 import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from './worker-contract.js'
 import type { IWebWorkerLikePort } from '@migaia/rpc-core/adapters/web-worker'
 import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js'
@@ -52,13 +53,13 @@ function snapshotWorkerClientOptions(options: object): {
 
 /** Captures per-request cancellation and transfer policy before asynchronous endpoint admission. */
 function snapshotWorkerRequestOptions(options: object): {
-  readonly signal?: IRpcAbortSignal
-  readonly transfer?: readonly Transferable[]
+  readonly signal?: IAbortSignal
+  readonly transfer?: readonly unknown[]
 } {
   try {
     return {
-      signal: (options as { readonly signal?: IRpcAbortSignal }).signal,
-      transfer: (options as { readonly transfer?: readonly Transferable[] }).transfer
+      signal: (options as { readonly signal?: IAbortSignal }).signal,
+      transfer: (options as { readonly transfer?: readonly unknown[] }).transfer
     }
   } catch (error) {
     throw createStoreWorkerError(
@@ -99,15 +100,15 @@ export class WorkerAdapter {
 
   request<Input, Output>(
     payload: Input,
-    options: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[] } = {}
+    options: { signal?: IAbortSignal; transfer?: readonly unknown[] } = {}
   ): Promise<Output> {
     if (this.#disposed)
       return Promise.reject(
         createStoreWorkerError(StoreWorkerErrorCode.adapterDisposed, StoreWorkerErrorText.disposed)
       )
     let requestOptions: {
-      readonly signal?: IRpcAbortSignal
-      readonly transfer?: readonly Transferable[]
+      readonly signal?: IAbortSignal
+      readonly transfer?: readonly unknown[]
     }
     try {
       assertWorkerOptions(options)
@@ -147,7 +148,7 @@ export class WorkerAdapter {
 }
 
 export function createWorkerHandler<Input, Output>(
-  compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>,
+  compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,
   postMessage: (message: unknown) => void,
   options: { readonly timeoutMs?: number } = {}
 ): IManagedRpcHandler {
@@ -164,13 +165,13 @@ export function createWorkerHandler<Input, Output>(
       StoreWorkerErrorText.workerHandlerCallback('postMessage')
     )
   }
-  let inboundListener: ((event: MessageEvent<unknown>) => void) | undefined
+  let inboundListener: ((event: IWorkerMessageEvent) => void) | undefined
   const endpointOptions = snapshotWorkerClientOptions(options)
   const endpoint = createWorkerContractEndpoint(
     {
       postMessage,
       addEventListener: (type, listener) => {
-        if (type === 'message') inboundListener = listener as (event: MessageEvent<unknown>) => void
+        if (type === 'message') inboundListener = listener as (event: IWorkerMessageEvent) => void
       },
       removeEventListener: (type, listener) => {
         if (type === 'message' && inboundListener === listener) inboundListener = undefined
@@ -184,7 +185,7 @@ export function createWorkerHandler<Input, Output>(
   )
   const endpointPromise = endpoint.then((readyEndpoint) => {
     const unsubscribe = readyEndpoint.onRequest(WorkerRpcIdentity.call, (payload, signal) =>
-      compute(payload as Input, { signal: signal as IRpcAbortSignal })
+      compute(payload as Input, { signal: signal as IAbortSignal })
     )
     return {
       dispose: async () => {
@@ -197,19 +198,19 @@ export function createWorkerHandler<Input, Output>(
   const handler = toManagedRpcHandler(endpointPromise, (message) => deliver(message))
   // The managed callback is the host boundary: it forwards each raw message into
   // the canonical endpoint's transport listener without recreating a provider path.
-  deliver = (message) => inboundListener?.({ data: message } as MessageEvent<unknown>)
+  deliver = (message) => inboundListener?.({ data: message } as IWorkerMessageEvent)
   return handler
 }
 
 export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {
   readonly runtime?: IRuntime
-  readonly transfer?: (input: Input) => readonly Transferable[]
+  readonly transfer?: (input: Input) => readonly unknown[]
 }
 
 /** Stable worker/resource configuration captured before Resource ownership and auto-start. */
 type IWorkerComputedOptionSnapshot<Input, Output> = {
   readonly runtime: IRuntime
-  readonly transfer: ((input: Input) => readonly Transferable[]) | undefined
+  readonly transfer: ((input: Input) => readonly unknown[]) | undefined
   readonly resource: IResourceOptions<Output>
 }
 

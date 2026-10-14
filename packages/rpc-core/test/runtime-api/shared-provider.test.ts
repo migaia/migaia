@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCapability } from '@migaia/rpc-contract'
@@ -17,7 +18,6 @@ import {
 } from '../../dist/remote/runtime-api/peer.js'
 import { runtimeSources } from './fixture.js'
 import type { RpcOutboundAttachment } from '../../dist/core/internal/outbound-attachment.js'
-import type { IRpcAbortSignal } from '../../dist/core/typing.js'
 
 it('[A73] a custom endpoint cannot advertise shared ordering while returning a different admission owner', async () => {
   const capabilities = [
@@ -251,10 +251,10 @@ it.each([false, true])(
     })
     const effects: string[] = []
     /** A real received cancellation precedes retirement of the same provider session. */
-    let providerSignal: IRpcAbortSignal | undefined
+    let providerSignal: IAbortSignal | undefined
     const controller = new AbortController()
     const fixture = await sharedProvider({
-      hold: async (_payload: unknown, context: { signal: IRpcAbortSignal }) => {
+      hold: async (_payload: unknown, context: { signal: IAbortSignal }) => {
         providerSignal = context.signal
         effects.push('hold')
         await held

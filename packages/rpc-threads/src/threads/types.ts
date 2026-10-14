@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IThreadHandle } from '@migaia/supervision/threads'
 import type { IRemoteChannel } from '@migaia/rpc-core/remote'

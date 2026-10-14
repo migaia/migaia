@@ -1,4 +1,5 @@
-export type { IAbortSignal, IReleaseDescriptor } from '@migaia/lifecycle'
+export type { IAbortSignal } from '@migaia/utils'
+export type { IReleaseDescriptor } from '@migaia/lifecycle'
 export type {
   ICapabilityGraphNodeState as IGraphNodeState,
   IGraphReleaseContext

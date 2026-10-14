@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createAbortController, observeAbortSubscription, type IAbortSignal } from '../src/abort.js'
+import type { IAbortSignal } from '@migaia/utils/promise'
+import { createAbortController, observeAbortSubscription } from '../src/abort.js'
 
 describe('T-15 reason 行为', () => {
   it('abort(reason) 后 reason 经 signal.reason 保持 === 身份可达', () => {
@@ -80,20 +81,10 @@ describe('T-15 reason 行为', () => {
 })
 
 describe('T-20 signal 双向结构兼容', () => {
-  it('IAbortSignal ↔ ISerializeAbortSignal 双向结构赋值（compile-time）', () => {
-    // serialize §4.2 将自声明的结构化 signal（reason 可选）；与 lifecycle IAbortSignal 双向兼容。
-    type ISerializeAbortSignal = {
-      readonly aborted: boolean
-      readonly reason?: unknown
-      addEventListener(
-        type: 'abort',
-        listener: () => void,
-        options?: { readonly once?: boolean }
-      ): void
-      removeEventListener(type: 'abort', listener: () => void): void
-    }
+  it('createAbortController().signal 满足 @migaia/utils 的 IAbortSignal（compile-time）', () => {
+    // lifecycle 与 serialize 不再各自声明 signal 结构，统一使用 utils 的 IAbortSignal。
     const signal: IAbortSignal = createAbortController().signal
-    const forward: ISerializeAbortSignal = signal
+    const forward: IAbortSignal = signal
     const backward: IAbortSignal = forward
     expect(backward).toBe(signal)
   })

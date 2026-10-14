@@ -1,6 +1,6 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import type {
   IRpcAuthenticationCapability,
-  IRpcAbortSignal,
   IRpcConnectCapability,
   IRpcContractCapability,
   IRpcDiscoveryCandidate,
@@ -17,7 +17,6 @@ import type { IInboundIdentityAdmission, IInboundIdentityRequest } from './inbou
 import type { IVariationHandler } from './variation-coordinator.js'
 import type { RpcControl } from '@migaia/rpc-contract'
 import type { IRpcEnvelope } from '@migaia/rpc-contract'
-import type { IAbortSignal } from './async-control.js'
 import type { IRpcRuntimeTask } from '@migaia/rpc-contract/runtime'
 
 /** Only the canonical attachment supplies local Promise misses and synchronous registry hits. */
@@ -75,7 +74,7 @@ export type IRpcPortName = (typeof RpcPortName)[keyof typeof RpcPortName]
 
 /** Native or lazily materialized provider signal; variation owns only its cancellation command. */
 export type IRpcProviderController = {
-  readonly signal: IRpcAbortSignal
+  readonly signal: IAbortSignal
   /** Only opted-in controllers carry their original complete mode/method/generation association. */
   readonly runtimeTask?: IRpcRuntimeTask
   /** Only a runtime task distinguishes caller start intent from resource/lifetime revocation. */

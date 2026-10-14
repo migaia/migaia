@@ -1,3 +1,4 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -21,7 +22,6 @@ import {
   type IProcessHandle,
   type IProcessSpec
 } from '@migaia/supervision/process'
-import type { IAbortSignal } from '@migaia/lifecycle'
 import type { IRemoteBinding, IRemoteChannel } from '@migaia/rpc-core/remote'
 import type { IRemoteServeEndpoint } from '@migaia/rpc-core/remote'
 import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'

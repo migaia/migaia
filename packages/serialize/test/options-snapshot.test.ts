@@ -1,7 +1,7 @@
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it } from 'vitest'
 import {
   createSerializeRegistry,
-  type ISerializeAbortSignal,
   type ISerializeChunk,
   type ISerializePlugin
 } from '../src/index.js'
@@ -26,7 +26,7 @@ describe('serialize operation option admission', () => {
       reason: undefined,
       addEventListener() {},
       removeEventListener() {}
-    } satisfies ISerializeAbortSignal
+    } satisfies IAbortSignal
     const options = {
       get type() {
         typeReads += 1
@@ -116,7 +116,7 @@ describe('serialize operation option admission', () => {
     const cause = new Error('add listener failed')
     let parserCalls = 0
     let removeCalls = 0
-    const signal: ISerializeAbortSignal = {
+    const signal: IAbortSignal = {
       aborted: false,
       reason: undefined,
       addEventListener() {
@@ -134,7 +134,7 @@ describe('serialize operation option admission', () => {
     ])
 
     await expect(
-      registry.encode('value', { signal: signal as unknown as ISerializeAbortSignal })
+      registry.encode('value', { signal: signal as unknown as IAbortSignal })
     ).rejects.toMatchObject({
       source: '@migaia/serialize',
       code: 'INVALID_OPTION',
@@ -165,7 +165,7 @@ describe('serialize operation option admission', () => {
     ])
 
     await expect(
-      registry.encode('value', { signal: signal as unknown as ISerializeAbortSignal })
+      registry.encode('value', { signal: signal as unknown as IAbortSignal })
     ).rejects.toMatchObject({
       source: '@migaia/serialize',
       code: 'INVALID_OPTION',
@@ -178,7 +178,7 @@ describe('serialize operation option admission', () => {
     const cause = new Error('reason getter failed')
     let listener: (() => void) | undefined
     let removeCalls = 0
-    const signal: ISerializeAbortSignal = {
+    const signal: IAbortSignal = {
       aborted: false,
       get reason() {
         throw cause
