@@ -8866,7 +8866,7 @@
           "name": "createEventChannel",
           "kind": "function",
           "signature": "export declare function createEventChannel<\n  T,\n  R,\n  const S extends IEventApiStyle | undefined,\n  const V = undefined,\n>(\n  options: S extends IEventApiStyle\n    ? IStyledEventChannelOptions<T, S, V>\n    : IEventChannelOptions<T, undefined, V>,\n): ICanonicalEventChannel<T, R, S, V> &\n  (S extends IEventApiStyle ? IStyledEventChannel<T, R, S, V> : Record<never, never>);\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: IEventChannelOptions<T, undefined, V>,\n): ICanonicalEventChannel<T, R, undefined, V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {\n    readonly style: 'subscribe-publish';\n  },\n): ICanonicalEventChannel<T, R>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {\n    readonly style: 'on-emit';\n  },\n): ICanonicalEventChannel<T, R, 'on-emit', V> & IStyledEventChannel<T, R, 'on-emit', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {\n    readonly style: 'on-trigger';\n  },\n): ICanonicalEventChannel<T, R, 'on-trigger', V> &\n  IStyledEventChannel<T, R, 'on-trigger', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options: Omit<IEventChannelOptions<T, undefined, V>, 'style'> & {\n    readonly style: 'listen-fire';\n  },\n): ICanonicalEventChannel<T, R, 'listen-fire', V> &\n  IStyledEventChannel<T, R, 'listen-fire', V>;\nexport declare function createEventChannel<T, R = void, const V = undefined>(\n  options?: IEventChannelOptions<T, undefined, V>,\n): ICanonicalEventChannel<T, R, undefined, V>;\nexport declare function createEventChannel<T, R = void, V = undefined>(\n  options: IEventChannelOptions<T, IEventApiStyle | undefined, V>,\n  projectionPlan: IEventProjectionPlan,\n): ICanonicalEventChannel<T, R, undefined, V>;",
-          "declarationLine": 54,
+          "declarationLine": 55,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Creates a canonical transient channel backed by an O(1) linked registration list.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createEventChannel.",
@@ -9175,7 +9175,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}"
+                  "code": "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}"
                 },
                 {
                   "type": "list",
@@ -10602,7 +10602,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for EventSubscriberState.",
           "examples": [
             "import { EventSubscriberState } from '@migaia/event-subscriber'",
-            "EventSubscriberState.abort // 'abort' —— IEventAbortSignal 的事件类型\nEventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值\nEventSubscriberState.rejected // 'rejected'",
+            "EventSubscriberState.abort // 'abort' —— IAbortSignal 的事件类型\nEventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值\nEventSubscriberState.rejected // 'rejected'",
             "import {\n  EventSubscriberState,\n  EventSubscriberErrorCode,\n  EVENT_SUBSCRIBER_SOURCE,\n  type IEventSubscriberErrorCode\n} from '@migaia/event-subscriber'",
             "EventSubscriberState.abort // 'abort'\nEventSubscriberState.fulfilled // 'fulfilled'\nEventSubscriberState.rejected // 'rejected'"
           ],
@@ -10705,7 +10705,7 @@
           "name": "ICanonicalEventChannel",
           "kind": "type",
           "signature": "export type ICanonicalEventChannel<\n  T,\n  R = void,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = IEventChannel<T, R, S, V> & { readonly [canonicalChannelBrand]: true };",
-          "declarationLine": 136,
+          "declarationLine": 134,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "ICanonicalEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICanonicalEventChannel.",
@@ -10970,8 +10970,8 @@
         {
           "name": "IEventChannel",
           "kind": "type",
-          "signature": "export type IEventChannel<\n  T,\n  R = void,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = {\n  subscribe(\n    listener: IEventListener<T, R, V>,\n    options?: { readonly taskId?: string },\n  ): IEventChannelSubscription<T, R, S, V>;\n  subscribeOnce(\n    listener: IEventListener<T, R, V>,\n    options?: { readonly taskId?: string },\n  ): IUnsubscribe;\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R, V>,\n    options?: { readonly taskId?: string },\n  ): IUnsubscribe;\n  publish(value: T): void;\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>;\n  clear(): void;\n  readonly size: number;\n};",
-          "declarationLine": 111,
+          "signature": "export type IEventChannel<\n  T,\n  R = void,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = {\n  subscribe(\n    listener: IEventListener<T, R, V>,\n    options?: { readonly taskId?: string },\n  ): IEventChannelSubscription<T, R, S, V>;\n  subscribeOnce(\n    listener: IEventListener<T, R, V>,\n    options?: { readonly taskId?: string },\n  ): IUnsubscribe;\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R, V>,\n    options?: { readonly taskId?: string },\n  ): IUnsubscribe;\n  publish(value: T): void;\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>;\n  clear(): void;\n  readonly size: number;\n};",
+          "declarationLine": 109,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannel.",
@@ -10983,14 +10983,14 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventChannel.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import {\n  createEventChannel,\n  type IEventChannel,\n  type IEventContext\n} from '@migaia/event-subscriber'"
           ],
           "members": [],
           "aliasOf": "IEventChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };"
+            "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11029,7 +11029,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannel:export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
+          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannel:export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
           "guidance": [],
           "usageScore": 32,
           "configuration": [],
@@ -11039,7 +11039,7 @@
           "name": "IEventChannelOptions",
           "kind": "type",
           "signature": "export type IEventChannelOptions<\n  T,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = {\n  readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>;\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>;\n  /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy;\n  /** Selects whether one listener identity has one registration or each subscribe owns a new one. */ readonly admissionPolicy?: IEventAdmissionPolicy;\n  /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?:\n    | 'handle'\n    | 'listener-all';\n  /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number;\n  /** * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners. */ readonly throwOnAborted?: boolean;\n  readonly style?: IEventApiStyleOption<S>;\n  readonly valueConfig?: IValidatedEventValueConfig<T, V>;\n};",
-          "declarationLine": 178,
+          "declarationLine": 176,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelOptions.",
@@ -11117,7 +11117,7 @@
           "errors": ["No documented errors are declared for IEventChannelSubscription."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventChannelSubscription.",
           "examples": [
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import type { IEventChannelSubscription, IEventHubSubscription } from '@migaia/event-subscriber'"
           ],
           "members": [],
@@ -11237,7 +11237,7 @@
           "name": "IEventHub",
           "kind": "type",
           "signature": "export type IEventHub<\n  C extends IEventMap,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = {\n  subscribe<K extends keyof C>(\n    key: K,\n    listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>,\n  ): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>, S, V>;\n  publish<K extends keyof C>(key: K, value: C[K]): void;\n  clear(key?: keyof C): void;\n  size(key?: keyof C): number;\n};",
-          "declarationLine": 153,
+          "declarationLine": 151,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHub is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHub.",
@@ -11306,7 +11306,7 @@
           "name": "IEventHubOptions",
           "kind": "type",
           "signature": "export type IEventHubOptions<\n  C extends IEventMap,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = {\n  readonly report?: (failure: IEventHubReport<C, V>) => void | PromiseLike<void>;\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>;\n  readonly style?: IEventApiStyleOption<S>;\n  readonly valueConfig?: IValidatedEventValueConfig<C[keyof C], V>;\n};",
-          "declarationLine": 147,
+          "declarationLine": 145,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHubOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubOptions.",
@@ -11374,7 +11374,7 @@
           "name": "IEventHubReport",
           "kind": "type",
           "signature": "export type IEventHubReport<C extends IEventMap, V = undefined> = {\n  [K in keyof C]: {\n    readonly key: K;\n    readonly event: IProjectedEventContext<C[K], IEventValueForKey<C[K], V>>;\n    readonly error: unknown;\n  };\n}[keyof C];",
-          "declarationLine": 140,
+          "declarationLine": 138,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHubReport is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubReport.",
@@ -11508,7 +11508,7 @@
           "name": "IEventInvocation",
           "kind": "type",
           "signature": "export type IEventInvocation<R> = {\n  readonly taskId: string | undefined;\n  invoke(): R | PromiseLike<R>;\n};",
-          "declarationLine": 61,
+          "declarationLine": 59,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Opaque invocation entry used by consumers that must not receive listener ownership.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventInvocation.",
@@ -11572,7 +11572,7 @@
           "name": "IEventInvocationVisitor",
           "kind": "type",
           "signature": "export type IEventInvocationVisitor<R> = (\n  entries: readonly IEventInvocation<R>[],\n) => void | PromiseLike<void>;",
-          "declarationLine": 66,
+          "declarationLine": 64,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Callback supplied to the module-owned invocation scope.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventInvocationVisitor.",
@@ -11636,7 +11636,7 @@
           "name": "IEventMap",
           "kind": "type",
           "signature": "export type IEventMap = object;",
-          "declarationLine": 139,
+          "declarationLine": 137,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventMap is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventMap.",
@@ -11702,7 +11702,7 @@
           "name": "IEventReport",
           "kind": "type",
           "signature": "export type IEventReport<T, V = undefined> = {\n  readonly event: IProjectedEventContext<T, V>;\n  readonly error: unknown;\n};",
-          "declarationLine": 71,
+          "declarationLine": 69,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventReport is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventReport.",
@@ -12038,7 +12038,7 @@
           "name": "IFilteredEventChannel",
           "kind": "type",
           "signature": "export type IFilteredEventChannel<T, R = void, V = undefined> = {\n  readonly [filteredChannelBrand]: {\n    readonly value: T;\n    readonly result: R;\n    readonly config: V;\n  };\n};",
-          "declarationLine": 129,
+          "declarationLine": 127,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IFilteredEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFilteredEventChannel.",
@@ -12050,7 +12050,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFilteredEventChannel.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "function invokeParallelSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeParallel<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeSerialSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeSerial<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>"
           ],
@@ -12107,7 +12107,7 @@
           "name": "IListenerResult",
           "kind": "type",
           "signature": "export type IListenerResult<R> =\n  | {\n      readonly status: typeof EventSubscriberState.fulfilled;\n      readonly value: Awaited<R>;\n    }\n  | { readonly status: typeof EventSubscriberState.rejected; readonly reason: unknown };",
-          "declarationLine": 75,
+          "declarationLine": 73,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IListenerResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IListenerResult.",
@@ -12123,7 +12123,7 @@
             "function invokeParallelSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeParallel<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeSerialSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeSerial<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeTaskSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<IListenerResult<R>>\nfunction invokeTask<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<Awaited<R>>",
-            "EventSubscriberState.abort // 'abort' —— IEventAbortSignal 的事件类型\nEventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值\nEventSubscriberState.rejected // 'rejected'"
+            "EventSubscriberState.abort // 'abort' —— IAbortSignal 的事件类型\nEventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值\nEventSubscriberState.rejected // 'rejected'"
           ],
           "members": [],
           "aliasOf": "IListenerResult",
@@ -12178,7 +12178,7 @@
           "name": "invokeEachLive",
           "kind": "const",
           "signature": "export declare const invokeEachLive: <T, R, V = undefined>(\n  channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>,\n  value: T,\n  visitor: (invocation: IEventInvocation<R>) => void,\n) => void;",
-          "declarationLine": 39,
+          "declarationLine": 40,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Visits registrations with append-live visibility while always releasing dispatch bookkeeping.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invokeEachLive.",
@@ -13040,7 +13040,7 @@
           "name": "IStyledEventChannel",
           "kind": "type",
           "signature": "export type IStyledEventChannel<\n  T,\n  R = void,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = IEventChannel<T, R, S, V> & IEventChannelStyleProjection<T, R, S, V>;",
-          "declarationLine": 126,
+          "declarationLine": 124,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IStyledEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStyledEventChannel.",
@@ -13104,7 +13104,7 @@
           "name": "IStyledEventHub",
           "kind": "type",
           "signature": "export type IStyledEventHub<\n  C extends IEventMap,\n  S extends IEventApiStyle | undefined = undefined,\n  V = undefined,\n> = IEventHub<C, S, V> & IEventHubStyleProjection<C, S, V>;",
-          "declarationLine": 177,
+          "declarationLine": 175,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IStyledEventHub is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStyledEventHub.",
@@ -13168,7 +13168,7 @@
           "name": "withSnapshotEntries",
           "kind": "const",
           "signature": "export declare const withSnapshotEntries: <T, R, V = undefined>(\n  channel: ICanonicalEventChannel<T, R, undefined, V> | IFilteredEventChannel<T, R, V>,\n  value: T,\n  visitor: IEventInvocationVisitor<R>,\n) => void | Promise<void>;",
-          "declarationLine": 37,
+          "declarationLine": 38,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Runs a callback over one immutable target snapshot and always closes its invocations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for withSnapshotEntries.",
@@ -13244,16 +13244,6 @@
       ],
       "aliases": [
         {
-          "identity": "packages/event-subscriber/dist/types.d.ts:IEventAbortSignal:export type IEventAbortSignal = IAbortSignal;",
-          "name": "IEventAbortSignal",
-          "signature": "export type IEventAbortSignal = IAbortSignal;",
-          "source": "packages/event-subscriber/dist/types.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./subscriber",
-          "ownerModule": "subscriber",
-          "ownerFragment": "event-subscriber-subscriber--IEventAbortSignal"
-        },
-        {
           "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannelLike:export type IEventChannelLike<T, R = void, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; };",
           "name": "IEventChannelLike",
           "signature": "export type IEventChannelLike<T, R = void, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; };",
@@ -13324,9 +13314,9 @@
           "ownerFragment": "event-subscriber-subscriber--subscribeSubscriber"
         },
         {
-          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeUntil:export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
+          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeUntil:export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
           "name": "subscribeUntil",
-          "signature": "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
+          "signature": "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./subscriber",
@@ -13352,76 +13342,10 @@
       "architecturePath": "/en/architecture/event-subscriber",
       "symbols": [
         {
-          "name": "IEventAbortSignal",
-          "kind": "type",
-          "signature": "export type IEventAbortSignal = IAbortSignal;",
-          "declarationLine": 39,
-          "source": "packages/event-subscriber/dist/types.d.ts",
-          "purpose": "Public compatibility name for utils-owned structural abort-signal admission.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventAbortSignal.",
-          "advanced": "No additional advanced behavior is declared for IEventAbortSignal.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IEventAbortSignal."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventAbortSignal.",
-          "examples": [
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
-            "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
-            "EventSubscriberState.abort // 'abort' —— IEventAbortSignal 的事件类型\nEventSubscriberState.fulfilled // 'fulfilled' —— IListenerResult 的状态判别值\nEventSubscriberState.rejected // 'rejected'"
-          ],
-          "members": [],
-          "aliasOf": "IEventAbortSignal",
-          "exportPath": "./subscriber",
-          "overloadSignatures": ["export type IEventAbortSignal = IAbortSignal;"],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IEventAbortSignal when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IEventAbortSignal does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Public compatibility name for utils-owned structural abort-signal admission."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IEventAbortSignal from @migaia/event-subscriber/subscriber, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IEventAbortSignal when its type contract and declared inputs match the result you need. Choose a different public symbol when IEventAbortSignal does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventAbortSignal."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IEventAbortSignal."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/types.d.ts:IEventAbortSignal:export type IEventAbortSignal = IAbortSignal;",
-          "guidance": [],
-          "usageScore": 36,
-          "configuration": [],
-          "fragment": "event-subscriber-subscriber--IEventAbortSignal"
-        },
-        {
           "name": "IEventChannelLike",
           "kind": "type",
           "signature": "export type IEventChannelLike<T, R = void, V = undefined> = {\n  subscribe(\n    listener: IEventListener<T, R, V>,\n    options?: { readonly taskId?: string },\n  ): IUnsubscribe;\n};",
-          "declarationLine": 82,
+          "declarationLine": 80,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelLike is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelLike.",
@@ -13434,7 +13358,7 @@
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
             "function subscribeOnce<T, R>(\n  channel: IEventChannelLike<T, R>,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe",
-            "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
+            "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }"
           ],
           "members": [],
@@ -13490,7 +13414,7 @@
           "name": "IEventContext",
           "kind": "type",
           "signature": "export type IEventContext<T> = {\n  readonly value: T;\n  readonly aborted: boolean;\n  readonly abortReason: unknown;\n  readonly taskId: string | undefined;\n  abort(reason?: unknown): void;\n  setTaskId(taskId: string | undefined): void;\n};",
-          "declarationLine": 40,
+          "declarationLine": 38,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventContext.",
@@ -13561,7 +13485,7 @@
           "name": "IEventListener",
           "kind": "type",
           "signature": "export type IEventListener<T, R = void, V = undefined> = (\n  event: IProjectedEventContext<T, V>,\n) => R | PromiseLike<R>;",
-          "declarationLine": 67,
+          "declarationLine": 65,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventListener is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventListener.",
@@ -13573,9 +13497,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventListener.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "function subscribeOnce<T, R>(\n  channel: IEventChannelLike<T, R>,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe",
-            "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
+            "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "type IEventHub<C extends IEventMap> = {\n  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>\n  publish<K extends keyof C>(key: K, value: C[K]): void\n  clear(key?: keyof C): void\n  size(key?: keyof C): number\n}"
           ],
           "members": [],
@@ -13631,7 +13555,7 @@
           "name": "IEventSubscriber",
           "kind": "type",
           "signature": "export type IEventSubscriber<T, R = void> = {\n  handle(event: IEventContext<T>): R | PromiseLike<R>;\n};",
-          "declarationLine": 68,
+          "declarationLine": 66,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventSubscriber is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventSubscriber.",
@@ -13850,9 +13774,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IUnsubscribe.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "function subscribeOnce<T, R>(\n  channel: IEventChannelLike<T, R>,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe",
-            "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
+            "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }"
           ],
           "members": [],
@@ -13906,7 +13830,7 @@
           "name": "subscribeOnce",
           "kind": "const",
           "signature": "export declare const subscribeOnce: <T, R, V = undefined>(\n  channel: IEventChannelLike<T, R, V>,\n  listener: IEventListener<T, R, V>,\n  options?: { readonly taskId?: string },\n) => IUnsubscribe;",
-          "declarationLine": 75,
+          "declarationLine": 76,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Installs once semantics on any event-subscriber-compatible structural channel.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for subscribeOnce.",
@@ -13917,7 +13841,7 @@
           "errors": ["No documented errors are declared for subscribeOnce."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for subscribeOnce.",
           "examples": [
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber/subscriber'",
             "function subscribeOnce<T, R>(\n  channel: IEventChannelLike<T, R>,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe",
             "subscribeOnce(channel, (event) => console.log('only once', event.value))"
@@ -14040,7 +13964,7 @@
           "name": "subscribeSubscriber",
           "kind": "const",
           "signature": "export declare const subscribeSubscriber: <T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: { readonly handle?: unknown },\n) => IUnsubscribe;",
-          "declarationLine": 71,
+          "declarationLine": 72,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Registers a subscriber object without introducing a class hierarchy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for subscribeSubscriber.",
@@ -14234,8 +14158,8 @@
         {
           "name": "subscribeUntil",
           "kind": "const",
-          "signature": "export declare const subscribeUntil: <T, R, V = undefined>(\n  channel: IEventChannelLike<T, R, V>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R, V>,\n  options?: { readonly taskId?: string },\n) => IUnsubscribe;",
-          "declarationLine": 79,
+          "signature": "export declare const subscribeUntil: <T, R, V = undefined>(\n  channel: IEventChannelLike<T, R, V>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R, V>,\n  options?: { readonly taskId?: string },\n) => IUnsubscribe;",
+          "declarationLine": 80,
           "source": "packages/event-subscriber/dist/channel.d.ts",
           "purpose": "Installs abort-linked subscription with a helper-owned overlay and closed race protocol.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for subscribeUntil.",
@@ -14246,9 +14170,9 @@
           "errors": ["No documented errors are declared for subscribeUntil."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for subscribeUntil.",
           "examples": [
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IEventAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber/subscriber'",
-            "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
+            "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "const controller = new AbortController()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\ncontroller.abort('owner closed')",
             "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
           ],
@@ -14256,7 +14180,7 @@
           "aliasOf": "subscribeUntil",
           "exportPath": "./subscriber",
           "overloadSignatures": [
-            "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;"
+            "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -14295,7 +14219,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeUntil:export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IEventAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
+          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeUntil:export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
           "guidance": [
             {
               "id": "subscribeuntil",
@@ -14304,7 +14228,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IEventAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IEventAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}"
+                  "code": "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -32163,7 +32087,7 @@
           "name": "createPipeline",
           "kind": "function",
           "signature": "export declare function createPipeline<TValue>(\n  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.sync>,\n): IMiddlewarePipeline<typeof MiddlewarePipelineMode.sync, TValue>;\nexport declare function createPipeline<TValue>(\n  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>,\n): IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, TValue>;\nexport declare function createPipeline<TValue>(\n  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.generator>,\n): IMiddlewarePipeline<typeof MiddlewarePipelineMode.generator, TValue>;\nexport declare function createPipeline<TValue>(\n  options: ICreatePipelineOptions<typeof MiddlewarePipelineMode.asyncGenerator>,\n): IMiddlewarePipeline<typeof MiddlewarePipelineMode.asyncGenerator, TValue>;\nexport declare function createPipeline<\n  TValue,\n  const TMode extends IMiddlewarePipelineMode,\n>(options: ICreatePipelineOptions<TMode>): IMiddlewarePipeline<TMode, TValue>;",
-          "declarationLine": 51,
+          "declarationLine": 52,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Creates a stateless sync pipeline with a value type chosen by its caller. Creates a stateless async pipeline with a value type chosen by its caller. Creates a stateless generator pipeline with a value type chosen by its caller. Creates a stateless async-generator pipeline with a value type chosen by its caller. Creates a stateless runner whose mode controls stage, terminal, lift, and result types.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createPipeline.",
@@ -32329,7 +32253,7 @@
             },
             {
               "name": "signal",
-              "type": "IMiddlewarePipelineAbortSignal",
+              "type": "IAbortSignal",
               "optional": true,
               "description": "Default cooperative abort signal; a run-level signal overrides it."
             },
@@ -32428,7 +32352,7 @@
             },
             {
               "name": "signal",
-              "type": "IMiddlewarePipelineAbortSignal",
+              "type": "IAbortSignal",
               "optional": true,
               "description": "`signal`：可选，所有调用的默认取消信号。",
               "descriptionEn": "Default cooperative abort signal; a run-level signal overrides it.",
@@ -32651,7 +32575,7 @@
           "name": "IAsyncGeneratorMiddlewareStage",
           "kind": "type",
           "signature": "export type IAsyncGeneratorMiddlewareStage<TValue> = (\n  value: TValue,\n  context?: IMiddlewarePipelineContext,\n) => AsyncGenerator<\n  TValue,\n  | TValue\n  | IGeneratorUndefinedSignal<TValue>\n  | typeof GENERATOR_HALT\n  | typeof GENERATOR_CONTINUE\n  | undefined,\n  void\n>;",
-          "declarationLine": 20,
+          "declarationLine": 18,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IAsyncGeneratorMiddlewareStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncGeneratorMiddlewareStage.",
@@ -32715,7 +32639,7 @@
           "name": "IAsyncMiddlewareStage",
           "kind": "type",
           "signature": "export type IAsyncMiddlewareStage<TValue> = (\n  value: TValue,\n  next: (value: TValue) => Promise<void>,\n  context?: IMiddlewarePipelineContext,\n) => void | Promise<void>;",
-          "declarationLine": 18,
+          "declarationLine": 16,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IAsyncMiddlewareStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAsyncMiddlewareStage.",
@@ -32778,8 +32702,8 @@
         {
           "name": "ICreatePipelineOptions",
           "kind": "type",
-          "signature": "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{\n  /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode;\n  /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler;\n  /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void;\n  /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IMiddlewarePipelineAbortSignal;\n  /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals;\n  /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (\n    stage: unknown,\n    downstream: unknown,\n  ) => unknown;\n}>;",
-          "declarationLine": 24,
+          "signature": "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{\n  /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode;\n  /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler;\n  /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void;\n  /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IAbortSignal;\n  /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals;\n  /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (\n    stage: unknown,\n    downstream: unknown,\n  ) => unknown;\n}>;",
+          "declarationLine": 25,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Shared construction options for every middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICreatePipelineOptions.",
@@ -32796,7 +32720,7 @@
           "aliasOf": "ICreatePipelineOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IMiddlewarePipelineAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;"
+            "export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -32835,7 +32759,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:ICreatePipelineOptions:export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IMiddlewarePipelineAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
+          "identity": "packages/middleware-pipeline/dist/create-pipeline.d.ts:ICreatePipelineOptions:export type ICreatePipelineOptions<TMode extends IMiddlewarePipelineMode> = Readonly<{ /** * Selects the execution algebra for every run; stages must match this mode or be lifted * explicitly. */ readonly mode: TMode; /** Reports duplicate or late next calls without starting a second downstream traversal. */ readonly onViolation?: IMiddlewarePipelineViolationHandler; /** Checks owner admission before each frame; a thrown failure prevents that stage from starting. */ readonly assertActive?: () => void; /** Default cooperative abort signal; a run-level signal overrides it. */ readonly signal?: IAbortSignal; /** Optional generator sentinel set; all three sentinel identities must be distinct. */ readonly signals?: IGeneratorMiddlewareSignals; /** * Combines simultaneous asynchronous stage and downstream failures while retaining both * originals. */ readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown; }>;",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -32909,7 +32833,7 @@
           "name": "IGeneratorMiddlewareStage",
           "kind": "type",
           "signature": "export type IGeneratorMiddlewareStage<TValue> = (\n  value: TValue,\n  context?: IMiddlewarePipelineContext,\n) => Generator<\n  TValue,\n  | TValue\n  | IGeneratorUndefinedSignal<TValue>\n  | typeof GENERATOR_HALT\n  | typeof GENERATOR_CONTINUE\n  | undefined,\n  void\n>;",
-          "declarationLine": 19,
+          "declarationLine": 17,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IGeneratorMiddlewareStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGeneratorMiddlewareStage.",
@@ -32973,7 +32897,7 @@
           "name": "IMiddlewarePipeline",
           "kind": "type",
           "signature": "export type IMiddlewarePipeline<\n  TMode extends IMiddlewarePipelineMode,\n  TValue,\n> = Readonly<{\n  readonly mode: TMode;\n  lift<TFrom extends IMiddlewarePipelineLiftSource<TMode>>(\n    stage: IMiddlewarePipelineStage<TFrom, TValue>,\n    from: TFrom,\n  ): IMiddlewarePipelineStage<TMode, TValue>;\n  run(\n    stages: readonly IMiddlewarePipelineStage<TMode, TValue>[],\n    value: TValue,\n    done: IMiddlewarePipelineDone<TMode, TValue>,\n    control?: IMiddlewarePipelineControlOptions,\n  ): IMiddlewarePipelineRunResult<TMode>;\n}>;",
-          "declarationLine": 45,
+          "declarationLine": 46,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Stateless runner returned by `createPipeline`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipeline.",
@@ -33036,74 +32960,10 @@
           "fragment": "middleware-pipeline-index--IMiddlewarePipeline"
         },
         {
-          "name": "IMiddlewarePipelineAbortSignal",
-          "kind": "type",
-          "signature": "export type IMiddlewarePipelineAbortSignal = IAbortSignal;",
-          "declarationLine": 10,
-          "source": "packages/middleware-pipeline/dist/runtime.d.ts",
-          "purpose": "Public compatibility name for utils-owned structural abort-signal admission.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineAbortSignal.",
-          "advanced": "No additional advanced behavior is declared for IMiddlewarePipelineAbortSignal.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IMiddlewarePipelineAbortSignal."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineAbortSignal.",
-          "examples": [
-            "type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal }"
-          ],
-          "members": [],
-          "aliasOf": "IMiddlewarePipelineAbortSignal",
-          "exportPath": ".",
-          "overloadSignatures": ["export type IMiddlewarePipelineAbortSignal = IAbortSignal;"],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IMiddlewarePipelineAbortSignal when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IMiddlewarePipelineAbortSignal does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Public compatibility name for utils-owned structural abort-signal admission."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IMiddlewarePipelineAbortSignal from @migaia/middleware-pipeline, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IMiddlewarePipelineAbortSignal when its type contract and declared inputs match the result you need. Choose a different public symbol when IMiddlewarePipelineAbortSignal does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineAbortSignal."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IMiddlewarePipelineAbortSignal."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineAbortSignal:export type IMiddlewarePipelineAbortSignal = IAbortSignal;",
-          "guidance": [],
-          "usageScore": 10,
-          "configuration": [],
-          "fragment": "middleware-pipeline-index--IMiddlewarePipelineAbortSignal"
-        },
-        {
           "name": "IMiddlewarePipelineContext",
           "kind": "type",
-          "signature": "export type IMiddlewarePipelineContext = {\n  readonly signal: IMiddlewarePipelineAbortSignal;\n};",
-          "declarationLine": 11,
+          "signature": "export type IMiddlewarePipelineContext = { readonly signal: IAbortSignal };",
+          "declarationLine": 9,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IMiddlewarePipelineContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineContext.",
@@ -33113,14 +32973,12 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IMiddlewarePipelineContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewarePipelineContext.",
-          "examples": [
-            "type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal }"
-          ],
+          "examples": ["type IMiddlewarePipelineContext = { readonly signal: IAbortSignal }"],
           "members": [],
           "aliasOf": "IMiddlewarePipelineContext",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal; };"
+            "export type IMiddlewarePipelineContext = { readonly signal: IAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -33159,7 +33017,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineContext:export type IMiddlewarePipelineContext = { readonly signal: IMiddlewarePipelineAbortSignal; };",
+          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineContext:export type IMiddlewarePipelineContext = { readonly signal: IAbortSignal; };",
           "guidance": [],
           "usageScore": 10,
           "configuration": [],
@@ -33168,8 +33026,8 @@
         {
           "name": "IMiddlewarePipelineControlOptions",
           "kind": "type",
-          "signature": "export type IMiddlewarePipelineControlOptions = {\n  readonly signal?: IMiddlewarePipelineAbortSignal;\n};",
-          "declarationLine": 14,
+          "signature": "export type IMiddlewarePipelineControlOptions = { readonly signal?: IAbortSignal };",
+          "declarationLine": 12,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "IMiddlewarePipelineControlOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineControlOptions.",
@@ -33184,7 +33042,7 @@
           "aliasOf": "IMiddlewarePipelineControlOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IMiddlewarePipelineControlOptions = { readonly signal?: IMiddlewarePipelineAbortSignal; };"
+            "export type IMiddlewarePipelineControlOptions = { readonly signal?: IAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -33223,7 +33081,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineControlOptions:export type IMiddlewarePipelineControlOptions = { readonly signal?: IMiddlewarePipelineAbortSignal; };",
+          "identity": "packages/middleware-pipeline/dist/runtime.d.ts:IMiddlewarePipelineControlOptions:export type IMiddlewarePipelineControlOptions = { readonly signal?: IAbortSignal; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -33233,7 +33091,7 @@
           "name": "IMiddlewarePipelineDone",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineDone<\n  TMode extends IMiddlewarePipelineMode,\n  TValue,\n> = TMode extends IMiddlewarePipelineSyncMode\n  ? (value: TValue, context?: IMiddlewarePipelineContext) => void\n  : (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>;",
-          "declarationLine": 13,
+          "declarationLine": 14,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Terminal callback selected by one concrete middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineDone.",
@@ -33361,7 +33219,7 @@
           "name": "IMiddlewarePipelineLiftSource",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineLiftSource<TMode extends IMiddlewarePipelineMode> = {\n  readonly sync: 'sync';\n  readonly async: 'sync' | 'async';\n  readonly generator: 'sync' | 'generator';\n  readonly 'async-generator': 'sync' | 'generator' | 'async-generator';\n}[TMode];",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Source modes that can be lifted into one target middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineLiftSource.",
@@ -33489,7 +33347,7 @@
           "name": "IMiddlewarePipelineRunResult",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineRunResult<TMode extends IMiddlewarePipelineMode> =\n  TMode extends IMiddlewarePipelineSyncMode ? void : Promise<void>;",
-          "declarationLine": 15,
+          "declarationLine": 16,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Execution result selected by one concrete middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineRunResult.",
@@ -33553,7 +33411,7 @@
           "name": "IMiddlewarePipelineStage",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineStage<TMode extends IMiddlewarePipelineMode, TValue> = {\n  readonly sync: ISyncMiddlewareStage<TValue>;\n  readonly async: IAsyncMiddlewareStage<TValue>;\n  readonly generator: IGeneratorMiddlewareStage<TValue>;\n  readonly 'async-generator': IAsyncGeneratorMiddlewareStage<TValue>;\n}[TMode];",
-          "declarationLine": 4,
+          "declarationLine": 5,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Stage selected by one concrete middleware mode.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineStage.",
@@ -33617,7 +33475,7 @@
           "name": "IMiddlewarePipelineSyncMode",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineSyncMode =\n  | typeof MiddlewarePipelineMode.sync\n  | typeof MiddlewarePipelineMode.generator;",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/middleware-pipeline/dist/create-pipeline.d.ts",
           "purpose": "Modes whose execution completes before `run` returns.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineSyncMode.",
@@ -33809,7 +33667,7 @@
           "name": "ISyncMiddlewareStage",
           "kind": "type",
           "signature": "export type ISyncMiddlewareStage<TValue> = (\n  value: TValue,\n  next: (value: TValue) => void,\n  context?: IMiddlewarePipelineContext,\n) => void;",
-          "declarationLine": 17,
+          "declarationLine": 15,
           "source": "packages/middleware-pipeline/dist/runtime.d.ts",
           "purpose": "ISyncMiddlewareStage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISyncMiddlewareStage.",
@@ -141600,7 +141458,7 @@
         {
           "name": "IMigrationContext",
           "kind": "type",
-          "signature": "export type IMigrationContext = {\n  readonly fromVersion: number;\n  readonly toVersion: number;\n  /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IWebAbortSignal;\n};",
+          "signature": "export type IMigrationContext = {\n  readonly fromVersion: number;\n  readonly toVersion: number;\n  /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IAbortSignal;\n};",
           "declarationLine": 3,
           "source": "packages/storage-web/dist/schema/migrate.d.ts",
           "purpose": "IMigrationContext is part of this module's public type contract.",
@@ -141618,7 +141476,7 @@
           "aliasOf": "IMigrationContext",
           "exportPath": "./schema",
           "overloadSignatures": [
-            "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IWebAbortSignal; };"
+            "export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -141657,7 +141515,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/schema/migrate.d.ts:IMigrationContext:export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IWebAbortSignal; };",
+          "identity": "packages/storage-web/dist/schema/migrate.d.ts:IMigrationContext:export type IMigrationContext = { readonly fromVersion: number; readonly toVersion: number; /** Optional operation signal for cooperative migration cancellation. */ readonly signal?: IAbortSignal; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -141891,7 +141749,7 @@
         {
           "name": "runMigrations",
           "kind": "const",
-          "signature": "export declare const runMigrations: (\n  value: unknown,\n  fromVersion: number,\n  toVersion: number,\n  migrations: Record<number, IMigration> | undefined,\n  signal?: IWebAbortSignal,\n) => Promise<unknown>;",
+          "signature": "export declare const runMigrations: (\n  value: unknown,\n  fromVersion: number,\n  toVersion: number,\n  migrations: Record<number, IMigration> | undefined,\n  signal?: IAbortSignal,\n) => Promise<unknown>;",
           "declarationLine": 15,
           "source": "packages/storage-web/dist/schema/migrate.d.ts",
           "purpose": "公开入口：创建新 runtime（一次 operation 一个 reporter），见 `docs/store-persist/storage-web-integration.sdd.md` §4.4「公开 API 兼作内部步骤的拆分」。",
@@ -141912,7 +141770,7 @@
           "aliasOf": "runMigrations",
           "exportPath": "./schema",
           "overloadSignatures": [
-            "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IWebAbortSignal) => Promise<unknown>;"
+            "export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal) => Promise<unknown>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -141951,7 +141809,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/schema/migrate.d.ts:runMigrations:export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IWebAbortSignal) => Promise<unknown>;",
+          "identity": "packages/storage-web/dist/schema/migrate.d.ts:runMigrations:export declare const runMigrations: (value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal) => Promise<unknown>;",
           "guidance": [
             {
               "id": "runmigrations",
@@ -195321,7 +195179,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -195331,7 +195189,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
@@ -195400,7 +195258,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； 注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             }
@@ -195569,7 +195427,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； 注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             }
@@ -195718,7 +195576,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； 注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             }
@@ -195876,7 +195734,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -195886,7 +195744,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
@@ -195955,7 +195813,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； 注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             }
@@ -196127,7 +195985,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -196137,7 +195995,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
@@ -196206,7 +196064,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； 注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             }
@@ -196330,7 +196188,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； 注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             }
@@ -196454,7 +196312,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； 注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             }
@@ -196578,7 +196436,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； 注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             }
@@ -197156,7 +197014,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -197166,7 +197024,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
@@ -198049,7 +197907,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -198059,7 +197917,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
@@ -198244,7 +198102,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -198254,7 +198112,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
@@ -198500,7 +198358,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -198510,7 +198368,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
@@ -198758,7 +198616,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -198768,7 +198626,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
@@ -199138,7 +198996,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -199148,7 +199006,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
@@ -199217,7 +199075,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； routing namespace 和 pub/sub 由后续 mesh 实现。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
+                  "text": "`defineRoutingPolicy(name, pick)` 提供纯 policy 契约，host DSL 可声明 `routing: [policy]`； 注册后通过 `tray.routing.<name>(host)` 或 `tray.routing('<name>', host)` 选实例；pub/sub 见 USEGUIDE。`pick(candidates, context)` 同步返回实例 id， `context` 为 `{ host, sequence }`。名称须符合 `^[a-z][A-Za-z0-9]*$`， 不能使用内置 policy 名称或函数、对象的保留属性名；非法定义抛 `TRAY_ROUTING_INVALID`。"
                 }
               ]
             }
@@ -200790,7 +200648,7 @@
                     [
                       "`routing`",
                       "`TRouting`，即只读 `ITrayRoutingPolicy[]`；默认未指定",
-                      "保存共享 policy 定义；执行与命名空间由 mesh 实现"
+                      "声明子实例插件可用的 policy；父端把它并入 registry 注册集，子端经 `deps.tray.routing` 调用（见 Routing）"
                     ]
                   ]
                 },
@@ -200800,7 +200658,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，当前只完成定义校验。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
+                  "text": "`createTray({ hosts, routing?, probe?, report? })` 返回 `ITray<THosts, TRouting>`。 `hosts` 是必填的定义只读数组；`routing` 是可选的共享 policy 只读数组，与各 host DSL 的 `routing` 合并注册，构成 `tray.routing` 命名空间（见 Routing）。 `probe` 的类型为 `IRpcProbe | readonly IRpcProbe[]`；`report(error: unknown): void` 接收运行与清理诊断，默认使用 `console.error`。"
                 },
                 {
                   "type": "paragraph",
