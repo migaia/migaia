@@ -1,6 +1,8 @@
 /**
- * 模拟 `document.cookie` 的读写不对称语义：getter 返回全部可见 cookie 的 拼接字符串；setter 每次只写入/删除一个 cookie（由赋值串里的 name=
- * 决定）。 真实浏览器对 Secure/SameSite/domain 的强制校验不在此模拟范围内——那些 只能在 e2e 用真实浏览器验证（见 SDD §12.4）。
+ * Models the asymmetric read and write behavior of `document.cookie`. The getter joins all visible
+ * cookies into one string. Each setter assignment writes or deletes only the cookie selected by its
+ * `name=` field. Does not model browser enforcement of `Secure`, `SameSite`, or `domain`. Those
+ * rules require end-to-end verification in a real browser; see SDD §12.4.
  */
 export const fakeCookieDocument = (): { cookie: string } => {
   const jar = new Map<string, string>()

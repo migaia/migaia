@@ -126,7 +126,10 @@ export const createStorageTypeError = (
 export type IStorageChannel = 'value' | 'bytes' | 'record'
 export type IExtensionStage = 'schema' | 'codec' | 'migration' | 'comparator' | 'diagnostic'
 
-/** 所有后端异常的统一归一化形态。原始异常一律进 cause，不改写其 message。 */
+/**
+ * Normalizes backend exceptions into one error form. Retains the original exception as `cause`
+ * without changing its message.
+ */
 export class StorageError extends Error {
   readonly source: string
   readonly code: IStorageErrorCode

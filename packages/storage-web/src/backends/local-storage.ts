@@ -8,7 +8,7 @@ import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { StorageBackend } from '../constants.js'
 
 export type ILocalStorageOptions = IWebStorageOptions & {
-  /** 注入点：测试环境与非浏览器环境用。默认为 globalThis.localStorage。 */
+  /** Injects storage for tests and non-browser environments. Defaults to `globalThis.localStorage`. */
   readonly storage?: IWebStorageLike
 }
 

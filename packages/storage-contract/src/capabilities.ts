@@ -10,9 +10,12 @@ export type IStorageCapabilities = {
   readonly secondaryIndexes: boolean
   /** Whether backend emits post-commit invalidation changes. Missing legacy fields mean false. */
   readonly changeFeed: boolean
-  /** 单值近似上限，字节。cookie ~4096，localStorage ~5MB，IndexedDB 为 undefined（受配额而非单值限制）。 */
+  /**
+   * Approximate per-value limit in bytes: about 4096 for cookies and 5 MB for localStorage.
+   * IndexedDB uses `undefined` because quota limits total storage.
+   */
   readonly maxValueBytes: number | undefined
-  /** 该后端上不可见的键是否可能存在（cookies 的 HttpOnly）。 */
+  /** Whether the backend can contain keys hidden from JavaScript, such as `HttpOnly` cookies. */
   readonly opaqueEntries: boolean
 }
 

@@ -188,7 +188,7 @@ export type IRepositoryConfig<TDomain, TStored> = {
   readonly key: Extract<keyof TDomain, string>
   readonly version: number
   readonly schema: ISchemaAdapter<TDomain, TStored>
-  /** 未提供时按后端类型选默认值，见 createRepository。 */
+  /** Selects a default from the backend kind when omitted. See `createRepository`. */
   readonly codec: ICodec<unknown, unknown> | undefined
   readonly migrations: Record<number, IMigration> | undefined
   readonly validateOnRead: boolean

@@ -1,10 +1,20 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 
-/** 协作式取消与超时。所有公开方法的最后一个可选参数。 */
+/**
+ * Supplies cooperative cancellation and timeouts as an optional final argument to storage
+ * operations.
+ */
 export type IOperationContext = {
-  /** 协作式取消。后端可忽略，但调用方一定会以 AbortError 结束等待。结构化信号，不引全局 AbortSignal。 */
+  /**
+   * Requests cooperative cancellation. Backends can ignore work cancellation, while
+   * cancellation-aware operations stop waiting with the contract `ABORTED` error. Uses a structural
+   * signal without depending on the global `AbortSignal`.
+   */
   readonly signal?: IAbortSignal
-  /** 便捷超时，内部合成为 signal；与外部 signal 同时存在时取先触发者。 */
+  /**
+   * Creates an internal timeout signal. When an external `signal` also exists, the first signal to
+   * fire wins.
+   */
   readonly timeoutMs?: number
   /** IndexedDB iterator page size; bounded to protect cursor memory. */
   readonly pageSize?: number
@@ -26,10 +36,16 @@ export type ISyncWriteOptions = {
   readonly conflictPolicy?: IConflictPolicy
 }
 
-/** L1 文档主键。结构化后端（IndexedDB）上等同 IDBValidKey。 */
+/**
+ * Identifies an L1 document. Corresponds to `IDBValidKey` on a structured backend such as
+ * IndexedDB.
+ */
 export type IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[]
 
-/** L1 范围查询边界，与 IDBKeyRange 语义对齐但不直接依赖它，便于其他结构化后端实现。 */
+/**
+ * Defines L1 query bounds with `IDBKeyRange` semantics. Avoids a direct dependency so other
+ * structured backends can implement it.
+ */
 export type IKeyRange<TKey extends IStorageKey = IStorageKey> = {
   readonly lower?: TKey
   readonly lowerOpen?: boolean

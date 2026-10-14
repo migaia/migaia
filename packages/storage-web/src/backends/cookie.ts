@@ -52,13 +52,13 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
 export type ICookieDocument = { cookie: string }
 
 export type ICookiesOptions = {
-  /** 命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。 */
+  /** Prefixes keys to isolate instances and applications. Defaults to `default`. */
   readonly namespace?: string
-  /** 高级物理键编码扩展点；改变 codec 即改变 cookie 持久化格式。 */
+  /** Customizes physical key encoding. Changing the codec changes the cookie persistence format. */
   readonly namespaceCodec?: INamespaceCodec
-  /** 固定 cookie scope；写入与删除始终使用同一 scope。 */
+  /** Fixes the cookie scope. Writes and deletions always use the same scope. */
   readonly scope?: ICookieScope
-  /** 注入点：测试环境用。默认为 globalThis.document。 */
+  /** Injects a document for testing. Defaults to `globalThis.document`. */
   readonly document?: ICookieDocument
 }
 
@@ -165,7 +165,10 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
   }
 }
 
-/** Document.cookie 后端。不处理服务端 cookie；SSR 场景由调用方在服务端 自行解析 `req.headers.cookie` 并注入 memoryStorageHost。 */
+/**
+ * Stores cookies through `document.cookie`. Does not handle server-side cookies. For SSR, the
+ * caller parses `req.headers.cookie` on the server and supplies the data to `memoryStorageHost`.
+ */
 export const cookiesHost = (options: ICookiesOptions = {}): ISyncCapableStore<ICookieStore> => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
     throw new StorageError(StorageErrorCode.invalidConfig, {

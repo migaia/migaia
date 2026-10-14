@@ -31,9 +31,9 @@ const CAPABILITIES: IStorageCapabilities = Object.freeze({
 })
 
 export type IWebStorageOptions = {
-  /** 命名空间前缀，避免多实例/多应用互相踩踏。默认为 'default'。 */
+  /** Prefixes keys to isolate instances and applications. Defaults to `default`. */
   readonly namespace?: string
-  /** 高级物理键编码扩展点；改变 codec 即改变持久化格式。 */
+  /** Customizes physical key encoding. Changing the codec changes the persistence format. */
   readonly namespaceCodec?: INamespaceCodec
 }
 
@@ -94,7 +94,11 @@ const assertWebStorageInjection: (
   }
 }
 
-/** LocalStorage / sessionStorageHost 的共用实现，仅注入不同的 Storage 实例。 `跨标签页 storage 事件不在本层暴露；订阅属于状态层职责。 */
+/**
+ * Shares the backend implementation for localStorage and `sessionStorageHost` by injecting
+ * different storage instances. Does not expose cross-tab `storage` events at this layer. The state
+ * layer owns subscriptions.
+ */
 export const createWebStorageBackend = (
   backend: IBackendKind,
   storage: IWebStorageLike | undefined,

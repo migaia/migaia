@@ -2,10 +2,10 @@ import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.j
 import type { IKeyRange, IStorageKey } from '../types/context.js'
 
 /**
- * 同一个 store 实例可能被多个 entity 共用（例如同一个 indexedDbHost() 连接 上挂 users 和 posts）。entity 名必须编入实际存储 key，否则不同
- * entity 的同 id 记录会互相覆盖。
- *
- * 结构化后端：`[entityName, id]`，原生数组键，天然可用作 range 的前缀。 KV 后端：`"<entityName>:<id>"` 字符串。
+ * Includes the entity name in a physical key so entities sharing one store do not overwrite records
+ * with the same ID. For example, `users` and `posts` can share one `indexedDbHost()` connection.
+ * Legacy structured keys use `[entityName, id]`, whose array prefix supports range queries.
+ * Key-value keys use `<entityName>:<encoded-id>`.
  */
 export const composeStructuredKey = (entityName: string, id: IStorageKey): IStorageKey => [
   entityName,
@@ -57,13 +57,19 @@ export const repositoryEntityRange = (
   upperOpen: false
 })
 
-/** `String(id)` 会丢失 IStorageKey 的类型信息；可逆编码保留完整类型与嵌套结构。 */
+/**
+ * Preserves the complete key type and nested structure through reversible encoding. `String(id)`
+ * loses that information.
+ */
 export const composeFlatKey = (entityName: string, id: IStorageKey): string =>
   `${entityName}:${encodeFlatStorageKey(id)}`
 
 export const flatKeyPrefix = (entityName: string): string => `${entityName}:`
 
-/** 结构化后端的历史前缀 range 仅保留给兼容调用方；repository 对嵌套数组使用全扫描过滤。 */
+/**
+ * Retains the historical structured prefix range for compatible callers. V2 repository queries scan
+ * entity-isolated ranges and filter ID bounds. Legacy records still require a full-store scan.
+ */
 export const structuredEntityRange = (
   entityName: string
 ): { readonly lower: IStorageKey; readonly upper: IStorageKey } => ({
@@ -80,9 +86,10 @@ export const legacyEntityRange = (
 })
 
 /**
- * 把调用方提供的 range（作用于原始 id 空间）与 entity 前缀复合，结果恒为 `[entityName, ...]` 形状。调用方传入的 lower/upper 只会被当作 id
- * 部分 使用，不可能被拼成跨 entity 的复合键——即使调用方误传一个本就带 entityName 前缀的复合键，外层也会再包一层 `[entityName, [entityName,
- * id]]`， 结果依旧落在本 entity 的范围内，不会逃逸到其他 entity 的 keyspace。
+ * Combines bounds from the original ID space with the entity prefix. The result always has the form
+ * `[entityName, ...]`. Treats `lower` and `upper` only as IDs, so the bounds cannot cross entity
+ * keyspaces. Even an already prefixed ID becomes `[entityName, [entityName, id]]` and stays within
+ * this entity.
  */
 export const composeEntityRange = (
   entityName: string,
