@@ -1216,9 +1216,9 @@
           "name": "createReduxDevToolsAdapter",
           "kind": "function",
           "signature": "export declare function createReduxDevToolsAdapter<S>(connection: IReduxDevToolsConnection<S>): IDevToolsAdapter<S>;",
-          "declarationLine": 86,
+          "declarationLine": 89,
           "source": "packages/store-middleware/dist/middleware.d.ts",
-          "purpose": "将 Redux DevTools 消息转换为 Store middleware 领域事件。",
+          "purpose": "Converts Redux DevTools messages into store middleware domain events.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createReduxDevToolsAdapter.",
           "advanced": "No additional advanced behavior is declared for createReduxDevToolsAdapter.",
           "parameters": ["connection: IReduxDevToolsConnection<S>"],
@@ -1259,7 +1259,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "将 Redux DevTools 消息转换为 Store middleware 领域事件。"
+              "content": "Converts Redux DevTools messages into store middleware domain events."
             },
             {
               "id": "getting-started",
@@ -1642,7 +1642,7 @@
           "name": "IDevToolsAdapter",
           "kind": "type",
           "signature": "export type IDevToolsAdapter<S> = { init(state: S): void; send(event: IMiddlewareEvent<S>, state: S): void; subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer; };",
-          "declarationLine": 68,
+          "declarationLine": 71,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "IDevToolsAdapter is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDevToolsAdapter.",
@@ -1708,7 +1708,7 @@
           "name": "IDevToolsCommand",
           "kind": "type",
           "signature": "export type IDevToolsCommand<S> = { readonly type: typeof MiddlewareCommandType.jump; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.reset; readonly state: S; } | { readonly type: typeof MiddlewareCommandType.commit; };",
-          "declarationLine": 59,
+          "declarationLine": 62,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "IDevToolsCommand is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDevToolsCommand.",
@@ -1902,9 +1902,9 @@
           "name": "IMiddlewareContext",
           "kind": "type",
           "signature": "export type IMiddlewareContext<S> = { readonly runtime: IRuntime; readonly getState: () => S; };",
-          "declarationLine": 54,
+          "declarationLine": 57,
           "source": "packages/store-middleware/dist/middleware.d.ts",
-          "purpose": "迁移适配器使用的旧 middleware 形状；新代码请使用 IStoreMiddlewarePlugin。",
+          "purpose": "Provides the legacy middleware context used by migration adapters. New code uses `IStoreMiddlewarePlugin`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewareContext.",
           "advanced": "No additional advanced behavior is declared for IMiddlewareContext.",
           "parameters": ["This type declaration has no parameters."],
@@ -1926,7 +1926,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "迁移适配器使用的旧 middleware 形状；新代码请使用 IStoreMiddlewarePlugin。"
+              "content": "Provides the legacy middleware context used by migration adapters. New code uses `IStoreMiddlewarePlugin`."
             },
             {
               "id": "getting-started",
@@ -2293,7 +2293,7 @@
           "signature": "export type IMutationPolicyMode = 'off' | 'actions-only';",
           "declarationLine": 6,
           "source": "packages/store-middleware/dist/middleware.d.ts",
-          "purpose": "严格写入策略；默认关闭，避免改变既有 Store 行为。",
+          "purpose": "Controls strict mutation policy. Defaults to `off` to preserve existing store behavior.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMutationPolicyMode.",
           "advanced": "No additional advanced behavior is declared for IMutationPolicyMode.",
           "parameters": ["This type declaration has no parameters."],
@@ -2315,7 +2315,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "严格写入策略；默认关闭，避免改变既有 Store 行为。"
+              "content": "Controls strict mutation policy. Defaults to `off` to preserve existing store behavior."
             },
             {
               "id": "getting-started",
@@ -2354,7 +2354,7 @@
           "name": "IReduxDevToolsConnection",
           "kind": "type",
           "signature": "export type IReduxDevToolsConnection<S> = { init(state: S): void; send(action: unknown, state: S): void; subscribe(listener: (message: IReduxDevToolsMessage) => void): IDisposer; };",
-          "declarationLine": 80,
+          "declarationLine": 83,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "IReduxDevToolsConnection is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReduxDevToolsConnection.",
@@ -2419,7 +2419,7 @@
           "name": "IReduxDevToolsMessage",
           "kind": "type",
           "signature": "export type IReduxDevToolsMessage = { readonly type?: string; readonly payload?: { readonly type?: string; }; readonly state?: string; };",
-          "declarationLine": 73,
+          "declarationLine": 76,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "IReduxDevToolsMessage is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReduxDevToolsMessage.",
@@ -2482,7 +2482,7 @@
           "name": "IStoreMiddleware",
           "kind": "type",
           "signature": "export type IStoreMiddleware<S> = (event: IMiddlewareEvent<S>, context: IMiddlewareContext<S>, next: () => void) => void;",
-          "declarationLine": 58,
+          "declarationLine": 61,
           "source": "packages/store-middleware/dist/middleware.d.ts",
           "purpose": "IStoreMiddleware is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreMiddleware.",
@@ -2744,7 +2744,7 @@
           "signature": "export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Readonly<{ readonly mutationPolicy: MutationPolicy; emit(event: IMiddlewareEvent<S>): void; runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T; recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void; recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void; connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; attachBindingDisposer(disposer: IDisposer): void; }>;",
           "declarationLine": 24,
           "source": "packages/store-middleware/dist/store-middleware-host.d.ts",
-          "purpose": "Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 plugin-host 提供。 由 `defineHost` 组合而成而不是继承 `PluginHost`：这个壳层真正需要基类的只有一个 domain core 钩子 和一条 dispose 前置，继承却把宿主的整个表面一并交了出去。句柄只带 Store 自己的成员加宿主的公开面。",
+          "purpose": "Provides a store event host using `plugin-host` for plugin lifecycle and pipelines. `defineHost` composes the store domain core and pre-disposal hook instead of inheriting `PluginHost`. The handle exposes store members together with the host's public surface.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreMiddlewareHost.",
           "advanced": "No additional advanced behavior is declared for IStoreMiddlewareHost.",
           "parameters": ["This type declaration has no parameters."],
@@ -2766,7 +2766,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Store 专用事件 Host；通用插件生命周期和 pipeline 全部由 plugin-host 提供。 由 `defineHost` 组合而成而不是继承 `PluginHost`：这个壳层真正需要基类的只有一个 domain core 钩子 和一条 dispose 前置，继承却把宿主的整个表面一并交了出去。句柄只带 Store 自己的成员加宿主的公开面。"
+              "content": "Provides a store event host using `plugin-host` for plugin lifecycle and pipelines. `defineHost` composes the store domain core and pre-disposal hook instead of inheriting `PluginHost`. The handle exposes store members together with the host's public surface."
             },
             {
               "id": "getting-started",

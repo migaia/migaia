@@ -1283,7 +1283,7 @@
           "name": "assertStoreFeature",
           "kind": "function",
           "signature": "export declare function assertStoreFeature(config: IStoreConfigValue | null, path: IStoreFeaturePath, apiName?: string): void;",
-          "declarationLine": 63,
+          "declarationLine": 81,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "assertStoreFeature is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertStoreFeature.",
@@ -2303,7 +2303,7 @@
           "name": "IStableNode",
           "kind": "type",
           "signature": "export type IStableNode<T> = { readonly value: T; peek(): T; };",
-          "declarationLine": 17,
+          "declarationLine": 22,
           "source": "packages/store-react/dist/useNode.d.ts",
           "purpose": "IStableNode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStableNode.",
@@ -2366,8 +2366,8 @@
         {
           "name": "IStoreConfigValue",
           "kind": "type",
-          "signature": "export type IStoreConfigValue = { readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }; readonly defaults: IStoreProviderDefaults; /** 归一化后的就绪跟踪；无屏障时为 null。 */ readonly ready: ITrackedReady | null; };",
-          "declarationLine": 43,
+          "signature": "export type IStoreConfigValue = { readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }; readonly defaults: IStoreProviderDefaults; /** Provides normalized readiness tracking, or `null` when no barrier exists. */ readonly ready: ITrackedReady | null; };",
+          "declarationLine": 61,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "IStoreConfigValue is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreConfigValue.",
@@ -2385,7 +2385,7 @@
           "aliasOf": "IStoreConfigValue",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreConfigValue = { readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }; readonly defaults: IStoreProviderDefaults; /** 归一化后的就绪跟踪；无屏障时为 null。 */ readonly ready: ITrackedReady | null; };"
+            "export type IStoreConfigValue = { readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }; readonly defaults: IStoreProviderDefaults; /** Provides normalized readiness tracking, or `null` when no barrier exists. */ readonly ready: ITrackedReady | null; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2424,7 +2424,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/store-config.d.ts:IStoreConfigValue:export type IStoreConfigValue = { readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }; readonly defaults: IStoreProviderDefaults; /** 归一化后的就绪跟踪；无屏障时为 null。 */ readonly ready: ITrackedReady | null; };",
+          "identity": "packages/store-react/dist/store-config.d.ts:IStoreConfigValue:export type IStoreConfigValue = { readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }; readonly defaults: IStoreProviderDefaults; /** Provides normalized readiness tracking, or `null` when no barrier exists. */ readonly ready: ITrackedReady | null; };",
           "guidance": [
             {
               "id": "2-5-assertstorefeature-config-path-apiname-normalizestoreconfig-config-barrierscope-readstorefeature-config-path",
@@ -2477,9 +2477,9 @@
           "name": "IStoreFeatureExperimental",
           "kind": "type",
           "signature": "export type IStoreFeatureExperimental = Readonly<Record<string, boolean>>;",
-          "declarationLine": 11,
+          "declarationLine": 13,
           "source": "packages/store-react/dist/store-config.d.ts",
-          "purpose": "应用级 Store 配置（挂在 StoreProvider 上）。 与 Runtime / AtomStore 隔离正交： - Provider 的 registry/runtime = 图的所有权 - config = 这棵树声明要哪些增强、就绪前是否挡住子树 `features.wasm === true` 时必须同时提供 `ready`（通常放入 `ensureWasm` from `@migaia/store-wasm`），否则在开发期直接抛错——避免「开了开关却没人 init」。",
+          "purpose": "IStoreFeatureExperimental is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreFeatureExperimental.",
           "advanced": "No additional advanced behavior is declared for IStoreFeatureExperimental.",
           "parameters": ["This type declaration has no parameters."],
@@ -2502,7 +2502,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "应用级 Store 配置（挂在 StoreProvider 上）。 与 Runtime / AtomStore 隔离正交： - Provider 的 registry/runtime = 图的所有权 - config = 这棵树声明要哪些增强、就绪前是否挡住子树 `features.wasm === true` 时必须同时提供 `ready`（通常放入 `ensureWasm` from `@migaia/store-wasm`），否则在开发期直接抛错——避免「开了开关却没人 init」。"
+              "content": "IStoreFeatureExperimental is part of this module's public type contract."
             },
             {
               "id": "getting-started",
@@ -2541,7 +2541,7 @@
           "name": "IStoreFeaturePath",
           "kind": "type",
           "signature": "export type IStoreFeaturePath = 'wasm' | `experimental.${string}`;",
-          "declarationLine": 61,
+          "declarationLine": 79,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "IStoreFeaturePath is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreFeaturePath.",
@@ -2604,8 +2604,8 @@
         {
           "name": "IStoreFeatures",
           "kind": "type",
-          "signature": "export type IStoreFeatures = { /** 声明本树会使用 wasm 字段。 默认 false：不强制就绪屏障。 true：必须配合 `ready` 完成 init（见 StoreProvider）。 */ readonly wasm?: boolean; /** 实验特性白名单。未列出或非严格 `true` 视为关闭。 实验 API 应 `assertStoreFeature('experimental.xxx')`。 */ readonly experimental?: IStoreFeatureExperimental; };",
-          "declarationLine": 12,
+          "signature": "export type IStoreFeatures = { /** * Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness * barrier. When `true`, `ready` must complete initialization before the provider renders its * subtree. */ readonly wasm?: boolean; /** * Allows experimental features only when their entry is exactly `true`. Missing entries are * disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`. */ readonly experimental?: IStoreFeatureExperimental; };",
+          "declarationLine": 14,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "IStoreFeatures is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreFeatures.",
@@ -2620,7 +2620,7 @@
           "aliasOf": "IStoreFeatures",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreFeatures = { /** 声明本树会使用 wasm 字段。 默认 false：不强制就绪屏障。 true：必须配合 `ready` 完成 init（见 StoreProvider）。 */ readonly wasm?: boolean; /** 实验特性白名单。未列出或非严格 `true` 视为关闭。 实验 API 应 `assertStoreFeature('experimental.xxx')`。 */ readonly experimental?: IStoreFeatureExperimental; };"
+            "export type IStoreFeatures = { /** * Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness * barrier. When `true`, `ready` must complete initialization before the provider renders its * subtree. */ readonly wasm?: boolean; /** * Allows experimental features only when their entry is exactly `true`. Missing entries are * disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`. */ readonly experimental?: IStoreFeatureExperimental; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2659,7 +2659,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/store-config.d.ts:IStoreFeatures:export type IStoreFeatures = { /** 声明本树会使用 wasm 字段。 默认 false：不强制就绪屏障。 true：必须配合 `ready` 完成 init（见 StoreProvider）。 */ readonly wasm?: boolean; /** 实验特性白名单。未列出或非严格 `true` 视为关闭。 实验 API 应 `assertStoreFeature('experimental.xxx')`。 */ readonly experimental?: IStoreFeatureExperimental; };",
+          "identity": "packages/store-react/dist/store-config.d.ts:IStoreFeatures:export type IStoreFeatures = { /** * Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness * barrier. When `true`, `ready` must complete initialization before the provider renders its * subtree. */ readonly wasm?: boolean; /** * Allows experimental features only when their entry is exactly `true`. Missing entries are * disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`. */ readonly experimental?: IStoreFeatureExperimental; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2668,8 +2668,8 @@
         {
           "name": "IStoreProviderConfig",
           "kind": "type",
-          "signature": "export type IStoreProviderConfig = { readonly features?: IStoreFeatures; /** 子树渲染前必须 settle 的屏障。 例：`ready: [ensureWasm]`（从 `@migaia/store-wasm` 引入）。 */ readonly ready?: readonly IStoreReadyBarrier[]; /** 屏障未完成时的占位。 */ readonly fallback?: ReactNode; /** 只读业务默认值快照；Provider 不会把这些值自动写入各 Store。 */ readonly defaults?: IStoreProviderDefaults; };",
-          "declarationLine": 27,
+          "signature": "export type IStoreProviderConfig = { readonly features?: IStoreFeatures; /** * Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. */ readonly ready?: readonly IStoreReadyBarrier[]; /** Displays this fallback while readiness barriers are pending. */ readonly fallback?: ReactNode; /** * Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores. */ readonly defaults?: IStoreProviderDefaults; };",
+          "declarationLine": 36,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "IStoreProviderConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreProviderConfig.",
@@ -2688,7 +2688,7 @@
           "aliasOf": "IStoreProviderConfig",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreProviderConfig = { readonly features?: IStoreFeatures; /** 子树渲染前必须 settle 的屏障。 例：`ready: [ensureWasm]`（从 `@migaia/store-wasm` 引入）。 */ readonly ready?: readonly IStoreReadyBarrier[]; /** 屏障未完成时的占位。 */ readonly fallback?: ReactNode; /** 只读业务默认值快照；Provider 不会把这些值自动写入各 Store。 */ readonly defaults?: IStoreProviderDefaults; };"
+            "export type IStoreProviderConfig = { readonly features?: IStoreFeatures; /** * Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. */ readonly ready?: readonly IStoreReadyBarrier[]; /** Displays this fallback while readiness barriers are pending. */ readonly fallback?: ReactNode; /** * Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores. */ readonly defaults?: IStoreProviderDefaults; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2727,7 +2727,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/store-config.d.ts:IStoreProviderConfig:export type IStoreProviderConfig = { readonly features?: IStoreFeatures; /** 子树渲染前必须 settle 的屏障。 例：`ready: [ensureWasm]`（从 `@migaia/store-wasm` 引入）。 */ readonly ready?: readonly IStoreReadyBarrier[]; /** 屏障未完成时的占位。 */ readonly fallback?: ReactNode; /** 只读业务默认值快照；Provider 不会把这些值自动写入各 Store。 */ readonly defaults?: IStoreProviderDefaults; };",
+          "identity": "packages/store-react/dist/store-config.d.ts:IStoreProviderConfig:export type IStoreProviderConfig = { readonly features?: IStoreFeatures; /** * Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`. */ readonly ready?: readonly IStoreReadyBarrier[]; /** Displays this fallback while readiness barriers are pending. */ readonly fallback?: ReactNode; /** * Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores. */ readonly defaults?: IStoreProviderDefaults; };",
           "guidance": [
             {
               "id": "2-2-config-的四个字段",
@@ -2781,8 +2781,8 @@
         {
           "name": "IStoreProviderDefaults",
           "kind": "type",
-          "signature": "export type IStoreProviderDefaults = { /** * 仅挂在 config 快照上供业务读取（useStoreConfig）， **不会**自动传给 createStore——createStore 仍要自己写 * options.warnAsyncActions。 */ readonly warnAsyncActions?: boolean; };",
-          "declarationLine": 20,
+          "signature": "export type IStoreProviderDefaults = { /** * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. */ readonly warnAsyncActions?: boolean; };",
+          "declarationLine": 29,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "IStoreProviderDefaults is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreProviderDefaults.",
@@ -2797,7 +2797,7 @@
           "aliasOf": "IStoreProviderDefaults",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreProviderDefaults = { /** * 仅挂在 config 快照上供业务读取（useStoreConfig）， **不会**自动传给 createStore——createStore 仍要自己写 * options.warnAsyncActions。 */ readonly warnAsyncActions?: boolean; };"
+            "export type IStoreProviderDefaults = { /** * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. */ readonly warnAsyncActions?: boolean; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2836,7 +2836,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/store-config.d.ts:IStoreProviderDefaults:export type IStoreProviderDefaults = { /** * 仅挂在 config 快照上供业务读取（useStoreConfig）， **不会**自动传给 createStore——createStore 仍要自己写 * options.warnAsyncActions。 */ readonly warnAsyncActions?: boolean; };",
+          "identity": "packages/store-react/dist/store-config.d.ts:IStoreProviderDefaults:export type IStoreProviderDefaults = { /** * Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It * is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly. */ readonly warnAsyncActions?: boolean; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -2845,7 +2845,7 @@
         {
           "name": "IStoreProviderProps",
           "kind": "type",
-          "signature": "export type IStoreProviderProps = { readonly children: ReactNode; readonly registry?: StoreRegistry; readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** 应用级配置：特性开关 + 就绪屏障。 省略时与历史行为一致（无屏障、features 全关）。 */ readonly config?: IStoreProviderConfig; };",
+          "signature": "export type IStoreProviderProps = { readonly children: ReactNode; readonly registry?: StoreRegistry; readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };",
           "declarationLine": 7,
           "source": "packages/store-react/dist/StoreProvider.d.ts",
           "purpose": "IStoreProviderProps is part of this module's public type contract.",
@@ -2863,7 +2863,7 @@
           "aliasOf": "IStoreProviderProps",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreProviderProps = { readonly children: ReactNode; readonly registry?: StoreRegistry; readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** 应用级配置：特性开关 + 就绪屏障。 省略时与历史行为一致（无屏障、features 全关）。 */ readonly config?: IStoreProviderConfig; };"
+            "export type IStoreProviderProps = { readonly children: ReactNode; readonly registry?: StoreRegistry; readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2902,7 +2902,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-react/dist/StoreProvider.d.ts:IStoreProviderProps:export type IStoreProviderProps = { readonly children: ReactNode; readonly registry?: StoreRegistry; readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** 应用级配置：特性开关 + 就绪屏障。 省略时与历史行为一致（无屏障、features 全关）。 */ readonly config?: IStoreProviderConfig; };",
+          "identity": "packages/store-react/dist/StoreProvider.d.ts:IStoreProviderProps:export type IStoreProviderProps = { readonly children: ReactNode; readonly registry?: StoreRegistry; readonly runtime?: IRuntime; /** * Internal registries dispose on unmount by default. External registries remain caller-owned * unless this flag is explicitly true. */ readonly disposeOnUnmount?: boolean; /** * Configures application features and readiness barriers. Omission keeps all features disabled * and uses no barrier. */ readonly config?: IStoreProviderConfig; };",
           "guidance": [],
           "usageScore": 12,
           "configuration": [],
@@ -2978,9 +2978,9 @@
           "name": "IStoreReadyBarrier",
           "kind": "type",
           "signature": "export type IStoreReadyBarrier = Promise<unknown> | (() => Promise<unknown> | unknown);",
-          "declarationLine": 19,
+          "declarationLine": 28,
           "source": "packages/store-react/dist/store-config.d.ts",
-          "purpose": "就绪屏障：Promise 或零参工厂（便于传 `ensureWasm`）。",
+          "purpose": "Provides a readiness promise or a zero-argument factory, such as `ensureWasm`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreReadyBarrier.",
           "advanced": "No additional advanced behavior is declared for IStoreReadyBarrier.",
           "parameters": ["This type declaration has no parameters."],
@@ -3003,7 +3003,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "就绪屏障：Promise 或零参工厂（便于传 `ensureWasm`）。"
+              "content": "Provides a readiness promise or a zero-argument factory, such as `ensureWasm`."
             },
             {
               "id": "getting-started",
@@ -3181,7 +3181,7 @@
           "name": "normalizeStoreConfig",
           "kind": "function",
           "signature": "export declare function normalizeStoreConfig(config?: IStoreProviderConfig, barrierScope?: object): IStoreConfigValue;",
-          "declarationLine": 53,
+          "declarationLine": 71,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "normalizeStoreConfig is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for normalizeStoreConfig.",
@@ -3272,19 +3272,19 @@
               "name": "ready",
               "type": "readonly IStoreReadyBarrier[]",
               "optional": true,
-              "description": "子树渲染前必须 settle 的屏障。 例：`ready: [ensureWasm]`（从 `@migaia/store-wasm` 引入）。"
+              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`."
             },
             {
               "name": "fallback",
               "type": "ReactNode",
               "optional": true,
-              "description": "屏障未完成时的占位。"
+              "description": "Displays this fallback while readiness barriers are pending."
             },
             {
               "name": "defaults",
               "type": "IStoreProviderDefaults",
               "optional": true,
-              "description": "只读业务默认值快照；Provider 不会把这些值自动写入各 Store。"
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores."
             }
           ],
           "identity": "packages/store-react/dist/store-config.d.ts:normalizeStoreConfig:export declare function normalizeStoreConfig(config?: IStoreProviderConfig, barrierScope?: object): IStoreConfigValue;",
@@ -3328,24 +3328,24 @@
               "type": "readonly IStoreReadyBarrier[]",
               "optional": true,
               "description": "`normalizeStoreConfig(config?, barrierScope?)`：`StoreProvider` 内部用来把 `IStoreProviderConfig` 归一化成 `IStoreConfigValue`（`features` 补全默认值、`ready` 屏障数组转换成惰性求值+缓存的 `ITrackedReady`）的同一段逻辑，独立导出后可以在 Provider 之外复现相同的归一化行为；`barrierScope` 决定就绪 Promise 与工厂结果缓存的隔离边界——不同调用传不同的 `barrierScope` 对象，各自独立求值，不会共享缓存。`config.ready` 里出现既不是函数也不是 thenable 的元素会抛 `[store] config.ready must be an array of Promises or zero-argument functions`。",
-              "descriptionEn": "",
+              "descriptionEn": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
               "descriptionZh": "`normalizeStoreConfig(config?, barrierScope?)`：`StoreProvider` 内部用来把 `IStoreProviderConfig` 归一化成 `IStoreConfigValue`（`features` 补全默认值、`ready` 屏障数组转换成惰性求值+缓存的 `ITrackedReady`）的同一段逻辑，独立导出后可以在 Provider 之外复现相同的归一化行为；`barrierScope` 决定就绪 Promise 与工厂结果缓存的隔离边界——不同调用传不同的 `barrierScope` 对象，各自独立求值，不会共享缓存。`config.ready` 里出现既不是函数也不是 thenable 的元素会抛 `[store] config.ready must be an array of Promises or zero-argument functions`。"
             },
             {
               "name": "fallback",
               "type": "ReactNode",
               "optional": true,
-              "description": "屏障未完成时的占位。",
-              "descriptionEn": "",
-              "descriptionZh": "屏障未完成时的占位。"
+              "description": "Displays this fallback while readiness barriers are pending.",
+              "descriptionEn": "Displays this fallback while readiness barriers are pending.",
+              "descriptionZh": ""
             },
             {
               "name": "defaults",
               "type": "IStoreProviderDefaults",
               "optional": true,
-              "description": "只读业务默认值快照；Provider 不会把这些值自动写入各 Store。",
-              "descriptionEn": "",
-              "descriptionZh": "只读业务默认值快照；Provider 不会把这些值自动写入各 Store。"
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores.",
+              "descriptionEn": "Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores.",
+              "descriptionZh": ""
             }
           ],
           "fragment": "store-react-index--normalizeStoreConfig"
@@ -3354,7 +3354,7 @@
           "name": "readStoreFeature",
           "kind": "function",
           "signature": "export declare function readStoreFeature(config: IStoreConfigValue, path: IStoreFeaturePath): boolean;",
-          "declarationLine": 62,
+          "declarationLine": 80,
           "source": "packages/store-react/dist/store-config.d.ts",
           "purpose": "readStoreFeature is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readStoreFeature.",
@@ -3662,7 +3662,7 @@
           "name": "StoreProvider",
           "kind": "function",
           "signature": "export declare function StoreProvider({ children, registry, runtime, disposeOnUnmount, config }: IStoreProviderProps): import(\"react\").JSX.Element;",
-          "declarationLine": 19,
+          "declarationLine": 22,
           "source": "packages/store-react/dist/StoreProvider.d.ts",
           "purpose": "StoreProvider is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreProvider.",
@@ -4565,9 +4565,9 @@
           "name": "useAssertStoreFeature",
           "kind": "function",
           "signature": "export declare function useAssertStoreFeature(path: IStoreFeaturePath, apiName?: string): void;",
-          "declarationLine": 69,
+          "declarationLine": 96,
           "source": "packages/store-react/dist/store-config.d.ts",
-          "purpose": "实验 / 增强 API 入口处调用：未开启则抛明确错误。 无 Provider 也抛（实验 API 不允许「默默在树外半开」）。",
+          "purpose": "Guards an experimental or enhanced API at its entry point. Throws when the feature is disabled or no provider exists.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for useAssertStoreFeature.",
           "advanced": "No additional advanced behavior is declared for useAssertStoreFeature.",
           "parameters": ["path: IStoreFeaturePath", "apiName: string (optional)"],
@@ -4616,7 +4616,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "实验 / 增强 API 入口处调用：未开启则抛明确错误。 无 Provider 也抛（实验 API 不允许「默默在树外半开」）。"
+              "content": "Guards an experimental or enhanced API at its entry point. Throws when the feature is disabled or no provider exists."
             },
             {
               "id": "getting-started",
@@ -5464,7 +5464,7 @@
           "name": "useNodeValue",
           "kind": "function",
           "signature": "export declare function useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled?: boolean): T;",
-          "declarationLine": 21,
+          "declarationLine": 26,
           "source": "packages/store-react/dist/useNode.d.ts",
           "purpose": "useNodeValue is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for useNodeValue.",
@@ -6818,9 +6818,9 @@
           "name": "useStoreConfig",
           "kind": "function",
           "signature": "export declare function useStoreConfig(): IStoreConfigValue | null;",
-          "declarationLine": 65,
+          "declarationLine": 86,
           "source": "packages/store-react/dist/store-config.d.ts",
-          "purpose": "完整配置；无 Provider 时返回 null（与 registry 不同，配置是可选的）。",
+          "purpose": "Returns the complete configuration, or `null` without a provider. Configuration is optional, unlike the registry.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for useStoreConfig.",
           "advanced": "No additional advanced behavior is declared for useStoreConfig.",
           "parameters": ["This function declaration has no parameters."],
@@ -6843,7 +6843,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "完整配置；无 Provider 时返回 null（与 registry 不同，配置是可选的）。"
+              "content": "Returns the complete configuration, or `null` without a provider. Configuration is optional, unlike the registry."
             },
             {
               "id": "getting-started",
@@ -6996,9 +6996,9 @@
           "name": "useStoreFeature",
           "kind": "function",
           "signature": "export declare function useStoreFeature(path: IStoreFeaturePath): boolean;",
-          "declarationLine": 67,
+          "declarationLine": 91,
           "source": "packages/store-react/dist/store-config.d.ts",
-          "purpose": "查询特性开关。 - 无 Provider：一律 false（不抛），便于可选增强 - 有 Provider：读归一化后的 features",
+          "purpose": "Reads normalized feature flags from the provider. Returns `false` without a provider instead of throwing.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for useStoreFeature.",
           "advanced": "No additional advanced behavior is declared for useStoreFeature.",
           "parameters": ["path: IStoreFeaturePath"],
@@ -7039,7 +7039,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "查询特性开关。 - 无 Provider：一律 false（不抛），便于可选增强 - 有 Provider：读归一化后的 features"
+              "content": "Reads normalized feature flags from the provider. Returns `false` without a provider instead of throwing."
             },
             {
               "id": "getting-started",

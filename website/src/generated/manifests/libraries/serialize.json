@@ -3005,9 +3005,9 @@
           "ownerFragment": "serialize-core--ICollectStreamOptions"
         },
         {
-          "identity": "packages/serialize/dist/stream.d.ts:IEncodeStreamOptions:export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** 同时在途的请求数上限，即背压。默认 1：编好一片就等它落地再编下一片， 峰值内存只有一片。调高可以让编码与 worker 处理重叠，代价是峰值内存翻倍。 */ readonly maxInFlight?: number; };",
+          "identity": "packages/serialize/dist/stream.d.ts:IEncodeStreamOptions:export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** * Backpressure limit for concurrent requests. Defaults to 1, waiting for each encoded slice * before encoding the next. Only one slice is in flight at that setting. Higher limits overlap * encoding with worker processing at the cost of retaining more slices in memory. */ readonly maxInFlight?: number; };",
           "name": "IEncodeStreamOptions",
-          "signature": "export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** 同时在途的请求数上限，即背压。默认 1：编好一片就等它落地再编下一片， 峰值内存只有一片。调高可以让编码与 worker 处理重叠，代价是峰值内存翻倍。 */ readonly maxInFlight?: number; };",
+          "signature": "export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** * Backpressure limit for concurrent requests. Defaults to 1, waiting for each encoded slice * before encoding the next. Only one slice is in flight at that setting. Higher limits overlap * encoding with worker processing at the cost of retaining more slices in memory. */ readonly maxInFlight?: number; };",
           "source": "packages/serialize/dist/stream.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -3015,9 +3015,9 @@
           "ownerFragment": "serialize-core--IEncodeStreamOptions"
         },
         {
-          "identity": "packages/serialize/dist/stream.d.ts:IFrameBudgetOptions:export type IFrameBudgetOptions = { /** 每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。 */ readonly targetMs?: number; /** 片大小下界，防止把开销摊成纯消息成本。 */ readonly minItems?: number; /** 片大小上界，防止首片就把主线程占死。 */ readonly maxItems?: number; /** 首片大小。太大则第一片必然超预算，所以刻意保守。 */ readonly initialItems?: number; /** * 让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或 * requestIdleCallback（更保守）。 */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主 * `setTimeout`/`performance`/`Date.now`）。 */ readonly scheduler: IScheduler; };",
+          "identity": "packages/serialize/dist/stream.d.ts:IFrameBudgetOptions:export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
           "name": "IFrameBudgetOptions",
-          "signature": "export type IFrameBudgetOptions = { /** 每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。 */ readonly targetMs?: number; /** 片大小下界，防止把开销摊成纯消息成本。 */ readonly minItems?: number; /** 片大小上界，防止首片就把主线程占死。 */ readonly maxItems?: number; /** 首片大小。太大则第一片必然超预算，所以刻意保守。 */ readonly initialItems?: number; /** * 让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或 * requestIdleCallback（更保守）。 */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主 * `setTimeout`/`performance`/`Date.now`）。 */ readonly scheduler: IScheduler; };",
+          "signature": "export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
           "source": "packages/serialize/dist/stream.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -3025,9 +3025,9 @@
           "ownerFragment": "serialize-core--IFrameBudgetOptions"
         },
         {
-          "identity": "packages/serialize/dist/plugins/json.d.ts:IJsonPluginOptions:export type IJsonPluginOptions = { /** 传给 JSON.stringify 的 replacer，用于裁剪不可序列化字段。 */ readonly replacer?: (key: string, value: unknown) => unknown; /** 传给 JSON.parse 的 reviver，用于还原 Date 之类的富类型。 */ readonly reviver?: (key: string, value: unknown) => unknown; /** 缩进。仅调试用——线上留空以免白白撑大体积。 */ readonly space?: number; /** 字节段解码器（Encoding 注入；省略时用宿主 `TextDecoder`，明确声明宿主 Encoding API）。 */ readonly decoder?: ITextDecoder; };",
+          "identity": "packages/serialize/dist/plugins/json.d.ts:IJsonPluginOptions:export type IJsonPluginOptions = { /** Passed to `JSON.stringify` to omit fields that cannot be serialized. */ readonly replacer?: (key: string, value: unknown) => unknown; /** Passed to `JSON.parse` to restore rich values such as dates. */ readonly reviver?: (key: string, value: unknown) => unknown; /** Debug indentation. Omit in production to avoid increasing payload size. */ readonly space?: number; /** * Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding * API. */ readonly decoder?: ITextDecoder; };",
           "name": "IJsonPluginOptions",
-          "signature": "export type IJsonPluginOptions = { /** 传给 JSON.stringify 的 replacer，用于裁剪不可序列化字段。 */ readonly replacer?: (key: string, value: unknown) => unknown; /** 传给 JSON.parse 的 reviver，用于还原 Date 之类的富类型。 */ readonly reviver?: (key: string, value: unknown) => unknown; /** 缩进。仅调试用——线上留空以免白白撑大体积。 */ readonly space?: number; /** 字节段解码器（Encoding 注入；省略时用宿主 `TextDecoder`，明确声明宿主 Encoding API）。 */ readonly decoder?: ITextDecoder; };",
+          "signature": "export type IJsonPluginOptions = { /** Passed to `JSON.stringify` to omit fields that cannot be serialized. */ readonly replacer?: (key: string, value: unknown) => unknown; /** Passed to `JSON.parse` to restore rich values such as dates. */ readonly reviver?: (key: string, value: unknown) => unknown; /** Debug indentation. Omit in production to avoid increasing payload size. */ readonly space?: number; /** * Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding * API. */ readonly decoder?: ITextDecoder; };",
           "source": "packages/serialize/dist/plugins/json.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./plugins",
@@ -3095,9 +3095,9 @@
           "ownerFragment": "serialize-registry--ISerializeCleanupError"
         },
         {
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeContext:export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。 */ readonly signal: IAbortSignal; /** 出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。 */ readonly context: string; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeContext:export type ISerializeContext = { /** * Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and * discards the eventual result. */ readonly signal: IAbortSignal; /** Included in failure messages to identify the affected store or key. */ readonly context: string; };",
           "name": "ISerializeContext",
-          "signature": "export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。 */ readonly signal: IAbortSignal; /** 出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。 */ readonly context: string; };",
+          "signature": "export type ISerializeContext = { /** * Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and * discards the eventual result. */ readonly signal: IAbortSignal; /** Included in failure messages to identify the affected store or key. */ readonly context: string; };",
           "source": "packages/serialize/dist/types.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -3125,9 +3125,9 @@
           "ownerFragment": "serialize-core--ISerializeOutput"
         },
         {
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeParser:export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** 释放 parser 自己持有的资源（worker 端口、wasm 句柄等）。异步释放时返回 Promise，框架会 await。 */ dispose?(): void | Promise<void>; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeParser:export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** * Releases parser-owned resources such as worker ports or Wasm handles. Return a Promise for * asynchronous release; the framework awaits it. */ dispose?(): void | Promise<void>; };",
           "name": "ISerializeParser",
-          "signature": "export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** 释放 parser 自己持有的资源（worker 端口、wasm 句柄等）。异步释放时返回 Promise，框架会 await。 */ dispose?(): void | Promise<void>; };",
+          "signature": "export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** * Releases parser-owned resources such as worker ports or Wasm handles. Return a Promise for * asynchronous release; the framework awaits it. */ dispose?(): void | Promise<void>; };",
           "source": "packages/serialize/dist/types.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -3165,9 +3165,9 @@
           "ownerFragment": "serialize-core--ISerializeRangeError"
         },
         {
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistry:export type ISerializeRegistry = { /** 写入使用的格式：插件数组的第一项。 */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** 同步：拒绝新请求并 abort 内部 closing controller；幂等；不调用 parser disposer。 */ close(): void; /** 异步：隐含先 close()；等待在途结算或到达 deadlineAt 后同步释放 parser；幂等复用同一 promise，首次调用冻结 deadlineAt。 */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistry:export type ISerializeRegistry = { /** Default write format, taken from the first registered plugin. */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** * Synchronously rejects new requests and aborts the internal closing controller. Idempotent and * never invokes parser disposers. */ close(): void; /** * Closes first, then drains pending work until settlement or `deadlineAt` before awaiting parser * cleanup. Repeated calls share the same Promise. The first admitted call fixes `deadlineAt`. */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
           "name": "ISerializeRegistry",
-          "signature": "export type ISerializeRegistry = { /** 写入使用的格式：插件数组的第一项。 */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** 同步：拒绝新请求并 abort 内部 closing controller；幂等；不调用 parser disposer。 */ close(): void; /** 异步：隐含先 close()；等待在途结算或到达 deadlineAt 后同步释放 parser；幂等复用同一 promise，首次调用冻结 deadlineAt。 */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
+          "signature": "export type ISerializeRegistry = { /** Default write format, taken from the first registered plugin. */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** * Synchronously rejects new requests and aborts the internal closing controller. Idempotent and * never invokes parser disposers. */ close(): void; /** * Closes first, then drains pending work until settlement or `deadlineAt` before awaiting parser * cleanup. Repeated calls share the same Promise. The first admitted call fixes `deadlineAt`. */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
           "source": "packages/serialize/dist/types.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -3175,9 +3175,9 @@
           "ownerFragment": "serialize-core--ISerializeRegistry"
         },
         {
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistryOptions:export type ISerializeRegistryOptions = { /** 默认 `@migaia/utils/scheduler` 的 `systemScheduler`；创建后不可更换（单调时钟契约见该子路径，此处不重复解释）。 */ readonly scheduler?: IScheduler; /** 省略时用宿主 `TextEncoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly encoder?: ITextEncoder; /** 省略时用宿主 `TextDecoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly decoder?: ITextDecoder; /** Cleanup error 出口（可选，默认 `{ policy: 'throw' }`；report 策略强制携带 reporter）。 */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Drain-timeout 观测（可选；与 cleanup error 边界分离）。 */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * 通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator * `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 * rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。 */ readonly report?: (error: unknown) => void; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistryOptions:export type ISerializeRegistryOptions = { /** * Defaults to `systemScheduler` from `@migaia/utils/scheduler`. Fixed at construction; the * scheduler subpath defines its monotonic clock contract. */ readonly scheduler?: IScheduler; /** * Defaults to the host `TextEncoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly encoder?: ITextEncoder; /** * Defaults to the host `TextDecoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly decoder?: ITextDecoder; /** * Optional cleanup error policy. Defaults to `{ policy: 'throw' }`. The report policy requires a * reporter. */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Optional drain-timeout observer, separate from the cleanup error boundary. */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. * Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also * reports late rejections from detached work after the deadline and cleanup through `track`. Late * work does not rejoin the registry lifecycle. Neither report changes the primary rejection or * terminal state. */ readonly report?: (error: unknown) => void; };",
           "name": "ISerializeRegistryOptions",
-          "signature": "export type ISerializeRegistryOptions = { /** 默认 `@migaia/utils/scheduler` 的 `systemScheduler`；创建后不可更换（单调时钟契约见该子路径，此处不重复解释）。 */ readonly scheduler?: IScheduler; /** 省略时用宿主 `TextEncoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly encoder?: ITextEncoder; /** 省略时用宿主 `TextDecoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly decoder?: ITextDecoder; /** Cleanup error 出口（可选，默认 `{ policy: 'throw' }`；report 策略强制携带 reporter）。 */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Drain-timeout 观测（可选；与 cleanup error 边界分离）。 */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * 通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator * `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 * rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。 */ readonly report?: (error: unknown) => void; };",
+          "signature": "export type ISerializeRegistryOptions = { /** * Defaults to `systemScheduler` from `@migaia/utils/scheduler`. Fixed at construction; the * scheduler subpath defines its monotonic clock contract. */ readonly scheduler?: IScheduler; /** * Defaults to the host `TextEncoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly encoder?: ITextEncoder; /** * Defaults to the host `TextDecoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly decoder?: ITextDecoder; /** * Optional cleanup error policy. Defaults to `{ policy: 'throw' }`. The report policy requires a * reporter. */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Optional drain-timeout observer, separate from the cleanup error boundary. */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. * Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also * reports late rejections from detached work after the deadline and cleanup through `track`. Late * work does not rejoin the registry lifecycle. Neither report changes the primary rejection or * terminal state. */ readonly report?: (error: unknown) => void; };",
           "source": "packages/serialize/dist/types.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./registry",
@@ -3275,9 +3275,9 @@
           "ownerFragment": "serialize-core--SERIALIZE_TYPE_PATTERN"
         },
         {
-          "identity": "packages/serialize/dist/types.d.ts:SerializeCodecError:export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** 覆盖 `source`（默认 `@migaia/serialize`）供复用本类的上层包标自己的 source。 */ source?: string; cause?: unknown; }); }",
+          "identity": "packages/serialize/dist/types.d.ts:SerializeCodecError:export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** * Overrides the default `@migaia/serialize` source when a higher-level package reuses this * error class. */ source?: string; cause?: unknown; }); }",
           "name": "SerializeCodecError",
-          "signature": "export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** 覆盖 `source`（默认 `@migaia/serialize`）供复用本类的上层包标自己的 source。 */ source?: string; cause?: unknown; }); }",
+          "signature": "export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** * Overrides the default `@migaia/serialize` source when a higher-level module reuses this * error class. */ source?: string; cause?: unknown; }); }",
           "source": "packages/serialize/dist/types.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./core",
@@ -5180,7 +5180,7 @@
           "name": "assertSerializeType",
           "kind": "function",
           "signature": "export declare function assertSerializeType(type: string): void;",
-          "declarationLine": 46,
+          "declarationLine": 63,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "assertSerializeType is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for assertSerializeType.",
@@ -5262,7 +5262,7 @@
           "name": "base64ToBytes",
           "kind": "function",
           "signature": "export declare function base64ToBytes(text: string): Uint8Array;",
-          "declarationLine": 13,
+          "declarationLine": 14,
           "source": "packages/serialize/dist/base64.d.ts",
           "purpose": "Decode canonical padded base64 while preserving the legacy public diagnostic boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for base64ToBytes.",
@@ -5658,9 +5658,9 @@
           "name": "collectStream",
           "kind": "function",
           "signature": "export declare function collectStream(chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>, encoder?: ITextEncoder, options?: ICollectStreamOptions): Promise<ISerializeChunk>;",
-          "declarationLine": 67,
+          "declarationLine": 83,
           "source": "packages/serialize/dist/stream.d.ts",
-          "purpose": "把分段流合并成一整块。只在消费者确实需要完整 blob 时才用——它会把整份数据 同时驻留在内存里，正是流式想避免的那笔峰值。",
+          "purpose": "Assembles a chunk stream into one result. Use only when the consumer needs a complete blob because all data stays in memory.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for collectStream.",
           "advanced": "No additional advanced behavior is declared for collectStream.",
           "parameters": [
@@ -5724,7 +5724,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "把分段流合并成一整块。只在消费者确实需要完整 blob 时才用——它会把整份数据 同时驻留在内存里，正是流式想避免的那笔峰值。"
+              "content": "Assembles a chunk stream into one result. Use only when the consumer needs a complete blob because all data stays in memory."
             },
             {
               "id": "getting-started",
@@ -5757,7 +5757,7 @@
               "name": "signal",
               "type": "IAbortSignal",
               "optional": true,
-              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** 序列化分段协议。 每一段都自带形态标签，框架据此决定怎么把多段拼成完整结果——所以一次输出里 允许混用形态（例如先吐一段 text 头、再流式吐若干 bytes 体）。这是异步与流式 能力的落点：parser 可以返回单段、Promise、或异步可迭代对象。 三种形态各自的意义： text —— 字符串线材。落 localStorage、内联进 HTML 走这条。 bytes —— 字节线材。transfer 零拷贝、落 IndexedDB、喂 wasm 走这条。 value —— 已经是成品对象，不需要再解析。用于「直通」型 parser（例如 memory storage 或测试桩），避免为了走流程而做一次无谓的编解码往返。 / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。"
+              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** Serialization chunk protocol. Each chunk carries a kind tag that controls assembly. One output can mix kinds, such as a text header followed by streamed byte chunks. Parsers can produce a single chunk, a Promise, or an async iterable. `text` carries wire text for localStorage or inline HTML. `bytes` carries wire bytes for zero-copy transfer, IndexedDB, or Wasm. `value` carries a complete object requiring no further parsing. Passthrough parsers, such as memory storage or test stubs, avoid an unnecessary encoding round trip. / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and discards the eventual result."
             },
             {
               "name": "empty",
@@ -5769,7 +5769,7 @@
               "name": "context",
               "type": "string",
               "optional": true,
-              "description": "出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。"
+              "description": "Included in failure messages to identify the affected store or key."
             }
           ],
           "identity": "packages/serialize/dist/stream.d.ts:collectStream:export declare function collectStream(chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>, encoder?: ITextEncoder, options?: ICollectStreamOptions): Promise<ISerializeChunk>;",
@@ -5978,7 +5978,7 @@
               "type": "string",
               "optional": true,
               "description": "`registry.encode`/`.decode` 传入未注册 `type` — `SerializeCodecError` — `CODEC_NOT_FOUND` — `context` 固定为 `'registry'`",
-              "descriptionEn": "",
+              "descriptionEn": "Included in failure messages to identify the affected store or key.",
               "descriptionZh": "`registry.encode`/`.decode` 传入未注册 `type` — `SerializeCodecError` — `CODEC_NOT_FOUND` — `context` 固定为 `'registry'`"
             }
           ],
@@ -5988,9 +5988,9 @@
           "name": "createSerializeError",
           "kind": "function",
           "signature": "export declare function createSerializeError(code: ISerializeErrorCode, message: string, options?: { readonly cause?: unknown; readonly context?: string; readonly errors?: readonly unknown[]; }): ISerializeLifecycleError;",
-          "declarationLine": 95,
+          "declarationLine": 104,
           "source": "packages/serialize/dist/errors.d.ts",
-          "purpose": "构造/生命周期错误（`REGISTRY_DISPOSED`/`ENV_UNSUPPORTED`/rollback）：原生 Error + source/code/context/cause/errors。 `errors` 是 rollback 完成后一次性创建的不可变快照（`Object.freeze`），空则省略字段、不替换 `cause`。",
+          "purpose": "Creates a native construction or lifecycle error, such as `REGISTRY_DISPOSED`, `ENV_UNSUPPORTED`, or rollback failure. Attaches `source`, `code`, and optional `context`, `cause`, and `errors`. `errors` is a frozen snapshot copied after rollback completes. An empty list omits that property and never replaces `cause`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSerializeError.",
           "advanced": "No additional advanced behavior is declared for createSerializeError.",
           "parameters": [
@@ -6051,7 +6051,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "构造/生命周期错误（`REGISTRY_DISPOSED`/`ENV_UNSUPPORTED`/rollback）：原生 Error + source/code/context/cause/errors。 `errors` 是 rollback 完成后一次性创建的不可变快照（`Object.freeze`），空则省略字段、不替换 `cause`。"
+              "content": "Creates a native construction or lifecycle error, such as `REGISTRY_DISPOSED`, `ENV_UNSUPPORTED`, or rollback failure. Attaches `source`, `code`, and optional `context`, `cause`, and `errors`. `errors` is a frozen snapshot copied after rollback completes. An empty list omits that property and never replaces `cause`."
             },
             {
               "id": "getting-started",
@@ -6144,9 +6144,9 @@
           "name": "createSerializeRangeError",
           "kind": "function",
           "signature": "export declare function createSerializeRangeError(code: ISerializeErrorCode, message: string, options?: { readonly cause?: unknown; readonly context?: string; }): ISerializeRangeError;",
-          "declarationLine": 106,
+          "declarationLine": 121,
           "source": "packages/serialize/dist/errors.d.ts",
-          "purpose": "插件校验失败（空表 / 重复 / 非法 type）：原生 RangeError + `INVALID_OPTION`。",
+          "purpose": "Creates a native `RangeError` tagged for invalid input, such as an empty plugin list, duplicate type, or illegal type.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSerializeRangeError.",
           "advanced": "No additional advanced behavior is declared for createSerializeRangeError.",
           "parameters": [
@@ -6207,7 +6207,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "插件校验失败（空表 / 重复 / 非法 type）：原生 RangeError + `INVALID_OPTION`。"
+              "content": "Creates a native `RangeError` tagged for invalid input, such as an empty plugin list, duplicate type, or illegal type."
             },
             {
               "id": "getting-started",
@@ -6300,9 +6300,9 @@
           "name": "createSerializeTypeError",
           "kind": "function",
           "signature": "export declare function createSerializeTypeError(code: ISerializeErrorCode, message: string, options?: { readonly cause?: unknown; readonly context?: string; }): ISerializeTypeError;",
-          "declarationLine": 101,
+          "declarationLine": 113,
           "source": "packages/serialize/dist/errors.d.ts",
-          "purpose": "参数错误（scheduler 结构非法）：原生 TypeError + `INVALID_OPTION`。",
+          "purpose": "Creates a native `TypeError` with the supplied code, for example `INVALID_OPTION` for an invalid scheduler.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSerializeTypeError.",
           "advanced": "No additional advanced behavior is declared for createSerializeTypeError.",
           "parameters": [
@@ -6363,7 +6363,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "参数错误（scheduler 结构非法）：原生 TypeError + `INVALID_OPTION`。"
+              "content": "Creates a native `TypeError` with the supplied code, for example `INVALID_OPTION` for an invalid scheduler."
             },
             {
               "id": "getting-started",
@@ -6456,9 +6456,9 @@
           "name": "decodeStream",
           "kind": "function",
           "signature": "export declare function decodeStream(registry: ISerializeRegistry, chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>, options?: { readonly type?: string; readonly context?: string; readonly signal?: IAbortSignal; }): AsyncGenerator<unknown, void, undefined>;",
-          "declarationLine": 61,
+          "declarationLine": 74,
           "source": "packages/serialize/dist/stream.d.ts",
-          "purpose": "把分段流逐片解码，同样不做拼装。",
+          "purpose": "Decodes a chunk stream one piece at a time without assembling the full result.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for decodeStream.",
           "advanced": "No additional advanced behavior is declared for decodeStream.",
           "parameters": [
@@ -6522,7 +6522,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "把分段流逐片解码，同样不做拼装。"
+              "content": "Decodes a chunk stream one piece at a time without assembling the full result."
             },
             {
               "id": "getting-started",
@@ -6692,9 +6692,9 @@
           "name": "encodeStream",
           "kind": "function",
           "signature": "export declare function encodeStream<T>(registry: ISerializeRegistry, items: readonly T[], options: IEncodeStreamOptions): AsyncGenerator<ISerializeChunk, void, undefined>;",
-          "declarationLine": 59,
+          "declarationLine": 72,
           "source": "packages/serialize/dist/stream.d.ts",
-          "purpose": "把一个大数组编码成分段流，**不做拼装**。 与 registry.encode 的区别就在这里：encode 会把所有分段合并成一整块返回， 适合「最终要一个完整 blob」的场景；而落 IndexedDB、写文件、发 fetch body 这类消费者能逐片吃下，拼装反而白白制造一个全量大对象的峰值内存。",
+          "purpose": "Encodes a large array as a chunk stream without assembling the full result. `registry.encode` merges each operation's chunks into one complete result for consumers that need a whole blob. Stream consumers such as IndexedDB, files, or fetch bodies can accept slices individually. Avoiding full-stream assembly avoids retaining another object containing all data.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for encodeStream.",
           "advanced": "No additional advanced behavior is declared for encodeStream.",
           "parameters": [
@@ -6760,7 +6760,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "把一个大数组编码成分段流，**不做拼装**。 与 registry.encode 的区别就在这里：encode 会把所有分段合并成一整块返回， 适合「最终要一个完整 blob」的场景；而落 IndexedDB、写文件、发 fetch body 这类消费者能逐片吃下，拼装反而白白制造一个全量大对象的峰值内存。"
+              "content": "Encodes a large array as a chunk stream without assembling the full result. `registry.encode` merges each operation's chunks into one complete result for consumers that need a whole blob. Stream consumers such as IndexedDB, files, or fetch bodies can accept slices individually. Avoiding full-stream assembly avoids retaining another object containing all data."
             },
             {
               "id": "getting-started",
@@ -6799,55 +6799,55 @@
               "name": "context",
               "type": "string",
               "optional": true,
-              "description": "出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。"
+              "description": "Included in failure messages to identify the affected store or key."
             },
             {
               "name": "maxInFlight",
               "type": "number",
               "optional": true,
-              "description": "同时在途的请求数上限，即背压。默认 1：编好一片就等它落地再编下一片， 峰值内存只有一片。调高可以让编码与 worker 处理重叠，代价是峰值内存翻倍。"
+              "description": "Backpressure limit for concurrent requests. Defaults to 1, waiting for each encoded slice * before encoding the next. Only one slice is in flight at that setting. Higher limits overlap * encoding with worker processing at the cost of retaining more slices in memory."
             },
             {
               "name": "targetMs",
               "type": "number",
               "optional": true,
-              "description": "每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。"
+              "description": "Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work."
             },
             {
               "name": "minItems",
               "type": "number",
               "optional": true,
-              "description": "片大小下界，防止把开销摊成纯消息成本。"
+              "description": "Minimum slice size to keep per-message overhead from dominating processing."
             },
             {
               "name": "maxItems",
               "type": "number",
               "optional": true,
-              "description": "片大小上界，防止首片就把主线程占死。"
+              "description": "Maximum slice size to limit how long one slice can occupy the main thread."
             },
             {
               "name": "initialItems",
               "type": "number",
               "optional": true,
-              "description": "首片大小。太大则第一片必然超预算，所以刻意保守。"
+              "description": "Conservative initial slice size to reduce the risk of exceeding the first frame budget."
             },
             {
               "name": "yieldTo",
               "type": "() => Promise<void>",
               "optional": true,
-              "description": "让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或 * requestIdleCallback（更保守）。"
+              "description": "Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield."
             },
             {
               "name": "signal",
               "type": "IAbortSignal",
               "optional": true,
-              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** 序列化分段协议。 每一段都自带形态标签，框架据此决定怎么把多段拼成完整结果——所以一次输出里 允许混用形态（例如先吐一段 text 头、再流式吐若干 bytes 体）。这是异步与流式 能力的落点：parser 可以返回单段、Promise、或异步可迭代对象。 三种形态各自的意义： text —— 字符串线材。落 localStorage、内联进 HTML 走这条。 bytes —— 字节线材。transfer 零拷贝、落 IndexedDB、喂 wasm 走这条。 value —— 已经是成品对象，不需要再解析。用于「直通」型 parser（例如 memory storage 或测试桩），避免为了走流程而做一次无谓的编解码往返。 / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。"
+              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** Serialization chunk protocol. Each chunk carries a kind tag that controls assembly. One output can mix kinds, such as a text header followed by streamed byte chunks. Parsers can produce a single chunk, a Promise, or an async iterable. `text` carries wire text for localStorage or inline HTML. `bytes` carries wire bytes for zero-copy transfer, IndexedDB, or Wasm. `value` carries a complete object requiring no further parsing. Passthrough parsers, such as memory storage or test stubs, avoid an unnecessary encoding round trip. / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and discards the eventual result."
             },
             {
               "name": "scheduler",
               "type": "IScheduler",
               "optional": false,
-              "description": "Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主 * `setTimeout`/`performance`/`Date.now`）。"
+              "description": "Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`."
             }
           ],
           "identity": "packages/serialize/dist/stream.d.ts:encodeStream:export declare function encodeStream<T>(registry: ISerializeRegistry, items: readonly T[], options: IEncodeStreamOptions): AsyncGenerator<ISerializeChunk, void, undefined>;",
@@ -6998,7 +6998,7 @@
               "type": "string",
               "optional": true,
               "description": "`registry.encode`/`.decode` 传入未注册 `type` — `SerializeCodecError` — `CODEC_NOT_FOUND` — `context` 固定为 `'registry'`",
-              "descriptionEn": "",
+              "descriptionEn": "Included in failure messages to identify the affected store or key.",
               "descriptionZh": "`registry.encode`/`.decode` 传入未注册 `type` — `SerializeCodecError` — `CODEC_NOT_FOUND` — `context` 固定为 `'registry'`"
             },
             {
@@ -7006,31 +7006,31 @@
               "type": "number",
               "optional": true,
               "description": "内部行为：用 `sliceByFrameBudget(items, options)` 切片，每片调用一次 `registry.encode(slice, { type, signal, context })`（`context` 默认 `'stream'`）；`maxInFlight`（默认 1）控制同时在途的编码请求数，即背压——默认值意味着编好一片就等它被消费（`yield` 返回）后再编下一片，峰值内存只有一片；调高能让编码与下游消费重叠，代价是峰值内存同比增加。`maxInFlight` 必须是正整数，否则抛 `RangeError`／`INVALID_OPTION`（`NaN` 会让 `>= maxInFlight` 的判断恒为 `false`，背压彻底失效，在途请求无限堆积直到内存耗尽，因此这里的校验和 `sliceByFrameBudget` 一样是必要的）。",
-              "descriptionEn": "",
+              "descriptionEn": "Backpressure limit for concurrent requests. Defaults to 1, waiting for each encoded slice * before encoding the next. Only one slice is in flight at that setting. Higher limits overlap * encoding with worker processing at the cost of retaining more slices in memory.",
               "descriptionZh": "内部行为：用 `sliceByFrameBudget(items, options)` 切片，每片调用一次 `registry.encode(slice, { type, signal, context })`（`context` 默认 `'stream'`）；`maxInFlight`（默认 1）控制同时在途的编码请求数，即背压——默认值意味着编好一片就等它被消费（`yield` 返回）后再编下一片，峰值内存只有一片；调高能让编码与下游消费重叠，代价是峰值内存同比增加。`maxInFlight` 必须是正整数，否则抛 `RangeError`／`INVALID_OPTION`（`NaN` 会让 `>= maxInFlight` 的判断恒为 `false`，背压彻底失效，在途请求无限堆积直到内存耗尽，因此这里的校验和 `sliceByFrameBudget` 一样是必要的）。"
             },
             {
               "name": "targetMs",
               "type": "number",
               "optional": true,
-              "description": "每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。",
-              "descriptionEn": "",
-              "descriptionZh": "每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。"
+              "description": "Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work.",
+              "descriptionEn": "Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work.",
+              "descriptionZh": "所以片大小不能按固定字节数写死，必须按实测耗时反推：生成器在 `yield` 之后挂起，消费者取下一片时才恢复，挂起与恢复之间的时差正好等于消费者处理这一片的真实耗时，据此调整下一片大小——`ratio = targetMs / max(elapsed, 0.05)`，新片大小取\"当前值\"与\"按比例算出的目标值\"的中点（阻尼调整，避免噪声下来回振荡），再钳制在 `[minItems, maxItems]` 之内。"
             },
             {
               "name": "minItems",
               "type": "number",
               "optional": true,
-              "description": "片大小下界，防止把开销摊成纯消息成本。",
-              "descriptionEn": "",
-              "descriptionZh": "片大小下界，防止把开销摊成纯消息成本。"
+              "description": "Minimum slice size to keep per-message overhead from dominating processing.",
+              "descriptionEn": "Minimum slice size to keep per-message overhead from dominating processing.",
+              "descriptionZh": "所以片大小不能按固定字节数写死，必须按实测耗时反推：生成器在 `yield` 之后挂起，消费者取下一片时才恢复，挂起与恢复之间的时差正好等于消费者处理这一片的真实耗时，据此调整下一片大小——`ratio = targetMs / max(elapsed, 0.05)`，新片大小取\"当前值\"与\"按比例算出的目标值\"的中点（阻尼调整，避免噪声下来回振荡），再钳制在 `[minItems, maxItems]` 之内。"
             },
             {
               "name": "maxItems",
               "type": "number",
               "optional": true,
               "description": "Q：大数据导出还是卡主线程。 检查 `encodeStream`/`sliceByFrameBudget` 的 `yieldTo` 是否被覆盖成了同步函数，或者 `maxItems`/`initialItems` 是否设置得过大导致首片就超出预算太多——自适应算法需要几轮才能收敛到合适的片大小，极端参数会削弱这个自适应过程的效果。",
-              "descriptionEn": "",
+              "descriptionEn": "Maximum slice size to limit how long one slice can occupy the main thread.",
               "descriptionZh": "Q：大数据导出还是卡主线程。 检查 `encodeStream`/`sliceByFrameBudget` 的 `yieldTo` 是否被覆盖成了同步函数，或者 `maxItems`/`initialItems` 是否设置得过大导致首片就超出预算太多——自适应算法需要几轮才能收敛到合适的片大小，极端参数会削弱这个自适应过程的效果。"
             },
             {
@@ -7038,7 +7038,7 @@
               "type": "number",
               "optional": true,
               "description": "Q：大数据导出还是卡主线程。 检查 `encodeStream`/`sliceByFrameBudget` 的 `yieldTo` 是否被覆盖成了同步函数，或者 `maxItems`/`initialItems` 是否设置得过大导致首片就超出预算太多——自适应算法需要几轮才能收敛到合适的片大小，极端参数会削弱这个自适应过程的效果。",
-              "descriptionEn": "",
+              "descriptionEn": "Conservative initial slice size to reduce the risk of exceeding the first frame budget.",
               "descriptionZh": "Q：大数据导出还是卡主线程。 检查 `encodeStream`/`sliceByFrameBudget` 的 `yieldTo` 是否被覆盖成了同步函数，或者 `maxItems`/`initialItems` 是否设置得过大导致首片就超出预算太多——自适应算法需要几轮才能收敛到合适的片大小，极端参数会削弱这个自适应过程的效果。"
             },
             {
@@ -7046,7 +7046,7 @@
               "type": "() => Promise<void>",
               "optional": true,
               "description": "Q：大数据导出还是卡主线程。 检查 `encodeStream`/`sliceByFrameBudget` 的 `yieldTo` 是否被覆盖成了同步函数，或者 `maxItems`/`initialItems` 是否设置得过大导致首片就超出预算太多——自适应算法需要几轮才能收敛到合适的片大小，极端参数会削弱这个自适应过程的效果。",
-              "descriptionEn": "",
+              "descriptionEn": "Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield.",
               "descriptionZh": "Q：大数据导出还是卡主线程。 检查 `encodeStream`/`sliceByFrameBudget` 的 `yieldTo` 是否被覆盖成了同步函数，或者 `maxItems`/`initialItems` 是否设置得过大导致首片就超出预算太多——自适应算法需要几轮才能收敛到合适的片大小，极端参数会削弱这个自适应过程的效果。"
             },
             {
@@ -7062,7 +7062,7 @@
               "type": "IScheduler",
               "optional": false,
               "description": "`options`（含继承自 `IFrameBudgetOptions` 的 `scheduler`）同样是必填参数。与 `registry.encode()` 的区别：`registry.encode()` 会把所有分段合并成一整块返回，适合\"最终要一个完整 blob\"的场景；`encodeStream()` 面向落 IndexedDB、写文件、发 fetch body 这类能逐片消费的下游——拼装反而会白白制造一次全量大对象的峰值内存。",
-              "descriptionEn": "",
+              "descriptionEn": "Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`.",
               "descriptionZh": "`options`（含继承自 `IFrameBudgetOptions` 的 `scheduler`）同样是必填参数。与 `registry.encode()` 的区别：`registry.encode()` 会把所有分段合并成一整块返回，适合\"最终要一个完整 blob\"的场景；`encodeStream()` 面向落 IndexedDB、写文件、发 fetch body 这类能逐片消费的下游——拼装反而会白白制造一次全量大对象的峰值内存。"
             }
           ],
@@ -7072,7 +7072,7 @@
           "name": "ICollectStreamOptions",
           "kind": "type",
           "signature": "export type ICollectStreamOptions = { readonly signal?: IAbortSignal; /** Chooses whether an empty stream returns empty text or rejects; defaults to `text`. */ readonly empty?: 'text' | 'reject'; readonly context?: string; };",
-          "declarationLine": 47,
+          "declarationLine": 59,
           "source": "packages/serialize/dist/stream.d.ts",
           "purpose": "Captured policy for one collector operation; getters are read before iterator acquisition.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICollectStreamOptions.",
@@ -7135,8 +7135,8 @@
         {
           "name": "IEncodeStreamOptions",
           "kind": "type",
-          "signature": "export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** 同时在途的请求数上限，即背压。默认 1：编好一片就等它落地再编下一片， 峰值内存只有一片。调高可以让编码与 worker 处理重叠，代价是峰值内存翻倍。 */ readonly maxInFlight?: number; };",
-          "declarationLine": 40,
+          "signature": "export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** * Backpressure limit for concurrent requests. Defaults to 1, waiting for each encoded slice * before encoding the next. Only one slice is in flight at that setting. Higher limits overlap * encoding with worker processing at the cost of retaining more slices in memory. */ readonly maxInFlight?: number; };",
+          "declarationLine": 48,
           "source": "packages/serialize/dist/stream.d.ts",
           "purpose": "IEncodeStreamOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEncodeStreamOptions.",
@@ -7155,7 +7155,7 @@
           "aliasOf": "IEncodeStreamOptions",
           "exportPath": "./core",
           "overloadSignatures": [
-            "export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** 同时在途的请求数上限，即背压。默认 1：编好一片就等它落地再编下一片， 峰值内存只有一片。调高可以让编码与 worker 处理重叠，代价是峰值内存翻倍。 */ readonly maxInFlight?: number; };"
+            "export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** * Backpressure limit for concurrent requests. Defaults to 1, waiting for each encoded slice * before encoding the next. Only one slice is in flight at that setting. Higher limits overlap * encoding with worker processing at the cost of retaining more slices in memory. */ readonly maxInFlight?: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7194,7 +7194,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/stream.d.ts:IEncodeStreamOptions:export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** 同时在途的请求数上限，即背压。默认 1：编好一片就等它落地再编下一片， 峰值内存只有一片。调高可以让编码与 worker 处理重叠，代价是峰值内存翻倍。 */ readonly maxInFlight?: number; };",
+          "identity": "packages/serialize/dist/stream.d.ts:IEncodeStreamOptions:export type IEncodeStreamOptions = IFrameBudgetOptions & { readonly type?: string; readonly context?: string; /** * Backpressure limit for concurrent requests. Defaults to 1, waiting for each encoded slice * before encoding the next. Only one slice is in flight at that setting. Higher limits overlap * encoding with worker processing at the cost of retaining more slices in memory. */ readonly maxInFlight?: number; };",
           "guidance": [],
           "usageScore": 34,
           "configuration": [],
@@ -7203,10 +7203,10 @@
         {
           "name": "IFrameBudgetOptions",
           "kind": "type",
-          "signature": "export type IFrameBudgetOptions = { /** 每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。 */ readonly targetMs?: number; /** 片大小下界，防止把开销摊成纯消息成本。 */ readonly minItems?: number; /** 片大小上界，防止首片就把主线程占死。 */ readonly maxItems?: number; /** 首片大小。太大则第一片必然超预算，所以刻意保守。 */ readonly initialItems?: number; /** * 让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或 * requestIdleCallback（更保守）。 */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主 * `setTimeout`/`performance`/`Date.now`）。 */ readonly scheduler: IScheduler; };",
-          "declarationLine": 13,
+          "signature": "export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
+          "declarationLine": 17,
           "source": "packages/serialize/dist/stream.d.ts",
-          "purpose": "帧预算切片。 实测（100 万条 → worker）：整包一次性编码会连续占住主线程 237ms，约合掉 14 帧； 切成 5 万条一片、片间让出后，最长单次阻塞降到 14.2ms —— 压在 60fps 的 16.7ms 预算之内，一帧不掉，墙钟还快了 37%。但切过头同样有害：1 万条一片时最长阻塞 只有 3.1ms，可 100 次让出的固定开销把墙钟顶回了整包水平。 所以片大小不能按字节数写死，得按**实测耗时**反推。这里的做法是让生成器在 yield 之后挂起，消费者取下一片时才恢复——挂起与恢复之间的时差正好等于消费者 处理这一片的真实耗时，据此调整下一片。",
+          "purpose": "IFrameBudgetOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFrameBudgetOptions.",
           "advanced": "No additional advanced behavior is declared for IFrameBudgetOptions.",
           "parameters": ["This type declaration has no parameters."],
@@ -7224,7 +7224,7 @@
           "aliasOf": "IFrameBudgetOptions",
           "exportPath": "./core",
           "overloadSignatures": [
-            "export type IFrameBudgetOptions = { /** 每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。 */ readonly targetMs?: number; /** 片大小下界，防止把开销摊成纯消息成本。 */ readonly minItems?: number; /** 片大小上界，防止首片就把主线程占死。 */ readonly maxItems?: number; /** 首片大小。太大则第一片必然超预算，所以刻意保守。 */ readonly initialItems?: number; /** * 让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或 * requestIdleCallback（更保守）。 */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主 * `setTimeout`/`performance`/`Date.now`）。 */ readonly scheduler: IScheduler; };"
+            "export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7234,7 +7234,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "帧预算切片。 实测（100 万条 → worker）：整包一次性编码会连续占住主线程 237ms，约合掉 14 帧； 切成 5 万条一片、片间让出后，最长单次阻塞降到 14.2ms —— 压在 60fps 的 16.7ms 预算之内，一帧不掉，墙钟还快了 37%。但切过头同样有害：1 万条一片时最长阻塞 只有 3.1ms，可 100 次让出的固定开销把墙钟顶回了整包水平。 所以片大小不能按字节数写死，得按**实测耗时**反推。这里的做法是让生成器在 yield 之后挂起，消费者取下一片时才恢复——挂起与恢复之间的时差正好等于消费者 处理这一片的真实耗时，据此调整下一片。"
+              "content": "IFrameBudgetOptions is part of this module's public type contract."
             },
             {
               "id": "getting-started",
@@ -7263,7 +7263,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/stream.d.ts:IFrameBudgetOptions:export type IFrameBudgetOptions = { /** 每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。 */ readonly targetMs?: number; /** 片大小下界，防止把开销摊成纯消息成本。 */ readonly minItems?: number; /** 片大小上界，防止首片就把主线程占死。 */ readonly maxItems?: number; /** 首片大小。太大则第一片必然超预算，所以刻意保守。 */ readonly initialItems?: number; /** * 让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或 * requestIdleCallback（更保守）。 */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主 * `setTimeout`/`performance`/`Date.now`）。 */ readonly scheduler: IScheduler; };",
+          "identity": "packages/serialize/dist/stream.d.ts:IFrameBudgetOptions:export type IFrameBudgetOptions = { /** * Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work. */ readonly targetMs?: number; /** Minimum slice size to keep per-message overhead from dominating processing. */ readonly minItems?: number; /** Maximum slice size to limit how long one slice can occupy the main thread. */ readonly maxItems?: number; /** Conservative initial slice size to reduce the risk of exceeding the first frame budget. */ readonly initialItems?: number; /** * Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield. */ readonly yieldTo?: () => Promise<void>; readonly signal?: IAbortSignal; /** * Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`. */ readonly scheduler: IScheduler; };",
           "guidance": [],
           "usageScore": 48,
           "configuration": [],
@@ -7273,9 +7273,9 @@
           "name": "isChunkShape",
           "kind": "const",
           "signature": "export declare const isChunkShape: (value: unknown) => value is ISerializeChunk;",
-          "declarationLine": 53,
+          "declarationLine": 71,
           "source": "packages/serialize/dist/types.d.ts",
-          "purpose": "判定一个值是「单段」还是「多段容器」。 二者都是数组，必须靠首元素消歧：单段的首元素是形态标签字符串，多段容器的首 元素是另一个分段（数组）。这里刻意只查 typeof 而不查标签是否合法——非法标签 要落到 validateSerializeChunk 里报出精确原因，而不是在这里被误判成多段容器。",
+          "purpose": "Distinguishes one chunk from a container of chunks. Both are arrays. A chunk begins with a kind string; a container begins with another chunk array. This checks the string shape without validating the tag. Invalid tags reach `validateSerializeChunk` for precise diagnostics instead of being mistaken for a container.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isChunkShape.",
           "advanced": "No additional advanced behavior is declared for isChunkShape.",
           "parameters": ["This const declaration has no parameters."],
@@ -7304,7 +7304,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "判定一个值是「单段」还是「多段容器」。 二者都是数组，必须靠首元素消歧：单段的首元素是形态标签字符串，多段容器的首 元素是另一个分段（数组）。这里刻意只查 typeof 而不查标签是否合法——非法标签 要落到 validateSerializeChunk 里报出精确原因，而不是在这里被误判成多段容器。"
+              "content": "Distinguishes one chunk from a container of chunks. Both are arrays. A chunk begins with a kind string; a container begins with another chunk array. This checks the string shape without validating the tag. Invalid tags reach `validateSerializeChunk` for precise diagnostics instead of being mistaken for a container."
             },
             {
               "id": "getting-started",
@@ -7343,9 +7343,9 @@
           "name": "ISerializeChunk",
           "kind": "type",
           "signature": "export type ISerializeChunk = readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown];",
-          "declarationLine": 14,
+          "declarationLine": 17,
           "source": "packages/serialize/dist/types.d.ts",
-          "purpose": "序列化分段协议。 每一段都自带形态标签，框架据此决定怎么把多段拼成完整结果——所以一次输出里 允许混用形态（例如先吐一段 text 头、再流式吐若干 bytes 体）。这是异步与流式 能力的落点：parser 可以返回单段、Promise、或异步可迭代对象。 三种形态各自的意义： text —— 字符串线材。落 localStorage、内联进 HTML 走这条。 bytes —— 字节线材。transfer 零拷贝、落 IndexedDB、喂 wasm 走这条。 value —— 已经是成品对象，不需要再解析。用于「直通」型 parser（例如 memory storage 或测试桩），避免为了走流程而做一次无谓的编解码往返。",
+          "purpose": "ISerializeChunk is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeChunk.",
           "advanced": "No additional advanced behavior is declared for ISerializeChunk.",
           "parameters": ["This type declaration has no parameters."],
@@ -7383,7 +7383,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "序列化分段协议。 每一段都自带形态标签，框架据此决定怎么把多段拼成完整结果——所以一次输出里 允许混用形态（例如先吐一段 text 头、再流式吐若干 bytes 体）。这是异步与流式 能力的落点：parser 可以返回单段、Promise、或异步可迭代对象。 三种形态各自的意义： text —— 字符串线材。落 localStorage、内联进 HTML 走这条。 bytes —— 字节线材。transfer 零拷贝、落 IndexedDB、喂 wasm 走这条。 value —— 已经是成品对象，不需要再解析。用于「直通」型 parser（例如 memory storage 或测试桩），避免为了走流程而做一次无谓的编解码往返。"
+              "content": "ISerializeChunk is part of this module's public type contract."
             },
             {
               "id": "getting-started",
@@ -7422,7 +7422,7 @@
           "name": "ISerializeChunkType",
           "kind": "type",
           "signature": "export type ISerializeChunkType = ISerializeChunk[0];",
-          "declarationLine": 15,
+          "declarationLine": 18,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "ISerializeChunkType is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeChunkType.",
@@ -7486,8 +7486,8 @@
         {
           "name": "ISerializeContext",
           "kind": "type",
-          "signature": "export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。 */ readonly signal: IAbortSignal; /** 出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。 */ readonly context: string; };",
-          "declarationLine": 16,
+          "signature": "export type ISerializeContext = { /** * Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and * discards the eventual result. */ readonly signal: IAbortSignal; /** Included in failure messages to identify the affected store or key. */ readonly context: string; };",
+          "declarationLine": 19,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "ISerializeContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeContext.",
@@ -7508,7 +7508,7 @@
           "aliasOf": "ISerializeContext",
           "exportPath": "./core",
           "overloadSignatures": [
-            "export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。 */ readonly signal: IAbortSignal; /** 出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。 */ readonly context: string; };"
+            "export type ISerializeContext = { /** * Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and * discards the eventual result. */ readonly signal: IAbortSignal; /** Included in failure messages to identify the affected store or key. */ readonly context: string; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7547,7 +7547,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeContext:export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。 */ readonly signal: IAbortSignal; /** 出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。 */ readonly context: string; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeContext:export type ISerializeContext = { /** * Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and * discards the eventual result. */ readonly signal: IAbortSignal; /** Included in failure messages to identify the affected store or key. */ readonly context: string; };",
           "guidance": [],
           "usageScore": 58,
           "configuration": [],
@@ -7557,9 +7557,9 @@
           "name": "ISerializeLifecycleError",
           "kind": "type",
           "signature": "export type ISerializeLifecycleError = ISerializeTaggedError<Error> & { readonly errors?: readonly unknown[]; };",
-          "declarationLine": 79,
+          "declarationLine": 85,
           "source": "packages/serialize/dist/errors.d.ts",
-          "purpose": "构造/生命周期错误的 tagged 原生 Error（`cause` 继承自 `Error`，另含 `errors`）。",
+          "purpose": "Tagged native error for construction and lifecycle failures. Inherits `cause` from `Error` and can carry `errors`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeLifecycleError.",
           "advanced": "No additional advanced behavior is declared for ISerializeLifecycleError.",
           "parameters": ["This type declaration has no parameters."],
@@ -7586,7 +7586,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "构造/生命周期错误的 tagged 原生 Error（`cause` 继承自 `Error`，另含 `errors`）。"
+              "content": "Tagged native error for construction and lifecycle failures. Inherits `cause` from `Error` and can carry `errors`."
             },
             {
               "id": "getting-started",
@@ -7679,7 +7679,7 @@
           "name": "ISerializeOutput",
           "kind": "type",
           "signature": "export type ISerializeOutput = ISerializeChunk | Promise<ISerializeChunk> | Iterable<ISerializeChunk> | AsyncIterable<ISerializeChunk>;",
-          "declarationLine": 22,
+          "declarationLine": 28,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "ISerializeOutput is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeOutput.",
@@ -7746,10 +7746,10 @@
         {
           "name": "ISerializeParser",
           "kind": "type",
-          "signature": "export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** 释放 parser 自己持有的资源（worker 端口、wasm 句柄等）。异步释放时返回 Promise，框架会 await。 */ dispose?(): void | Promise<void>; };",
-          "declarationLine": 24,
+          "signature": "export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** * Releases parser-owned resources such as worker ports or Wasm handles. Return a Promise for * asynchronous release; the framework awaits it. */ dispose?(): void | Promise<void>; };",
+          "declarationLine": 33,
           "source": "packages/serialize/dist/types.d.ts",
-          "purpose": "一个具体的编解码实现。同步实现直接返回非 Promise 值即可——框架不会为同步路径 额外制造微任务。",
+          "purpose": "Parser implementation. Synchronous implementations return values directly without creating their own Promises or extra microtasks.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeParser.",
           "advanced": "No additional advanced behavior is declared for ISerializeParser.",
           "parameters": ["This type declaration has no parameters."],
@@ -7771,7 +7771,7 @@
           "aliasOf": "ISerializeParser",
           "exportPath": "./core",
           "overloadSignatures": [
-            "export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** 释放 parser 自己持有的资源（worker 端口、wasm 句柄等）。异步释放时返回 Promise，框架会 await。 */ dispose?(): void | Promise<void>; };"
+            "export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** * Releases parser-owned resources such as worker ports or Wasm handles. Return a Promise for * asynchronous release; the framework awaits it. */ dispose?(): void | Promise<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7781,7 +7781,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "一个具体的编解码实现。同步实现直接返回非 Promise 值即可——框架不会为同步路径 额外制造微任务。"
+              "content": "Parser implementation. Synchronous implementations return values directly without creating their own Promises or extra microtasks."
             },
             {
               "id": "getting-started",
@@ -7810,7 +7810,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeParser:export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** 释放 parser 自己持有的资源（worker 端口、wasm 句柄等）。异步释放时返回 Promise，框架会 await。 */ dispose?(): void | Promise<void>; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeParser:export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** * Releases parser-owned resources such as worker ports or Wasm handles. Return a Promise for * asynchronous release; the framework awaits it. */ dispose?(): void | Promise<void>; };",
           "guidance": [
             {
               "id": "3-1-createserializeregistry-与-iserializeregistryoptions",
@@ -7891,7 +7891,7 @@
           "name": "ISerializePhase",
           "kind": "type",
           "signature": "export type ISerializePhase = (typeof SerializePhase)[keyof typeof SerializePhase];",
-          "declarationLine": 36,
+          "declarationLine": 51,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "ISerializePhase is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializePhase.",
@@ -7959,9 +7959,9 @@
           "name": "ISerializePlugin",
           "kind": "type",
           "signature": "export type ISerializePlugin = { readonly type: string; readonly parser: ISerializeParser; };",
-          "declarationLine": 32,
+          "declarationLine": 47,
           "source": "packages/serialize/dist/types.d.ts",
-          "purpose": "注册项。`type` 是写进信封的格式标签，读取时据此找回对应 parser——因此同一份 存档可以用旧格式读、用新格式写，格式迁移不需要清空用户数据。",
+          "purpose": "Registers a parser under an envelope format tag. Reads can use older registered formats while new writes use a new format without clearing data.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializePlugin.",
           "advanced": "No additional advanced behavior is declared for ISerializePlugin.",
           "parameters": ["This type declaration has no parameters."],
@@ -7992,7 +7992,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "注册项。`type` 是写进信封的格式标签，读取时据此找回对应 parser——因此同一份 存档可以用旧格式读、用新格式写，格式迁移不需要清空用户数据。"
+              "content": "Registers a parser under an envelope format tag. Reads can use older registered formats while new writes use a new format without clearing data."
             },
             {
               "id": "getting-started",
@@ -8102,7 +8102,7 @@
           "name": "ISerializeRangeError",
           "kind": "type",
           "signature": "export type ISerializeRangeError = ISerializeTaggedError<RangeError>;",
-          "declarationLine": 77,
+          "declarationLine": 80,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "ISerializeRangeError is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeRangeError.",
@@ -8223,8 +8223,8 @@
         {
           "name": "ISerializeRegistry",
           "kind": "type",
-          "signature": "export type ISerializeRegistry = { /** 写入使用的格式：插件数组的第一项。 */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** 同步：拒绝新请求并 abort 内部 closing controller；幂等；不调用 parser disposer。 */ close(): void; /** 异步：隐含先 close()；等待在途结算或到达 deadlineAt 后同步释放 parser；幂等复用同一 promise，首次调用冻结 deadlineAt。 */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
-          "declarationLine": 111,
+          "signature": "export type ISerializeRegistry = { /** Default write format, taken from the first registered plugin. */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** * Synchronously rejects new requests and aborts the internal closing controller. Idempotent and * never invokes parser disposers. */ close(): void; /** * Closes first, then drains pending work until settlement or `deadlineAt` before awaiting parser * cleanup. Repeated calls share the same Promise. The first admitted call fixes `deadlineAt`. */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
+          "declarationLine": 136,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "ISerializeRegistry is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeRegistry.",
@@ -8248,7 +8248,7 @@
           "aliasOf": "ISerializeRegistry",
           "exportPath": "./core",
           "overloadSignatures": [
-            "export type ISerializeRegistry = { /** 写入使用的格式：插件数组的第一项。 */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** 同步：拒绝新请求并 abort 内部 closing controller；幂等；不调用 parser disposer。 */ close(): void; /** 异步：隐含先 close()；等待在途结算或到达 deadlineAt 后同步释放 parser；幂等复用同一 promise，首次调用冻结 deadlineAt。 */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };"
+            "export type ISerializeRegistry = { /** Default write format, taken from the first registered plugin. */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** * Synchronously rejects new requests and aborts the internal closing controller. Idempotent and * never invokes parser disposers. */ close(): void; /** * Closes first, then drains pending work until settlement or `deadlineAt` before awaiting parser * cleanup. Repeated calls share the same Promise. The first admitted call fixes `deadlineAt`. */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8287,7 +8287,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistry:export type ISerializeRegistry = { /** 写入使用的格式：插件数组的第一项。 */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** 同步：拒绝新请求并 abort 内部 closing controller；幂等；不调用 parser disposer。 */ close(): void; /** 异步：隐含先 close()；等待在途结算或到达 deadlineAt 后同步释放 parser；幂等复用同一 promise，首次调用冻结 deadlineAt。 */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistry:export type ISerializeRegistry = { /** Default write format, taken from the first registered plugin. */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** * Synchronously rejects new requests and aborts the internal closing controller. Idempotent and * never invokes parser disposers. */ close(): void; /** * Closes first, then drains pending work until settlement or `deadlineAt` before awaiting parser * cleanup. Repeated calls share the same Promise. The first admitted call fixes `deadlineAt`. */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
           "guidance": [
             {
               "id": "3-1-createserializeregistry-与-iserializeregistryoptions",
@@ -8368,9 +8368,9 @@
           "name": "ISerializeTaggedError",
           "kind": "type",
           "signature": "export type ISerializeTaggedError<TError extends Error> = TError & { readonly source: string; readonly code: ISerializeErrorCode; readonly context?: string; };",
-          "declarationLine": 71,
+          "declarationLine": 74,
           "source": "packages/serialize/dist/errors.d.ts",
-          "purpose": "结构化 tagged 错误：原生错误类型 `TError` 交叉附加 `source`/`code`/`context?`。运行时仍为 `TError`（`instanceof` 保持真）。",
+          "purpose": "Adds `source`, `code`, and optional `context` to a native error while retaining its runtime type and `instanceof` behavior.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeTaggedError.",
           "advanced": "No additional advanced behavior is declared for ISerializeTaggedError.",
           "parameters": ["This type declaration has no parameters."],
@@ -8397,7 +8397,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "结构化 tagged 错误：原生错误类型 `TError` 交叉附加 `source`/`code`/`context?`。运行时仍为 `TError`（`instanceof` 保持真）。"
+              "content": "Adds `source`, `code`, and optional `context` to a native error while retaining its runtime type and `instanceof` behavior."
             },
             {
               "id": "getting-started",
@@ -8490,7 +8490,7 @@
           "name": "ISerializeTypeError",
           "kind": "type",
           "signature": "export type ISerializeTypeError = ISerializeTaggedError<TypeError>;",
-          "declarationLine": 76,
+          "declarationLine": 79,
           "source": "packages/serialize/dist/errors.d.ts",
           "purpose": "ISerializeTypeError is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeTypeError.",
@@ -8612,7 +8612,7 @@
           "name": "ITextDecoder",
           "kind": "type",
           "signature": "export type ITextDecoder = { decode(input: Uint8Array): string; };",
-          "declarationLine": 108,
+          "declarationLine": 133,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "ITextDecoder is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITextDecoder.",
@@ -8754,9 +8754,9 @@
           "name": "ITextEncoder",
           "kind": "type",
           "signature": "export type ITextEncoder = { encode(input: string): Uint8Array; };",
-          "declarationLine": 105,
+          "declarationLine": 130,
           "source": "packages/serialize/dist/types.d.ts",
-          "purpose": "结构化 Encoding API（`TextEncoder`/`TextDecoder` 鸭子类型），供 core/plugins/registry 注入使用。",
+          "purpose": "Structural Encoding API capability injected into core, plugins, and registry without requiring concrete host classes.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITextEncoder.",
           "advanced": "No additional advanced behavior is declared for ITextEncoder.",
           "parameters": ["This type declaration has no parameters."],
@@ -8786,7 +8786,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "结构化 Encoding API（`TextEncoder`/`TextDecoder` 鸭子类型），供 core/plugins/registry 注入使用。"
+              "content": "Structural Encoding API capability injected into core, plugins, and registry without requiring concrete host classes."
             },
             {
               "id": "getting-started",
@@ -8898,7 +8898,7 @@
           "signature": "export declare const SERIALIZE_SOURCE: \"@migaia/serialize\";",
           "declarationLine": 4,
           "source": "packages/serialize/dist/errors.d.ts",
-          "purpose": "错误 `source` 的唯一字面量来源；禁止各处手写 `'@migaia/serialize'` 字符串。",
+          "purpose": "The single literal source for error `source`. Throw sites do not repeat `'@migaia/serialize'`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SERIALIZE_SOURCE.",
           "advanced": "No additional advanced behavior is declared for SERIALIZE_SOURCE.",
           "parameters": ["This const declaration has no parameters."],
@@ -8924,7 +8924,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "错误 `source` 的唯一字面量来源；禁止各处手写 `'@migaia/serialize'` 字符串。"
+              "content": "The single literal source for error `source`. Throw sites do not repeat `'@migaia/serialize'`."
             },
             {
               "id": "getting-started",
@@ -9017,9 +9017,9 @@
           "name": "SERIALIZE_TYPE_PATTERN",
           "kind": "const",
           "signature": "export declare const SERIALIZE_TYPE_PATTERN: RegExp;",
-          "declarationLine": 45,
+          "declarationLine": 62,
           "source": "packages/serialize/dist/types.d.ts",
-          "purpose": "插件 type 的合法字符集。 这个字符串会被写进两个对转义敏感的位置：SSR 的 `data-codec=\"...\"` HTML 属性， 以及 persist 存档头 `MW1|<type>|<t|b>|` 的分隔字段。引号能闭合属性、`>` 能闭合 标签、`|` 能撕裂信封解析——而 type 往往来自第三方插件包，属于不可信输入。 所以在注册这一关就收死，只放行 token 字符。写入点仍然做转义，两道防线。",
+          "purpose": "Allowed plugin `type` characters. The type enters the SSR `data-codec` HTML attribute and the persistence header `MW1|<type>|<t|b>|`. Quotes can close attributes, `>` can close tags, and `|` can break envelope parsing. Plugin types often come from untrusted third-party module. Registration accepts only token characters. Write sites also escape them, retaining both protections.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SERIALIZE_TYPE_PATTERN.",
           "advanced": "No additional advanced behavior is declared for SERIALIZE_TYPE_PATTERN.",
           "parameters": ["This const declaration has no parameters."],
@@ -9048,7 +9048,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "插件 type 的合法字符集。 这个字符串会被写进两个对转义敏感的位置：SSR 的 `data-codec=\"...\"` HTML 属性， 以及 persist 存档头 `MW1|<type>|<t|b>|` 的分隔字段。引号能闭合属性、`>` 能闭合 标签、`|` 能撕裂信封解析——而 type 往往来自第三方插件包，属于不可信输入。 所以在注册这一关就收死，只放行 token 字符。写入点仍然做转义，两道防线。"
+              "content": "Allowed plugin `type` characters. The type enters the SSR `data-codec` HTML attribute and the persistence header `MW1|<type>|<t|b>|`. Quotes can close attributes, `>` can close tags, and `|` can break envelope parsing. Plugin types often come from untrusted third-party module. Registration accepts only token characters. Write sites also escape them, retaining both protections."
             },
             {
               "id": "getting-started",
@@ -9157,15 +9157,15 @@
         {
           "name": "SerializeCodecError",
           "kind": "class",
-          "signature": "export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** 覆盖 `source`（默认 `@migaia/serialize`）供复用本类的上层包标自己的 source。 */ source?: string; cause?: unknown; }); }",
-          "declarationLine": 73,
+          "signature": "export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** * Overrides the default `@migaia/serialize` source when a higher-level module reuses this * error class. */ source?: string; cause?: unknown; }); }",
+          "declarationLine": 92,
           "source": "packages/serialize/dist/types.d.ts",
-          "purpose": "Encode/decode 错误（`CODEC_NOT_FOUND`/`ENCODE_FAILED`/`DECODE_FAILED`/`INVALID_CHUNK`/`ABORTED`）：携带 `type`/`phase`/`chunkIndex`/`bytesConsumed` 定位。构造/生命周期错误走 `createSerializeError`（tagged 原生 Error），不 new 本类。 `TCode` 默认收紧为 serialize 登记码 `ISerializeErrorCode`；复用本类的上层包（如 store-worker）可传自己的码联合覆盖 `code`。",
+          "purpose": "SerializeCodecError is part of this module's public class contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SerializeCodecError.",
           "advanced": "No additional advanced behavior is declared for SerializeCodecError.",
           "parameters": [
             "message: string",
-            "details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** 覆盖 `source`（默认 `@migaia/serialize`）供复用本类的上层包标自己的 source。 */ source?: string; cause?: unknown; }"
+            "details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** * Overrides the default `@migaia/serialize` source when a higher-level module reuses this * error class. */ source?: string; cause?: unknown; }"
           ],
           "parameterDetails": [
             {
@@ -9175,7 +9175,7 @@
             },
             {
               "name": "details",
-              "type": "{ code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** 覆盖 `source`（默认 `@migaia/serialize`）供复用本类的上层包标自己的 source。 */ source?: string; cause?: unknown; }",
+              "type": "{ code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** * Overrides the default `@migaia/serialize` source when a higher-level package reuses this * error class. */ source?: string; cause?: unknown; }",
               "optional": false
             }
           ],
@@ -9244,7 +9244,7 @@
           "aliasOf": "SerializeCodecError",
           "exportPath": "./core",
           "overloadSignatures": [
-            "export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** 覆盖 `source`（默认 `@migaia/serialize`）供复用本类的上层包标自己的 source。 */ source?: string; cause?: unknown; }); }"
+            "export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** * Overrides the default `@migaia/serialize` source when a higher-level module reuses this * error class. */ source?: string; cause?: unknown; }); }"
           ],
           "overloadParameterDetails": [
             [
@@ -9255,7 +9255,7 @@
               },
               {
                 "name": "details",
-                "type": "{ code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** 覆盖 `source`（默认 `@migaia/serialize`）供复用本类的上层包标自己的 source。 */ source?: string; cause?: unknown; }",
+                "type": "{ code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** * Overrides the default `@migaia/serialize` source when a higher-level package reuses this * error class. */ source?: string; cause?: unknown; }",
                 "optional": false
               }
             ]
@@ -9267,7 +9267,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Encode/decode 错误（`CODEC_NOT_FOUND`/`ENCODE_FAILED`/`DECODE_FAILED`/`INVALID_CHUNK`/`ABORTED`）：携带 `type`/`phase`/`chunkIndex`/`bytesConsumed` 定位。构造/生命周期错误走 `createSerializeError`（tagged 原生 Error），不 new 本类。 `TCode` 默认收紧为 serialize 登记码 `ISerializeErrorCode`；复用本类的上层包（如 store-worker）可传自己的码联合覆盖 `code`。"
+              "content": "SerializeCodecError is part of this module's public class contract."
             },
             {
               "id": "getting-started",
@@ -9296,7 +9296,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/types.d.ts:SerializeCodecError:export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** 覆盖 `source`（默认 `@migaia/serialize`）供复用本类的上层包标自己的 source。 */ source?: string; cause?: unknown; }); }",
+          "identity": "packages/serialize/dist/types.d.ts:SerializeCodecError:export declare class SerializeCodecError<TCode extends string = ISerializeErrorCode> extends Error { readonly source: string; readonly code: TCode; readonly context?: string; readonly type: string; readonly phase: ISerializePhase; readonly chunkIndex: number; readonly bytesConsumed: number; constructor(message: string, details: { code: TCode; type: string; phase: ISerializePhase; chunkIndex: number; bytesConsumed: number; context?: string; /** * Overrides the default `@migaia/serialize` source when a higher-level package reuses this * error class. */ source?: string; cause?: unknown; }); }",
           "guidance": [
             {
               "id": "4-错误体系-serializecodecerror-与-tagged-原生错误",
@@ -9580,9 +9580,9 @@
           "name": "sliceByFrameBudget",
           "kind": "function",
           "signature": "export declare function sliceByFrameBudget<T>(items: readonly T[], options: IFrameBudgetOptions): AsyncGenerator<readonly T[], void, undefined>;",
-          "declarationLine": 39,
+          "declarationLine": 47,
           "source": "packages/serialize/dist/stream.d.ts",
-          "purpose": "按帧预算把一个大数组切成若干片，片间让出主线程。 用法是 `for await (const slice of sliceByFrameBudget(rows))`，循环体里做实际 工作——那段耗时会被自动量到，用来定下一片的大小。",
+          "purpose": "Slices a large array to fit a frame budget and yields the main thread between slices. Use `for await (const slice of sliceByFrameBudget(rows, { scheduler }))` and process each slice in the loop. The generator measures that processing time to choose the next slice size.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for sliceByFrameBudget.",
           "advanced": "No additional advanced behavior is declared for sliceByFrameBudget.",
           "parameters": ["items: readonly T[]", "options: IFrameBudgetOptions"],
@@ -9629,7 +9629,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "按帧预算把一个大数组切成若干片，片间让出主线程。 用法是 `for await (const slice of sliceByFrameBudget(rows))`，循环体里做实际 工作——那段耗时会被自动量到，用来定下一片的大小。"
+              "content": "Slices a large array to fit a frame budget and yields the main thread between slices. Use `for await (const slice of sliceByFrameBudget(rows, { scheduler }))` and process each slice in the loop. The generator measures that processing time to choose the next slice size."
             },
             {
               "id": "getting-started",
@@ -9662,43 +9662,43 @@
               "name": "targetMs",
               "type": "number",
               "optional": true,
-              "description": "每片目标耗时。默认 8ms：60fps 一帧 16.7ms，留一半余量给渲染与其他任务， 免得刚好卡在预算边缘时被别的工作顶出去。"
+              "description": "Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work."
             },
             {
               "name": "minItems",
               "type": "number",
               "optional": true,
-              "description": "片大小下界，防止把开销摊成纯消息成本。"
+              "description": "Minimum slice size to keep per-message overhead from dominating processing."
             },
             {
               "name": "maxItems",
               "type": "number",
               "optional": true,
-              "description": "片大小上界，防止首片就把主线程占死。"
+              "description": "Maximum slice size to limit how long one slice can occupy the main thread."
             },
             {
               "name": "initialItems",
               "type": "number",
               "optional": true,
-              "description": "首片大小。太大则第一片必然超预算，所以刻意保守。"
+              "description": "Conservative initial slice size to reduce the risk of exceeding the first frame budget."
             },
             {
               "name": "yieldTo",
               "type": "() => Promise<void>",
               "optional": true,
-              "description": "让出方式。缺省用 `scheduler.schedule(resolve, 0)`；可换成 `scheduler.yield()`（更精确）或 * requestIdleCallback（更保守）。"
+              "description": "Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield."
             },
             {
               "name": "signal",
               "type": "IAbortSignal",
               "optional": true,
-              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** 序列化分段协议。 每一段都自带形态标签，框架据此决定怎么把多段拼成完整结果——所以一次输出里 允许混用形态（例如先吐一段 text 头、再流式吐若干 bytes 体）。这是异步与流式 能力的落点：parser 可以返回单段、Promise、或异步可迭代对象。 三种形态各自的意义： text —— 字符串线材。落 localStorage、内联进 HTML 走这条。 bytes —— 字节线材。transfer 零拷贝、落 IndexedDB、喂 wasm 走这条。 value —— 已经是成品对象，不需要再解析。用于「直通」型 parser（例如 memory storage 或测试桩），避免为了走流程而做一次无谓的编解码往返。 / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。"
+              "description": "结构化取消信号：只描述 `AbortSignal` 用到的那部分形状，不依赖 DOM lib.d.ts—— 这个包要在 Deno/Bun/小程序等不一定有全局 `AbortSignal` 类型的运行时里可用。 故意在这里复制一份而不是从 `@migaia/rpc/core` 里借用同名类型：serialize 是 store-persist/store-ssr/store-worker 依赖的底层 codec 原语，而 RPC core 是更上层的传输层；反向依赖会倒置层次，也会让只需要 codec 的消费者被迫依赖整个 RPC 包。 / import { SERIALIZE_SOURCE, createSerializeRangeError, createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js' import { isUint8Array } from '@migaia/utils/bytes' import type { ISerializeErrorCode } from './error-code.js' import { SerializeChunkKind, SerializeCleanupKind, SerializeCleanupPolicy, SerializePhase } from './format-constants.js' /** Serialization chunk protocol. Each chunk carries a kind tag that controls assembly. One output can mix kinds, such as a text header followed by streamed byte chunks. Parsers can produce a single chunk, a Promise, or an async iterable. `text` carries wire text for localStorage or inline HTML. `bytes` carries wire bytes for zero-copy transfer, IndexedDB, or Wasm. `value` carries a complete object requiring no further parsing. Passthrough parsers, such as memory storage or test stubs, avoid an unnecessary encoding round trip. / export type ISerializeChunk = | readonly [typeof SerializeChunkKind.text, string] | readonly [typeof SerializeChunkKind.bytes, Uint8Array] | readonly [typeof SerializeChunkKind.value, unknown] export type ISerializeChunkType = ISerializeChunk[0] export type ISerializeContext = { /** Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and discards the eventual result."
             },
             {
               "name": "scheduler",
               "type": "IScheduler",
               "optional": false,
-              "description": "Runtime-neutral scheduler（**必填**，R-4：core 无默认 timer、不直接使用宿主 * `setTimeout`/`performance`/`Date.now`）。"
+              "description": "Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`."
             }
           ],
           "identity": "packages/serialize/dist/stream.d.ts:sliceByFrameBudget:export declare function sliceByFrameBudget<T>(items: readonly T[], options: IFrameBudgetOptions): AsyncGenerator<readonly T[], void, undefined>;",
@@ -9830,7 +9830,7 @@
               "type": "number",
               "optional": true,
               "description": "所以片大小不能按固定字节数写死，必须按实测耗时反推：生成器在 `yield` 之后挂起，消费者取下一片时才恢复，挂起与恢复之间的时差正好等于消费者处理这一片的真实耗时，据此调整下一片大小——`ratio = targetMs / max(elapsed, 0.05)`，新片大小取\"当前值\"与\"按比例算出的目标值\"的中点（阻尼调整，避免噪声下来回振荡），再钳制在 `[minItems, maxItems]` 之内。",
-              "descriptionEn": "",
+              "descriptionEn": "Target duration per slice. Defaults to 8 ms, leaving about half a 16.7 ms frame at 60 fps for * rendering and other work.",
               "descriptionZh": "所以片大小不能按固定字节数写死，必须按实测耗时反推：生成器在 `yield` 之后挂起，消费者取下一片时才恢复，挂起与恢复之间的时差正好等于消费者处理这一片的真实耗时，据此调整下一片大小——`ratio = targetMs / max(elapsed, 0.05)`，新片大小取\"当前值\"与\"按比例算出的目标值\"的中点（阻尼调整，避免噪声下来回振荡），再钳制在 `[minItems, maxItems]` 之内。"
             },
             {
@@ -9838,7 +9838,7 @@
               "type": "number",
               "optional": true,
               "description": "所以片大小不能按固定字节数写死，必须按实测耗时反推：生成器在 `yield` 之后挂起，消费者取下一片时才恢复，挂起与恢复之间的时差正好等于消费者处理这一片的真实耗时，据此调整下一片大小——`ratio = targetMs / max(elapsed, 0.05)`，新片大小取\"当前值\"与\"按比例算出的目标值\"的中点（阻尼调整，避免噪声下来回振荡），再钳制在 `[minItems, maxItems]` 之内。",
-              "descriptionEn": "",
+              "descriptionEn": "Minimum slice size to keep per-message overhead from dominating processing.",
               "descriptionZh": "所以片大小不能按固定字节数写死，必须按实测耗时反推：生成器在 `yield` 之后挂起，消费者取下一片时才恢复，挂起与恢复之间的时差正好等于消费者处理这一片的真实耗时，据此调整下一片大小——`ratio = targetMs / max(elapsed, 0.05)`，新片大小取\"当前值\"与\"按比例算出的目标值\"的中点（阻尼调整，避免噪声下来回振荡），再钳制在 `[minItems, maxItems]` 之内。"
             },
             {
@@ -9846,7 +9846,7 @@
               "type": "number",
               "optional": true,
               "description": "所以片大小不能按固定字节数写死，必须按实测耗时反推：生成器在 `yield` 之后挂起，消费者取下一片时才恢复，挂起与恢复之间的时差正好等于消费者处理这一片的真实耗时，据此调整下一片大小——`ratio = targetMs / max(elapsed, 0.05)`，新片大小取\"当前值\"与\"按比例算出的目标值\"的中点（阻尼调整，避免噪声下来回振荡），再钳制在 `[minItems, maxItems]` 之内。",
-              "descriptionEn": "",
+              "descriptionEn": "Maximum slice size to limit how long one slice can occupy the main thread.",
               "descriptionZh": "所以片大小不能按固定字节数写死，必须按实测耗时反推：生成器在 `yield` 之后挂起，消费者取下一片时才恢复，挂起与恢复之间的时差正好等于消费者处理这一片的真实耗时，据此调整下一片大小——`ratio = targetMs / max(elapsed, 0.05)`，新片大小取\"当前值\"与\"按比例算出的目标值\"的中点（阻尼调整，避免噪声下来回振荡），再钳制在 `[minItems, maxItems]` 之内。"
             },
             {
@@ -9854,7 +9854,7 @@
               "type": "number",
               "optional": true,
               "description": "`initialItems` — 首片大小；太大则第一片必然超预算，所以刻意保守",
-              "descriptionEn": "",
+              "descriptionEn": "Conservative initial slice size to reduce the risk of exceeding the first frame budget.",
               "descriptionZh": "`initialItems` — 首片大小；太大则第一片必然超预算，所以刻意保守"
             },
             {
@@ -9862,7 +9862,7 @@
               "type": "() => Promise<void>",
               "optional": true,
               "description": "`yieldTo` — 让出方式，省略时用 `scheduler.schedule(resolve, 0)`（内部自带信号感知，`signal` 在等待期间被 abort 会让这次让出立即以 `ABORTED` reject），可换成更精确/更保守的实现",
-              "descriptionEn": "",
+              "descriptionEn": "Yield mechanism. Defaults to `scheduler.schedule(resolve, 0)`. Can use `scheduler.yield()` for * finer scheduling or `requestIdleCallback` for a more conservative yield.",
               "descriptionZh": "`yieldTo` — 让出方式，省略时用 `scheduler.schedule(resolve, 0)`（内部自带信号感知，`signal` 在等待期间被 abort 会让这次让出立即以 `ABORTED` reject），可换成更精确/更保守的实现"
             },
             {
@@ -9878,7 +9878,7 @@
               "type": "IScheduler",
               "optional": false,
               "description": "`options` 本身是必填参数，因为 `scheduler` 没有默认值——`/core` 不假定任何宿主全局 timer，一律经 `scheduler` 注入（`setTimeout`/`performance.now`/`Date.now` 都不会被直接调用）。主入口/`/registry` 场景下通常传 `@migaia/utils/scheduler` 的 `systemScheduler`。",
-              "descriptionEn": "",
+              "descriptionEn": "Required runtime-neutral scheduler (R-4). Core has no default timer and never directly accesses * host `setTimeout`, `performance`, or `Date.now`.",
               "descriptionZh": "`options` 本身是必填参数，因为 `scheduler` 没有默认值——`/core` 不假定任何宿主全局 timer，一律经 `scheduler` 注入（`setTimeout`/`performance.now`/`Date.now` 都不会被直接调用）。主入口/`/registry` 场景下通常传 `@migaia/utils/scheduler` 的 `systemScheduler`。"
             }
           ],
@@ -9888,9 +9888,9 @@
           "name": "streamBase64Chunks",
           "kind": "function",
           "signature": "export declare function streamBase64Chunks(bytes: Uint8Array): Generator<string, void, void>;",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/serialize/dist/base64.d.ts",
-          "purpose": "逐片产出 base64 文本，供写入 sink（`WritableStream`、分块上传）的调用方——它永远不需要整份 base64 字符串一次成型。`bytesToBase64` 仍是「最终只要一个字符串」时的正确选择。",
+          "purpose": "Yields base64 text pieces to consumers that write to a sink, such as `WritableStream` or chunked upload. The full base64 string never needs to be assembled at once. Use `bytesToBase64` when the final consumer requires one string.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for streamBase64Chunks.",
           "advanced": "No additional advanced behavior is declared for streamBase64Chunks.",
           "parameters": ["bytes: Uint8Array"],
@@ -9929,7 +9929,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "逐片产出 base64 文本，供写入 sink（`WritableStream`、分块上传）的调用方——它永远不需要整份 base64 字符串一次成型。`bytesToBase64` 仍是「最终只要一个字符串」时的正确选择。"
+              "content": "Yields base64 text pieces to consumers that write to a sink, such as `WritableStream` or chunked upload. The full base64 string never needs to be assembled at once. Use `bytesToBase64` when the final consumer requires one string."
             },
             {
               "id": "getting-started",
@@ -9968,9 +9968,9 @@
           "name": "tagSerializeError",
           "kind": "function",
           "signature": "export declare function tagSerializeError<E extends Error>(error: E, code: ISerializeErrorCode, context?: string): ISerializeTaggedError<E>;",
-          "declarationLine": 88,
+          "declarationLine": 96,
           "source": "packages/serialize/dist/errors.d.ts",
-          "purpose": "只读附加 `source`/`code`（及可选 `context`），返回带字段的原对象：不重建、不替换、不覆盖 stack。 **幂等（方案 A）**：已标记且 `(source, code)` 一致 → 直接返回（`context` 仅在未定义时写入一次）；已标记但 `(source, code)` 不一致 → 抛 TypeError（不得静默改写，避免二次 `defineProperty` 触发 `configurable: false` 抛错）。",
+          "purpose": "Attaches read-only `source`, `code`, and optional `context` and returns the original error. Never rebuilds or replaces the error or overwrites its stack. Idempotent for matching `(source, code)`: returns the error and adds `context` only if not already defined. Conflicting identity throws a `TypeError` instead of silently rewriting immutable properties.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for tagSerializeError.",
           "advanced": "No additional advanced behavior is declared for tagSerializeError.",
           "parameters": ["error: E", "code: ISerializeErrorCode", "context: string (optional)"],
@@ -10027,7 +10027,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "只读附加 `source`/`code`（及可选 `context`），返回带字段的原对象：不重建、不替换、不覆盖 stack。 **幂等（方案 A）**：已标记且 `(source, code)` 一致 → 直接返回（`context` 仅在未定义时写入一次）；已标记但 `(source, code)` 不一致 → 抛 TypeError（不得静默改写，避免二次 `defineProperty` 触发 `configurable: false` 抛错）。"
+              "content": "Attaches read-only `source`, `code`, and optional `context` and returns the original error. Never rebuilds or replaces the error or overwrites its stack. Idempotent for matching `(source, code)`: returns the error and adds `context` only if not already defined. Conflicting identity throws a `TypeError` instead of silently rewriting immutable properties."
             },
             {
               "id": "getting-started",
@@ -10138,7 +10138,7 @@
         {
           "name": "IJsonPluginOptions",
           "kind": "type",
-          "signature": "export type IJsonPluginOptions = { /** 传给 JSON.stringify 的 replacer，用于裁剪不可序列化字段。 */ readonly replacer?: (key: string, value: unknown) => unknown; /** 传给 JSON.parse 的 reviver，用于还原 Date 之类的富类型。 */ readonly reviver?: (key: string, value: unknown) => unknown; /** 缩进。仅调试用——线上留空以免白白撑大体积。 */ readonly space?: number; /** 字节段解码器（Encoding 注入；省略时用宿主 `TextDecoder`，明确声明宿主 Encoding API）。 */ readonly decoder?: ITextDecoder; };",
+          "signature": "export type IJsonPluginOptions = { /** Passed to `JSON.stringify` to omit fields that cannot be serialized. */ readonly replacer?: (key: string, value: unknown) => unknown; /** Passed to `JSON.parse` to restore rich values such as dates. */ readonly reviver?: (key: string, value: unknown) => unknown; /** Debug indentation. Omit in production to avoid increasing payload size. */ readonly space?: number; /** * Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding * API. */ readonly decoder?: ITextDecoder; };",
           "declarationLine": 2,
           "source": "packages/serialize/dist/plugins/json.d.ts",
           "purpose": "IJsonPluginOptions is part of this module's public type contract.",
@@ -10158,7 +10158,7 @@
           "aliasOf": "IJsonPluginOptions",
           "exportPath": "./plugins",
           "overloadSignatures": [
-            "export type IJsonPluginOptions = { /** 传给 JSON.stringify 的 replacer，用于裁剪不可序列化字段。 */ readonly replacer?: (key: string, value: unknown) => unknown; /** 传给 JSON.parse 的 reviver，用于还原 Date 之类的富类型。 */ readonly reviver?: (key: string, value: unknown) => unknown; /** 缩进。仅调试用——线上留空以免白白撑大体积。 */ readonly space?: number; /** 字节段解码器（Encoding 注入；省略时用宿主 `TextDecoder`，明确声明宿主 Encoding API）。 */ readonly decoder?: ITextDecoder; };"
+            "export type IJsonPluginOptions = { /** Passed to `JSON.stringify` to omit fields that cannot be serialized. */ readonly replacer?: (key: string, value: unknown) => unknown; /** Passed to `JSON.parse` to restore rich values such as dates. */ readonly reviver?: (key: string, value: unknown) => unknown; /** Debug indentation. Omit in production to avoid increasing payload size. */ readonly space?: number; /** * Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding * API. */ readonly decoder?: ITextDecoder; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10197,7 +10197,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/plugins/json.d.ts:IJsonPluginOptions:export type IJsonPluginOptions = { /** 传给 JSON.stringify 的 replacer，用于裁剪不可序列化字段。 */ readonly replacer?: (key: string, value: unknown) => unknown; /** 传给 JSON.parse 的 reviver，用于还原 Date 之类的富类型。 */ readonly reviver?: (key: string, value: unknown) => unknown; /** 缩进。仅调试用——线上留空以免白白撑大体积。 */ readonly space?: number; /** 字节段解码器（Encoding 注入；省略时用宿主 `TextDecoder`，明确声明宿主 Encoding API）。 */ readonly decoder?: ITextDecoder; };",
+          "identity": "packages/serialize/dist/plugins/json.d.ts:IJsonPluginOptions:export type IJsonPluginOptions = { /** Passed to `JSON.stringify` to omit fields that cannot be serialized. */ readonly replacer?: (key: string, value: unknown) => unknown; /** Passed to `JSON.parse` to restore rich values such as dates. */ readonly reviver?: (key: string, value: unknown) => unknown; /** Debug indentation. Omit in production to avoid increasing payload size. */ readonly space?: number; /** * Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding * API. */ readonly decoder?: ITextDecoder; };",
           "guidance": [],
           "usageScore": 52,
           "configuration": [],
@@ -10207,9 +10207,9 @@
           "name": "jsonParser",
           "kind": "function",
           "signature": "export declare function jsonParser(options?: IJsonPluginOptions): ISerializeParser;",
-          "declarationLine": 16,
+          "declarationLine": 20,
           "source": "packages/serialize/dist/plugins/json.d.ts",
-          "purpose": "默认方案，也是实测下最快的一条：V8 的 JSON 是高度优化的 C++ 实现， 在「需要拿到主线程上的对象图」这个前提下没有任何方案能赢它。 只有当你不需要对象图（字节直通）或格式 V8 不认识时，才该换别的插件。",
+          "purpose": "Default JSON parser using V8's optimized native JSON implementation. Earlier measurements identify JSON as the fastest tested path when consumers require a main-thread object graph. Use another parser for byte passthrough or a format that JSON cannot represent.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for jsonParser.",
           "advanced": "No additional advanced behavior is declared for jsonParser.",
           "parameters": ["options: IJsonPluginOptions (optional)"],
@@ -10248,7 +10248,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "默认方案，也是实测下最快的一条：V8 的 JSON 是高度优化的 C++ 实现， 在「需要拿到主线程上的对象图」这个前提下没有任何方案能赢它。 只有当你不需要对象图（字节直通）或格式 V8 不认识时，才该换别的插件。"
+              "content": "Default JSON parser using V8's optimized native JSON implementation. Earlier measurements identify JSON as the fastest tested path when consumers require a main-thread object graph. Use another parser for byte passthrough or a format that JSON cannot represent."
             },
             {
               "id": "getting-started",
@@ -10281,25 +10281,25 @@
               "name": "replacer",
               "type": "(key: string, value: unknown) => unknown",
               "optional": true,
-              "description": "传给 JSON.stringify 的 replacer，用于裁剪不可序列化字段。"
+              "description": "Passed to `JSON.stringify` to omit fields that cannot be serialized."
             },
             {
               "name": "reviver",
               "type": "(key: string, value: unknown) => unknown",
               "optional": true,
-              "description": "传给 JSON.parse 的 reviver，用于还原 Date 之类的富类型。"
+              "description": "Passed to `JSON.parse` to restore rich values such as dates."
             },
             {
               "name": "space",
               "type": "number",
               "optional": true,
-              "description": "缩进。仅调试用——线上留空以免白白撑大体积。"
+              "description": "Debug indentation. Omit in production to avoid increasing payload size."
             },
             {
               "name": "decoder",
               "type": "ITextDecoder",
               "optional": true,
-              "description": "字节段解码器（Encoding 注入；省略时用宿主 `TextDecoder`，明确声明宿主 Encoding API）。"
+              "description": "Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding * API."
             }
           ],
           "identity": "packages/serialize/dist/plugins/json.d.ts:jsonParser:export declare function jsonParser(options?: IJsonPluginOptions): ISerializeParser;",
@@ -10311,7 +10311,7 @@
               "type": "(key: string, value: unknown) => unknown",
               "optional": true,
               "description": "`replacer` — `(key, value) => unknown` — 可选 — 无 — 传给 `JSON.stringify`，用于裁剪不可序列化字段",
-              "descriptionEn": "",
+              "descriptionEn": "Passed to `JSON.stringify` to omit fields that cannot be serialized.",
               "descriptionZh": "`replacer` — `(key, value) => unknown` — 可选 — 无 — 传给 `JSON.stringify`，用于裁剪不可序列化字段"
             },
             {
@@ -10319,7 +10319,7 @@
               "type": "(key: string, value: unknown) => unknown",
               "optional": true,
               "description": "`reviver` — `(key, value) => unknown` — 可选 — 无 — 传给 `JSON.parse`，用于还原 `Date` 之类的富类型",
-              "descriptionEn": "",
+              "descriptionEn": "Passed to `JSON.parse` to restore rich values such as dates.",
               "descriptionZh": "`reviver` — `(key, value) => unknown` — 可选 — 无 — 传给 `JSON.parse`，用于还原 `Date` 之类的富类型"
             },
             {
@@ -10327,7 +10327,7 @@
               "type": "number",
               "optional": true,
               "description": "`space` — `number` — 可选 — 无 — 缩进，仅调试用途——线上留空以免白白撑大体积",
-              "descriptionEn": "",
+              "descriptionEn": "Debug indentation. Omit in production to avoid increasing payload size.",
               "descriptionZh": "`space` — `number` — 可选 — 无 — 缩进，仅调试用途——线上留空以免白白撑大体积"
             },
             {
@@ -10335,7 +10335,7 @@
               "type": "ITextDecoder",
               "optional": true,
               "description": "`decoder` — `ITextDecoder` — 可选 — 宿主 `TextDecoder` — 解码 `bytes` 段时用；省略且宿主没有 `TextDecoder` 时，`decode()` 遇到 `bytes` 段会抛 `ENV_UNSUPPORTED`",
-              "descriptionEn": "",
+              "descriptionEn": "Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding * API.",
               "descriptionZh": "`decoder` — `ITextDecoder` — 可选 — 宿主 `TextDecoder` — 解码 `bytes` 段时用；省略且宿主没有 `TextDecoder` 时，`decode()` 遇到 `bytes` 段会抛 `ENV_UNSUPPORTED`"
             }
           ],
@@ -10345,7 +10345,7 @@
           "name": "jsonPlugin",
           "kind": "const",
           "signature": "export declare const jsonPlugin: (options?: IJsonPluginOptions) => ISerializePlugin;",
-          "declarationLine": 17,
+          "declarationLine": 21,
           "source": "packages/serialize/dist/plugins/json.d.ts",
           "purpose": "jsonPlugin is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for jsonPlugin.",
@@ -10418,25 +10418,25 @@
               "name": "replacer",
               "type": "(key: string, value: unknown) => unknown",
               "optional": true,
-              "description": "传给 JSON.stringify 的 replacer，用于裁剪不可序列化字段。"
+              "description": "Passed to `JSON.stringify` to omit fields that cannot be serialized."
             },
             {
               "name": "reviver",
               "type": "(key: string, value: unknown) => unknown",
               "optional": true,
-              "description": "传给 JSON.parse 的 reviver，用于还原 Date 之类的富类型。"
+              "description": "Passed to `JSON.parse` to restore rich values such as dates."
             },
             {
               "name": "space",
               "type": "number",
               "optional": true,
-              "description": "缩进。仅调试用——线上留空以免白白撑大体积。"
+              "description": "Debug indentation. Omit in production to avoid increasing payload size."
             },
             {
               "name": "decoder",
               "type": "ITextDecoder",
               "optional": true,
-              "description": "字节段解码器（Encoding 注入；省略时用宿主 `TextDecoder`，明确声明宿主 Encoding API）。"
+              "description": "Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding * API."
             }
           ],
           "identity": "packages/serialize/dist/plugins/json.d.ts:jsonPlugin:export declare const jsonPlugin: (options?: IJsonPluginOptions) => ISerializePlugin;",
@@ -10460,7 +10460,7 @@
               "type": "(key: string, value: unknown) => unknown",
               "optional": true,
               "description": "`replacer` — `(key, value) => unknown` — 可选 — 无 — 传给 `JSON.stringify`，用于裁剪不可序列化字段",
-              "descriptionEn": "",
+              "descriptionEn": "Passed to `JSON.stringify` to omit fields that cannot be serialized.",
               "descriptionZh": "`replacer` — `(key, value) => unknown` — 可选 — 无 — 传给 `JSON.stringify`，用于裁剪不可序列化字段"
             },
             {
@@ -10468,7 +10468,7 @@
               "type": "(key: string, value: unknown) => unknown",
               "optional": true,
               "description": "`reviver` — `(key, value) => unknown` — 可选 — 无 — 传给 `JSON.parse`，用于还原 `Date` 之类的富类型",
-              "descriptionEn": "",
+              "descriptionEn": "Passed to `JSON.parse` to restore rich values such as dates.",
               "descriptionZh": "`reviver` — `(key, value) => unknown` — 可选 — 无 — 传给 `JSON.parse`，用于还原 `Date` 之类的富类型"
             },
             {
@@ -10476,7 +10476,7 @@
               "type": "number",
               "optional": true,
               "description": "`space` — `number` — 可选 — 无 — 缩进，仅调试用途——线上留空以免白白撑大体积",
-              "descriptionEn": "",
+              "descriptionEn": "Debug indentation. Omit in production to avoid increasing payload size.",
               "descriptionZh": "`space` — `number` — 可选 — 无 — 缩进，仅调试用途——线上留空以免白白撑大体积"
             },
             {
@@ -10484,7 +10484,7 @@
               "type": "ITextDecoder",
               "optional": true,
               "description": "`decoder` — `ITextDecoder` — 可选 — 宿主 `TextDecoder` — 解码 `bytes` 段时用；省略且宿主没有 `TextDecoder` 时，`decode()` 遇到 `bytes` 段会抛 `ENV_UNSUPPORTED`",
-              "descriptionEn": "",
+              "descriptionEn": "Injected byte decoder. Defaults to the host `TextDecoder`, explicitly relying on the Encoding * API.",
               "descriptionZh": "`decoder` — `ITextDecoder` — 可选 — 宿主 `TextDecoder` — 解码 `bytes` 段时用；省略且宿主没有 `TextDecoder` 时，`decode()` 遇到 `bytes` 段会抛 `ENV_UNSUPPORTED`"
             }
           ],
@@ -10513,9 +10513,9 @@
           "name": "chunkToBytes",
           "kind": "function",
           "signature": "export declare function chunkToBytes(chunk: ISerializeChunk, encoder: ITextEncoder): Uint8Array;",
-          "declarationLine": 5,
+          "declarationLine": 11,
           "source": "packages/serialize/dist/registry.d.ts",
-          "purpose": "把任意分段规约成字节（transfer / IndexedDB / wasm）。`encoder` 必填（Encoding 注入）。",
+          "purpose": "Converts text or byte chunks to bytes using the required `encoder`, for transfer, IndexedDB, or Wasm. Value chunks reject.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for chunkToBytes.",
           "advanced": "No additional advanced behavior is declared for chunkToBytes.",
           "parameters": ["chunk: ISerializeChunk", "encoder: ITextEncoder"],
@@ -10564,7 +10564,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "把任意分段规约成字节（transfer / IndexedDB / wasm）。`encoder` 必填（Encoding 注入）。"
+              "content": "Converts text or byte chunks to bytes using the required `encoder`, for transfer, IndexedDB, or Wasm. Value chunks reject."
             },
             {
               "id": "getting-started",
@@ -10784,9 +10784,9 @@
           "name": "chunkToText",
           "kind": "function",
           "signature": "export declare function chunkToText(chunk: ISerializeChunk, decoder: ITextDecoder): string;",
-          "declarationLine": 3,
+          "declarationLine": 6,
           "source": "packages/serialize/dist/registry.d.ts",
-          "purpose": "把任意分段规约成字符串（文本载体）。`decoder` 必填（Encoding 注入）。",
+          "purpose": "Converts text or byte chunks to text using the required `decoder`. Value chunks reject because they have no text form.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for chunkToText.",
           "advanced": "No additional advanced behavior is declared for chunkToText.",
           "parameters": ["chunk: ISerializeChunk", "decoder: ITextDecoder"],
@@ -10835,7 +10835,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "把任意分段规约成字符串（文本载体）。`decoder` 必填（Encoding 注入）。"
+              "content": "Converts text or byte chunks to text using the required `decoder`. Value chunks reject because they have no text form."
             },
             {
               "id": "getting-started",
@@ -11055,7 +11055,7 @@
           "name": "createSerializeRegistry",
           "kind": "function",
           "signature": "export declare function createSerializeRegistry(plugins: readonly ISerializePlugin[], options?: ISerializeRegistryOptions): ISerializeRegistry;",
-          "declarationLine": 7,
+          "declarationLine": 13,
           "source": "packages/serialize/dist/registry.d.ts",
           "purpose": "createSerializeRegistry is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSerializeRegistry.",
@@ -11150,25 +11150,25 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "默认 `@migaia/utils/scheduler` 的 `systemScheduler`；创建后不可更换（单调时钟契约见该子路径，此处不重复解释）。"
+              "description": "Defaults to `systemScheduler` from `@migaia/utils/scheduler`. Fixed at construction; the * scheduler subpath defines its monotonic clock contract."
             },
             {
               "name": "encoder",
               "type": "ITextEncoder",
               "optional": true,
-              "description": "省略时用宿主 `TextEncoder`（Encoding API，明确声明 host capability）；创建后不可更换。"
+              "description": "Defaults to the host `TextEncoder`, explicitly requiring the Encoding API. Fixed at * construction."
             },
             {
               "name": "decoder",
               "type": "ITextDecoder",
               "optional": true,
-              "description": "省略时用宿主 `TextDecoder`（Encoding API，明确声明 host capability）；创建后不可更换。"
+              "description": "Defaults to the host `TextDecoder`, explicitly requiring the Encoding API. Fixed at * construction."
             },
             {
               "name": "cleanup",
               "type": "{ readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }",
               "optional": true,
-              "description": "Cleanup error 出口（可选，默认 `{ policy: 'throw' }`；report 策略强制携带 reporter）。"
+              "description": "Optional cleanup error policy. Defaults to `{ policy: 'throw' }`. The report policy requires a * reporter."
             },
             {
               "name": "cleanup.policy",
@@ -11180,19 +11180,19 @@
               "name": "cleanup.report",
               "type": "(d: ISerializeCleanupError) => void",
               "optional": false,
-              "description": "通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。"
+              "description": "Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also reports late rejections from detached work after the deadline and cleanup through `track`. Late work does not rejoin the registry lifecycle. Neither report changes the primary rejection or terminal state."
             },
             {
               "name": "onDrainTimeout",
               "type": "(d: ISerializeTimeoutDiagnostic) => void",
               "optional": true,
-              "description": "Drain-timeout 观测（可选；与 cleanup error 边界分离）。"
+              "description": "Optional drain-timeout observer, separate from the cleanup error boundary."
             },
             {
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator * `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 * rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。"
+              "description": "Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. * Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also * reports late rejections from detached work after the deadline and cleanup through `track`. Late * work does not rejoin the registry lifecycle. Neither report changes the primary rejection or * terminal state."
             }
           ],
           "identity": "packages/serialize/dist/registry.d.ts:createSerializeRegistry:export declare function createSerializeRegistry(plugins: readonly ISerializePlugin[], options?: ISerializeRegistryOptions): ISerializeRegistry;",
@@ -11405,7 +11405,7 @@
               "type": "IScheduler",
               "optional": true,
               "description": "`scheduler?: IScheduler` — `@migaia/utils/scheduler` 的 `systemScheduler` — 创建后不可更换；结构非法（缺 `now`/`schedule`，或 `now()` 不返回有限数字）抛 `TypeError`／`INVALID_OPTION`（\"serialize scheduler must be { now, schedule }\" 等）",
-              "descriptionEn": "",
+              "descriptionEn": "Defaults to `systemScheduler` from `@migaia/utils/scheduler`. Fixed at construction; the * scheduler subpath defines its monotonic clock contract.",
               "descriptionZh": "`scheduler?: IScheduler` — `@migaia/utils/scheduler` 的 `systemScheduler` — 创建后不可更换；结构非法（缺 `now`/`schedule`，或 `now()` 不返回有限数字）抛 `TypeError`／`INVALID_OPTION`（\"serialize scheduler must be { now, schedule }\" 等）"
             },
             {
@@ -11413,7 +11413,7 @@
               "type": "ITextEncoder",
               "optional": true,
               "description": "`encoder?: ITextEncoder` — 宿主 `TextEncoder` — 用于把 `text` 段就地转成字节（多段拼装出现 `bytes` 时）；省略且宿主没有 `TextEncoder` → 构造期抛 `ENV_UNSUPPORTED`；提供了但形状不对（没有 `.encode` 方法）→ `TypeError`／`INVALID_OPTION`",
-              "descriptionEn": "",
+              "descriptionEn": "Defaults to the host `TextEncoder`, explicitly requiring the Encoding API. Fixed at * construction.",
               "descriptionZh": "`encoder?: ITextEncoder` — 宿主 `TextEncoder` — 用于把 `text` 段就地转成字节（多段拼装出现 `bytes` 时）；省略且宿主没有 `TextEncoder` → 构造期抛 `ENV_UNSUPPORTED`；提供了但形状不对（没有 `.encode` 方法）→ `TypeError`／`INVALID_OPTION`"
             },
             {
@@ -11421,7 +11421,7 @@
               "type": "ITextDecoder",
               "optional": true,
               "description": "`decoder?: ITextDecoder` — 宿主 `TextDecoder` — 目前构造期只做能力探测（供后续经该 registry 派生的 API 复用），同上校验规则",
-              "descriptionEn": "",
+              "descriptionEn": "Defaults to the host `TextDecoder`, explicitly requiring the Encoding API. Fixed at * construction.",
               "descriptionZh": "`decoder?: ITextDecoder` — 宿主 `TextDecoder` — 目前构造期只做能力探测（供后续经该 registry 派生的 API 复用），同上校验规则"
             },
             {
@@ -11429,7 +11429,7 @@
               "type": "{ readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }",
               "optional": true,
               "description": "`SerializeCleanupPolicy` — `throw` / `report` — `createSerializeRegistry` 的 `cleanup.policy` 取值",
-              "descriptionEn": "",
+              "descriptionEn": "Optional cleanup error policy. Defaults to `{ policy: 'throw' }`. The report policy requires a * reporter.",
               "descriptionZh": "`SerializeCleanupPolicy` — `throw` / `report` — `createSerializeRegistry` 的 `cleanup.policy` 取值"
             },
             {
@@ -11444,16 +11444,16 @@
               "name": "cleanup.report",
               "type": "(d: ISerializeCleanupError) => void",
               "optional": false,
-              "description": "通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。",
-              "descriptionEn": "",
-              "descriptionZh": "通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。"
+              "description": "Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also reports late rejections from detached work after the deadline and cleanup through `track`. Late work does not rejoin the registry lifecycle. Neither report changes the primary rejection or terminal state.",
+              "descriptionEn": "Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also reports late rejections from detached work after the deadline and cleanup through `track`. Late work does not rejoin the registry lifecycle. Neither report changes the primary rejection or terminal state.",
+              "descriptionZh": ""
             },
             {
               "name": "onDrainTimeout",
               "type": "(d: ISerializeTimeoutDiagnostic) => void",
               "optional": true,
               "description": "`onDrainTimeout?: (d) => void` — no-op — `dispose({ deadlineAt })` 到期时仍有在途操作，触发一次诊断回调；回调抛错被吞掉（containment），不影响 `dispose()`",
-              "descriptionEn": "",
+              "descriptionEn": "Optional drain-timeout observer, separate from the cleanup error boundary.",
               "descriptionZh": "`onDrainTimeout?: (d) => void` — no-op — `dispose({ deadlineAt })` 到期时仍有在途操作，触发一次诊断回调；回调抛错被吞掉（containment），不影响 `dispose()`"
             },
             {
@@ -11461,7 +11461,7 @@
               "type": "(error: unknown) => void",
               "optional": true,
               "description": "`SerializeCleanupPolicy` — `throw` / `report` — `createSerializeRegistry` 的 `cleanup.policy` 取值",
-              "descriptionEn": "",
+              "descriptionEn": "Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. * Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also * reports late rejections from detached work after the deadline and cleanup through `track`. Late * work does not rejoin the registry lifecycle. Neither report changes the primary rejection or * terminal state.",
               "descriptionZh": "`SerializeCleanupPolicy` — `throw` / `report` — `createSerializeRegistry` 的 `cleanup.policy` 取值"
             }
           ],
@@ -11471,7 +11471,7 @@
           "name": "ISerializeCleanupError",
           "kind": "type",
           "signature": "export type ISerializeCleanupError = { readonly kind: typeof SerializeCleanupKind.cleanupError; readonly source: string; readonly error: unknown; };",
-          "declarationLine": 133,
+          "declarationLine": 164,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "ISerializeCleanupError is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeCleanupError.",
@@ -11610,8 +11610,8 @@
         {
           "name": "ISerializeRegistryOptions",
           "kind": "type",
-          "signature": "export type ISerializeRegistryOptions = { /** 默认 `@migaia/utils/scheduler` 的 `systemScheduler`；创建后不可更换（单调时钟契约见该子路径，此处不重复解释）。 */ readonly scheduler?: IScheduler; /** 省略时用宿主 `TextEncoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly encoder?: ITextEncoder; /** 省略时用宿主 `TextDecoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly decoder?: ITextDecoder; /** Cleanup error 出口（可选，默认 `{ policy: 'throw' }`；report 策略强制携带 reporter）。 */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Drain-timeout 观测（可选；与 cleanup error 边界分离）。 */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * 通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator * `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 * rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。 */ readonly report?: (error: unknown) => void; };",
-          "declarationLine": 144,
+          "signature": "export type ISerializeRegistryOptions = { /** * Defaults to `systemScheduler` from `@migaia/utils/scheduler`. Fixed at construction; the * scheduler subpath defines its monotonic clock contract. */ readonly scheduler?: IScheduler; /** * Defaults to the host `TextEncoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly encoder?: ITextEncoder; /** * Defaults to the host `TextDecoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly decoder?: ITextDecoder; /** * Optional cleanup error policy. Defaults to `{ policy: 'throw' }`. The report policy requires a * reporter. */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Optional drain-timeout observer, separate from the cleanup error boundary. */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. * Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also * reports late rejections from detached work after the deadline and cleanup through `track`. Late * work does not rejoin the registry lifecycle. Neither report changes the primary rejection or * terminal state. */ readonly report?: (error: unknown) => void; };",
+          "declarationLine": 175,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "ISerializeRegistryOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeRegistryOptions.",
@@ -11631,7 +11631,7 @@
           "aliasOf": "ISerializeRegistryOptions",
           "exportPath": "./registry",
           "overloadSignatures": [
-            "export type ISerializeRegistryOptions = { /** 默认 `@migaia/utils/scheduler` 的 `systemScheduler`；创建后不可更换（单调时钟契约见该子路径，此处不重复解释）。 */ readonly scheduler?: IScheduler; /** 省略时用宿主 `TextEncoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly encoder?: ITextEncoder; /** 省略时用宿主 `TextDecoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly decoder?: ITextDecoder; /** Cleanup error 出口（可选，默认 `{ policy: 'throw' }`；report 策略强制携带 reporter）。 */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Drain-timeout 观测（可选；与 cleanup error 边界分离）。 */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * 通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator * `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 * rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。 */ readonly report?: (error: unknown) => void; };"
+            "export type ISerializeRegistryOptions = { /** * Defaults to `systemScheduler` from `@migaia/utils/scheduler`. Fixed at construction; the * scheduler subpath defines its monotonic clock contract. */ readonly scheduler?: IScheduler; /** * Defaults to the host `TextEncoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly encoder?: ITextEncoder; /** * Defaults to the host `TextDecoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly decoder?: ITextDecoder; /** * Optional cleanup error policy. Defaults to `{ policy: 'throw' }`. The report policy requires a * reporter. */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Optional drain-timeout observer, separate from the cleanup error boundary. */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. * Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also * reports late rejections from detached work after the deadline and cleanup through `track`. Late * work does not rejoin the registry lifecycle. Neither report changes the primary rejection or * terminal state. */ readonly report?: (error: unknown) => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11670,7 +11670,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistryOptions:export type ISerializeRegistryOptions = { /** 默认 `@migaia/utils/scheduler` 的 `systemScheduler`；创建后不可更换（单调时钟契约见该子路径，此处不重复解释）。 */ readonly scheduler?: IScheduler; /** 省略时用宿主 `TextEncoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly encoder?: ITextEncoder; /** 省略时用宿主 `TextDecoder`（Encoding API，明确声明 host capability）；创建后不可更换。 */ readonly decoder?: ITextDecoder; /** Cleanup error 出口（可选，默认 `{ policy: 'throw' }`；report 策略强制携带 reporter）。 */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Drain-timeout 观测（可选；与 cleanup error 边界分离）。 */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * 通用 registry 二次/迟到错误 reporter（可选；不提供时用本 registry 的固定静态 no-op fallback）。 承载两类语义：① iterator * `return()` 的二次错误（active drain 期，`drainAsyncIterable` 上报）； ② deadline 后 detached task 的迟到 * rejection（cleanup 后，`track` 上报，不重新接入 registry 生命周期）。 两类都不改变 primary rejection，也不改变 terminal。 */ readonly report?: (error: unknown) => void; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistryOptions:export type ISerializeRegistryOptions = { /** * Defaults to `systemScheduler` from `@migaia/utils/scheduler`. Fixed at construction; the * scheduler subpath defines its monotonic clock contract. */ readonly scheduler?: IScheduler; /** * Defaults to the host `TextEncoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly encoder?: ITextEncoder; /** * Defaults to the host `TextDecoder`, explicitly requiring the Encoding API. Fixed at * construction. */ readonly decoder?: ITextDecoder; /** * Optional cleanup error policy. Defaults to `{ policy: 'throw' }`. The report policy requires a * reporter. */ readonly cleanup?: { readonly policy: typeof SerializeCleanupPolicy.throw; } | { readonly policy: typeof SerializeCleanupPolicy.report; readonly report: (d: ISerializeCleanupError) => void; }; /** Optional drain-timeout observer, separate from the cleanup error boundary. */ readonly onDrainTimeout?: (d: ISerializeTimeoutDiagnostic) => void; /** * Optional reporter for secondary or late registry failures. Defaults to a fixed static no-op. * Reports iterator `return()` failures during active draining through `drainAsyncIterable`. Also * reports late rejections from detached work after the deadline and cleanup through `track`. Late * work does not rejoin the registry lifecycle. Neither report changes the primary rejection or * terminal state. */ readonly report?: (error: unknown) => void; };",
           "guidance": [
             {
               "id": "3-1-createserializeregistry-与-iserializeregistryoptions",
@@ -11751,7 +11751,7 @@
           "name": "ISerializeTimeoutDiagnostic",
           "kind": "type",
           "signature": "export type ISerializeTimeoutDiagnostic = { readonly kind: typeof SerializeCleanupKind.drainTimeout; readonly source: string; readonly deadlineAt?: number; readonly pendingCount?: number; };",
-          "declarationLine": 138,
+          "declarationLine": 169,
           "source": "packages/serialize/dist/types.d.ts",
           "purpose": "ISerializeTimeoutDiagnostic is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISerializeTimeoutDiagnostic.",
@@ -11900,9 +11900,9 @@
           "ownerFragment": "serialize-core--ISerializeChunk"
         },
         {
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeContext:export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。 */ readonly signal: IAbortSignal; /** 出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。 */ readonly context: string; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeContext:export type ISerializeContext = { /** * Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and * discards the eventual result. */ readonly signal: IAbortSignal; /** Included in failure messages to identify the affected store or key. */ readonly context: string; };",
           "name": "ISerializeContext",
-          "signature": "export type ISerializeContext = { /** 协作式取消。parser 若忽略它，框架仍会丢弃其结果并以 AbortError 结束。 */ readonly signal: IAbortSignal; /** 出错时拼进消息，用来定位是哪个 store / 哪个 key 出的事。 */ readonly context: string; };",
+          "signature": "export type ISerializeContext = { /** * Cancellation signal. Even if the parser ignores it, the registry rejects with `ABORTED` and * discards the eventual result. */ readonly signal: IAbortSignal; /** Included in failure messages to identify the affected store or key. */ readonly context: string; };",
           "source": "packages/serialize/dist/types.d.ts",
           "exportPath": "./registry",
           "ownerExportPath": "./core",
@@ -11910,9 +11910,9 @@
           "ownerFragment": "serialize-core--ISerializeContext"
         },
         {
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeParser:export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** 释放 parser 自己持有的资源（worker 端口、wasm 句柄等）。异步释放时返回 Promise，框架会 await。 */ dispose?(): void | Promise<void>; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeParser:export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** * Releases parser-owned resources such as worker ports or Wasm handles. Return a Promise for * asynchronous release; the framework awaits it. */ dispose?(): void | Promise<void>; };",
           "name": "ISerializeParser",
-          "signature": "export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** 释放 parser 自己持有的资源（worker 端口、wasm 句柄等）。异步释放时返回 Promise，框架会 await。 */ dispose?(): void | Promise<void>; };",
+          "signature": "export type ISerializeParser = { readonly name: string; encode(value: unknown, context: ISerializeContext): ISerializeOutput; decode(chunk: ISerializeChunk, context: ISerializeContext): unknown | Promise<unknown>; /** * Releases parser-owned resources such as worker ports or Wasm handles. Return a Promise for * asynchronous release; the framework awaits it. */ dispose?(): void | Promise<void>; };",
           "source": "packages/serialize/dist/types.d.ts",
           "exportPath": "./registry",
           "ownerExportPath": "./core",
@@ -11940,9 +11940,9 @@
           "ownerFragment": "serialize-core--ISerializePlugin"
         },
         {
-          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistry:export type ISerializeRegistry = { /** 写入使用的格式：插件数组的第一项。 */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** 同步：拒绝新请求并 abort 内部 closing controller；幂等；不调用 parser disposer。 */ close(): void; /** 异步：隐含先 close()；等待在途结算或到达 deadlineAt 后同步释放 parser；幂等复用同一 promise，首次调用冻结 deadlineAt。 */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
+          "identity": "packages/serialize/dist/types.d.ts:ISerializeRegistry:export type ISerializeRegistry = { /** Default write format, taken from the first registered plugin. */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** * Synchronously rejects new requests and aborts the internal closing controller. Idempotent and * never invokes parser disposers. */ close(): void; /** * Closes first, then drains pending work until settlement or `deadlineAt` before awaiting parser * cleanup. Repeated calls share the same Promise. The first admitted call fixes `deadlineAt`. */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
           "name": "ISerializeRegistry",
-          "signature": "export type ISerializeRegistry = { /** 写入使用的格式：插件数组的第一项。 */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** 同步：拒绝新请求并 abort 内部 closing controller；幂等；不调用 parser disposer。 */ close(): void; /** 异步：隐含先 close()；等待在途结算或到达 deadlineAt 后同步释放 parser；幂等复用同一 promise，首次调用冻结 deadlineAt。 */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
+          "signature": "export type ISerializeRegistry = { /** Default write format, taken from the first registered plugin. */ readonly primaryType: string; readonly types: readonly string[]; has(type: string): boolean; encode(value: unknown, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<ISerializeChunk>; decode(chunk: ISerializeChunk, options?: { readonly type?: string; readonly signal?: IAbortSignal; readonly context?: string; }): Promise<unknown>; /** * Synchronously rejects new requests and aborts the internal closing controller. Idempotent and * never invokes parser disposers. */ close(): void; /** * Closes first, then drains pending work until settlement or `deadlineAt` before awaiting parser * cleanup. Repeated calls share the same Promise. The first admitted call fixes `deadlineAt`. */ dispose(options?: { readonly deadlineAt?: number; }): Promise<void>; };",
           "source": "packages/serialize/dist/types.d.ts",
           "exportPath": "./registry",
           "ownerExportPath": "./core",

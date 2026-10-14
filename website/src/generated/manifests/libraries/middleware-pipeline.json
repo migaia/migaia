@@ -727,9 +727,9 @@
           "name": "GENERATOR_CONTINUE",
           "kind": "const",
           "signature": "export declare const GENERATOR_CONTINUE: unique symbol;",
-          "declarationLine": 21,
+          "declarationLine": 33,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Generator runner 的公开继续控制信号，由 stage 返回以采用最后一次 yield。",
+          "purpose": "Provides the public generator control signal that a stage returns to continue with its last yielded value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GENERATOR_CONTINUE.",
           "advanced": "No additional advanced behavior is declared for GENERATOR_CONTINUE.",
           "parameters": ["This const declaration has no parameters."],
@@ -755,7 +755,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Generator runner 的公开继续控制信号，由 stage 返回以采用最后一次 yield。"
+              "content": "Provides the public generator control signal that a stage returns to continue with its last yielded value."
             },
             {
               "id": "getting-started",
@@ -794,9 +794,9 @@
           "name": "GENERATOR_HALT",
           "kind": "const",
           "signature": "export declare const GENERATOR_HALT: unique symbol;",
-          "declarationLine": 19,
+          "declarationLine": 28,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Generator runner 的公开终止控制信号，由 stage 返回以停止整个 pipeline。",
+          "purpose": "Provides the public generator control signal that a stage returns to halt the entire pipeline.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GENERATOR_HALT.",
           "advanced": "No additional advanced behavior is declared for GENERATOR_HALT.",
           "parameters": ["This const declaration has no parameters."],
@@ -820,7 +820,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Generator runner 的公开终止控制信号，由 stage 返回以停止整个 pipeline。"
+              "content": "Provides the public generator control signal that a stage returns to halt the entire pipeline."
             },
             {
               "id": "getting-started",
@@ -859,9 +859,9 @@
           "name": "GENERATOR_UNDEFINED",
           "kind": "const",
           "signature": "export declare const GENERATOR_UNDEFINED: unique symbol;",
-          "declarationLine": 17,
+          "declarationLine": 26,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "Generator runner 的公开 undefined 控制信号，由兼容层与消费者返回。",
+          "purpose": "Provides the public generator control signal for an undefined result. Compatibility layers and consumers return it.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GENERATOR_UNDEFINED.",
           "advanced": "No additional advanced behavior is declared for GENERATOR_UNDEFINED.",
           "parameters": ["This const declaration has no parameters."],
@@ -882,7 +882,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Generator runner 的公开 undefined 控制信号，由兼容层与消费者返回。"
+              "content": "Provides the public generator control signal for an undefined result. Compatibility layers and consumers return it."
             },
             {
               "id": "getting-started",
@@ -1115,7 +1115,7 @@
           "name": "IGeneratorMiddlewareSignals",
           "kind": "type",
           "signature": "export type IGeneratorMiddlewareSignals = { readonly undefined: symbol; readonly halt: symbol; readonly continue: symbol; };",
-          "declarationLine": 23,
+          "declarationLine": 35,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
           "purpose": "Runtime sentinel identities used by a generator runner; compatibility hosts may inject theirs.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGeneratorMiddlewareSignals.",
@@ -1567,7 +1567,7 @@
           "name": "IMiddlewarePipelineErrorCode",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineErrorCode = (typeof MiddlewarePipelineErrorCode)[keyof typeof MiddlewarePipelineErrorCode];",
-          "declarationLine": 22,
+          "declarationLine": 24,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
           "purpose": "IMiddlewarePipelineErrorCode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineErrorCode.",
@@ -1695,7 +1695,7 @@
           "name": "IMiddlewarePipelineMode",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineMode = (typeof MiddlewarePipelineMode)[keyof typeof MiddlewarePipelineMode];",
-          "declarationLine": 8,
+          "declarationLine": 11,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
           "purpose": "IMiddlewarePipelineMode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineMode.",
@@ -1951,7 +1951,7 @@
           "name": "IMiddlewarePipelineViolation",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineViolation = (typeof MiddlewarePipelineViolation)[keyof typeof MiddlewarePipelineViolation];",
-          "declarationLine": 14,
+          "declarationLine": 20,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
           "purpose": "IMiddlewarePipelineViolation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineViolation.",
@@ -2015,7 +2015,7 @@
           "name": "IMiddlewarePipelineViolationHandler",
           "kind": "type",
           "signature": "export type IMiddlewarePipelineViolationHandler = (kind: IMiddlewarePipelineViolation) => void;",
-          "declarationLine": 15,
+          "declarationLine": 21,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
           "purpose": "IMiddlewarePipelineViolationHandler is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMiddlewarePipelineViolationHandler.",
@@ -2143,9 +2143,9 @@
           "name": "MIDDLEWARE_PIPELINE_SOURCE",
           "kind": "const",
           "signature": "export declare const MIDDLEWARE_PIPELINE_SOURCE = \"@migaia/middleware-pipeline\";",
-          "declarationLine": 2,
+          "declarationLine": 5,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
-          "purpose": "`errors.ts` 默认双失败工厂与 `docs/contracts/error-codes.md` 注册表共用的稳定 source。",
+          "purpose": "Defines the stable `source` shared by the default dual-failure factory in `errors.ts` and the error-code registry.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MIDDLEWARE_PIPELINE_SOURCE.",
           "advanced": "No additional advanced behavior is declared for MIDDLEWARE_PIPELINE_SOURCE.",
           "parameters": ["This const declaration has no parameters."],
@@ -2168,7 +2168,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "`errors.ts` 默认双失败工厂与 `docs/contracts/error-codes.md` 注册表共用的稳定 source。"
+              "content": "Defines the stable `source` shared by the default dual-failure factory in `errors.ts` and the error-code registry."
             },
             {
               "id": "getting-started",
@@ -2206,10 +2206,10 @@
         {
           "name": "MiddlewarePipelineErrorCode",
           "kind": "const",
-          "signature": "export declare const MiddlewarePipelineErrorCode: { /** * 当前 stage 与它已经启动的 downstream 同时失败，且调用方未提供错误组合策略时抛出。 * * 落实 `middleware-pipeline.sdd.md` MP-R08；调用方应检查 `AggregateError.errors` 中的两个原始失败，或通过 * `combineStageAndDownstreamError` 接管领域错误。 */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
-          "declarationLine": 4,
+          "signature": "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Enforces `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in * `AggregateError.errors`, or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
+          "declarationLine": 7,
           "source": "packages/middleware-pipeline/dist/error-code.d.ts",
-          "purpose": "`@migaia/middleware-pipeline` 的包边界错误码唯一声明处。",
+          "purpose": "Owns the module-boundary error-code declarations for `@migaia/middleware-pipeline`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineErrorCode.",
           "advanced": "No additional advanced behavior is declared for MiddlewarePipelineErrorCode.",
           "parameters": ["This const declaration has no parameters."],
@@ -2224,7 +2224,7 @@
           "aliasOf": "MiddlewarePipelineErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const MiddlewarePipelineErrorCode: { /** * 当前 stage 与它已经启动的 downstream 同时失败，且调用方未提供错误组合策略时抛出。 * * 落实 `middleware-pipeline.sdd.md` MP-R08；调用方应检查 `AggregateError.errors` 中的两个原始失败，或通过 * `combineStageAndDownstreamError` 接管领域错误。 */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };"
+            "export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Enforces `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in * `AggregateError.errors`, or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2234,7 +2234,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "`@migaia/middleware-pipeline` 的包边界错误码唯一声明处。"
+              "content": "Owns the module-boundary error-code declarations for `@migaia/middleware-pipeline`."
             },
             {
               "id": "getting-started",
@@ -2263,7 +2263,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/middleware-pipeline/dist/error-code.d.ts:MiddlewarePipelineErrorCode:export declare const MiddlewarePipelineErrorCode: { /** * 当前 stage 与它已经启动的 downstream 同时失败，且调用方未提供错误组合策略时抛出。 * * 落实 `middleware-pipeline.sdd.md` MP-R08；调用方应检查 `AggregateError.errors` 中的两个原始失败，或通过 * `combineStageAndDownstreamError` 接管领域错误。 */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
+          "identity": "packages/middleware-pipeline/dist/error-code.d.ts:MiddlewarePipelineErrorCode:export declare const MiddlewarePipelineErrorCode: { /** * Reports failure in both the current stage and its started downstream when no error combiner is * supplied. Enforces `middleware-pipeline.sdd.md` MP-R08. Inspect both original failures in * `AggregateError.errors`, or provide `combineStageAndDownstreamError` for domain errors. */ readonly executionFailed: \"EXECUTION_FAILED\"; /** * Invalid mode, onViolation or other callback, signal/control shape, signals, or lift target. The * caller must correct the supplied option rather than retrying the same input. */ readonly invalidOption: \"INVALID_OPTION\"; /** Cooperative abort observed with primitive or undefined reason; caller should inspect cause. */ readonly aborted: \"ABORTED\"; /** Abort cleanup and abort primary both failed; caller should inspect errors in order. */ readonly abortCleanupFailed: \"ABORT_CLEANUP_FAILED\"; };",
           "guidance": [],
           "usageScore": 16,
           "configuration": [],
@@ -2273,7 +2273,7 @@
           "name": "MiddlewarePipelineGeneratorSignals",
           "kind": "const",
           "signature": "export declare const MiddlewarePipelineGeneratorSignals: IGeneratorMiddlewareSignals;",
-          "declarationLine": 29,
+          "declarationLine": 41,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
           "purpose": "Default sentinel set paired with this module's public generator constants.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineGeneratorSignals.",
@@ -2337,9 +2337,9 @@
           "name": "MiddlewarePipelineMode",
           "kind": "const",
           "signature": "export declare const MiddlewarePipelineMode: { readonly sync: \"sync\"; readonly async: \"async\"; readonly generator: \"generator\"; readonly asyncGenerator: \"async-generator\"; };",
-          "declarationLine": 2,
+          "declarationLine": 5,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "四种稳定执行代数；由公开 runner/type 使用，不表示 host 生命周期状态。",
+          "purpose": "Defines four stable execution modes for public runners and types. These values do not represent host lifecycle states.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineMode.",
           "advanced": "No additional advanced behavior is declared for MiddlewarePipelineMode.",
           "parameters": ["This const declaration has no parameters."],
@@ -2376,7 +2376,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "四种稳定执行代数；由公开 runner/type 使用，不表示 host 生命周期状态。"
+              "content": "Defines four stable execution modes for public runners and types. These values do not represent host lifecycle states."
             },
             {
               "id": "getting-started",
@@ -2467,9 +2467,9 @@
           "name": "MiddlewarePipelineViolation",
           "kind": "const",
           "signature": "export declare const MiddlewarePipelineViolation: { readonly late: \"late\"; readonly duplicate: \"duplicate\"; };",
-          "declarationLine": 10,
+          "declarationLine": 16,
           "source": "packages/middleware-pipeline/dist/state-constants.d.ts",
-          "purpose": "`next()` 的稳定违约协议；由所有 runner 发出，并由 host 转成诊断或领域错误。",
+          "purpose": "Defines stable `next()` violations emitted by every runner. Hosts convert these values into diagnostics or domain errors.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for MiddlewarePipelineViolation.",
           "advanced": "No additional advanced behavior is declared for MiddlewarePipelineViolation.",
           "parameters": ["This const declaration has no parameters."],
@@ -2492,7 +2492,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "`next()` 的稳定违约协议；由所有 runner 发出，并由 host 转成诊断或领域错误。"
+              "content": "Defines stable `next()` violations emitted by every runner. Hosts convert these values into diagnostics or domain errors."
             },
             {
               "id": "getting-started",
