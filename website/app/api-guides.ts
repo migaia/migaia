@@ -902,7 +902,8 @@ const optionTranslations: Readonly<
     zh: 'readiness barrier 等待期间显示的界面；应选择可安全展示、但不会被误认为已经加载的 Store 数据的内容。'
   },
   'store-react:index:normalizeStoreConfig:defaults': {
-    en: 'Read-only application defaults snapshot. StoreProvider does not write these values into individual stores.'
+    en: 'Read-only application defaults snapshot. StoreProvider does not write these values into individual stores.',
+    zh: '应用默认设置的只读快照。StoreProvider 不会将这些值自动写入各个 Store；业务代码需自行读取并传递给创建选项。'
   },
   'store-react:index:StoreRegistry:owned': {
     en: 'Transfers instance lifecycle to the registry. Owned values are disposed when the registry is released.'

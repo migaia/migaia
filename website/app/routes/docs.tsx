@@ -1450,6 +1450,10 @@ function ClassMemberReference({
               ? member.description
               : undefined
           if (description) describedMembers.add(description)
+          /** Introduces the operation before its source-authored lifecycle and failure details. */
+          const purpose = description ? openingSentence(description) : undefined
+          /** Keeps the remaining contract intact in a separate reading paragraph. */
+          const detail = purpose ? description?.trim().slice(purpose.length).trim() : undefined
           return (
             <section
               className="option-entry class-member-entry"
@@ -1472,9 +1476,14 @@ function ClassMemberReference({
                       : member.kind}
                 </span>
               </div>
-              {description ? (
+              {purpose ? (
                 <p>
-                  <InlineText library={api.library} locale={locale} text={description} />
+                  <InlineText library={api.library} locale={locale} text={purpose} />
+                </p>
+              ) : null}
+              {detail ? (
+                <p>
+                  <InlineText library={api.library} locale={locale} text={detail} />
                 </p>
               ) : null}
               <CodeBlock
