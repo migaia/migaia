@@ -2168,8 +2168,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "IExtensionStage",
@@ -3574,8 +3574,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "cookiesHost",
@@ -3851,8 +3851,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "defineEntity",
@@ -5216,8 +5216,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "assertStorageBackendId",
@@ -7752,8 +7752,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "IIndexedDbOptions",
@@ -8017,8 +8017,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "ILocalStorageOptions",
@@ -8480,8 +8480,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "memoryStorageHost",
@@ -8601,8 +8601,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "cookieBackendPlugin",
@@ -8741,8 +8741,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "indexedDbBackendPlugin",
@@ -8988,8 +8988,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "localStorageBackendPlugin",
@@ -9086,8 +9086,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "memoryBackendPlugin",
@@ -9172,8 +9172,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [],
       "aliases": [
         {
@@ -9241,8 +9241,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "cookiesReactive",
@@ -9381,8 +9381,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "indexedDbReactive",
@@ -9566,8 +9566,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "localStorageReactive",
@@ -9664,8 +9664,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "memoryReactive",
@@ -9746,8 +9746,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "sessionStorageReactive",
@@ -9844,8 +9844,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "sessionStorageBackendPlugin",
@@ -9942,8 +9942,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "defineReactiveAdapterFeature",
@@ -10171,8 +10171,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "fromStandardSchema",
@@ -10753,8 +10753,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "binaryCodec",
@@ -11222,8 +11222,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "ISessionStorageOptions",

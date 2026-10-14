@@ -1276,8 +1276,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-react/getting-started",
-      "architecturePath": "/en/architecture/store-react",
+      "guidePath": "/en/docs/store-react/getting-started",
+      "architecturePath": "/en/docs/store-react",
       "symbols": [
         {
           "name": "assertStoreFeature",

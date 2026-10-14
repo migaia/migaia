@@ -1110,8 +1110,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createAdapterProcessLaunch",
@@ -7118,8 +7118,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [],
       "aliases": [
         {
@@ -7157,8 +7157,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createBunProcessLauncher",
@@ -7331,8 +7331,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createDenoProcessLauncher",
@@ -7573,8 +7573,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "dialProcessByteChannel",
@@ -7737,8 +7737,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createElectronUtilityProcessLauncher",
@@ -7882,8 +7882,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createAdapterChildStdio",
@@ -8518,8 +8518,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createAdapterSocketByteIO",
@@ -8764,8 +8764,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createWindowsJobProcessLauncher",

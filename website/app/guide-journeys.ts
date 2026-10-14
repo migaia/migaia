@@ -12298,665 +12298,870 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'utils:index': {
     zh: {
-      title: 'Utils 学习路径',
-      lede: '从要固定的语义进入：等待期限、错误身份、字节协议、不可变更新或配置所有权；不要把 utils 当作应用框架。',
+      title: 'Utils：库代码常用的基础工具',
+      lede: '超时、取消、重试、并发限制、错误身份、字节编码、不可变更新、配置所有权和文本格式化，每一组都在自己的子路径里，按需导入。',
       document: {
         sections: [
           {
-            id: 'choose-primitive',
-            heading: '按问题选择最窄入口',
+            id: 'what',
+            heading: '它是什么',
             blocks: [
               {
-                type: 'table',
-                headers: ['问题', '子入口', '首选原语'],
-                rows: [
-                  ['等待需要 deadline 或取消', '/promise', 'withTimeout、raceWithAbort'],
-                  ['失败需要稳定身份与因果链', '/error', 'attachErrorIdentity、walkErrorCauses'],
-                  ['协议需要 Base64 或 UTF-8', '/bytes', 'base64ToBytes、splitUtf8'],
-                  ['嵌套值需要不可变读写', '/object', 'get、set、probeObjectPath'],
-                  [
-                    '配置需要快照、只读访问与合并',
-                    '/config',
-                    'ownConfig、readonlyConfig、combineConfig'
-                  ],
-                  [
-                    '入口需要区分空值或只执行一次',
-                    '/value、/function',
-                    'isEmptyValue、once、onceAsync'
-                  ],
-                  [
-                    '界面需要安全插值或本地化数字',
-                    '/string、/number',
-                    'format、createNumberFormatter'
-                  ],
-                  ['内存数组需要惰性筛选、去重与分页', '包根入口', 'collect']
-                ]
+                type: 'paragraph',
+                text: '@migaia/utils 收集了写库代码时反复需要、但很容易写错的小工具。例如“给一个请求加超时”看起来只要一个 setTimeout，但还要考虑：超时后操作本身怎么停下、操作在超时之后才失败时这个错误去哪、定时器有没有清理。这个包把这些边界情况处理好，并给每种失败一个稳定的错误代码。'
+              },
+              {
+                type: 'paragraph',
+                text: '它不依赖浏览器或 Node.js 的专有 API，在任何 JavaScript 运行时里都能用；migaia 的其他包也都建立在它之上。它不是应用框架：没有状态管理、事件总线或资源生命周期，这些分别由 reactive、event-subscriber、lifecycle 负责。'
+              },
+              {
+                type: 'paragraph',
+                text: '有一条规则贯穿所有异步工具：取消是“协作式”的。超时或取消只会通过 signal 通知你的操作，操作自己检查 signal 才能真正停下；不检查 signal 的代码不会被强行中断。'
               }
             ]
           },
           {
-            id: 'boundaries',
-            heading: '先记住三条边界',
+            id: 'api',
+            heading: '按子路径查找',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  '取消是协作式通知；忽略 signal 的操作不会被强制停止。',
-                  'identitySnapshot 明确保留引用，不等于不可变快照。',
-                  '配置 profile、限制和 merge 策略是所有权契约，不能在下游静默放宽。'
+                type: 'table',
+                headers: ['导入路径', '主要 API', '用来做什么'],
+                rows: [
+                  [
+                    '@migaia/utils/promise',
+                    'withTimeout, raceWithAbort, retry, createConcurrencyLimiter, sleep',
+                    '超时、取消、重试、限制并发'
+                  ],
+                  [
+                    '@migaia/utils/error',
+                    'attachErrorIdentity, walkErrorCauses, combineErrors, toError',
+                    '给错误加稳定代码、追踪原因、合并多个错误'
+                  ],
+                  [
+                    '@migaia/utils/bytes',
+                    'bytesToBase64, base64ToBytes, encodeUtf8, splitUtf8',
+                    'Base64 和 UTF-8 编解码'
+                  ],
+                  [
+                    '@migaia/utils/object',
+                    'get, set, probeProperty, immutableSnapshot',
+                    '按路径读写嵌套对象、不可变更新、快照'
+                  ],
+                  [
+                    '@migaia/utils/config',
+                    'ownConfig, readonlyConfig, patchConfig, combineConfig',
+                    '接收、保护、更新、合并配置'
+                  ],
+                  ['@migaia/utils/function', 'once, onceAsync, noop', '只执行一次的初始化'],
+                  [
+                    '@migaia/utils/value',
+                    'isEmptyValue, isNullish, isPrimitive',
+                    '判断空值和值的种类'
+                  ],
+                  [
+                    '@migaia/utils/string · /number',
+                    'format, formatCurrency, createNumberFormatter',
+                    '模板插值、数字和金额格式化'
+                  ],
+                  ['@migaia/utils', 'collect', '在内存数组上做筛选、去重、分页']
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: '根入口 @migaia/utils 也重新导出了大部分工具，但从子路径导入能让打包工具只包含你用到的部分。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Collector 惰性数组查询', path: 'collector' },
-        { label: '五分钟组合 deadline、retry 与 limiter', path: 'getting-started' },
-        { label: '截止时间与取消', path: 'deadlines-and-abort' }
-      ]
-    },
-    en: {
-      title: 'Utils learning paths',
-      lede: 'Enter through the semantic you must fix: waiting deadlines, error identity, byte protocols, immutable updates, or configuration ownership. Utils is not an application framework.',
-      document: {
-        sections: [
-          {
-            id: 'choose-primitive',
-            heading: 'Choose the narrowest entry for the problem',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Problem', 'Subpath', 'Start with'],
-                rows: [
-                  [
-                    'A wait needs a deadline or cancellation',
-                    '/promise',
-                    'withTimeout, raceWithAbort'
-                  ],
-                  [
-                    'A failure needs stable identity and causes',
-                    '/error',
-                    'attachErrorIdentity, walkErrorCauses'
-                  ],
-                  ['A protocol needs Base64 or UTF-8', '/bytes', 'base64ToBytes, splitUtf8'],
-                  ['A nested value needs immutable access', '/object', 'get, set, probeObjectPath'],
-                  [
-                    'Configuration needs snapshots, readonly views, and merge',
-                    '/config',
-                    'ownConfig, readonlyConfig, combineConfig'
-                  ],
-                  [
-                    'An entry boundary needs absence checks or one-time work',
-                    '/value, /function',
-                    'isEmptyValue, once, onceAsync'
-                  ],
-                  [
-                    'A UI needs safe interpolation or localized numbers',
-                    '/string, /number',
-                    'format, createNumberFormatter'
-                  ],
-                  [
-                    'An in-memory array needs lazy filtering, deduplication, and pagination',
-                    'root entry',
-                    'collect'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'boundaries',
-            heading: 'Keep three boundaries in mind',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  'Cancellation is cooperative notification; an operation that ignores signal cannot be forcibly stopped.',
-                  'identitySnapshot explicitly preserves a reference and is not an immutable snapshot.',
-                  'Configuration profiles, limits, and merge strategies are ownership contracts that downstream code cannot silently widen.'
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        { label: 'Lazy array queries with Collector', path: 'collector' },
         {
-          label: 'Compose a deadline, retry, and limiter in five minutes',
+          label: '快速开始',
           path: 'getting-started'
         },
-        { label: 'Deadlines and abort', path: 'deadlines-and-abort' }
-      ]
-    }
-  },
-  'utils:collector': {
-    zh: {
-      title: '用 Collector 组合惰性数组查询',
-      lede: 'Collector 借用 readonly source，把字段筛选、业务 predicate、稳定去重和分页记录成有序流水线；首次读取 result 时扫描并缓存。',
-      document: {
-        sections: [
-          {
-            id: 'complete-example',
-            heading: '从完整查询开始',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'collect 只从 @migaia/utils 包根入口导出。它不会复制输入，也不会在每次链式调用时立刻扫描。下面的查询先保留至少存在一个名称字段的用户，再执行忽略大小写的子串匹配、业务状态过滤、按 id 保留第一次出现，最后分页。动作顺序就是执行顺序。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { collect } from '@migaia/utils'\n\ntype IUser = {\n  readonly id: string\n  readonly active: boolean\n  readonly profile: {\n    readonly nameZh?: string\n    readonly nameEn?: string\n  }\n}\n\nconst visibleUsers = collect(users)\n  .fieldBy('profile.nameZh', 'profile.nameEn')\n  .like(searchText)\n  .where((user) => user.active)\n  .distinctBy('id')\n  .skip(page * pageSize)\n  .take(pageSize)\n  .result"
-              },
-              {
-                type: 'table',
-                headers: ['动作', '语义', '关键边界'],
-                rows: [
-                  [
-                    'fieldBy(...paths)',
-                    '选择活动字段并过滤所有字段均为 undefined 的项',
-                    '至少传一个安全 object path'
-                  ],
-                  [
-                    'like(query)',
-                    '字符串字段 trim 后忽略大小写做连续子串 OR 匹配',
-                    '空 query 是 no-op；非字符串不匹配'
-                  ],
-                  ['equals(value)', '字段之间 OR；与其他动作按顺序组成 AND', '使用 Object.is'],
-                  ['oneOf(...values)', '任一字段等于任一候选值', '候选值线性扫描'],
-                  ['where(predicate)', '对 source 项执行同步业务 predicate', '异常保持原始身份'],
-                  ['distinctBy(path)', '按已定义 key 保留第一次出现', 'undefined 不参与去重'],
-                  ['skip/take(count)', '在当前位置跳过或截断', '只接受非负安全整数']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'ordering-and-cache',
-            heading: '顺序、缓存与快照身份',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { collect } from '@migaia/utils'\n\ntype IUser = { id: number; active: boolean }\nconst users: readonly IUser[] = [\n  { id: 1, active: true },\n  { id: 2, active: false },\n  { id: 3, active: true }\n]\nconst isActive = (user: IUser) => user.active\n\nconst first = collect(users).take(2).where(isActive).result\nconst second = collect(users).where(isActive).take(2).result\nconsole.log(first, second)\n\nconst query = collect(users).where(isActive)\nconst a = query.result\nconst b = query.result\nconsole.assert(a === b)\nquery.take(1)\nconst c = query.result\nconsole.assert(c !== a)"
-              },
-              {
-                type: 'list',
-                items: [
-                  '无动作或所有 source 均通过时，result 可以直接复用原 readonly 数组。',
-                  '每个动作立刻改变查询 revision，但直到读取 result 才求值。',
-                  '新增动作后从原 source 重新求值，不会接着修改旧结果数组。',
-                  '求值失败不写缓存；修复外部原因后再次读取可以重新求值。',
-                  '求值回调中重读 result 或修改同一 collector 会抛带 REENTRANT_CALL 的 TypeError。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'ownership-and-choice',
-            heading: '输入所有权与何时不要使用',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Collector 借用 source 和其中对象；readonly 是调用方契约，不是运行时深冻结。外部绕过类型修改数组或嵌套字段后，已缓存 revision 不会自动失效。需要响应式更新时，应在 Store/Signal 变化后创建新 collector；需要远端过滤、索引、排序或稳定游标时，应把查询交给数据库或存储层。'
-              },
-              {
-                type: 'list',
-                items: [
-                  '适合：中小型内存快照、一次渲染派生、命令结果整理和测试数据筛选。',
-                  '不适合：持续变化的共享数组、百万级全表搜索、远端数据、异步 predicate 或事务查询。',
-                  'like 不是全文搜索、locale collation 或模糊匹配；这些需求必须使用专用搜索设施。',
-                  'skip/take 是当前位置的流水线动作，不是固定在查询末尾的 SQL OFFSET/LIMIT。'
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        { label: 'collect API', path: 'docs/utils/collect' },
-        { label: '不可变对象与安全路径', path: 'immutable-objects-and-paths' },
-        { label: '返回 Utils 学习路径', path: 'index' }
+        {
+          label: '超时与取消',
+          path: 'deadlines-and-abort'
+        },
+        {
+          label: '配置所有权',
+          path: 'configuration-ownership'
+        }
       ]
     },
     en: {
-      title: 'Compose lazy array queries with Collector',
-      lede: 'Collector borrows a readonly source and records field filters, business predicates, stable deduplication, and pagination as an ordered pipeline evaluated and cached on first result access.',
+      title: 'Utils: everyday building blocks for library code',
+      lede: 'Timeouts, cancellation, retries, concurrency limits, error identity, byte encoding, immutable updates, configuration ownership, and text formatting, each under its own subpath for import on demand.',
       document: {
         sections: [
           {
-            id: 'complete-example',
-            heading: 'Start with a complete query',
+            id: 'what',
+            heading: 'What it is',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'collect is exported only from the @migaia/utils root entry. It neither copies input nor scans on every chained call. This query keeps users with at least one defined name, applies a case-insensitive substring match, filters active users, keeps the first occurrence of each id, and then pages the result. Stage order is execution order.'
+                text: '@migaia/utils collects small tools that library code needs again and again and that are easy to get wrong. Adding a timeout to a request looks like one setTimeout, but you also need to stop the operation, decide where an error raised after the timeout goes, and clear the timer. This package handles those edge cases and gives every failure a stable error code.'
               },
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { collect } from '@migaia/utils'\n\ntype IUser = {\n  readonly id: string\n  readonly active: boolean\n  readonly profile: {\n    readonly nameZh?: string\n    readonly nameEn?: string\n  }\n}\n\nconst visibleUsers = collect(users)\n  .fieldBy('profile.nameZh', 'profile.nameEn')\n  .like(searchText)\n  .where((user) => user.active)\n  .distinctBy('id')\n  .skip(page * pageSize)\n  .take(pageSize)\n  .result"
+                type: 'paragraph',
+                text: 'It relies on no browser- or Node-specific API, so it runs in any JavaScript runtime, and the other migaia packages build on it. It is not an application framework: state, event buses, and resource lifecycles belong to reactive, event-subscriber, and lifecycle.'
               },
+              {
+                type: 'paragraph',
+                text: 'One rule runs through every async tool: cancellation is cooperative. A timeout or abort only notifies your operation through signal; the operation stops when it checks signal, and code that ignores signal is never forcibly interrupted.'
+              }
+            ]
+          },
+          {
+            id: 'api',
+            heading: 'Find tools by subpath',
+            blocks: [
               {
                 type: 'table',
-                headers: ['Stage', 'Meaning', 'Boundary'],
+                headers: ['Import path', 'Main APIs', 'Use it to'],
                 rows: [
                   [
-                    'fieldBy(...paths)',
-                    'Selects active fields and removes items where every field is undefined',
-                    'Requires at least one safe object path'
+                    '@migaia/utils/promise',
+                    'withTimeout, raceWithAbort, retry, createConcurrencyLimiter, sleep',
+                    'time out, cancel, retry, and limit concurrency'
                   ],
                   [
-                    'like(query)',
-                    'Trimmed case-insensitive substring OR across string fields',
-                    'Blank query is a no-op; non-strings do not match'
+                    '@migaia/utils/error',
+                    'attachErrorIdentity, walkErrorCauses, combineErrors, toError',
+                    'give errors stable codes, trace causes, combine failures'
                   ],
                   [
-                    'equals(value)',
-                    'OR across fields and ordered AND with other stages',
-                    'Uses Object.is'
+                    '@migaia/utils/bytes',
+                    'bytesToBase64, base64ToBytes, encodeUtf8, splitUtf8',
+                    'encode and decode Base64 and UTF-8'
                   ],
                   [
-                    'oneOf(...values)',
-                    'Any selected field equals any candidate',
-                    'Candidates use a linear scan'
+                    '@migaia/utils/object',
+                    'get, set, probeProperty, immutableSnapshot',
+                    'read and write nested paths, update immutably, snapshot'
                   ],
                   [
-                    'where(predicate)',
-                    'Runs a synchronous business predicate on each source item',
-                    'Preserves thrown error identity'
+                    '@migaia/utils/config',
+                    'ownConfig, readonlyConfig, patchConfig, combineConfig',
+                    'accept, protect, update, and merge configuration'
+                  ],
+                  ['@migaia/utils/function', 'once, onceAsync, noop', 'run initialization once'],
+                  [
+                    '@migaia/utils/value',
+                    'isEmptyValue, isNullish, isPrimitive',
+                    'check for empty values and value kinds'
                   ],
                   [
-                    'distinctBy(path)',
-                    'Keeps the first occurrence of each defined key',
-                    'Undefined keys do not deduplicate'
+                    '@migaia/utils/string · /number',
+                    'format, formatCurrency, createNumberFormatter',
+                    'interpolate templates, format numbers and money'
                   ],
-                  [
-                    'skip/take(count)',
-                    'Skips or truncates at its pipeline position',
-                    'Requires a non-negative safe integer'
-                  ]
+                  ['@migaia/utils', 'collect', 'filter, deduplicate, and page an in-memory array']
                 ]
-              }
-            ]
-          },
-          {
-            id: 'ordering-and-cache',
-            heading: 'Ordering, caching, and snapshot identity',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { collect } from '@migaia/utils'\n\ntype IUser = { id: number; active: boolean }\nconst users: readonly IUser[] = [\n  { id: 1, active: true },\n  { id: 2, active: false },\n  { id: 3, active: true }\n]\nconst isActive = (user: IUser) => user.active\n\nconst first = collect(users).take(2).where(isActive).result\nconst second = collect(users).where(isActive).take(2).result\nconsole.log(first, second)\n\nconst query = collect(users).where(isActive)\nconst a = query.result\nconst b = query.result\nconsole.assert(a === b)\nquery.take(1)\nconst c = query.result\nconsole.assert(c !== a)"
               },
-              {
-                type: 'list',
-                items: [
-                  'With no stages, or when every source passes, result may reuse the original readonly array.',
-                  'Each stage immediately changes query revision, but evaluation waits until result is read.',
-                  'A new stage reevaluates from the original source and never mutates an earlier result array.',
-                  'Failed evaluation is not cached, allowing a later read after its external cause is fixed.',
-                  'Reading result or mutating the same collector during evaluation throws a REENTRANT_CALL TypeError.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'ownership-and-choice',
-            heading: 'Input ownership and when not to use it',
-            blocks: [
               {
                 type: 'paragraph',
-                text: 'Collector borrows the source and its objects. readonly is a caller contract, not runtime deep freezing. If external code bypasses types and mutates the array or nested fields, an already cached revision does not invalidate itself. Create a new collector after Store or Signal changes. Delegate remote filtering, indexes, sorting, and stable cursors to the database or storage owner.'
-              },
-              {
-                type: 'list',
-                items: [
-                  'Use it for small or medium in-memory snapshots, render derivation, command-result shaping, and test-data filtering.',
-                  'Avoid it for continuously mutated shared arrays, million-row scans, remote data, async predicates, or transactional queries.',
-                  'like is not full-text search, locale collation, or fuzzy matching; use a dedicated search facility for those semantics.',
-                  'skip and take run at their exact pipeline positions and are not fixed SQL OFFSET/LIMIT clauses.'
-                ]
+                text: 'The root @migaia/utils re-exports most tools too, but importing from subpaths lets bundlers include only what you use.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'collect API', path: 'docs/utils/collect' },
-        { label: 'Immutable objects and safe paths', path: 'immutable-objects-and-paths' },
-        { label: 'Back to Utils learning paths', path: 'index' }
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'Timeouts and cancellation',
+          path: 'deadlines-and-abort'
+        },
+        {
+          label: 'Configuration ownership',
+          path: 'configuration-ownership'
+        }
       ]
     }
   },
   'utils:getting-started': {
     zh: {
-      title: '五分钟建立有界、可取消的批处理',
-      lede: '用一个总 deadline、有限重试与并发 limiter 组合批量请求；每层只拥有一种策略。',
+      title: '快速开始：给一个不稳定的请求加上重试',
+      lede: '安装包，用 retry 让一个偶尔失败的请求自动重试，并弄清每个选项的作用。',
       document: {
         sections: [
           {
-            id: 'compose',
-            heading: '把 deadline 放在最外层',
+            id: 'install',
+            heading: '安装',
             blocks: [
               {
                 type: 'code',
-                language: 'ts',
-                code: "import {\n  createConcurrencyLimiter,\n  retry,\n  withTimeout\n} from '@migaia/utils/promise'\n\nconst limiter = createConcurrencyLimiter({ concurrency: 4 })\n\ntry {\n  return await withTimeout(\n    ({ signal }) =>\n      Promise.all(\n        urls.map((url) =>\n          limiter.run(() =>\n            retry(\n              () => fetch(url, { signal }),\n              {\n                maxAttempts: 3,\n                shouldRetry: (error) => isTransient(error),\n                signal\n              }\n            )\n          )\n        )\n      ),\n    { timeoutMs: 10_000 }\n  )\n} finally {\n  await limiter.dispose()\n}"
+                language: 'bash',
+                code: 'pnpm add @migaia/utils'
               },
               {
-                type: 'list',
-                items: [
-                  'withTimeout 拥有整个批次的最终期限。',
-                  'retry 只拥有单项失败后的再次尝试，shouldRetry 必须按错误分类。',
-                  'limiter 只拥有并发准入；dispose 等待在途任务后进入终态。',
-                  'fetch 读取同一个 signal，取消才会真正传播到底层 I/O。'
-                ]
+                type: 'paragraph',
+                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
               }
             ]
           },
           {
-            id: 'observe',
-            heading: '迟到失败必须可观察',
+            id: 'first',
+            heading: '第一个例子',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { retry } from '@migaia/utils/promise'\n\nlet calls = 0\n/** 模拟一个不稳定的接口：前两次失败，第三次成功。 */\nasync function fetchProfile(): Promise<string> {\n  calls += 1\n  if (calls < 3) throw new Error(`第 ${calls} 次请求失败`)\n  return 'ada'\n}\n\nconst name = await retry(fetchProfile, {\n  maxAttempts: 3,\n  shouldRetry: (error) => {\n    console.log('重试，原因:', (error as Error).message)\n    return true\n  },\n  delay: 100,\n  attemptTimeoutMs: 1000\n})\nconsole.log('结果:', name, '共请求', calls, '次')"
+              },
+              {
                 type: 'paragraph',
-                text: '操作在 timeout 或 abort 后才 reject 时，最终 Promise 已经结算；迟到失败交给 report，默认 hostRethrowReporter，不会被静默吞掉。生产环境通常注入结构化日志 reporter。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '重试，原因: 第 1 次请求失败\n重试，原因: 第 2 次请求失败\n结果: ada 共请求 3 次'
+              },
+              {
+                type: 'paragraph',
+                text: 'retry(operation, options) 调用 operation；失败时问 shouldRetry 要不要再试，要的话等 delay 毫秒后再调用，最多调用 maxAttempts 次。第三次成功，所以拿到了结果。如果三次都失败，retry 会以最后一次的错误拒绝。'
+              },
+              {
+                type: 'paragraph',
+                text: 'attemptTimeoutMs 给每一次调用单独设置超时：某次调用超过 1 秒还没完成，就算作失败并进入重试判断。'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'retry 的选项',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['选项', '必填', '作用'],
+                rows: [
+                  ['maxAttempts', '是', '最多调用几次（包括第一次），正整数'],
+                  [
+                    'shouldRetry(error, context)',
+                    '是',
+                    '收到这次的错误，返回 true 才重试。context 里有 attempt（第几次）和 signal'
+                  ],
+                  [
+                    'delay',
+                    '否',
+                    '两次调用之间等待的毫秒数，或 (error, context) => 毫秒数 的函数，用于逐次加长等待'
+                  ],
+                  ['attemptTimeoutMs', '否', '每次调用的超时'],
+                  ['totalTimeoutMs', '否', '整个重试过程（包括等待）的总超时'],
+                  ['signal', '否', '外部取消信号，随时停止整个重试']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'operation 收到 { attempt, signal }：attempt 从 1 开始；signal 在超时或外部取消时变为已取消，把它交给 fetch 等 API，就能让正在进行的请求也停下。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '截止时间与取消', path: 'deadlines-and-abort' },
-        { label: '重试与并发', path: 'retry-and-concurrency' }
+        {
+          label: '重试与并发限制',
+          path: 'retry-and-concurrency'
+        },
+        {
+          label: '超时与取消',
+          path: 'deadlines-and-abort'
+        },
+        {
+          label: 'retry API',
+          path: 'docs/utils/promise/retry'
+        }
       ]
     },
     en: {
-      title: 'Build a bounded, cancellable batch in five minutes',
-      lede: 'Compose one total deadline, finite retries, and a concurrency limiter for a request batch. Each layer owns one policy.',
+      title: 'Quick start: add retries to a flaky request',
+      lede: 'Install the package, let retry repeat a request that sometimes fails, and learn what each option does.',
       document: {
         sections: [
           {
-            id: 'compose',
-            heading: 'Put the total deadline at the outside',
+            id: 'install',
+            heading: 'Install',
             blocks: [
               {
                 type: 'code',
-                language: 'ts',
-                code: "import {\n  createConcurrencyLimiter,\n  retry,\n  withTimeout\n} from '@migaia/utils/promise'\n\nconst limiter = createConcurrencyLimiter({ concurrency: 4 })\n\ntry {\n  return await withTimeout(\n    ({ signal }) =>\n      Promise.all(\n        urls.map((url) =>\n          limiter.run(() =>\n            retry(\n              () => fetch(url, { signal }),\n              {\n                maxAttempts: 3,\n                shouldRetry: (error) => isTransient(error),\n                signal\n              }\n            )\n          )\n        )\n      ),\n    { timeoutMs: 10_000 }\n  )\n} finally {\n  await limiter.dispose()\n}"
+                language: 'bash',
+                code: 'pnpm add @migaia/utils'
               },
               {
-                type: 'list',
-                items: [
-                  'withTimeout owns the final deadline for the complete batch.',
-                  'retry owns only another attempt after one item fails; shouldRetry must classify the error.',
-                  'The limiter owns concurrency admission only; dispose waits for active work and becomes terminal.',
-                  'fetch reads the same signal so cancellation actually reaches the underlying I/O.'
-                ]
+                type: 'paragraph',
+                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
               }
             ]
           },
           {
-            id: 'observe',
-            heading: 'Late failures must remain observable',
+            id: 'first',
+            heading: 'First example',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { retry } from '@migaia/utils/promise'\n\nlet calls = 0\n/** A flaky endpoint: the first two calls fail, the third succeeds. */\nasync function fetchProfile(): Promise<string> {\n  calls += 1\n  if (calls < 3) throw new Error(`request ${calls} failed`)\n  return 'ada'\n}\n\nconst name = await retry(fetchProfile, {\n  maxAttempts: 3,\n  shouldRetry: (error) => {\n    console.log('retrying because:', (error as Error).message)\n    return true\n  },\n  delay: 100,\n  attemptTimeoutMs: 1000\n})\nconsole.log('result:', name, 'after', calls, 'requests')"
+              },
+              {
                 type: 'paragraph',
-                text: 'When an operation rejects after timeout or abort, the returned Promise is already settled. The late failure goes to report, defaulting to hostRethrowReporter, instead of being swallowed. Production code normally supplies a structured logging reporter.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'retrying because: request 1 failed\nretrying because: request 2 failed\nresult: ada after 3 requests'
+              },
+              {
+                type: 'paragraph',
+                text: 'retry(operation, options) calls operation; on failure it asks shouldRetry whether to try again, waits delay milliseconds if so, and calls at most maxAttempts times. The third call succeeds, so the result arrives. If all three fail, retry rejects with the last error.'
+              },
+              {
+                type: 'paragraph',
+                text: 'attemptTimeoutMs gives each call its own timeout: a call still running after one second counts as a failure and goes to the retry decision.'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'retry options',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Required', 'Purpose'],
+                rows: [
+                  [
+                    'maxAttempts',
+                    'yes',
+                    'Maximum number of calls including the first; a positive integer'
+                  ],
+                  [
+                    'shouldRetry(error, context)',
+                    'yes',
+                    'Receives the error and returns true to retry; context holds attempt and signal'
+                  ],
+                  [
+                    'delay',
+                    'no',
+                    'Milliseconds between calls, or (error, context) => ms for growing back-off'
+                  ],
+                  ['attemptTimeoutMs', 'no', 'Timeout for each call'],
+                  ['totalTimeoutMs', 'no', 'Timeout for the whole process, waits included'],
+                  ['signal', 'no', 'External abort signal that stops the whole process at any time']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'operation receives { attempt, signal }: attempt starts at 1, and signal aborts on timeout or external cancellation; pass it to fetch and similar APIs so an in-flight request stops too.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Deadlines and abort', path: 'deadlines-and-abort' },
-        { label: 'Retry and concurrency', path: 'retry-and-concurrency' }
+        {
+          label: 'Retries and concurrency limits',
+          path: 'retry-and-concurrency'
+        },
+        {
+          label: 'Timeouts and cancellation',
+          path: 'deadlines-and-abort'
+        },
+        {
+          label: 'retry API',
+          path: 'docs/utils/promise/retry'
+        }
       ]
     }
   },
   'utils:deadlines-and-abort': {
     zh: {
-      title: '选择 signal composition、abort race 或 deadline',
-      lede: '三个原语拥有不同的 Promise 结算责任；先确定谁决定最终事实，再选择 API。',
+      title: '超时与取消',
+      lede: 'withTimeout 给操作加截止时间，raceWithAbort 让操作响应外部取消；两者都通过 signal 通知操作停下。',
       document: {
         sections: [
           {
-            id: 'choose',
-            heading: '按结算所有权选择',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['API', '拥有最终 Promise', '适用场景'],
-                rows: [
-                  [
-                    'createAbortTimeoutSignal',
-                    '否，只组合 signal',
-                    '事务或底层操作自己决定何时真正完成'
-                  ],
-                  ['raceWithAbort', '是，只响应外部 signal', '没有 deadline、但等待可取消'],
-                  [
-                    'withTimeout',
-                    '是，响应 signal 与 deadline',
-                    '调用方必须在固定期限内获得 settlement'
-                  ],
-                  ['sleep', '是，拥有延时等待', '退避、节流和可取消延迟']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'deadline',
-            heading: '让操作协作退出',
+            id: 'timeout',
+            heading: '给操作加超时',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { withTimeout } from '@migaia/utils'\n\nconst reportLateFailure = (error: unknown) => console.warn('late failure', error)\nexport async function fetchWithDeadline(url: string) {\n  return withTimeout(\n    async ({ signal }) => {\n      const response = await fetch(url, { signal })\n      if (!response.ok) throw new Error('request failed')\n      return response.json()\n    },\n    { timeoutMs: 2_000, zeroTimeoutBehavior: 'skip', report: reportLateFailure }\n  )\n}"
+                code: "import { withTimeout } from '@migaia/utils/promise'\nimport { isUtilsTimeoutError } from '@migaia/utils/error'\n\ntry {\n  await withTimeout(\n    async ({ signal }) => {\n      // 模拟一个需要 1 秒的操作；收到 signal 的取消通知就立即停止\n      await new Promise((resolve, reject) => {\n        const timer = setTimeout(resolve, 1000)\n        signal.addEventListener('abort', () => {\n          clearTimeout(timer)\n          reject(signal.reason)\n        })\n      })\n      return 'done'\n    },\n    {\n      timeoutMs: 100,\n      // 操作在超时之后才 reject，这个“迟到的结果”交给 report；不传时默认重新抛给宿主\n      report: (_error, context) => console.log('迟到的结果:', context.operation, context.phase)\n    }\n  )\n} catch (error) {\n  if (isUtilsTimeoutError(error)) {\n    console.log(error.code, error.scope, error.timeoutMs)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'signal 与 signals 互斥；同时提供会以 TypeError 拒绝。',
-                  'timeoutMs: 0 默认不启动操作；start 表示立即启动且不设置 timeout。',
-                  'cooperativeCancellation: false 只限时等待，不通知操作退出。',
-                  'createAbortTimeoutSignal 返回的 dispose 必须由创建者在 finally 中调用。'
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'DEADLINE_EXCEEDED operation 100\n// 操作随后以 signal.reason 拒绝，这个迟到的结果交给 report\n迟到的结果: withTimeout late-rejection'
+              },
+              {
+                type: 'paragraph',
+                text: 'withTimeout(operation, { timeoutMs }) 调用 operation 并传入 { signal }。超过 timeoutMs 毫秒，withTimeout 以 UtilsTimeoutError 拒绝（code 为 DEADLINE_EXCEEDED，scope 为 operation，timeoutMs 为设定值），同时让 signal 变为已取消。操作监听 signal，收到通知后停下。'
+              }
+            ]
+          },
+          {
+            id: 'late',
+            heading: '重要：迟到的结果默认会被重新抛出',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '上面的操作在超时之后以 signal.reason 拒绝，这时 withTimeout 已经结束了，这个结果叫“迟到的结果”。为了不悄悄吞掉错误，默认的 report（hostRethrowReporter）会把它重新抛给运行环境：在 Node.js 里这会变成未捕获异常，使进程退出。'
+              },
+              {
+                type: 'paragraph',
+                text: '所以只要你的操作会在取消后 reject（这是正常写法），就应该传入 report，自己决定记录还是忽略。report 收到 (error, { operation, phase })，phase 为 late-rejection。'
+              }
+            ]
+          },
+          {
+            id: 'abort',
+            heading: '响应外部取消',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { raceWithAbort, sleep } from '@migaia/utils/promise'\nimport { isUtilsAbortError } from '@migaia/utils/error'\n\nconst controller = new AbortController()\nsetTimeout(() => controller.abort('用户点击了取消'), 50)\n\ntry {\n  await raceWithAbort(\n    async ({ signal }) => {\n      await sleep(1000, { signal }) // sleep 也接受 signal，取消时立即结束\n      return '上传完成'\n    },\n    {\n      signal: controller.signal,\n      report: (_error, context) => console.log('迟到的结果:', context.operation, context.phase)\n    }\n  )\n} catch (error) {\n  if (isUtilsAbortError(error)) console.log(error.code, '原因:', error.cause)\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'ABORTED 原因: 用户点击了取消\n迟到的结果: raceWithAbort late-rejection'
+              },
+              {
+                type: 'paragraph',
+                text: 'raceWithAbort(operation, { signal }) 不设截止时间，只在外部 signal 被取消时以 UtilsAbortError 拒绝（code 为 ABORTED），abort() 传入的原因放在 error.cause 里。sleep(ms, { signal }) 是可以被取消的等待。'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: '选项',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['选项', '适用于', '作用'],
+                rows: [
+                  ['timeoutMs', 'withTimeout', '必填，截止时间（毫秒）；0 默认立即超时'],
+                  [
+                    'signal / signals',
+                    'withTimeout, raceWithAbort, sleep',
+                    '外部取消信号；signals 是多个信号，任意一个取消即取消。两者不能同时传'
+                  ],
+                  ['report', '全部', '处理迟到的结果，默认重新抛给运行环境'],
+                  [
+                    'cooperativeCancellation',
+                    'withTimeout',
+                    '设为 false 时操作拿到一个永不取消的 signal，只限时等待结果'
+                  ],
+                  [
+                    'zeroTimeoutBehavior',
+                    'withTimeout',
+                    "timeoutMs 为 0 时：'skip'（默认）立即超时，'start' 直接执行且不设超时"
+                  ]
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: '需要把超时和外部取消合成一个 signal，交给多个请求共同使用时，用 createAbortTimeoutSignal({ signal, timeoutMs })，它返回 { signal, dispose }，用完调用 dispose()。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'withTimeout API', path: 'docs/utils/promise/withTimeout' },
-        { label: '重试与并发', path: 'retry-and-concurrency' }
+        {
+          label: '重试与并发限制',
+          path: 'retry-and-concurrency'
+        },
+        {
+          label: '错误身份与原因链',
+          path: 'error-identity-and-causes'
+        },
+        {
+          label: 'withTimeout API',
+          path: 'docs/utils/promise/withTimeout'
+        }
       ]
     },
     en: {
-      title: 'Choose signal composition, an abort race, or a deadline',
-      lede: 'The three primitives own different parts of Promise settlement. Decide who owns the final fact before choosing an API.',
+      title: 'Timeouts and cancellation',
+      lede: 'withTimeout gives an operation a deadline and raceWithAbort makes it respond to external cancellation; both tell the operation to stop through signal.',
       document: {
         sections: [
           {
-            id: 'choose',
-            heading: 'Choose by settlement ownership',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['API', 'Owns final Promise', 'Use it when'],
-                rows: [
-                  [
-                    'createAbortTimeoutSignal',
-                    'No, it only composes a signal',
-                    'A transaction or lower operation decides when work truly completes'
-                  ],
-                  [
-                    'raceWithAbort',
-                    'Yes, for external signals only',
-                    'The wait is cancellable but has no deadline'
-                  ],
-                  [
-                    'withTimeout',
-                    'Yes, for signals and deadline',
-                    'The caller requires settlement within a fixed deadline'
-                  ],
-                  ['sleep', 'Yes, for the delay', 'Backoff, throttling, and cancellable delay']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'deadline',
-            heading: 'Make the operation exit cooperatively',
+            id: 'timeout',
+            heading: 'Give an operation a deadline',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { withTimeout } from '@migaia/utils'\n\nconst reportLateFailure = (error: unknown) => console.warn('late failure', error)\nexport async function fetchWithDeadline(url: string) {\n  return withTimeout(\n    async ({ signal }) => {\n      const response = await fetch(url, { signal })\n      if (!response.ok) throw new Error('request failed')\n      return response.json()\n    },\n    { timeoutMs: 2_000, zeroTimeoutBehavior: 'skip', report: reportLateFailure }\n  )\n}"
+                code: "import { withTimeout } from '@migaia/utils/promise'\nimport { isUtilsTimeoutError } from '@migaia/utils/error'\n\ntry {\n  await withTimeout(\n    async ({ signal }) => {\n      // A one-second operation that stops as soon as signal reports cancellation\n      await new Promise((resolve, reject) => {\n        const timer = setTimeout(resolve, 1000)\n        signal.addEventListener('abort', () => {\n          clearTimeout(timer)\n          reject(signal.reason)\n        })\n      })\n      return 'done'\n    },\n    {\n      timeoutMs: 100,\n      // The operation rejects after the timeout; report receives that late result. Without report it is rethrown to the host\n      report: (_error, context) => console.log('late result:', context.operation, context.phase)\n    }\n  )\n} catch (error) {\n  if (isUtilsTimeoutError(error)) {\n    console.log(error.code, error.scope, error.timeoutMs)\n  }\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'signal and signals are mutually exclusive; supplying both rejects with TypeError.',
-                  'timeoutMs: 0 skips the operation by default; start begins immediately without a timeout.',
-                  'cooperativeCancellation: false only bounds the wait and does not notify the operation to exit.',
-                  'The creator must call the dispose returned by createAbortTimeoutSignal in finally.'
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'DEADLINE_EXCEEDED operation 100\n// the operation then rejects with signal.reason; report receives that late result\nlate result: withTimeout late-rejection'
+              },
+              {
+                type: 'paragraph',
+                text: 'withTimeout(operation, { timeoutMs }) calls operation with { signal }. After timeoutMs it rejects with UtilsTimeoutError (code DEADLINE_EXCEEDED, scope operation, timeoutMs as set) and aborts signal. The operation listens to signal and stops.'
+              }
+            ]
+          },
+          {
+            id: 'late',
+            heading: 'Important: late results are rethrown by default',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The operation above rejects with signal.reason after the timeout, when withTimeout has already finished; that is a late result. To avoid silently swallowing errors, the default report (hostRethrowReporter) rethrows it to the runtime, which in Node.js becomes an uncaught exception and ends the process.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Whenever your operation rejects after cancellation, which is the normal pattern, pass report and decide whether to log or ignore. report receives (error, { operation, phase }) with phase late-rejection.'
+              }
+            ]
+          },
+          {
+            id: 'abort',
+            heading: 'Respond to external cancellation',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { raceWithAbort, sleep } from '@migaia/utils/promise'\nimport { isUtilsAbortError } from '@migaia/utils/error'\n\nconst controller = new AbortController()\nsetTimeout(() => controller.abort('user clicked cancel'), 50)\n\ntry {\n  await raceWithAbort(\n    async ({ signal }) => {\n      await sleep(1000, { signal }) // sleep accepts a signal too and ends at once on cancellation\n      return 'upload finished'\n    },\n    {\n      signal: controller.signal,\n      report: (_error, context) => console.log('late result:', context.operation, context.phase)\n    }\n  )\n} catch (error) {\n  if (isUtilsAbortError(error)) console.log(error.code, 'reason:', error.cause)\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'ABORTED reason: user clicked cancel\nlate result: raceWithAbort late-rejection'
+              },
+              {
+                type: 'paragraph',
+                text: 'raceWithAbort(operation, { signal }) has no deadline; it rejects with UtilsAbortError (code ABORTED) when the external signal aborts, with the abort() reason in error.cause. sleep(ms, { signal }) is a cancellable wait.'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'Options',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Option', 'Applies to', 'Purpose'],
+                rows: [
+                  [
+                    'timeoutMs',
+                    'withTimeout',
+                    'Required deadline in ms; 0 times out immediately by default'
+                  ],
+                  [
+                    'signal / signals',
+                    'withTimeout, raceWithAbort, sleep',
+                    'External abort signal; signals takes several and aborts on any. Do not pass both'
+                  ],
+                  ['report', 'all', 'Handles late results; rethrows to the runtime by default'],
+                  [
+                    'cooperativeCancellation',
+                    'withTimeout',
+                    'false gives the operation a signal that never aborts; it only bounds the wait'
+                  ],
+                  [
+                    'zeroTimeoutBehavior',
+                    'withTimeout',
+                    "For timeoutMs 0: 'skip' (default) times out at once, 'start' runs without a deadline"
+                  ]
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'To merge a timeout and an external abort into one signal shared by several requests, use createAbortTimeoutSignal({ signal, timeoutMs }); it returns { signal, dispose }, and you call dispose() when done.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'withTimeout API', path: 'docs/utils/promise/withTimeout' },
-        { label: 'Retry and concurrency', path: 'retry-and-concurrency' }
+        {
+          label: 'Retries and concurrency limits',
+          path: 'retry-and-concurrency'
+        },
+        {
+          label: 'Error identity and causes',
+          path: 'error-identity-and-causes'
+        },
+        {
+          label: 'withTimeout API',
+          path: 'docs/utils/promise/withTimeout'
+        }
       ]
     }
   },
   'utils:retry-and-concurrency': {
     zh: {
-      title: '用有限重试与并发准入保护依赖',
-      lede: '重试扩大请求次数，limiter 限制同时执行数；两者必须同时受取消、deadline 和终态约束。',
+      title: '重试与并发限制',
+      lede: 'retry 只重试值得重试的错误并逐次加长等待；createConcurrencyLimiter 限制同时进行的任务数量。',
       document: {
         sections: [
           {
             id: 'retry',
-            heading: '明确总预算与单次预算',
+            heading: '只重试值得重试的错误',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { retry } from '@migaia/utils'\n\nconst loadRecord = async ({ signal }: { signal: AbortSignal }) => ({ id: 'record-1', value: 42 })\nconst isTransient = (error: unknown) => error instanceof TypeError\n\nexport async function loadWithRetry() {\n  return retry(\n    ({ signal }) => loadRecord({ signal }),\n    {\n      maxAttempts: 4,\n      attemptTimeoutMs: 1_000,\n      totalTimeoutMs: 3_500,\n      delay: (_, { attempt }) => attempt * 100,\n      shouldRetry: (error) => isTransient(error)\n    }\n  )\n}"
+                code: "import { retry } from '@migaia/utils/promise'\n\nclass HttpError extends Error {\n  status: number\n  constructor(status: number) {\n    super(`HTTP ${status}`)\n    this.status = status\n  }\n}\nconst responses = [503, 503, 404]\n\ntry {\n  await retry(\n    async ({ attempt }) => {\n      const status = responses[attempt - 1]\n      console.log(`第 ${attempt} 次请求 → ${status}`)\n      throw new HttpError(status)\n    },\n    {\n      maxAttempts: 5,\n      // 只有服务端暂时不可用（5xx）才值得重试\n      shouldRetry: (error) => error instanceof HttpError && error.status >= 500,\n      // 退避：第 1 次失败后等 100ms，第 2 次失败后等 200ms\n      delay: (_error, { attempt }) => attempt * 100\n    }\n  )\n} catch (error) {\n  console.log('放弃:', (error as Error).message)\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'maxAttempts 包含第一次尝试，必须是正安全整数。',
-                  'totalTimeoutMs 包含尝试和退避；不能用次数预算替代时间预算。',
-                  'shouldRetry 返回 false 时保留并抛出当前原始失败。',
-                  '取消立即终止整个序列，不再进入下一次尝试。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '第 1 次请求 → 503\n第 2 次请求 → 503\n第 3 次请求 → 404\n// 404 不满足 shouldRetry，不再重试\n放弃: HTTP 404'
+              },
+              {
+                type: 'paragraph',
+                text: 'shouldRetry 决定哪些错误值得再试：服务端暂时不可用（5xx）可能下一次就好了，而 404 再试多少次都一样。delay 写成函数时，可以根据 attempt 逐次加长等待，避免在服务恢复前不停请求。完整选项见“快速开始”。'
               }
             ]
           },
           {
             id: 'limiter',
-            heading: '区分排队取消与在途取消',
+            heading: '限制同时进行的任务数',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { createConcurrencyLimiter, sleep } from '@migaia/utils/promise'\n\nconst limiter = createConcurrencyLimiter({ concurrency: 2 })\n\nconst download = (file: string) =>\n  limiter.run(async () => {\n    console.log(`开始 ${file}（同时进行 ${limiter.activeCount} 个，排队 ${limiter.pendingCount} 个）`)\n    await sleep(50)\n    return file\n  })\n\nconst files = await Promise.all(['a.png', 'b.png', 'c.png', 'd.png'].map(download))\nconsole.log('全部完成:', files)\nawait limiter.dispose()"
+              },
+              {
                 type: 'paragraph',
-                text: 'limiter.run 的 signal 可以移除尚未开始的任务；任务开始后，回调必须读取 context.signal 才能退出。close 停止新准入，dispose 还会等待 activeCount 归零。whenIdle 只等待当前队列为空，不关闭 limiter。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "开始 a.png（同时进行 2 个，排队 2 个）\n开始 b.png（同时进行 2 个，排队 2 个）\n// a、b 完成后，c、d 才开始\n开始 c.png（同时进行 2 个，排队 1 个）\n开始 d.png（同时进行 2 个，排队 0 个）\n全部完成: [ 'a.png', 'b.png', 'c.png', 'd.png' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'createConcurrencyLimiter({ concurrency }) 创建一个限流器。limiter.run(task) 把任务放进队列：正在执行的任务少于 concurrency 时立即开始，否则排队等待空位，按先来后到执行。run 返回任务结果的 Promise。'
+              },
+              {
+                type: 'table',
+                headers: ['成员', '作用'],
+                rows: [
+                  ['run(task, { signal? })', '执行或排队一个任务；signal 只能取消还在排队的任务'],
+                  ['activeCount / pendingCount', '正在执行 / 正在排队的任务数'],
+                  ['whenIdle()', '所有任务都完成时 resolve'],
+                  ['close(reason?)', '不再接收新任务，排队中的任务被拒绝（LIMITER_CLOSED）'],
+                  ['dispose(reason?)', 'close 之后等待正在执行的任务结束，用于优雅关闭']
+                ]
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'retry API', path: 'docs/utils/promise/retry' },
-        { label: '错误身份与因果链', path: 'error-identity-and-causes' }
+        {
+          label: '超时与取消',
+          path: 'deadlines-and-abort'
+        },
+        {
+          label: '错误身份与原因链',
+          path: 'error-identity-and-causes'
+        },
+        {
+          label: 'createConcurrencyLimiter API',
+          path: 'docs/utils/promise/createConcurrencyLimiter'
+        }
       ]
     },
     en: {
-      title: 'Protect dependencies with finite retry and concurrency admission',
-      lede: 'Retry expands request count while a limiter bounds simultaneous work. Both must remain under cancellation, deadline, and terminal-state control.',
+      title: 'Retries and concurrency limits',
+      lede: 'retry repeats only failures worth retrying with growing waits; createConcurrencyLimiter caps how many tasks run at once.',
       document: {
         sections: [
           {
             id: 'retry',
-            heading: 'Define total and per-attempt budgets',
+            heading: 'Retry only failures worth retrying',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { retry } from '@migaia/utils'\n\nconst loadRecord = async ({ signal }: { signal: AbortSignal }) => ({ id: 'record-1', value: 42 })\nconst isTransient = (error: unknown) => error instanceof TypeError\n\nexport async function loadWithRetry() {\n  return retry(\n    ({ signal }) => loadRecord({ signal }),\n    {\n      maxAttempts: 4,\n      attemptTimeoutMs: 1_000,\n      totalTimeoutMs: 3_500,\n      delay: (_, { attempt }) => attempt * 100,\n      shouldRetry: (error) => isTransient(error)\n    }\n  )\n}"
+                code: "import { retry } from '@migaia/utils/promise'\n\nclass HttpError extends Error {\n  status: number\n  constructor(status: number) {\n    super(`HTTP ${status}`)\n    this.status = status\n  }\n}\nconst responses = [503, 503, 404]\n\ntry {\n  await retry(\n    async ({ attempt }) => {\n      const status = responses[attempt - 1]\n      console.log(`request ${attempt} → ${status}`)\n      throw new HttpError(status)\n    },\n    {\n      maxAttempts: 5,\n      // Only temporary server failures (5xx) are worth retrying\n      shouldRetry: (error) => error instanceof HttpError && error.status >= 500,\n      // Back off: wait 100 ms after the first failure, 200 ms after the second\n      delay: (_error, { attempt }) => attempt * 100\n    }\n  )\n} catch (error) {\n  console.log('gave up:', (error as Error).message)\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'maxAttempts includes the first attempt and must be a positive safe integer.',
-                  'totalTimeoutMs includes attempts and backoff; an attempt-count budget cannot replace a time budget.',
-                  'When shouldRetry returns false, retry preserves and throws the current original failure.',
-                  'Cancellation ends the complete sequence immediately and prevents another attempt.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'request 1 → 503\nrequest 2 → 503\nrequest 3 → 404\n// 404 fails shouldRetry, so retrying stops\ngave up: HTTP 404'
+              },
+              {
+                type: 'paragraph',
+                text: 'shouldRetry decides which failures are worth another try: a temporary 5xx may succeed next time, while a 404 never will. A delay function can grow the wait with attempt so you do not hammer a recovering service. See Quick start for every option.'
               }
             ]
           },
           {
             id: 'limiter',
-            heading: 'Separate queued cancellation from active cancellation',
+            heading: 'Cap concurrent tasks',
             blocks: [
               {
+                type: 'code',
+                language: 'ts',
+                code: "import { createConcurrencyLimiter, sleep } from '@migaia/utils/promise'\n\nconst limiter = createConcurrencyLimiter({ concurrency: 2 })\n\nconst download = (file: string) =>\n  limiter.run(async () => {\n    console.log(`start ${file} (${limiter.activeCount} running, ${limiter.pendingCount} queued)`)\n    await sleep(50)\n    return file\n  })\n\nconst files = await Promise.all(['a.png', 'b.png', 'c.png', 'd.png'].map(download))\nconsole.log('all done:', files)\nawait limiter.dispose()"
+              },
+              {
                 type: 'paragraph',
-                text: 'A signal passed to limiter.run can remove work that has not started. After admission, the callback must observe context.signal to exit. close stops new admission; dispose additionally waits for activeCount to reach zero. whenIdle waits for an empty current queue without closing the limiter.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "start a.png (2 running, 2 queued)\nstart b.png (2 running, 2 queued)\n// c and d start only after a and b finish\nstart c.png (2 running, 1 queued)\nstart d.png (2 running, 0 queued)\nall done: [ 'a.png', 'b.png', 'c.png', 'd.png' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'createConcurrencyLimiter({ concurrency }) creates a limiter. limiter.run(task) queues the task: it starts at once while fewer than concurrency run, otherwise it waits for a free slot in arrival order. run returns a Promise of the task result.'
+              },
+              {
+                type: 'table',
+                headers: ['Member', 'Purpose'],
+                rows: [
+                  [
+                    'run(task, { signal? })',
+                    'Runs or queues a task; signal cancels only a still-queued task'
+                  ],
+                  ['activeCount / pendingCount', 'Number of running / queued tasks'],
+                  ['whenIdle()', 'Resolves when every task has finished'],
+                  [
+                    'close(reason?)',
+                    'Stops accepting tasks and rejects queued ones (LIMITER_CLOSED)'
+                  ],
+                  ['dispose(reason?)', 'close, then wait for running tasks; for graceful shutdown']
+                ]
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'retry API', path: 'docs/utils/promise/retry' },
-        { label: 'Error identity and causes', path: 'error-identity-and-causes' }
+        {
+          label: 'Timeouts and cancellation',
+          path: 'deadlines-and-abort'
+        },
+        {
+          label: 'Error identity and causes',
+          path: 'error-identity-and-causes'
+        },
+        {
+          label: 'createConcurrencyLimiter API',
+          path: 'docs/utils/promise/createConcurrencyLimiter'
+        }
       ]
     }
   },
   'utils:error-identity-and-causes': {
     zh: {
-      title: '保留错误身份、原始类型与完整因果链',
-      lede: '错误码用于程序分支，message 用于人类诊断；给原对象附加身份，不要重建并丢失类型、stack 或 cause。',
+      title: '错误身份与原因链',
+      lede: '给错误加上稳定的 source 和 code，沿 cause 链找到最初的原因，把多个错误合并成一个。',
       document: {
         sections: [
           {
-            id: 'identity',
-            heading: '在包边界附加稳定身份',
+            id: 'example',
+            heading: '例子',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "try {\n  return await load()\n} catch (value) {\n  const error = toError(value)\n  throw attachErrorIdentity(error, {\n    source: 'catalog',\n    code: 'LOAD_FAILED',\n    phase: 'read'\n  })\n}"
+                code: "import { attachErrorIdentity, combineErrors, toError, walkErrorCauses } from '@migaia/utils/error'\n\n// 1. 给底层错误加上稳定的 source / code，并保留原错误作为 cause\nconst lowLevel = new Error('ECONNRESET')\nconst failure = attachErrorIdentity(new Error('同步订单失败', { cause: lowLevel }), {\n  source: 'order-service',\n  code: 'SYNC_FAILED'\n})\nconst identified = failure as Error & { source: string; code: string }\nconsole.log(identified.source, identified.code)\n\n// 2. 沿 cause 链找到最初的原因\nconsole.log(walkErrorCauses(failure).map((error) => (error as Error).message))\n\n// 3. 把 throw 的任意值统一成 Error\nconsole.log(toError('磁盘已满') instanceof Error, toError('磁盘已满').message)\n\n// 4. 合并多个错误：0 个返回 undefined，1 个原样返回，多个变成 AggregateError\nconsole.log(combineErrors([], '批量失败'))\nconst many = combineErrors([new Error('a'), new Error('b')], '批量失败') as AggregateError\nconsole.log(many.name, many.message, many.errors.length)"
               },
               {
                 type: 'paragraph',
-                text: 'attachErrorIdentity 修改并返回同一个 Error；同名 identity 字段已有不同值时拒绝覆盖。调用方应按 source/code 分支，而不是解析 message。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "order-service SYNC_FAILED\n[ '同步订单失败', 'ECONNRESET' ]\ntrue 磁盘已满\nundefined\nAggregateError 批量失败 2"
+              },
+              {
+                type: 'table',
+                headers: ['函数', '作用'],
+                rows: [
+                  [
+                    'attachErrorIdentity(error, { source, code, detail? })',
+                    '给已有的错误对象加上 source（哪个模块）和 code（什么失败），不创建新对象。调用方可以按 code 分支，而不用解析错误消息'
+                  ],
+                  [
+                    'walkErrorCauses(error)',
+                    '返回错误本身和它的整条 cause 链（包括 AggregateError.errors）'
+                  ],
+                  ['toError(value)', '把 throw 出来的任意值（字符串、对象）转成 Error'],
+                  [
+                    'combineErrors(errors, message)',
+                    '没有错误返回 undefined，一个错误原样返回，多个变成 AggregateError'
+                  ],
+                  ['isUtilsTimeoutError / isUtilsAbortError', '判断是不是本包的超时 / 取消错误']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'attachErrorIdentity 在类型上返回传入错误的原类型，读取 source、code 时需要类型断言，如例子所示。同一个错误已经有不同的 source 或 code 时抛 ERROR_IDENTITY_CONFLICT，不会覆盖原有身份。'
               }
             ]
           },
           {
-            id: 'causes',
-            heading: '有界遍历 cause 与 AggregateError',
+            id: 'codes',
+            heading: '本包的错误代码',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { combineErrors, walkErrorCauses } from '@migaia/utils'\n\nconst originalError = new Error('load failed')\nconst cleanupErrors: Error[] = [new Error('flush failed')]\nconst error = new AggregateError([originalError], 'request failed')\nconst causes = walkErrorCauses(error, { maxDepth: 32 })\nconst cleanupFailure = combineErrors(cleanupErrors, 'cleanup failed')\nconsole.log(causes.length, cleanupFailure?.message)"
+                type: 'paragraph',
+                text: "本包抛出的错误都有 error.source（'@migaia/utils'）和 error.code，请用 UtilsErrorCode 常量比较。"
               },
               {
-                type: 'list',
-                items: [
-                  'walkErrorCauses 同时遍历 cause 与 AggregateError.errors，并用 maxDepth 限制恶意或循环链。',
-                  'combineErrors 对零项返回 undefined、单项保持 identity、多项才创建 AggregateError。',
-                  'toError 把非 Error throw 值正规化，但无法恢复原本不存在的 stack。'
+                type: 'table',
+                headers: ['error.code', '什么时候出现'],
+                rows: [
+                  ['DEADLINE_EXCEEDED', '超时；error.scope 是 operation、attempt 或 total'],
+                  ['ABORTED', '外部 signal 被取消，原因在 cause'],
+                  ['INVALID_ARGUMENT', '参数类型或范围不对'],
+                  ['INVALID_ENCODING', 'Base64 输入不是标准格式'],
+                  [
+                    'CONFIG_READONLY / CONFIG_CONFLICT / CONFIG_UNSUPPORTED',
+                    '写只读配置 / 合并时规则冲突 / 配置包含不支持的值'
+                  ],
+                  ['LIMITER_CLOSED', '限流器已关闭'],
+                  ['REENTRANT_CALL', '在 once 等函数还没返回时又调用了它自己']
                 ]
               }
             ]
@@ -12964,45 +13169,94 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'attachErrorIdentity API', path: 'docs/utils/error/attachErrorIdentity' },
-        { label: '字节与文本', path: 'bytes-and-text' }
+        {
+          label: '超时与取消',
+          path: 'deadlines-and-abort'
+        },
+        {
+          label: 'attachErrorIdentity API',
+          path: 'docs/utils/error/attachErrorIdentity'
+        },
+        {
+          label: '字节与文本',
+          path: 'bytes-and-text'
+        }
       ]
     },
     en: {
-      title: 'Preserve error identity, native type, and the complete cause chain',
-      lede: 'Codes drive program branches while messages support human diagnosis. Attach identity to the original object instead of rebuilding it and losing type, stack, or cause.',
+      title: 'Error identity and causes',
+      lede: 'Give errors a stable source and code, walk the cause chain to the original reason, and combine several errors into one.',
       document: {
         sections: [
           {
-            id: 'identity',
-            heading: 'Attach stable identity at the public boundary',
+            id: 'example',
+            heading: 'Example',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "try {\n  return await load()\n} catch (value) {\n  const error = toError(value)\n  throw attachErrorIdentity(error, {\n    source: 'catalog',\n    code: 'LOAD_FAILED',\n    phase: 'read'\n  })\n}"
+                code: "import { attachErrorIdentity, combineErrors, toError, walkErrorCauses } from '@migaia/utils/error'\n\n// 1. Give a failure a stable source / code and keep the low-level error as cause\nconst lowLevel = new Error('ECONNRESET')\nconst failure = attachErrorIdentity(new Error('order sync failed', { cause: lowLevel }), {\n  source: 'order-service',\n  code: 'SYNC_FAILED'\n})\nconst identified = failure as Error & { source: string; code: string }\nconsole.log(identified.source, identified.code)\n\n// 2. Walk the cause chain to the original reason\nconsole.log(walkErrorCauses(failure).map((error) => (error as Error).message))\n\n// 3. Normalize any thrown value into an Error\nconsole.log(toError('disk full') instanceof Error, toError('disk full').message)\n\n// 4. Combine errors: none gives undefined, one is returned as is, several become an AggregateError\nconsole.log(combineErrors([], 'batch failed'))\nconst many = combineErrors([new Error('a'), new Error('b')], 'batch failed') as AggregateError\nconsole.log(many.name, many.message, many.errors.length)"
               },
               {
                 type: 'paragraph',
-                text: 'attachErrorIdentity mutates and returns the same Error. It refuses to overwrite an existing identity field with a different value. Callers branch on source and code instead of parsing message text.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "order-service SYNC_FAILED\n[ 'order sync failed', 'ECONNRESET' ]\ntrue disk full\nundefined\nAggregateError batch failed 2"
+              },
+              {
+                type: 'table',
+                headers: ['Function', 'Purpose'],
+                rows: [
+                  [
+                    'attachErrorIdentity(error, { source, code, detail? })',
+                    'Adds source (which module) and code (which failure) to an existing error without creating a new object, so callers branch on code instead of parsing messages'
+                  ],
+                  [
+                    'walkErrorCauses(error)',
+                    'Returns the error and its whole cause chain, AggregateError.errors included'
+                  ],
+                  ['toError(value)', 'Turns any thrown value (string, object) into an Error'],
+                  [
+                    'combineErrors(errors, message)',
+                    'Returns undefined for none, the error itself for one, an AggregateError for several'
+                  ],
+                  [
+                    'isUtilsTimeoutError / isUtilsAbortError',
+                    'Checks for this package’s timeout / abort errors'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'attachErrorIdentity returns the input error’s own type, so reading source and code needs a type assertion, as shown. If the error already carries a different source or code it throws ERROR_IDENTITY_CONFLICT instead of overwriting.'
               }
             ]
           },
           {
-            id: 'causes',
-            heading: 'Traverse cause and AggregateError with a bound',
+            id: 'codes',
+            heading: 'Error codes of this package',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { combineErrors, walkErrorCauses } from '@migaia/utils'\n\nconst originalError = new Error('load failed')\nconst cleanupErrors: Error[] = [new Error('flush failed')]\nconst error = new AggregateError([originalError], 'request failed')\nconst causes = walkErrorCauses(error, { maxDepth: 32 })\nconst cleanupFailure = combineErrors(cleanupErrors, 'cleanup failed')\nconsole.log(causes.length, cleanupFailure?.message)"
+                type: 'paragraph',
+                text: "Errors from this package carry error.source ('@migaia/utils') and error.code; compare against UtilsErrorCode constants."
               },
               {
-                type: 'list',
-                items: [
-                  'walkErrorCauses traverses both cause and AggregateError.errors while maxDepth bounds malicious or cyclic chains.',
-                  'combineErrors returns undefined for zero items, preserves identity for one, and creates AggregateError only for several.',
-                  'toError normalizes a non-Error thrown value but cannot recover a stack that never existed.'
+                type: 'table',
+                headers: ['error.code', 'When it appears'],
+                rows: [
+                  ['DEADLINE_EXCEEDED', 'Timed out; error.scope is operation, attempt, or total'],
+                  ['ABORTED', 'The external signal aborted; the reason is in cause'],
+                  ['INVALID_ARGUMENT', 'Wrong argument type or range'],
+                  ['INVALID_ENCODING', 'Base64 input is not canonical'],
+                  [
+                    'CONFIG_READONLY / CONFIG_CONFLICT / CONFIG_UNSUPPORTED',
+                    'Writing read-only config / conflicting merge rules / unsupported values in config'
+                  ],
+                  ['LIMITER_CLOSED', 'The limiter is closed'],
+                  ['REENTRANT_CALL', 'once or a similar function was called again before returning']
                 ]
               }
             ]
@@ -13010,184 +13264,240 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'attachErrorIdentity API', path: 'docs/utils/error/attachErrorIdentity' },
-        { label: 'Bytes and text', path: 'bytes-and-text' }
+        {
+          label: 'Timeouts and cancellation',
+          path: 'deadlines-and-abort'
+        },
+        {
+          label: 'attachErrorIdentity API',
+          path: 'docs/utils/error/attachErrorIdentity'
+        },
+        {
+          label: 'Bytes and text',
+          path: 'bytes-and-text'
+        }
       ]
     }
   },
   'utils:bytes-and-text': {
     zh: {
-      title: '在协议边界正确处理 Base64 与 UTF-8',
-      lede: '先确定协议接受字节、文本还是规范 Base64；分块必须保持每片独立有效，并且不能切断 Unicode 码点。',
+      title: '字节与文本：Base64 和 UTF-8',
+      lede: '在字符串、UTF-8 字节和 Base64 之间转换，按字节上限切分文本而不切坏字符。',
       document: {
         sections: [
           {
-            id: 'base64',
-            heading: '拒绝非规范 Base64',
+            id: 'example',
+            heading: '例子',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { base64ToBytes, bytesToBase64, streamBase64Chunks } from '@migaia/serialize'\n\nconst largePayload = new Uint8Array(100_000).fill(7)\nconst send = (chunk: string) => console.log('sending chunk', chunk.length)\nconst encoded = bytesToBase64(new Uint8Array([1, 2, 3]))\nconst decoded = base64ToBytes(encoded)\nconsole.log(decoded.length)\n\nfor (const chunk of streamBase64Chunks(largePayload, 32_763)) {\n  send(chunk)\n}"
+                code: "import {\n  base64ToBytes,\n  bytesToBase64,\n  decodeUtf8,\n  encodeUtf8,\n  splitUtf8,\n  utf8ByteLength\n} from '@migaia/utils/bytes'\n\nconst bytes = encodeUtf8('你好')\nconsole.log(bytes) // UTF-8 编码后的字节\nconsole.log(bytesToBase64(bytes))\nconsole.log(decodeUtf8(base64ToBytes('5L2g5aW9')))\n\nconsole.log(utf8ByteLength('你好')) // 每个汉字占 3 个字节\nconsole.log(splitUtf8('你好世界', 7)) // 每段最多 7 个字节，不会把一个汉字切成两半\n\ntry {\n  base64ToBytes('5L2g5aW9=') // 多了一个补齐符号\n} catch (error) {\n  console.log((error as { code: string }).code)\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'base64ToBytes 只接受规范 RFC 4648 形式，非规范输入抛 TypeError。',
-                  'streamBase64Chunks 的每片都是独立合法 Base64，不是任意切字符串。',
-                  '跨 realm 品牌检测使用 isUint8Array/isArrayBuffer，不信任 constructor.name。'
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "Uint8Array(6) [ 228, 189, 160, 229, 165, 189 ]\n5L2g5aW9\n你好\n6\n[ '你好', '世界' ]\nINVALID_ENCODING"
+              },
+              {
+                type: 'table',
+                headers: ['函数', '作用'],
+                rows: [
+                  [
+                    'encodeUtf8(text) / decodeUtf8(bytes, { fatal? })',
+                    '字符串与 UTF-8 字节互转；fatal: true 时遇到非法字节报错，而不是替换成 �'
+                  ],
+                  [
+                    'bytesToBase64(bytes) / base64ToBytes(text)',
+                    '字节与 Base64 互转；只接受标准 Base64，不接受 URL 安全变体或缺少补齐的写法'
+                  ],
+                  ['utf8ByteLength(text)', '计算 UTF-8 字节数，不分配内存'],
+                  [
+                    'splitUtf8(text, maxBytes)',
+                    '按字节上限切分，不会把一个字符切成两半；maxBytes 至少为 4'
+                  ],
+                  [
+                    'streamBase64Chunks(bytes, maxChunkBytes?)',
+                    '把大块字节切成多段各自合法的 Base64，适合分片发送'
+                  ]
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: '字符串长度不等于字节数：一个汉字在 UTF-8 里占 3 个字节，一个 emoji 占 4 个。网络协议、存储配额通常按字节计算，所以要用 utf8ByteLength 和 splitUtf8，而不是 text.length 和 slice。'
               }
             ]
           },
           {
-            id: 'utf8',
-            heading: '按字节预算切文本，不切断码点',
+            id: 'buffers',
+            heading: 'ArrayBuffer 和 Uint8Array',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { decodeUtf8, encodeUtf8, splitUtf8, utf8ByteLength } from '@migaia/serialize'\n\nconst text = '你好，RPC'\nconst size = utf8ByteLength(text)\nconst chunks = splitUtf8(text, 4_096)\nconst strict = decodeUtf8(encodeUtf8(text), { fatal: true })\nconsole.log(size, chunks.length, strict)"
-              },
-              {
                 type: 'paragraph',
-                text: 'splitUtf8 的 maxBytes 至少为 4，保证单个 Unicode 码点总能容纳。fatal: true 在非法序列处失败；默认模式用 U+FFFD 替换，适合展示而不是协议验证。'
+                text: 'ArrayBuffer 是一段原始内存，不能直接按下标读写；Uint8Array 是覆盖在它上面的“按字节读写”的视图。本模块的函数都使用 Uint8Array。new Uint8Array(buffer) 不会复制数据，修改视图会改变原内存；需要独立副本时用 slice()。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'base64ToBytes API', path: 'docs/utils/bytes/base64ToBytes' },
-        { label: '不可变对象与路径', path: 'immutable-objects-and-paths' }
+        {
+          label: '对象路径与不可变更新',
+          path: 'immutable-objects-and-paths'
+        },
+        {
+          label: '错误身份与原因链',
+          path: 'error-identity-and-causes'
+        },
+        {
+          label: 'base64ToBytes API',
+          path: 'docs/utils/bytes/base64ToBytes'
+        }
       ]
     },
     en: {
-      title: 'Handle Base64 and UTF-8 correctly at protocol boundaries',
-      lede: 'First decide whether the protocol accepts bytes, text, or canonical Base64. Chunking must keep every piece independently valid and never split a Unicode code point.',
+      title: 'Bytes and text: Base64 and UTF-8',
+      lede: 'Convert between strings, UTF-8 bytes, and Base64, and split text by byte limit without breaking characters.',
       document: {
         sections: [
           {
-            id: 'base64',
-            heading: 'Reject non-canonical Base64',
+            id: 'example',
+            heading: 'Example',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { base64ToBytes, bytesToBase64, streamBase64Chunks } from '@migaia/serialize'\n\nconst largePayload = new Uint8Array(100_000).fill(7)\nconst send = (chunk: string) => console.log('sending chunk', chunk.length)\nconst encoded = bytesToBase64(new Uint8Array([1, 2, 3]))\nconst decoded = base64ToBytes(encoded)\nconsole.log(decoded.length)\n\nfor (const chunk of streamBase64Chunks(largePayload, 32_763)) {\n  send(chunk)\n}"
+                code: "import {\n  base64ToBytes,\n  bytesToBase64,\n  decodeUtf8,\n  encodeUtf8,\n  splitUtf8,\n  utf8ByteLength\n} from '@migaia/utils/bytes'\n\nconst bytes = encodeUtf8('hé')\nconsole.log(bytes) // UTF-8 bytes\nconsole.log(bytesToBase64(bytes))\nconsole.log(decodeUtf8(base64ToBytes('aMOp')))\n\nconsole.log(utf8ByteLength('héllo')) // é takes 2 bytes\nconsole.log(splitUtf8('日本語テキスト', 7)) // at most 7 bytes per piece; a character is never cut in half\n\ntry {\n  base64ToBytes('aMOp=') // one padding character too many\n} catch (error) {\n  console.log((error as { code: string }).code)\n}"
               },
               {
-                type: 'list',
-                items: [
-                  'base64ToBytes accepts canonical RFC 4648 input only and throws TypeError for non-canonical forms.',
-                  'Every streamBase64Chunks item is independently valid Base64; it does not split an encoded string arbitrarily.',
-                  'Use isUint8Array and isArrayBuffer for cross-realm branding instead of trusting constructor.name.'
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "Uint8Array(3) [ 104, 195, 169 ]\naMOp\nhé\n6\n[ '日本', '語テ', 'キス', 'ト' ]\nINVALID_ENCODING"
+              },
+              {
+                type: 'table',
+                headers: ['Function', 'Purpose'],
+                rows: [
+                  [
+                    'encodeUtf8(text) / decodeUtf8(bytes, { fatal? })',
+                    'Convert between strings and UTF-8 bytes; fatal: true throws on invalid bytes instead of inserting �'
+                  ],
+                  [
+                    'bytesToBase64(bytes) / base64ToBytes(text)',
+                    'Convert between bytes and Base64; only canonical Base64 is accepted, not URL-safe or unpadded variants'
+                  ],
+                  ['utf8ByteLength(text)', 'Counts UTF-8 bytes without allocating'],
+                  [
+                    'splitUtf8(text, maxBytes)',
+                    'Splits by byte limit without cutting a character; maxBytes must be at least 4'
+                  ],
+                  [
+                    'streamBase64Chunks(bytes, maxChunkBytes?)',
+                    'Splits large byte arrays into independently valid Base64 chunks for chunked sending'
+                  ]
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'String length is not byte count: a Chinese character takes 3 UTF-8 bytes and an emoji 4. Protocols and storage quotas count bytes, so use utf8ByteLength and splitUtf8 rather than text.length and slice.'
               }
             ]
           },
           {
-            id: 'utf8',
-            heading: 'Split text by byte budget without cutting code points',
+            id: 'buffers',
+            heading: 'ArrayBuffer and Uint8Array',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { decodeUtf8, encodeUtf8, splitUtf8, utf8ByteLength } from '@migaia/serialize'\n\nconst text = '你好，RPC'\nconst size = utf8ByteLength(text)\nconst chunks = splitUtf8(text, 4_096)\nconst strict = decodeUtf8(encodeUtf8(text), { fatal: true })\nconsole.log(size, chunks.length, strict)"
-              },
-              {
                 type: 'paragraph',
-                text: 'splitUtf8 requires maxBytes of at least 4 so one Unicode code point always fits. fatal: true fails on an invalid sequence; the default replaces it with U+FFFD and is suitable for display rather than protocol validation.'
+                text: 'An ArrayBuffer is raw memory you cannot index directly; a Uint8Array is a byte-level view over it. This module works with Uint8Array. new Uint8Array(buffer) does not copy, so writing the view changes the memory; use slice() for an independent copy.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'base64ToBytes API', path: 'docs/utils/bytes/base64ToBytes' },
-        { label: 'Immutable objects and paths', path: 'immutable-objects-and-paths' }
+        {
+          label: 'Object paths and immutable updates',
+          path: 'immutable-objects-and-paths'
+        },
+        {
+          label: 'Error identity and causes',
+          path: 'error-identity-and-causes'
+        },
+        {
+          label: 'base64ToBytes API',
+          path: 'docs/utils/bytes/base64ToBytes'
+        }
       ]
     }
   },
   'utils:immutable-objects-and-paths': {
     zh: {
-      title: '选择快照语义，并安全更新嵌套路径',
-      lede: '深拷贝、诊断拷贝和引用保留是三种不同所有权；路径读写还必须拒绝原型污染段并保持结构共享。',
+      title: '对象路径与不可变更新',
+      lede: '用字符串路径读写嵌套对象，更新时不修改原对象；区分“属性不存在”和“读取失败”；给对象拍一张与原对象断开的快照。',
       document: {
         sections: [
           {
-            id: 'snapshot',
-            heading: '明确你要哪一种快照',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['API', '语义', '失败方式'],
-                rows: [
-                  ['immutableSnapshot', 'structuredClone 深拷贝', '环境或值不支持时抛错'],
-                  [
-                    'diagnosticSnapshot',
-                    '尽力拷贝并返回 diagnostics',
-                    '把 accessor、读取失败和不支持值逐路径报告'
-                  ],
-                  ['identitySnapshot', '保留原始引用', '不拷贝；调用方明确接受共享所有权']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'paths',
-            heading: '用 probe 解释失败，用 set 保持不可变',
+            id: 'example',
+            heading: '例子',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createPathAccessor, probeObjectPath, set } from '@migaia/utils'\n\nconst state = { user: { profile: { name: 'Ada' } } }\nconst report = (result: unknown) => console.warn('blocked path', result)\nconst audit = (event: unknown) => console.log('path update', event)\nconst probe = probeObjectPath(state, 'user.profile.name')\nconst next = set(state, 'user.profile.name', 'Grace')\n\nconst accessor = createPathAccessor(next, {\n  ifBlocked: report,\n  onSet: audit\n})\nconsole.log(probe.value, accessor.get('user.profile.name'))"
+                code: "import { get, immutableSnapshot, probeProperty, set } from '@migaia/utils/object'\n\nconst state = { user: { name: 'Ada' }, settings: { theme: 'dark' } }\n\nconsole.log(get(state, 'user.name'))\nconst next = set(state, 'user.name', 'Grace')\nconsole.log(next.user.name, state.user.name) // 原对象没有被修改\nconsole.log(next.settings === state.settings) // 没改的分支直接复用\n\nconst profile = { name: 'Ada' }\nconsole.log(probeProperty(profile, 'name')) // 读到了值\nconsole.log(probeProperty(profile, 'email')) // 属性不存在\n\nconst draft = { tags: ['a'] }\nconst snapshot = immutableSnapshot(draft)\ndraft.tags.push('b')\nconsole.log(snapshot.tags) // 快照与原对象断开"
               },
               {
-                type: 'list',
-                items: [
-                  'get 对 missing 或 blocked 返回 undefined；需要区分原因时用 probeObjectPath。',
-                  'set 不修改旧根，只复制变更路径并共享未变分支。',
-                  '__proto__、prototype 和 constructor 路径段始终拒绝。',
-                  '路径总长、段长和段数都有界，不能用路径字符串制造无限工作。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "Ada\nGrace Ada\ntrue\n{ kind: 'value', value: 'Ada' }\n{ kind: 'missing' }\n[ 'a' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'set(object, path, value) 返回一个新的根对象：路径上的对象被浅拷贝，没改的分支直接复用，原对象保持不变。这正是 React 等框架判断“状态变了没有”所需要的更新方式。新值和旧值相同时，set 直接返回原对象。'
               }
             ]
-          }
-        ]
-      },
-      next: [
-        { label: 'probeObjectPath API', path: 'docs/utils/object-path/probeObjectPath' },
-        { label: '配置所有权', path: 'configuration-ownership' }
-      ]
-    },
-    en: {
-      title: 'Choose snapshot semantics and update nested paths safely',
-      lede: 'Deep copying, diagnostic copying, and reference retention are distinct ownership choices. Path access must also reject prototype-pollution segments while preserving structural sharing.',
-      document: {
-        sections: [
+          },
           {
-            id: 'snapshot',
-            heading: 'Choose the snapshot you actually mean',
+            id: 'api',
+            heading: '函数一览',
             blocks: [
               {
                 type: 'table',
-                headers: ['API', 'Semantic', 'Failure'],
+                headers: ['函数', '作用'],
                 rows: [
+                  ['get(object, path)', '按路径读取，不存在时返回 undefined'],
+                  ['set(object, path, value)', '按路径写入，返回新对象，不修改原对象'],
                   [
-                    'immutableSnapshot',
-                    'Deep clone through structuredClone',
-                    'Throws when the environment or value is unsupported'
+                    'probeObjectPath(object, path)',
+                    '按路径读取并说明结果：kind 为 value、missing（不存在）、blocked（中途遇到非对象）或 failed（getter 抛错）'
                   ],
                   [
-                    'diagnosticSnapshot',
-                    'Best-effort clone plus diagnostics',
-                    'Reports accessors, read failures, and unsupported values by path'
+                    'probeProperty(object, key)',
+                    '读一个属性，只读一次，区分 value、missing、failed'
                   ],
                   [
-                    'identitySnapshot',
-                    'Retain the original reference',
-                    'No copy; the caller explicitly accepts shared ownership'
+                    'immutableSnapshot(value)',
+                    '用 structuredClone 深拷贝，返回与原对象断开的副本（不会冻结）；不可克隆时抛 CLONE_UNSUPPORTED'
+                  ],
+                  [
+                    'diagnosticSnapshot(value)',
+                    '尽力复制，复制不了的部分保留原引用，并在 diagnostics 里列出路径'
+                  ],
+                  [
+                    'createPathAccessor(object, options?)',
+                    '带状态的读写器：set 之后自动指向新对象，可以挂钩子观察读写'
                   ]
                 ]
               }
@@ -13195,441 +13505,813 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           },
           {
             id: 'paths',
-            heading: 'Use probes to explain failure and set for immutability',
+            heading: '路径写法',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { createPathAccessor, probeObjectPath, set } from '@migaia/utils'\n\nconst state = { user: { profile: { name: 'Ada' } } }\nconst report = (result: unknown) => console.warn('blocked path', result)\nconst audit = (event: unknown) => console.log('path update', event)\nconst probe = probeObjectPath(state, 'user.profile.name')\nconst next = set(state, 'user.profile.name', 'Grace')\n\nconst accessor = createPathAccessor(next, {\n  ifBlocked: report,\n  onSet: audit\n})\nconsole.log(probe.value, accessor.get('user.profile.name'))"
-              },
-              {
-                type: 'list',
-                items: [
-                  'get returns undefined for missing or blocked paths; use probeObjectPath when the reason matters.',
-                  'set leaves the old root unchanged, copies only the changed path, and shares unchanged branches.',
-                  '__proto__, prototype, and constructor path segments are always rejected.',
-                  'Total path length, segment length, and segment count are bounded to prevent unbounded path work.'
-                ]
+                type: 'paragraph',
+                text: "路径可以是字符串 'user.tags.[0]'，也可以是数组 ['user', 'tags', 0]。数组下标写成 [0]。为了安全，__proto__、prototype、constructor 会被拒绝，并抛 OBJECT_PATH_INVALID。TypeScript 会根据对象类型检查路径是否存在、推断读到的值的类型。"
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'probeObjectPath API', path: 'docs/utils/object-path/probeObjectPath' },
-        { label: 'Configuration ownership', path: 'configuration-ownership' }
+        {
+          label: '配置所有权',
+          path: 'configuration-ownership'
+        },
+        {
+          label: 'Collector',
+          path: 'collector'
+        },
+        {
+          label: 'set API',
+          path: 'docs/utils/object-path/set'
+        }
+      ]
+    },
+    en: {
+      title: 'Object paths and immutable updates',
+      lede: 'Read and write nested objects by string path without mutating the original, tell a missing property from a failed read, and take a snapshot disconnected from the original.',
+      document: {
+        sections: [
+          {
+            id: 'example',
+            heading: 'Example',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { get, immutableSnapshot, probeProperty, set } from '@migaia/utils/object'\n\nconst state = { user: { name: 'Ada' }, settings: { theme: 'dark' } }\n\nconsole.log(get(state, 'user.name'))\nconst next = set(state, 'user.name', 'Grace')\nconsole.log(next.user.name, state.user.name) // the original object is unchanged\nconsole.log(next.settings === state.settings) // unchanged branches are reused\n\nconst profile = { name: 'Ada' }\nconsole.log(probeProperty(profile, 'name')) // the value was read\nconsole.log(probeProperty(profile, 'email')) // the property does not exist\n\nconst draft = { tags: ['a'] }\nconst snapshot = immutableSnapshot(draft)\ndraft.tags.push('b')\nconsole.log(snapshot.tags) // the snapshot is disconnected from the original"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "Ada\nGrace Ada\ntrue\n{ kind: 'value', value: 'Ada' }\n{ kind: 'missing' }\n[ 'a' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'set(object, path, value) returns a new root: objects on the path are shallow-copied, untouched branches are reused, and the original stays unchanged, which is the update style React and similar frameworks rely on. If the new value equals the old one, set returns the original object.'
+              }
+            ]
+          },
+          {
+            id: 'api',
+            heading: 'Functions',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Function', 'Purpose'],
+                rows: [
+                  ['get(object, path)', 'Reads by path; undefined when missing'],
+                  [
+                    'set(object, path, value)',
+                    'Writes by path and returns a new object without mutating'
+                  ],
+                  [
+                    'probeObjectPath(object, path)',
+                    'Reads by path and explains: kind is value, missing, blocked (a non-object on the way), or failed (a getter threw)'
+                  ],
+                  [
+                    'probeProperty(object, key)',
+                    'Reads one property once and distinguishes value, missing, failed'
+                  ],
+                  [
+                    'immutableSnapshot(value)',
+                    'Deep-copies with structuredClone into a disconnected copy (not frozen); throws CLONE_UNSUPPORTED for uncloneable values'
+                  ],
+                  [
+                    'diagnosticSnapshot(value)',
+                    'Copies what it can, keeps references for the rest, and lists their paths in diagnostics'
+                  ],
+                  [
+                    'createPathAccessor(object, options?)',
+                    'A stateful reader-writer whose set moves it to the new root, with hooks to observe reads and writes'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'paths',
+            heading: 'Path syntax',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "A path is a string such as 'user.tags.[0]' or an array such as ['user', 'tags', 0]; indexes are written [0]. For safety __proto__, prototype, and constructor are rejected with OBJECT_PATH_INVALID. TypeScript checks the path against the object type and infers the value type."
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Configuration ownership',
+          path: 'configuration-ownership'
+        },
+        {
+          label: 'Collector',
+          path: 'collector'
+        },
+        {
+          label: 'set API',
+          path: 'docs/utils/object-path/set'
+        }
       ]
     }
   },
   'utils:configuration-ownership': {
     zh: {
-      title: '建立配置所有权、只读边界与合并策略',
-      lede: '先用 ownConfig 固定 profile 和资源限制，再向消费者提供 readonlyConfig；patch 与 combine 只能保持或收紧契约。',
+      title: '配置所有权：接收、保护、更新、合并',
+      lede: '把调用方传入的配置复制成自己拥有的一份，对外只给只读视图，需要修改时派生新的一份，并按规则合并多层配置。',
       document: {
         sections: [
           {
-            id: 'own',
-            heading: '在入口取得配置所有权',
+            id: 'why',
+            heading: '为什么需要它',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { ConfigProfile, ownConfig, readonlyConfig } from '@migaia/utils'\n\nconst input = { retries: 1, features: { cache: true } }\nconst owned = ownConfig(input, {\n  profile: ConfigProfile.data,\n  limits: { maxDepth: 32, maxNodes: 10_000 }\n})\n\nconst publicConfig = readonlyConfig(owned)\nconsole.log(publicConfig.features.cache)"
-              },
-              {
-                type: 'list',
-                items: [
-                  'data profile 拒绝函数；只有明确需要运行时函数时才选择 richRuntime。',
-                  'limits 只能收紧默认值，防止深度、节点、键和路径输入耗尽资源。',
-                  'readonlyConfig 只接受 ownConfig 产物；写入以 CONFIG_READONLY 拒绝。'
-                ]
+                type: 'paragraph',
+                text: '一个库接收用户的配置对象后，用户仍然持有这个对象的引用，之后修改它可能悄悄改变库的行为；库把配置对象交给插件，插件也可能修改它。config 模块用“所有权”解决这个问题：在边界上复制一份由库拥有的配置，对外只给只读视图，任何修改都必须显式派生一份新配置。'
               }
             ]
           },
           {
-            id: 'update',
-            heading: '区分根级 patch 与多源 merge',
+            id: 'example',
+            heading: '例子',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { CONFIG_DELETE, combineConfig, patchConfig } from '@migaia/utils'\n\nconst defaults = { retries: 1, features: { cache: false } }\nconst environment = { retries: 2 }\nconst owned = { retries: 1, features: { cache: true } }\nconst patched = patchConfig(owned, { retries: 3, debug: CONFIG_DELETE })\nconst merged = combineConfig([defaults, environment, patched], {\n  strategies: { array: 'replace', record: 'merge' },\n  pathRules: [{ prefix: ['features'], strategies: { array: 'concat' } }]\n})\nconsole.log(merged.retries)"
-              },
-              {
-                type: 'list',
-                items: [
-                  'patchConfig 只覆盖根层；嵌套修改先用 object.set 构造完整子树。',
-                  'combineConfig 后者覆盖前者，数组、Map、Set 和 undefined 策略必须显式选择。',
-                  'pathRules 使用最长匹配前缀；onConflict 必须同步返回裁定。',
-                  'profile 或 limits 与已有 owned config 冲突时拒绝，不静默改变所有权。'
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        { label: 'ownConfig API', path: 'docs/utils/config/ownConfig' },
-        { label: '值判断与一次性执行', path: 'function-and-value-guards' }
-      ]
-    },
-    en: {
-      title: 'Establish configuration ownership, readonly boundaries, and merge policy',
-      lede: 'Fix the profile and resource limits with ownConfig, then expose readonlyConfig to consumers. Patch and combine may only preserve or tighten that contract.',
-      document: {
-        sections: [
-          {
-            id: 'own',
-            heading: 'Take configuration ownership at the boundary',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { ConfigProfile, ownConfig, readonlyConfig } from '@migaia/utils'\n\nconst input = { retries: 1, features: { cache: true } }\nconst owned = ownConfig(input, {\n  profile: ConfigProfile.data,\n  limits: { maxDepth: 32, maxNodes: 10_000 }\n})\n\nconst publicConfig = readonlyConfig(owned)\nconsole.log(publicConfig.features.cache)"
-              },
-              {
-                type: 'list',
-                items: [
-                  'The data profile rejects functions; choose richRuntime only when runtime functions are explicitly required.',
-                  'limits can only tighten defaults, bounding depth, nodes, keys, and path input against resource exhaustion.',
-                  'readonlyConfig accepts only an ownConfig result and rejects writes with CONFIG_READONLY.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'update',
-            heading: 'Separate root patching from multi-source merge',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { CONFIG_DELETE, combineConfig, patchConfig } from '@migaia/utils'\n\nconst defaults = { retries: 1, features: { cache: false } }\nconst environment = { retries: 2 }\nconst owned = { retries: 1, features: { cache: true } }\nconst patched = patchConfig(owned, { retries: 3, debug: CONFIG_DELETE })\nconst merged = combineConfig([defaults, environment, patched], {\n  strategies: { array: 'replace', record: 'merge' },\n  pathRules: [{ prefix: ['features'], strategies: { array: 'concat' } }]\n})\nconsole.log(merged.retries)"
-              },
-              {
-                type: 'list',
-                items: [
-                  'patchConfig replaces root fields only; build a complete nested subtree with object.set first.',
-                  'Later combineConfig sources override earlier ones; array, Map, Set, and undefined strategies must be explicit.',
-                  'pathRules use the longest matching prefix and onConflict must return a synchronous decision.',
-                  'A profile or limits conflict with an owned config is rejected instead of silently changing ownership.'
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        { label: 'ownConfig API', path: 'docs/utils/config/ownConfig' },
-        { label: 'Value guards and one-time work', path: 'function-and-value-guards' }
-      ]
-    }
-  },
-  'utils:function-and-value-guards': {
-    zh: {
-      title: '正确判断空值，并让初始化只执行一次',
-      lede: '入口校验要保留 0、false 与空集合的业务含义；一次性初始化还要明确失败缓存、重入和 Promise identity。',
-      document: {
-        sections: [
-          {
-            id: 'value-guards',
-            heading: '按业务语义选择判断器',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['API', '判定为 true', '明确不包含'],
-                rows: [
-                  ['isNullish', 'null、undefined', '空字符串、0、false、NaN'],
-                  ['isBlankString', '空字符串或纯空白字符串', '非字符串值'],
-                  ['isEmptyValue', 'null、undefined、空白字符串、NaN', '0、0n、false、数组、对象'],
-                  ['isPrimitive', '全部 JavaScript primitive', '函数与对象']
-                ]
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { isEmptyValue } from '@migaia/utils/value'\n\nfunction parseQuantity(input: unknown): number {\n  if (isEmptyValue(input)) throw new TypeError('quantity is required')\n  if (typeof input !== 'number') throw new TypeError('quantity must be numeric')\n  return input // 0 remains a valid quantity\n}"
+                code: "import { CONFIG_DELETE, combineConfig, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config'\n\n// 1. 接收调用方传入的配置：复制一份由你拥有\nconst callerOptions = { endpoint: '/v1', retry: { attempts: 2 }, debug: true }\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\nconsole.log(config.retry.attempts) // 调用方之后的修改不影响已接收的配置\n\n// 2. 对外只暴露只读视图\nconst view = readonlyConfig(config)\ntry {\n  ;(view as { endpoint: string }).endpoint = '/v2'\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\n\n// 3. 需要修改时派生一份新配置，CONFIG_DELETE 删除一个键\nconst next = patchConfig(config, { retry: { attempts: 3 }, debug: CONFIG_DELETE })\nconsole.log(next, config.retry.attempts)\n\n// 4. 合并默认值和用户配置\nconst defaults = ownConfig({ timeoutMs: 1000, headers: { accept: 'json' } })\nconst user = ownConfig({ headers: { token: 'x' } })\nconsole.log(combineConfig([defaults, user]))"
               },
               {
                 type: 'paragraph',
-                text: 'isEmptyValue 不推断数组或对象是否为空，因为集合的空语义属于业务所有者。需要检查集合长度时，在拥有该集合契约的代码中显式判断。'
-              }
-            ]
-          },
-          {
-            id: 'once',
-            heading: '区分同步缓存与异步 single-flight',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { once, onceAsync } from '@migaia/utils/function'\n\nconst readConfig = once(() => parseConfig(rawConfig))\nconst connect = onceAsync(() => openConnection())\n\nconst config = readConfig()\nconst first = connect()\nconst second = connect()\nconsole.assert(first === second)"
-              },
-              {
-                type: 'list',
-                items: [
-                  'once 缓存第一次返回值或第一次抛出的同一个错误；后续调用不再执行函数。',
-                  '同步重入在初始化尚未结束时以 REENTRANT_CALL 拒绝，避免读到半初始化状态。',
-                  'onceAsync 只启动一次并返回同一个 Promise；拒绝也会缓存，不会隐式重试。',
-                  'onceAsync 的工厂必须返回 Promise 或 PromiseLike；普通值以 INVALID_ARGUMENT 拒绝。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'hostile-thenables',
-            heading: '第三方 thenable 只探测一次',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils'\n\nconst value: unknown = { then(resolve: (result: string) => void) { resolve('ready') } }\nconst report = (error: unknown) => console.error(error)\nconst probe = probeThenable(value)\n\nif (probe.kind === ThenableProbeKind.failed) report(probe.error)\nif (probe.kind === ThenableProbeKind.thenable) {\n  await assimilateCapturedThen(value, probe.thenFn)\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'probeThenable 把非 thenable、可调用 then 与 getter 失败分开，并保证只读取一次 .then。同步 API 需要观察意外 thenable 的迟到拒绝时，组合 inspectThenable 与 observeThenableRejection。'
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        { label: 'once API', path: 'docs/utils/function/once' },
-        { label: '字符串与数字展示', path: 'strings-and-numbers' }
-      ]
-    },
-    en: {
-      title: 'Classify absent values and run initialization exactly once',
-      lede: 'Boundary validation must preserve the business meaning of 0, false, and empty collections. One-time initialization must also define failure caching, reentrancy, and Promise identity.',
-      document: {
-        sections: [
-          {
-            id: 'value-guards',
-            heading: 'Choose a guard by business semantic',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['API', 'Returns true for', 'Explicitly excludes'],
-                rows: [
-                  ['isNullish', 'null and undefined', 'empty strings, 0, false, and NaN'],
-                  ['isBlankString', 'empty or whitespace-only strings', 'non-string values'],
-                  [
-                    'isEmptyValue',
-                    'null, undefined, blank strings, and NaN',
-                    '0, 0n, false, arrays, and objects'
-                  ],
-                  ['isPrimitive', 'all JavaScript primitives', 'functions and objects']
-                ]
+                text: '输出：'
               },
               {
                 type: 'code',
-                language: 'ts',
-                code: "import { isEmptyValue } from '@migaia/utils/value'\n\nfunction parseQuantity(input: unknown): number {\n  if (isEmptyValue(input)) throw new TypeError('quantity is required')\n  if (typeof input !== 'number') throw new TypeError('quantity must be numeric')\n  return input // 0 remains a valid quantity\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'isEmptyValue never infers whether an array or object is empty because collection emptiness belongs to the business owner. Check collection length explicitly where that contract is owned.'
-              }
-            ]
-          },
-          {
-            id: 'once',
-            heading: 'Separate synchronous caching from asynchronous single-flight',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { once, onceAsync } from '@migaia/utils/function'\n\nconst readConfig = once(() => parseConfig(rawConfig))\nconst connect = onceAsync(() => openConnection())\n\nconst config = readConfig()\nconst first = connect()\nconst second = connect()\nconsole.assert(first === second)"
-              },
-              {
-                type: 'list',
-                items: [
-                  'once caches the first return value or the exact first thrown error; later calls do not invoke the function again.',
-                  'Synchronous reentrancy is rejected with REENTRANT_CALL while initialization is still running, preventing partially initialized reads.',
-                  'onceAsync starts once and returns the same Promise; rejection is cached and does not trigger an implicit retry.',
-                  'The onceAsync factory must return a Promise or PromiseLike; a plain value is rejected with INVALID_ARGUMENT.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'hostile-thenables',
-            heading: 'Probe third-party thenables once',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils'\n\nconst value: unknown = { then(resolve: (result: string) => void) { resolve('ready') } }\nconst report = (error: unknown) => console.error(error)\nconst probe = probeThenable(value)\n\nif (probe.kind === ThenableProbeKind.failed) report(probe.error)\nif (probe.kind === ThenableProbeKind.thenable) {\n  await assimilateCapturedThen(value, probe.thenFn)\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'probeThenable separates a non-thenable, a callable then method, and a getter failure while reading .then only once. When a synchronous API must observe a late rejection from an accidental thenable, compose inspectThenable with observeThenableRejection.'
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        { label: 'once API', path: 'docs/utils/function/once' },
-        { label: 'Strings and numeric display', path: 'strings-and-numbers' }
-      ]
-    }
-  },
-  'utils:strings-and-numbers': {
-    zh: {
-      title: '安全插值文本，并统一本地化数字展示',
-      lede: '模板负责显示插值，不执行表达式；数字辅助函数负责 Intl 策略与复用，但货币、精度和 locale 仍由产品边界决定。',
-      document: {
-        sections: [
-          {
-            id: 'format',
-            heading: '显式决定缺失值和 nullish 策略',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { format } from '@migaia/utils/string'\n\nformat('Hello {user.name}', { user: { name: 'Ada' } })\nformat('Cost: {amount}', {}, { missing: 'throw' })\nformat('[[name]]', { name: 'Ada' }, {\n  placeholder: { open: '[[', close: ']]' },\n  nullish: 'stringify'\n})"
+                language: 'text',
+                code: "2\nCONFIG_READONLY\n{ endpoint: '/v1', retry: { attempts: 3 } } 2\n[Object: null prototype] {\n  timeoutMs: 1000,\n  headers: { accept: 'json', token: 'x' }\n}"
               },
               {
                 type: 'table',
-                headers: ['选项', '默认值', '作用'],
+                headers: ['函数', '作用'],
                 rows: [
                   [
-                    'placeholder',
-                    "{ open: '{', close: '}' }",
-                    '设置非空且不同的边界，单边最长 64 字符'
+                    'ownConfig(value, { profile?, limits? })',
+                    '校验并复制配置（包括 Date、Map、Set、循环引用），返回受管理的配置。之后的函数只接收它的返回值'
                   ],
-                  ['missing', 'preserve', '保留占位符；也可选择 empty 或 throw'],
-                  ['nullish', 'empty', '把 null/undefined 显示为空；也可选择 stringify']
-                ]
-              },
-              {
-                type: 'list',
-                items: [
-                  '点路径只访问 own property，不遍历原型链。',
-                  '__proto__、prototype、constructor 始终视为缺失，避免模板变成对象遍历入口。',
-                  '重复起止边界输出字面边界；未闭合占位符原样保留。',
-                  'getter 或字符串转换失败保留为带 cause 的 FORMAT_INVALID，而不是吞掉。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'number',
-            heading: '让产品拥有 locale、货币与精度',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import {\n  createNumberFormatter,\n  formatCompactNumber,\n  formatCurrency,\n  formatPercent\n} from '@migaia/utils/number'\n\nformatCurrency(1299, 'CNY', { locales: 'zh' })\nformatPercent(0.375, { format: { maximumFractionDigits: 1 } })\nformatCompactNumber(12_500, { locales: 'en' })\n\nconst renderQuantity = createNumberFormatter({\n  locales: 'en-SG',\n  format: { maximumFractionDigits: 2 }\n})\nrows.map(({ quantity }) => renderQuantity(quantity))"
-              },
-              {
-                type: 'table',
-                headers: ['API', '内置策略', '调用方必须决定'],
-                rows: [
-                  ['formatNumber', '原样使用 Intl.NumberFormatOptions', 'locale 与完整格式策略'],
-                  ['formatCurrency', "强制 style: 'currency'", 'currency 与舍入策略'],
-                  ['formatPercent', "强制 style: 'percent'", '输入是比例值及精度'],
-                  ['formatInteger', 'maximumFractionDigits 默认 0', '是否覆盖小数策略'],
-                  ['formatCompactNumber', "强制 notation: 'compact'", 'locale 与有效数字']
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '一次性 helper 复用最多 64 个 Intl formatter。热循环用 createNumberFormatter 在循环外取得闭包，避免每项重复解析选项和查找缓存；输入只接受 number 或 bigint，不做字符串数值的有损强制转换。'
-              }
-            ]
-          }
-        ]
-      },
-      next: [
-        { label: 'format API', path: 'docs/utils/string/format' },
-        { label: 'createNumberFormatter API', path: 'docs/utils/number/createNumberFormatter' },
-        { label: '返回 Utils 学习路径', path: 'index' }
-      ]
-    },
-    en: {
-      title: 'Interpolate display text safely and localize numeric output consistently',
-      lede: 'Templates interpolate display values without evaluating expressions. Numeric helpers own Intl policy and reuse, while product boundaries still choose currency, precision, and locale.',
-      document: {
-        sections: [
-          {
-            id: 'format',
-            heading: 'Choose missing-value and nullish policy explicitly',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { format } from '@migaia/utils/string'\n\nformat('Hello {user.name}', { user: { name: 'Ada' } })\nformat('Cost: {amount}', {}, { missing: 'throw' })\nformat('[[name]]', { name: 'Ada' }, {\n  placeholder: { open: '[[', close: ']]' },\n  nullish: 'stringify'\n})"
-              },
-              {
-                type: 'table',
-                headers: ['Option', 'Default', 'Effect'],
-                rows: [
+                  ['readonlyConfig(config)', '返回只读视图，任何层级的写入都抛 CONFIG_READONLY'],
                   [
-                    'placeholder',
-                    "{ open: '{', close: '}' }",
-                    'Sets distinct non-empty boundaries, each at most 64 characters'
-                  ],
-                  ['missing', 'preserve', 'Keeps the placeholder; empty and throw are available'],
-                  ['nullish', 'empty', 'Renders null/undefined as empty; stringify is available']
-                ]
-              },
-              {
-                type: 'list',
-                items: [
-                  'Dot paths read own properties only and never traverse the prototype chain.',
-                  '__proto__, prototype, and constructor are always missing so a display template cannot become an object traversal surface.',
-                  'Doubled opening or closing boundaries emit literal boundaries; an unclosed placeholder remains unchanged.',
-                  'Getter or string-conversion failures remain reachable as the cause of FORMAT_INVALID instead of being swallowed.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'number',
-            heading: 'Keep locale, currency, and precision product-owned',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import {\n  createNumberFormatter,\n  formatCompactNumber,\n  formatCurrency,\n  formatPercent\n} from '@migaia/utils/number'\n\nformatCurrency(1299, 'CNY', { locales: 'zh' })\nformatPercent(0.375, { format: { maximumFractionDigits: 1 } })\nformatCompactNumber(12_500, { locales: 'en' })\n\nconst renderQuantity = createNumberFormatter({\n  locales: 'en-SG',\n  format: { maximumFractionDigits: 2 }\n})\nrows.map(({ quantity }) => renderQuantity(quantity))"
-              },
-              {
-                type: 'table',
-                headers: ['API', 'Built-in policy', 'Caller must decide'],
-                rows: [
-                  [
-                    'formatNumber',
-                    'Uses Intl.NumberFormatOptions unchanged',
-                    'locale and complete format policy'
-                  ],
-                  ['formatCurrency', "forces style: 'currency'", 'currency and rounding policy'],
-                  ['formatPercent', "forces style: 'percent'", 'ratio input and precision'],
-                  [
-                    'formatInteger',
-                    'defaults maximumFractionDigits to 0',
-                    'whether to override fraction policy'
+                    'patchConfig(config, patch)',
+                    '在根一层覆盖字段并返回新配置；CONFIG_DELETE 删除一个键'
                   ],
                   [
-                    'formatCompactNumber',
-                    "forces notation: 'compact'",
-                    'locale and significant digits'
+                    'combineConfig(configs, { strategies? })',
+                    '按顺序合并多份配置，后面的覆盖前面的'
+                  ],
+                  [
+                    'readConfigPath(config, path)',
+                    "按路径读取，区分 { kind: 'missing' } 和值为 undefined"
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'One-shot helpers reuse a cache bounded to 64 Intl formatters. In a hot loop, call createNumberFormatter outside the loop so each item avoids option parsing and cache lookup. Inputs accept number or bigint only and never coerce numeric strings lossily.'
+                text: '合并结果是没有原型的纯数据对象（输出里显示为 [Object: null prototype]），这样配置里的键不会和 Object.prototype 上的方法混淆。'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: '选项',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  "profile：默认 'data'，只允许纯数据，遇到函数报错；配置确实需要携带回调时用 'richRuntime'。",
+                  'limits：maxDepth、maxNodes 等安全上限，只能收紧不能放宽，防止超大或恶意配置。',
+                  "combineConfig 的 strategies：record（对象）默认 'merge' 逐键合并；array 默认 'replace'，可选 'concat'、'mergeByIndex'；map、set、undefined 也可以分别设置。pathRules 可以对某个路径单独指定策略。"
+                ]
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'format API', path: 'docs/utils/string/format' },
-        { label: 'createNumberFormatter API', path: 'docs/utils/number/createNumberFormatter' },
-        { label: 'Return to Utils learning paths', path: 'index' }
+        {
+          label: '对象路径与不可变更新',
+          path: 'immutable-objects-and-paths'
+        },
+        {
+          label: '一次性初始化与值判断',
+          path: 'function-and-value-guards'
+        },
+        {
+          label: 'ownConfig API',
+          path: 'docs/utils/config/ownConfig'
+        }
+      ]
+    },
+    en: {
+      title: 'Configuration ownership: accept, protect, update, merge',
+      lede: 'Copy caller options into a configuration you own, expose only a read-only view, derive a new copy to change it, and merge layers by rule.',
+      document: {
+        sections: [
+          {
+            id: 'why',
+            heading: 'Why you need it',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'After a library accepts a configuration object, the caller still holds a reference and may change the library’s behavior by mutating it later; a plugin receiving the object might mutate it too. The config module solves this with ownership: copy at the boundary into a configuration the library owns, expose only read-only views, and make every change derive a new configuration explicitly.'
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Example',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { CONFIG_DELETE, combineConfig, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config'\n\n// 1. Accept caller options: take a copy you own\nconst callerOptions = { endpoint: '/v1', retry: { attempts: 2 }, debug: true }\nconst config = ownConfig(callerOptions)\ncallerOptions.retry.attempts = 99\nconsole.log(config.retry.attempts) // later caller changes do not affect the accepted configuration\n\n// 2. Expose only a read-only view\nconst view = readonlyConfig(config)\ntry {\n  ;(view as { endpoint: string }).endpoint = '/v2'\n} catch (error) {\n  console.log((error as { code: string }).code)\n}\n\n// 3. Derive a new configuration to change it; CONFIG_DELETE removes a key\nconst next = patchConfig(config, { retry: { attempts: 3 }, debug: CONFIG_DELETE })\nconsole.log(next, config.retry.attempts)\n\n// 4. Merge defaults with user configuration\nconst defaults = ownConfig({ timeoutMs: 1000, headers: { accept: 'json' } })\nconst user = ownConfig({ headers: { token: 'x' } })\nconsole.log(combineConfig([defaults, user]))"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "2\nCONFIG_READONLY\n{ endpoint: '/v1', retry: { attempts: 3 } } 2\n[Object: null prototype] {\n  timeoutMs: 1000,\n  headers: { accept: 'json', token: 'x' }\n}"
+              },
+              {
+                type: 'table',
+                headers: ['Function', 'Purpose'],
+                rows: [
+                  [
+                    'ownConfig(value, { profile?, limits? })',
+                    'Validates and copies configuration (Date, Map, Set, and cycles included) into a managed configuration; the functions below accept only its results'
+                  ],
+                  [
+                    'readonlyConfig(config)',
+                    'Returns a read-only view; writes at any depth throw CONFIG_READONLY'
+                  ],
+                  [
+                    'patchConfig(config, patch)',
+                    'Overrides root-level fields and returns a new configuration; CONFIG_DELETE removes a key'
+                  ],
+                  [
+                    'combineConfig(configs, { strategies? })',
+                    'Merges configurations in order, later ones winning'
+                  ],
+                  [
+                    'readConfigPath(config, path)',
+                    "Reads by path and tells { kind: 'missing' } from an undefined value"
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Merge results are prototype-free data objects (printed as [Object: null prototype]) so configuration keys never collide with Object.prototype methods.'
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'Options',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  "profile: 'data' by default allows only plain data and rejects functions; use 'richRuntime' when configuration really carries callbacks.",
+                  'limits: safety caps such as maxDepth and maxNodes; they can only be tightened, protecting against huge or hostile input.',
+                  "combineConfig strategies: record defaults to 'merge' key by key; array defaults to 'replace' with 'concat' and 'mergeByIndex' available; map, set, and undefined have their own settings, and pathRules override strategies for a given path."
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Object paths and immutable updates',
+          path: 'immutable-objects-and-paths'
+        },
+        {
+          label: 'Run once and value checks',
+          path: 'function-and-value-guards'
+        },
+        {
+          label: 'ownConfig API',
+          path: 'docs/utils/config/ownConfig'
+        }
+      ]
+    }
+  },
+  'utils:function-and-value-guards': {
+    zh: {
+      title: '一次性初始化与值判断',
+      lede: 'once 和 onceAsync 让初始化只执行一次并共享结果；value 模块判断空值和值的种类。',
+      document: {
+        sections: [
+          {
+            id: 'once',
+            heading: '只执行一次的初始化',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { once, onceAsync } from '@migaia/utils/function'\n\nconst getRegistry = once(() => {\n  console.log('构建 registry（只执行一次）')\n  return new Map([['help', '显示帮助']])\n})\nconsole.log(getRegistry() === getRegistry())\n\nlet requests = 0\nconst loadConfig = onceAsync(async () => {\n  requests += 1\n  await new Promise((resolve) => setTimeout(resolve, 10))\n  return { apiBaseUrl: 'https://api.example.com' }\n})\nconst [a, b] = await Promise.all([loadConfig(), loadConfig()])\nconsole.log(a === b, '请求次数:', requests)"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '构建 registry（只执行一次）\ntrue\ntrue 请求次数: 1'
+              },
+              {
+                type: 'paragraph',
+                text: 'once(fn) 返回一个包装函数：第一次调用执行 fn 并缓存结果，之后直接返回同一个结果。onceAsync(fn) 用于异步初始化：多个地方同时调用时共享同一个 Promise，所以请求只发出一次。'
+              },
+              {
+                type: 'list',
+                items: [
+                  '第一次的结果会被永久缓存，包括失败：第一次抛错，之后每次调用都得到同一个错误，不会自动重试。需要重试、刷新或按请求隔离时，用带失效策略的缓存。',
+                  '每调用一次 once(fn) 就有一份独立缓存。它不是全局单例：同一个模块在不同 Worker 或 iframe 中会各自初始化。',
+                  '第一次调用还没返回时，又在 fn 内部调用同一个包装函数，会抛 REENTRANT_CALL。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'values',
+            heading: '判断空值和值的种类',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { isBlankString, isEmptyValue, isNullish, isPrimitive } from '@migaia/utils/value'\n\nconst label = (value: unknown) =>\n  typeof value === 'string' ? JSON.stringify(value) : Array.isArray(value) ? '[]' : String(value)\nfor (const value of [undefined, null, '  ', NaN, 0, false, '', []]) {\n  console.log(label(value), '→ isEmptyValue:', isEmptyValue(value))\n}\nconsole.log(isNullish(0), isBlankString(' \\n'), isPrimitive(Symbol('id')), isPrimitive({}))"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'undefined → isEmptyValue: true\nnull → isEmptyValue: true\n"  " → isEmptyValue: true\nNaN → isEmptyValue: true\n0 → isEmptyValue: false\nfalse → isEmptyValue: false\n"" → isEmptyValue: true\n[] → isEmptyValue: false\nfalse true true false'
+              },
+              {
+                type: 'table',
+                headers: ['函数', '返回 true 的情况'],
+                rows: [
+                  ['isNullish(value)', 'null、undefined'],
+                  ['isBlankString(value)', '去掉首尾空白后为空的字符串'],
+                  [
+                    'isEmptyValue(value)',
+                    'null、undefined、空白字符串、NaN；0、false、[]、{} 都不算空'
+                  ],
+                  [
+                    'isPrimitive(value)',
+                    '七种原始值：string、number、bigint、boolean、symbol、null、undefined'
+                  ],
+                  ['isSafeIntegerValue(value)', '有限的安全整数（不转换字符串）']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'noop 是一个什么都不做的函数，适合作为可选回调的默认值：const onChange = options.onChange ?? noop。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '字符串与数字格式化',
+          path: 'strings-and-numbers'
+        },
+        {
+          label: '配置所有权',
+          path: 'configuration-ownership'
+        },
+        {
+          label: 'once API',
+          path: 'docs/utils/function/once'
+        }
+      ]
+    },
+    en: {
+      title: 'Run once and value checks',
+      lede: 'once and onceAsync run initialization once and share the result; the value module checks empty values and value kinds.',
+      document: {
+        sections: [
+          {
+            id: 'once',
+            heading: 'Initialize once',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { once, onceAsync } from '@migaia/utils/function'\n\nconst getRegistry = once(() => {\n  console.log('building registry (runs once)')\n  return new Map([['help', 'show help']])\n})\nconsole.log(getRegistry() === getRegistry())\n\nlet requests = 0\nconst loadConfig = onceAsync(async () => {\n  requests += 1\n  await new Promise((resolve) => setTimeout(resolve, 10))\n  return { apiBaseUrl: 'https://api.example.com' }\n})\nconst [a, b] = await Promise.all([loadConfig(), loadConfig()])\nconsole.log(a === b, 'requests:', requests)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'building registry (runs once)\ntrue\ntrue requests: 1'
+              },
+              {
+                type: 'paragraph',
+                text: 'once(fn) returns a wrapper that runs fn on the first call, caches the result, and returns it afterwards. onceAsync(fn) is for async initialization: concurrent callers share one Promise, so the request is sent once.'
+              },
+              {
+                type: 'list',
+                items: [
+                  'The first outcome is cached forever, failures included: if the first call throws, every later call gets the same error with no retry. Use a cache with invalidation for retries, refresh, or per-request isolation.',
+                  'Each once(fn) call has its own cache. It is not a global singleton: the same module initializes separately in each Worker or iframe.',
+                  'Calling the same wrapper again from inside fn before the first call returns throws REENTRANT_CALL.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'values',
+            heading: 'Check empty values and value kinds',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { isBlankString, isEmptyValue, isNullish, isPrimitive } from '@migaia/utils/value'\n\nconst label = (value: unknown) =>\n  typeof value === 'string' ? JSON.stringify(value) : Array.isArray(value) ? '[]' : String(value)\nfor (const value of [undefined, null, '  ', NaN, 0, false, '', []]) {\n  console.log(label(value), '→ isEmptyValue:', isEmptyValue(value))\n}\nconsole.log(isNullish(0), isBlankString(' \\n'), isPrimitive(Symbol('id')), isPrimitive({}))"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'undefined → isEmptyValue: true\nnull → isEmptyValue: true\n"  " → isEmptyValue: true\nNaN → isEmptyValue: true\n0 → isEmptyValue: false\nfalse → isEmptyValue: false\n"" → isEmptyValue: true\n[] → isEmptyValue: false\nfalse true true false'
+              },
+              {
+                type: 'table',
+                headers: ['Function', 'Returns true for'],
+                rows: [
+                  ['isNullish(value)', 'null, undefined'],
+                  ['isBlankString(value)', 'strings that are empty after trimming'],
+                  [
+                    'isEmptyValue(value)',
+                    'null, undefined, blank strings, NaN; 0, false, [], and {} are not empty'
+                  ],
+                  [
+                    'isPrimitive(value)',
+                    'the seven primitives: string, number, bigint, boolean, symbol, null, undefined'
+                  ],
+                  ['isSafeIntegerValue(value)', 'finite safe integers (strings are not converted)']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'noop is a function that does nothing, handy as an optional callback default: const onChange = options.onChange ?? noop.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Strings and numbers',
+          path: 'strings-and-numbers'
+        },
+        {
+          label: 'Configuration ownership',
+          path: 'configuration-ownership'
+        },
+        {
+          label: 'once API',
+          path: 'docs/utils/function/once'
+        }
+      ]
+    }
+  },
+  'utils:strings-and-numbers': {
+    zh: {
+      title: '字符串模板与数字格式化',
+      lede: '用 format 把数据填进 {占位符} 模板；用 Intl 格式化数字、金额和百分比，并缓存格式化器。',
+      document: {
+        sections: [
+          {
+            id: 'example',
+            heading: '例子',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createNumberFormatter, formatCurrency } from '@migaia/utils/number'\nimport { format } from '@migaia/utils/string'\n\nconsole.log(format('你好，{user.name}！你有 {count} 条新消息', { user: { name: 'Ada' }, count: 3 }))\nconsole.log(format('你好，{name}', {})) // 缺少的值默认保留占位符\nconsole.log(format('你好，{name}', {}, { missing: 'empty' }))\n\nconsole.log(formatCurrency(1234.5, 'CNY', { locales: 'zh-CN' }))\nconst percent = createNumberFormatter({ locales: 'zh-CN', format: { style: 'percent' } })\nconsole.log([0.1, 0.25, 1].map(percent))"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "你好，Ada！你有 3 条新消息\n你好，{name}\n你好，\n¥1,234.50\n[ '10%', '25%', '100%' ]"
+              },
+              {
+                type: 'paragraph',
+                text: "format(template, values, options?) 把 {路径} 替换成 values 里对应的值，路径可以嵌套（{user.name}）。找不到值时默认保留占位符原样输出，方便发现遗漏；options.missing 可改为 'empty'（输出空字符串）或 'throw'（抛 FORMAT_VALUE_MISSING）。options.placeholder 可以把边界改成 ${ } 或 [[ ]]。"
+              }
+            ]
+          },
+          {
+            id: 'numbers',
+            heading: '数字格式化',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['函数', '作用'],
+                rows: [
+                  [
+                    'formatNumber(value, { locales, format })',
+                    '通用数字格式化，format 就是 Intl.NumberFormat 的选项'
+                  ],
+                  [
+                    'formatCurrency(value, currency, { locales, format? })',
+                    '金额，currency 是 ISO 币种代码，如 CNY、USD'
+                  ],
+                  [
+                    'formatPercent / formatInteger / formatCompactNumber',
+                    '百分比 / 整数 / 紧凑写法（如 1.2万、1.2K）'
+                  ],
+                  [
+                    'createNumberFormatter(options)',
+                    '创建一次、反复调用的格式化函数，适合表格和循环'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '这些函数共享一个有上限的格式化器缓存。locale、币种和精度都需要你显式传入，包里不内置任何业务默认值。locale 或选项不合法时抛 NUMBER_FORMAT_INVALID。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '一次性初始化与值判断',
+          path: 'function-and-value-guards'
+        },
+        {
+          label: 'Collector',
+          path: 'collector'
+        },
+        {
+          label: 'format API',
+          path: 'docs/utils/string/format'
+        }
+      ]
+    },
+    en: {
+      title: 'String templates and number formatting',
+      lede: 'Fill {placeholder} templates with format, and format numbers, money, and percentages with cached Intl formatters.',
+      document: {
+        sections: [
+          {
+            id: 'example',
+            heading: 'Example',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createNumberFormatter, formatCurrency } from '@migaia/utils/number'\nimport { format } from '@migaia/utils/string'\n\nconsole.log(format('Hi {user.name}! You have {count} new messages', { user: { name: 'Ada' }, count: 3 }))\nconsole.log(format('Hi {name}', {})) // a missing value keeps the placeholder by default\nconsole.log(format('Hi {name}', {}, { missing: 'empty' }))\n\nconsole.log(formatCurrency(1234.5, 'USD', { locales: 'en-US' }))\nconst percent = createNumberFormatter({ locales: 'en-US', format: { style: 'percent' } })\nconsole.log([0.1, 0.25, 1].map(percent))"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "Hi Ada! You have 3 new messages\nHi {name}\nHi \n$1,234.50\n[ '10%', '25%', '100%' ]"
+              },
+              {
+                type: 'paragraph',
+                text: "format(template, values, options?) replaces {path} with the matching value, nested paths ({user.name}) included. A missing value keeps the placeholder by default so omissions are visible; options.missing can be 'empty' (empty string) or 'throw' (FORMAT_VALUE_MISSING). options.placeholder can change the delimiters to ${ } or [[ ]]."
+              }
+            ]
+          },
+          {
+            id: 'numbers',
+            heading: 'Number formatting',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Function', 'Purpose'],
+                rows: [
+                  [
+                    'formatNumber(value, { locales, format })',
+                    'General formatting; format takes Intl.NumberFormat options'
+                  ],
+                  [
+                    'formatCurrency(value, currency, { locales, format? })',
+                    'Money; currency is an ISO code such as CNY or USD'
+                  ],
+                  [
+                    'formatPercent / formatInteger / formatCompactNumber',
+                    'Percent / integer / compact notation such as 1.2K'
+                  ],
+                  [
+                    'createNumberFormatter(options)',
+                    'Creates a formatter once for repeated use in tables and loops'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'These functions share a bounded formatter cache. You pass locale, currency, and precision explicitly; the package has no business defaults. Invalid locales or options throw NUMBER_FORMAT_INVALID.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Run once and value checks',
+          path: 'function-and-value-guards'
+        },
+        {
+          label: 'Collector',
+          path: 'collector'
+        },
+        {
+          label: 'format API',
+          path: 'docs/utils/string/format'
+        }
+      ]
+    }
+  },
+  'utils:collector': {
+    zh: {
+      title: 'Collector：在内存数组上筛选、去重、分页',
+      lede: '用链式调用描述查询，第一次读取 result 时才扫描一遍数组，并缓存结果。',
+      document: {
+        sections: [
+          {
+            id: 'example',
+            heading: '例子',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { collect } from '@migaia/utils'\n\nconst users = [\n  { id: 1, active: true, profile: { name: 'Ada Lovelace' } },\n  { id: 2, active: false, profile: { name: 'Alan Turing' } },\n  { id: 3, active: true, profile: { name: 'Grace Hopper' } },\n  { id: 3, active: true, profile: { name: 'Grace Hopper' } }\n]\n\nconst result = collect(users)\n  .fieldBy('profile.name')\n  .like(' a ') // 去掉首尾空格、忽略大小写，名字包含 a\n  .where((user) => user.active)\n  .distinctBy('id')\n  // 分页：第 1 页，每页 10 条\n  .skip(0)\n  .take(10).result\n\nconsole.log(result.map((user) => user.profile.name))"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "[ 'Ada Lovelace', 'Grace Hopper' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'collect(array) 开始一个查询，它不复制数组。每个链式调用只是记录一个步骤，读取 .result 时才按调用顺序扫描一次。再次读取返回同一个数组；继续添加步骤后会重新计算。步骤的顺序有影响：先 take(2) 再 where 和先 where 再 take(2) 结果不同。'
+              }
+            ]
+          },
+          {
+            id: 'actions',
+            heading: '可用的步骤',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['步骤', '作用'],
+                rows: [
+                  [
+                    'fieldBy(...paths)',
+                    '选择要匹配的字段（可以多个，任一满足即可），并去掉这些字段都为 undefined 的项。之后才能用 like、equals、oneOf'
+                  ],
+                  ['like(text)', '字段包含 text（去掉首尾空格、忽略大小写）；text 为空时不过滤'],
+                  ['equals(value) / oneOf(...values)', '字段等于某个值 / 等于其中任意一个'],
+                  ['where(predicate)', '自定义条件'],
+                  ['distinctBy(path)', '按某个字段去重，保留第一次出现的项'],
+                  ['skip(n) / take(n)', '跳过前 n 项 / 最多取 n 项，用于分页']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Collector 不会监听数组的变化：如果在查询之后修改了原数组，已缓存的结果不会自动更新。把传入的数组当作只读的。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '对象路径与不可变更新',
+          path: 'immutable-objects-and-paths'
+        },
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: 'collect API',
+          path: 'docs/utils/collect'
+        }
+      ]
+    },
+    en: {
+      title: 'Collector: filter, deduplicate, and page an in-memory array',
+      lede: 'Describe a query with chained calls; the array is scanned once when result is first read, and the result is cached.',
+      document: {
+        sections: [
+          {
+            id: 'example',
+            heading: 'Example',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { collect } from '@migaia/utils'\n\nconst users = [\n  { id: 1, active: true, profile: { name: 'Ada Lovelace' } },\n  { id: 2, active: false, profile: { name: 'Alan Turing' } },\n  { id: 3, active: true, profile: { name: 'Grace Hopper' } },\n  { id: 3, active: true, profile: { name: 'Grace Hopper' } }\n]\n\nconst result = collect(users)\n  .fieldBy('profile.name')\n  .like(' a ') // trims the query and ignores case: names containing a\n  .where((user) => user.active)\n  .distinctBy('id')\n  // paging: page 1, 10 items per page\n  .skip(0)\n  .take(10).result\n\nconsole.log(result.map((user) => user.profile.name))"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "[ 'Ada Lovelace', 'Grace Hopper' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'collect(array) starts a query without copying the array. Each chained call records a step, and reading .result scans once in call order. Reading again returns the same array; adding steps recomputes. Order matters: take(2) then where differs from where then take(2).'
+              }
+            ]
+          },
+          {
+            id: 'actions',
+            heading: 'Available steps',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Step', 'Purpose'],
+                rows: [
+                  [
+                    'fieldBy(...paths)',
+                    'Chooses fields to match (any of several) and drops items where all are undefined; enables like, equals, and oneOf'
+                  ],
+                  [
+                    'like(text)',
+                    'The field contains text (trimmed, case-insensitive); an empty text does not filter'
+                  ],
+                  [
+                    'equals(value) / oneOf(...values)',
+                    'The field equals a value / any of several values'
+                  ],
+                  ['where(predicate)', 'A custom condition'],
+                  ['distinctBy(path)', 'Deduplicates by a field, keeping the first occurrence'],
+                  ['skip(n) / take(n)', 'Skips n items / takes at most n, for paging']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Collector does not watch the array: changing it after a query leaves the cached result untouched. Treat the input array as read-only.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Object paths and immutable updates',
+          path: 'immutable-objects-and-paths'
+        },
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'collect API',
+          path: 'docs/utils/collect'
+        }
       ]
     }
   },
@@ -18885,51 +19567,73 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'plugin-host:index': {
     zh: {
-      title: '用插件扩展应用',
-      lede: '安装一个插件，把文字转换成大写。再学习共享处理能力、更新配置和卸载插件。',
+      title: 'Plugin Host：让你的库可以被插件扩展',
+      lede: '你定义宿主和插件，Host 负责按依赖顺序安装、发布插件方法、更新配置、执行处理步骤，并在卸载或失败时清理资源。',
       document: {
         sections: [
           {
-            id: 'choose-path',
-            heading: '按要完成的任务选择指南',
+            id: 'what',
+            heading: '它解决什么问题',
             blocks: [
               {
-                type: 'table',
-                headers: ['任务', '入口', '可检查的结果'],
-                rows: [
-                  ['安装第一个插件', 'getting-started', '把 migaia 转换为 MIGAIA。'],
-                  [
-                    '让插件使用另一个插件的能力',
-                    'install-and-compose',
-                    '用 formatter 的 Feature 生成 Hello MIGAIA。'
-                  ],
-                  [
-                    '更新问候语并共享格式化方法',
-                    'configuration-and-shared',
-                    '新调用使用 Welcome，两个插件复用 casing。'
-                  ],
-                  ['按顺序转换输入', 'pipelines', '处理结果从 hello 变为 HELLO。'],
-                  [
-                    '移除插件并处理安装失败',
-                    'removal-and-rollback',
-                    '资源释放一次，失败后可以重新安装。'
-                  ]
+                type: 'paragraph',
+                text: '假设你在写一个 logger。核心只负责“写一行日志”，而颜色输出、批量发送、上报到服务器这些能力，希望由不同的人按需添加，用不到的不装。这就是插件系统：核心保持精简，可选能力做成独立的插件，在运行时安装和卸载。migaia 自己的 @migaia/logger 就是这样构建的。'
+              },
+              {
+                type: 'paragraph',
+                text: '自己写一个插件系统，难的不是“把函数挂上去”，而是边界情况：插件 A 依赖插件 B，安装顺序怎么定？一批插件装到一半失败了，已经装好的要不要撤销、它们打开的连接谁来关？插件被卸载时，正在执行的请求怎么办？@migaia/plugin-host 把这些规则统一做好，你只需要描述插件“提供什么、依赖什么、需要清理什么”。'
+              },
+              {
+                type: 'list',
+                items: [
+                  '一批插件要么全部安装成功，要么全部回滚，并释放已经分配的资源。',
+                  '插件之间的依赖通过 Feature 显式声明，Host 按依赖顺序安装，并在卸载时检查是否还有人依赖。',
+                  '插件在安装时登记的资源（连接、定时器）在卸载或 Host 关闭时一定被释放，且只释放一次。',
+                  '插件可以注册处理步骤（pipeline stage），卸载插件时它的步骤自动离开处理链。',
+                  '配置以只读快照保存，更新先经过插件的 update 钩子校验，失败时旧配置保持不变。'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: '如果你的扩展点只有一两个，而且不需要运行时装卸，几个可选参数或回调就够了，不必引入插件宿主。单纯按顺序执行处理步骤的算法在 middleware-pipeline 里，plugin-host 在它之上增加了插件注册、生命周期和清理。'
               }
             ]
           },
           {
-            id: 'mental-model',
-            heading: '分清定义、安装与调用',
+            id: 'api',
+            heading: 'API 一览',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'Host 是管理插件安装和清理的宿主。defineHost 创建可直接使用的 Host handle（宿主句柄）。',
-                  'definePlugin 保存插件定义。host.use(...plugins) 才执行安装，并返回按输入顺序排列的 plugin handle（插件句柄）。',
-                  'extension 是 install 返回给业务调用方的方法。使用 handle.extensions 调用它。',
-                  'Feature 是可复用的能力实现。用 defineFeature 声明依赖，通过 handle.getFeature 读取已安装的输出。',
-                  '需要卸载时调用 host.unUse。应用结束时 await host.dispose，并检查清理结果。'
+                type: 'table',
+                headers: ['API', '作用'],
+                rows: [
+                  [
+                    'defineHost({ host, domainCore? })',
+                    '创建一个 Host 句柄。host 是宿主选项，domainCore 为每个插件提供应用能力'
+                  ],
+                  [
+                    'class X extends PluginHost<TCore, TValue>',
+                    '另一种写法：你的库导出一个类，在类里重写 createPluginDomainCore() 并调用 runPipeline()'
+                  ],
+                  [
+                    'definePlugin(name, factory) / definePlugin({ ... })',
+                    '定义一个插件，只保存定义，不执行任何代码'
+                  ],
+                  ['defineFeature(factory, dependencies?)', '定义一种可被其他插件依赖的能力'],
+                  ['host.use(...plugins)', '安装一批插件，返回与输入同序的插件句柄数组'],
+                  [
+                    'host.unUse(name, options?)',
+                    '卸载一个插件；options.policy 决定如何处理依赖它的插件'
+                  ],
+                  ['host.plugin.disable(name) / token.enable()', '暂停和恢复一个插件，不释放资源'],
+                  ['host.replace(name, next) / host.activate(name)', '热替换插件 / 激活惰性插件'],
+                  ['host.config.get(path) / handle.config.update(recipe)', '读取 / 更新插件配置'],
+                  ['host.runPipeline(value, done)', '让一个值依次经过所有插件注册的处理步骤'],
+                  ['host.dispose()', '关闭宿主，按依赖逆序释放全部插件'],
+                  [
+                    'handle.extensions / handle.getFeature(name)',
+                    '调用插件 install 返回的方法 / 读取插件提供的 Feature'
+                  ]
                 ]
               }
             ]
@@ -18938,61 +19642,108 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '安装 upper 并得到 MIGAIA',
+          label: '快速开始',
           path: 'getting-started'
         },
         {
-          label: '组合 formatter 与 greeter',
+          label: '插件之间共享能力',
           path: 'install-and-compose'
+        },
+        {
+          label: 'definePlugin API',
+          path: 'docs/plugin-host/definePlugin'
         }
       ]
     },
     en: {
-      title: 'Extend an application with plugins',
-      lede: 'Install a plugin that converts text to uppercase. Then share processing capabilities, update configuration, and remove plugins.',
+      title: 'Plugin Host: make your library extensible with plugins',
+      lede: 'You define a host and plugins; the Host installs them in dependency order, publishes their methods, updates configuration, runs their processing stages, and cleans up on removal or failure.',
       document: {
         sections: [
           {
-            id: 'choose-path',
-            heading: 'Choose a guide by the task',
+            id: 'what',
+            heading: 'What problem it solves',
             blocks: [
               {
-                type: 'table',
-                headers: ['Task', 'Guide', 'Result to check'],
-                rows: [
-                  ['Install the first plugin', 'getting-started', 'Convert migaia to MIGAIA.'],
-                  [
-                    'Use a capability from another plugin',
-                    'install-and-compose',
-                    'Build Hello MIGAIA through the formatter Feature.'
-                  ],
-                  [
-                    'Update greetings and share formatting',
-                    'configuration-and-shared',
-                    'New calls use Welcome and two plugins reuse casing.'
-                  ],
-                  ['Transform input in order', 'pipelines', 'Turn hello into HELLO.'],
-                  [
-                    'Remove a plugin and handle installation failure',
-                    'removal-and-rollback',
-                    'Release resources once and install again after failure.'
-                  ]
+                type: 'paragraph',
+                text: 'Say you are writing a logger. The core only writes a line; colored output, batching, and shipping logs to a server should be added by whoever needs them, and left out otherwise. That is a plugin system: the core stays small, optional abilities become separate plugins installed and removed at runtime. migaia’s own @migaia/logger is built this way.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The hard part of a homemade plugin system is not attaching functions; it is the edge cases. If plugin A depends on B, which installs first? If a batch fails halfway, are the installed ones undone, and who closes the connections they opened? What happens to in-flight requests when a plugin is removed? @migaia/plugin-host settles these rules once; you only describe what each plugin provides, depends on, and must clean up.'
+              },
+              {
+                type: 'list',
+                items: [
+                  'A batch of plugins either installs completely or rolls back, releasing whatever it allocated.',
+                  'Plugin dependencies are declared explicitly through Features; the Host installs in dependency order and checks dependents before removal.',
+                  'Resources a plugin registers during installation (connections, timers) are always released on removal or Host shutdown, exactly once.',
+                  'Plugins can register processing stages; removing a plugin removes its stages from the chain.',
+                  'Configuration is kept as a read-only snapshot; updates pass the plugin update hook first and the old value stays on failure.'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'If you have one or two extension points and never install or remove them at runtime, a few options or callbacks are simpler than a plugin host. The bare algorithm for running ordered stages lives in middleware-pipeline; plugin-host adds plugin registration, lifecycle, and cleanup on top of it.'
               }
             ]
           },
           {
-            id: 'mental-model',
-            heading: 'Separate definitions, installation, and calls',
+            id: 'api',
+            heading: 'API at a glance',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'The Host owns plugin installation and cleanup. defineHost creates its usable handle.',
-                  'definePlugin stores a definition. host.use(...plugins) performs installation and returns plugin handles in input order.',
-                  'An extension is a business method returned by install. Call it through handle.extensions.',
-                  'A Feature is a reusable capability implementation. Declare dependencies with defineFeature and read installed output through handle.getFeature.',
-                  'Call host.unUse to remove a plugin. Await host.dispose at shutdown and inspect its cleanup result.'
+                type: 'table',
+                headers: ['API', 'Purpose'],
+                rows: [
+                  [
+                    'defineHost({ host, domainCore? })',
+                    'Creates a Host handle. host holds host options; domainCore supplies application capabilities to each plugin'
+                  ],
+                  [
+                    'class X extends PluginHost<TCore, TValue>',
+                    'Alternative: your library exports a class that overrides createPluginDomainCore() and calls runPipeline()'
+                  ],
+                  [
+                    'definePlugin(name, factory) / definePlugin({ ... })',
+                    'Defines a plugin; it only stores the definition and runs no code'
+                  ],
+                  [
+                    'defineFeature(factory, dependencies?)',
+                    'Defines a capability other plugins can depend on'
+                  ],
+                  [
+                    'host.use(...plugins)',
+                    'Installs a batch and returns plugin handles in input order'
+                  ],
+                  [
+                    'host.unUse(name, options?)',
+                    'Removes a plugin; options.policy decides what happens to dependents'
+                  ],
+                  [
+                    'host.plugin.disable(name) / token.enable()',
+                    'Pauses and resumes a plugin without releasing resources'
+                  ],
+                  [
+                    'host.replace(name, next) / host.activate(name)',
+                    'Hot-replaces a plugin / activates a lazy plugin'
+                  ],
+                  [
+                    'host.config.get(path) / handle.config.update(recipe)',
+                    'Reads / updates plugin configuration'
+                  ],
+                  [
+                    'host.runPipeline(value, done)',
+                    'Passes one value through every stage plugins registered'
+                  ],
+                  [
+                    'host.dispose()',
+                    'Shuts the host down, releasing every plugin in reverse dependency order'
+                  ],
+                  [
+                    'handle.extensions / handle.getFeature(name)',
+                    'Calls methods returned by install / reads a Feature the plugin provides'
+                  ]
                 ]
               }
             ]
@@ -19001,80 +19752,204 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Install upper and obtain MIGAIA',
+          label: 'Quick start',
           path: 'getting-started'
         },
         {
-          label: 'Compose formatter and greeter',
+          label: 'Share capabilities between plugins',
           path: 'install-and-compose'
+        },
+        {
+          label: 'definePlugin API',
+          path: 'docs/plugin-host/definePlugin'
         }
       ]
     }
   },
   'plugin-host:getting-started': {
     zh: {
-      title: '安装 upper 插件并得到 MIGAIA',
-      lede: '定义一个转换方法。安装后从插件句柄调用它，并在同一个脚本中释放宿主。',
+      title: '快速开始：安装第一个插件',
+      lede: '创建 Host，定义一个插件，安装后调用它的方法，最后关闭 Host；并弄清 defineHost 和 definePlugin 的每个选项。',
       document: {
         sections: [
           {
-            id: 'create-host',
-            heading: '运行一个完整的安装与调用示例',
+            id: 'install',
+            heading: '安装',
             blocks: [
               {
-                type: 'paragraph',
-                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/plugin-host'
               },
+              {
+                type: 'paragraph',
+                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: '第一个例子',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst upper = definePlugin({\n  name: 'upper',\n  install: () => ({ upper: (value: string) => value.toUpperCase() })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(upper)\n  const result = handle.extensions.upper('migaia')\n  assert.equal(result, 'MIGAIA')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst upper = definePlugin({\n  name: 'upper',\n  install: () => ({ upper: (text: string) => text.toUpperCase() })\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\n\nconst [upperHandle] = await host.use(upper)\nconsole.log(upperHandle.extensions.upper('migaia'))\n\nconst cleanup = await host.dispose()\nconsole.log(cleanup.cleanupComplete)"
               },
               {
                 type: 'paragraph',
-                text: 'definePlugin 不会立即执行 install。defineHost 创建宿主，await host.use(upper) 安装插件。返回值是 tuple（按输入顺序排列的结果数组），所以示例取出第一项 handle。'
-              }
-            ]
-          },
-          {
-            id: 'use-view',
-            heading: '从插件句柄调用已安装的方法',
-            blocks: [
+                text: '输出：'
+              },
               {
-                type: 'paragraph',
-                text: 'handle.extensions.upper 是本例的业务入口。传入 migaia 后得到 MIGAIA，assert.equal 检查结果。Host handle 负责安装和清理，plugin handle 负责访问插件能力。'
+                type: 'code',
+                language: 'text',
+                code: 'MIGAIA\ntrue'
               },
               {
                 type: 'paragraph',
-                text: '当前入口不需要旧式 view。plugin handle 没有 unUse 或 dispose；这些操作属于 Host。安装失败时 use 拒绝，调用方不能使用本次未返回的 handle。'
-              }
-            ]
-          },
-          {
-            id: 'plugin-contract',
-            heading: '需要领域能力时再提供 core',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'core 是 install 收到的宿主能力对象。它提供配置、pipeline（逐步处理输入的管线）和 onDispose。defineHost 的 domainCore 可添加应用自己的方法。单纯转换字符串不需要 domainCore。'
+                text: '这段代码分三步：definePlugin 定义一个名为 upper 的插件，它的 install 函数返回一个对象，对象里的方法就是这个插件提供给外部的能力（叫 extension）；defineHost 创建 Host；host.use(upper) 才真正执行 install。'
               },
               {
                 type: 'paragraph',
-                text: 'install 返回的 extension 与 Feature 的输出分开访问。应用资源在 install 中通过 core.onDispose 登记，交给宿主在卸载时清理。'
+                text: 'host.use 返回一个数组，每个元素是一个插件句柄（handle），顺序和传入的插件一致，所以用解构取出第一个。通过 handle.extensions.upper 调用插件的方法。程序结束前调用 host.dispose()，它卸载所有插件并返回清理结果；cleanupComplete 为 true 表示资源都已释放。'
               }
             ]
           },
           {
             id: 'host-options',
-            heading: '只配置这个任务需要的等待时间',
+            heading: 'defineHost 的选项',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'execution.mutationTimeoutMs 限制安装、配置更新和卸载 hook 的等待。execution.pipelineDrainTimeoutMs 限制卸载时等待正在运行的 pipeline。两个字段必填，本例各使用 5000 ms。false 表示明确接受无限等待。'
+                text: 'defineHost(options) 只接收一个对象，其中 host 必填：'
+              },
+              {
+                type: 'table',
+                headers: ['选项', '必填', '作用'],
+                rows: [
+                  [
+                    'host.execution.mutationTimeoutMs',
+                    '是',
+                    '一次安装、配置更新或卸载最多等待多少毫秒；false 表示不限时'
+                  ],
+                  [
+                    'host.execution.pipelineDrainTimeoutMs',
+                    '是',
+                    '卸载插件时，最多等待正在执行的处理链多少毫秒'
+                  ],
+                  [
+                    'host.pipeline.mode',
+                    '否',
+                    "处理链的执行模式：'sync'（默认）、'async'、'generator'、'async-generator'，创建后不能更改"
+                  ],
+                  [
+                    'host.diagnostic',
+                    '否',
+                    '(message, code?, error?) => void，接收不构成错误但值得关注的信号，比如回滚时的清理失败'
+                  ],
+                  ['host.disposeStepTimeoutMs', '否', '单个清理函数最多等待多少毫秒，默认 5000'],
+                  [
+                    'host.queueAdmissionTimeoutMs',
+                    '否',
+                    '多个安装/卸载排队时，等待超过这个时间就拒绝；默认只报告诊断、不拒绝'
+                  ],
+                  [
+                    'domainCore',
+                    '否',
+                    '({ pluginName }) => 对象。为每个插件创建一份应用能力，插件在 install 里通过 core 读到'
+                  ]
+                ]
               },
               {
                 type: 'paragraph',
-                text: 'finally 等待 Host 清理，并报告 cleanupErrors。若返回 physicalCompletion，则继续等待实际清理。cleanupComplete: false 不能解释成资源已经释放。'
+                text: '两个 execution 时间都必须显式写出，这是为了让你决定“装不上、卸不掉时最多等多久”，而不是使用一个隐藏的默认值。'
+              }
+            ]
+          },
+          {
+            id: 'domain-core',
+            heading: '给插件提供应用能力',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '插件通常需要调用宿主的能力，比如 logger 的插件要“写一行日志”。用 domainCore 提供这些能力，插件在 definePlugin 的工厂函数里通过 core 参数拿到。definePlugin 的第一个类型参数声明 core 的类型，第二个声明插件返回的方法。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\n/** 宿主提供给每个插件的应用能力：这里是写一行日志。 */\ntype ILoggerCore = { write(line: string): void }\n\nconst host = defineHost<ILoggerCore>({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } },\n  domainCore: ({ pluginName }) => ({ write: (line) => console.log(`[${pluginName}] ${line}`) })\n})\n\nconst greet = definePlugin<ILoggerCore, { greet(name: string): void }>('greet', (core) => ({\n  install: () => ({ greet: (name: string) => core.write(`hello, ${name}`) })\n}))\n\nconst [greetHandle] = await host.use(greet)\ngreetHandle.extensions.greet('ada')\nawait host.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[greet] hello, ada'
+              }
+            ]
+          },
+          {
+            id: 'define-plugin',
+            heading: 'definePlugin 的两种写法',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '函数形 definePlugin(name, (core) => ({ install })) 适合需要 core 的简单插件；对象形 definePlugin({ name, install, ... }) 适合需要配置和生命周期钩子的插件。两种写法都只保存定义，install 在 host.use 时才执行。对象形可以使用的字段：'
+              },
+              {
+                type: 'table',
+                headers: ['字段', '作用'],
+                rows: [
+                  ['name', '必填，插件在 Host 内的唯一名字，不能包含 .'],
+                  [
+                    'install(core)',
+                    '必填，安装时执行，返回的对象成为 handle.extensions；可以在这里注册处理步骤和要清理的资源'
+                  ],
+                  ['config', '初始配置，Host 保存一份只读副本'],
+                  ['update(next, core)', '配置更新时调用，抛错则拒绝这次更新'],
+                  [
+                    'features / featureExpose',
+                    '声明本插件提供的 Feature 及其实现，见“插件之间共享能力”'
+                  ],
+                  [
+                    'setup(context)',
+                    'install 之前的异步准备，例如建立连接；返回值作为 install 的第二个参数'
+                  ],
+                  ['dispose()', '插件卸载时的清理'],
+                  ['beforeRelease(context)', '卸载前、插件仍可服务时调用一次，用于优雅收尾'],
+                  ["activation: 'lazy'", 'use 时只登记，等 host.activate(name) 时才安装'],
+                  ['onEnable / onDisable', '插件被启用 / 禁用后的通知']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'class',
+            heading: '另一种写法：继承 PluginHost',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '如果你在写一个库，希望用户拿到的是一个“带插件能力的类”，可以继承 PluginHost。在类里重写 createPluginDomainCore() 提供应用能力，并在自己的方法里调用受保护的 runPipeline()。用户只看到你的类的方法，看不到 Host 的内部。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype ILoggerCore = { write(line: string): void }\n\n/** 你的库对外暴露的类；插件扩展它，业务代码只看到 log()。 */\nclass Logger extends PluginHost<ILoggerCore, string> {\n  protected createPluginDomainCore(): ILoggerCore {\n    return { write: (line) => console.log(line) }\n  }\n\n  log(message: string): void {\n    this.runPipeline(message, (line) => console.log(line))\n  }\n}\n\nconst timestamp = definePlugin<ILoggerCore, Record<string, never>, string>('timestamp', (core) => ({\n  install: () => {\n    core.usePipeline((message, next) => next(`12:00 ${message}`))\n    return {}\n  }\n}))\n\nconst logger = new Logger({ execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } })\nawait logger.use(timestamp)\nlogger.log('服务已启动')\nawait logger.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '12:00 服务已启动'
+              },
+              {
+                type: 'paragraph',
+                text: 'PluginHost 的两个类型参数：TCore 是插件能拿到的应用能力，TValue 是处理链中传递的值的类型（不需要处理链时省略，默认为 never）。defineHost 的类型参数含义相同。'
               }
             ]
           }
@@ -19082,78 +19957,215 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '让 greeter 使用 formatter 的 Feature',
+          label: '插件之间共享能力',
           path: 'install-and-compose'
         },
         {
-          label: '为插件更新配置',
-          path: 'configuration-and-shared'
+          label: '插件配置',
+          path: 'configuration'
+        },
+        {
+          label: 'defineHost API',
+          path: 'docs/plugin-host/defineHost'
         }
       ]
     },
     en: {
-      title: 'Install upper and obtain MIGAIA',
-      lede: 'Define a conversion method. Call it through the installed plugin handle, then release the Host in the same script.',
+      title: 'Quick start: install your first plugin',
+      lede: 'Create a Host, define a plugin, call its method after installation, and shut the Host down; then learn every defineHost and definePlugin option.',
       document: {
         sections: [
           {
-            id: 'create-host',
-            heading: 'Run a complete installation and call example',
+            id: 'install',
+            heading: 'Install',
             blocks: [
               {
-                type: 'paragraph',
-                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/plugin-host'
               },
+              {
+                type: 'paragraph',
+                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: 'First example',
+            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst upper = definePlugin({\n  name: 'upper',\n  install: () => ({ upper: (value: string) => value.toUpperCase() })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(upper)\n  const result = handle.extensions.upper('migaia')\n  assert.equal(result, 'MIGAIA')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst upper = definePlugin({\n  name: 'upper',\n  install: () => ({ upper: (text: string) => text.toUpperCase() })\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\n\nconst [upperHandle] = await host.use(upper)\nconsole.log(upperHandle.extensions.upper('migaia'))\n\nconst cleanup = await host.dispose()\nconsole.log(cleanup.cleanupComplete)"
               },
               {
                 type: 'paragraph',
-                text: 'definePlugin does not execute install immediately. defineHost creates the Host and await host.use(upper) installs the plugin. The result is a tuple in input order, so the example takes its first handle.'
-              }
-            ]
-          },
-          {
-            id: 'use-view',
-            heading: 'Call installed methods through the plugin handle',
-            blocks: [
+                text: 'Output:'
+              },
               {
-                type: 'paragraph',
-                text: 'handle.extensions.upper is the business entry in this example. It converts migaia to MIGAIA and assert.equal checks the result. The Host handle manages installation and cleanup. The plugin handle accesses plugin capabilities.'
+                type: 'code',
+                language: 'text',
+                code: 'MIGAIA\ntrue'
               },
               {
                 type: 'paragraph',
-                text: 'This entry requires no legacy view. Plugin handles have no unUse or dispose methods. Those operations belong to the Host. Failed installation rejects use and returns no handle for that attempt.'
-              }
-            ]
-          },
-          {
-            id: 'plugin-contract',
-            heading: 'Supply a domain core only when the task needs it',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'The installation core provides configuration, pipelines, and onDispose. defineHost domainCore can add application methods. Converting a string requires no domainCore.'
+                text: 'The code has three steps: definePlugin defines a plugin named upper whose install function returns an object; the methods on that object are what the plugin offers (its extensions). defineHost creates the Host. Only host.use(upper) actually runs install.'
               },
               {
                 type: 'paragraph',
-                text: 'Extensions returned by install and Feature outputs have separate access paths. Register application resources with core.onDispose during install so the Host can clean them during removal.'
+                text: 'host.use returns an array with one plugin handle per plugin, in input order, so destructuring takes the first. Call plugin methods through handle.extensions.upper. Before exiting, host.dispose() removes every plugin and returns the cleanup result; cleanupComplete is true when every resource has been released.'
               }
             ]
           },
           {
             id: 'host-options',
-            heading: 'Configure only the waits this task requires',
+            heading: 'defineHost options',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'execution.mutationTimeoutMs bounds installation, configuration update, and removal hooks. execution.pipelineDrainTimeoutMs bounds waiting for active pipelines during removal. Both fields are required. This example uses 5000 ms for each. false explicitly permits an unbounded wait.'
+                text: 'defineHost(options) takes one object; host is required:'
+              },
+              {
+                type: 'table',
+                headers: ['Option', 'Required', 'Purpose'],
+                rows: [
+                  [
+                    'host.execution.mutationTimeoutMs',
+                    'yes',
+                    'Maximum milliseconds for one install, config update, or removal; false means no limit'
+                  ],
+                  [
+                    'host.execution.pipelineDrainTimeoutMs',
+                    'yes',
+                    'Maximum milliseconds to wait for running pipelines when a plugin is removed'
+                  ],
+                  [
+                    'host.pipeline.mode',
+                    'no',
+                    "Pipeline mode: 'sync' (default), 'async', 'generator', or 'async-generator'; fixed after creation"
+                  ],
+                  [
+                    'host.diagnostic',
+                    'no',
+                    '(message, code?, error?) => void receives notable signals that are not errors, such as cleanup failures during rollback'
+                  ],
+                  [
+                    'host.disposeStepTimeoutMs',
+                    'no',
+                    'Maximum milliseconds for one cleanup function, default 5000'
+                  ],
+                  [
+                    'host.queueAdmissionTimeoutMs',
+                    'no',
+                    'Rejects a queued install or removal after this wait; by default it only reports a diagnostic'
+                  ],
+                  [
+                    'domainCore',
+                    'no',
+                    '({ pluginName }) => object. Creates application capabilities for each plugin, read through core in install'
+                  ]
+                ]
               },
               {
                 type: 'paragraph',
-                text: 'finally awaits Host cleanup and reports cleanupErrors. When physicalCompletion exists, it also awaits actual cleanup. cleanupComplete: false does not mean resources were released.'
+                text: 'Both execution timeouts must be written explicitly so you decide how long to wait when installation or removal hangs, instead of relying on a hidden default.'
+              }
+            ]
+          },
+          {
+            id: 'domain-core',
+            heading: 'Give plugins application capabilities',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Plugins usually need host capabilities, such as writing a log line. Provide them with domainCore; a plugin receives them through the core parameter of its factory. The first definePlugin type argument declares the core type, the second the methods the plugin returns.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\n/** Application capability the host gives every plugin: here, writing one log line. */\ntype ILoggerCore = { write(line: string): void }\n\nconst host = defineHost<ILoggerCore>({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } },\n  domainCore: ({ pluginName }) => ({ write: (line) => console.log(`[${pluginName}] ${line}`) })\n})\n\nconst greet = definePlugin<ILoggerCore, { greet(name: string): void }>('greet', (core) => ({\n  install: () => ({ greet: (name: string) => core.write(`hello, ${name}`) })\n}))\n\nconst [greetHandle] = await host.use(greet)\ngreetHandle.extensions.greet('ada')\nawait host.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[greet] hello, ada'
+              }
+            ]
+          },
+          {
+            id: 'define-plugin',
+            heading: 'Two forms of definePlugin',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The function form definePlugin(name, (core) => ({ install })) suits simple plugins that need core; the object form definePlugin({ name, install, ... }) suits plugins with configuration and lifecycle hooks. Both only store the definition; install runs during host.use. Object-form fields:'
+              },
+              {
+                type: 'table',
+                headers: ['Field', 'Purpose'],
+                rows: [
+                  ['name', 'Required unique name within the Host; it cannot contain a dot'],
+                  [
+                    'install(core)',
+                    'Required; runs on installation and its returned object becomes handle.extensions; register stages and resources here'
+                  ],
+                  ['config', 'Initial configuration; the Host keeps a read-only copy'],
+                  [
+                    'update(next, core)',
+                    'Called on configuration updates; throwing rejects the update'
+                  ],
+                  [
+                    'features / featureExpose',
+                    'Declares the Features this plugin provides and their implementation; see Share capabilities'
+                  ],
+                  [
+                    'setup(context)',
+                    'Async preparation before install, such as opening a connection; its result becomes install’s second argument'
+                  ],
+                  ['dispose()', 'Cleanup when the plugin is removed'],
+                  [
+                    'beforeRelease(context)',
+                    'Called once before removal while the plugin still serves, for graceful wind-down'
+                  ],
+                  [
+                    "activation: 'lazy'",
+                    'Registers on use and installs only on host.activate(name)'
+                  ],
+                  ['onEnable / onDisable', 'Notifications after the plugin is enabled or disabled']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'class',
+            heading: 'Alternative: extend PluginHost',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'If you are writing a library and want users to get a class with plugin support, extend PluginHost. Override createPluginDomainCore() to provide capabilities and call the protected runPipeline() from your own methods. Users see only your class methods, not Host internals.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype ILoggerCore = { write(line: string): void }\n\n/** The class your library exports; plugins extend it, application code only sees log(). */\nclass Logger extends PluginHost<ILoggerCore, string> {\n  protected createPluginDomainCore(): ILoggerCore {\n    return { write: (line) => console.log(line) }\n  }\n\n  log(message: string): void {\n    this.runPipeline(message, (line) => console.log(line))\n  }\n}\n\nconst timestamp = definePlugin<ILoggerCore, Record<string, never>, string>('timestamp', (core) => ({\n  install: () => {\n    core.usePipeline((message, next) => next(`12:00 ${message}`))\n    return {}\n  }\n}))\n\nconst logger = new Logger({ execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } })\nawait logger.use(timestamp)\nlogger.log('server started')\nawait logger.dispose()"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '12:00 server started'
+              },
+              {
+                type: 'paragraph',
+                text: 'PluginHost has two type parameters: TCore, the application capabilities plugins receive, and TValue, the value type passed through the pipeline (omit it when you need no pipeline; it defaults to never). defineHost uses the same type parameters.'
               }
             ]
           }
@@ -19161,60 +20173,113 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Let greeter use the formatter Feature',
+          label: 'Share capabilities between plugins',
           path: 'install-and-compose'
         },
         {
-          label: 'Update plugin configuration',
-          path: 'configuration-and-shared'
+          label: 'Plugin configuration',
+          path: 'configuration'
+        },
+        {
+          label: 'defineHost API',
+          path: 'docs/plugin-host/defineHost'
         }
       ]
     }
   },
   'plugin-host:install-and-compose': {
     zh: {
-      title: '让 greeter 使用 formatter 的能力',
-      lede: '一个插件提供大写方法。另一个插件声明依赖并生成 Hello MIGAIA。',
+      title: '插件之间共享能力',
+      lede: '一个插件用 Feature 提供能力，另一个插件声明依赖它；Host 据此决定安装顺序，并在卸载时保护依赖关系。',
       document: {
         sections: [
           {
-            id: 'order',
-            heading: '声明 Feature 依赖并安装两个插件',
+            id: 'feature',
+            heading: 'provider 和 consumer',
             blocks: [
               {
                 type: 'paragraph',
-                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
+                text: 'Feature 是一个插件提供给其他插件使用的能力。提供能力的插件叫 provider，使用能力的插件叫 consumer。provider 用 defineFeature 定义能力，放进自己的 features 字段；consumer 用 provider.getFeature(名字) 得到一个依赖引用，作为 defineFeature 的第二个参数。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (value: string) => value.toUpperCase() }))\nconst formatter = definePlugin({\n  name: 'formatter', features: { casing }, install: () => ({})\n})\nconst greeting = defineFeature(\n  (_core, dependencies) => ({ greet: (name: string) => `Hello ${dependencies.casing.upper(name)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst greeter = definePlugin({\n  name: 'greeter', features: { greeting },\n  install: (core) => ({ greet: (name: string) => core.features.greeting.greet(name) })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [greeterHandle, formatterHandle] = await host.use(greeter, formatter)\n  assert.equal(greeterHandle.extensions.greet('migaia'), 'Hello MIGAIA')\n  assert.equal(formatterHandle.getFeature('casing').upper('ready'), 'READY')\n  const removal = await host.unUse('formatter', { policy: 'cascade' })\n  assert.equal(removal.ok, true)\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\n// provider：formatter 提供一个名为 casing 的能力\nconst casing = defineFeature(() => ({ upper: (text: string) => text.toUpperCase() }))\nconst formatter = definePlugin({ name: 'formatter', features: { casing }, install: () => ({}) })\n\n// consumer：greeter 声明自己依赖 formatter 的 casing\nconst greeting = defineFeature(\n  (_core, dependencies) => ({ greet: (name: string) => `Hello ${dependencies.casing.upper(name)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst greeter = definePlugin({\n  name: 'greeter',\n  features: { greeting },\n  install: (core) => ({ greet: (name: string) => core.features.greeting.greet(name) })\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\n// 传入顺序无关紧要：Host 会先安装 formatter\nconst [greeterHandle] = await host.use(greeter, formatter)\nconsole.log(greeterHandle.extensions.greet('migaia'))\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'formatter 是 provider（提供能力的插件），greeter 是 consumer（使用能力的插件）。formatter.getFeature("casing") 返回依赖引用。defineFeature 的第二参数声明直接依赖，factory 的第二参数接收依赖输出。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'Hello MIGAIA'
               },
               {
                 type: 'paragraph',
-                text: 'Host 解析这些依赖，并先安装 formatter。use 返回的 handles 仍按输入顺序排列，所以第一项对应 greeter。示例把两个插件放在同一次 use 调用中。'
+                text: 'consumer 的 defineFeature 工厂函数的第二个参数 dependencies 里是依赖的输出，键名就是声明依赖时用的名字（这里是 casing）。consumer 在 install 里通过 core.features.greeting 读取自己的 Feature。'
+              },
+              {
+                type: 'paragraph',
+                text: 'Host 根据依赖关系排序：即使先传 greeter，也会先安装 formatter。use 返回的句柄仍按传入顺序排列，所以第一个是 greeter 的句柄。安装后，其他代码也可以用 handle.getFeature(名字) 读取某个插件提供的 Feature。'
               }
             ]
           },
           {
-            id: 'ownership',
-            heading: '只把需要的方法交给业务调用方',
+            id: 'dependency-rules',
+            heading: '依赖关系受到保护',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'greeter 的 install 显式返回 greet。调用方通过 greeterHandle.extensions.greet 使用它。Feature 不会把所有依赖方法自动添加到 extensions。'
+                text: '声明了依赖之后，Host 会在安装和卸载时检查它：'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (text: string) => text.toUpperCase() }))\nconst formatter = definePlugin({ name: 'formatter', features: { casing }, install: () => ({}) })\nconst greeting = defineFeature(\n  (_core, dependencies) => ({ greet: (name: string) => `Hello ${dependencies.casing.upper(name)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst greeter = definePlugin({ name: 'greeter', features: { greeting }, install: () => ({}) })\nconst options = { host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } }\n\n// 1. 缺少 provider：安装直接失败\nconst empty = defineHost(options)\ntry {\n  await empty.use(greeter)\n} catch (error) {\n  console.log('缺少 provider:', (error as { code: string }).code)\n}\n\n// 2. provider 仍被依赖：默认拒绝卸载\nconst host = defineHost(options)\nawait host.use(greeter, formatter)\ntry {\n  await host.unUse('formatter')\n} catch (error) {\n  console.log('拒绝卸载:', (error as { code: string }).code)\n}\n\n// 3. 先看计划，再连同依赖者一起卸载\nconst plan = await host.unUse('formatter', { policy: 'cascade', dryRun: true })\nconsole.log('卸载顺序:', plan.order)\nconst removal = await host.unUse('formatter', { policy: 'cascade' })\nconsole.log('卸载结果:', removal.ok)\nawait empty.dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: '跨插件关系通过 getFeature 引用声明。当前契约不使用 provide/requires 元数据或 shared.get。缺少必需 provider 时安装失败。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "缺少 provider: PREREQUISITE_MISSING\n拒绝卸载: DEPENDENCY_BLOCKED\n卸载顺序: [ 'greeter', 'formatter' ]\n卸载结果: true"
+              },
+              {
+                type: 'list',
+                items: [
+                  '安装 consumer 时找不到 provider，抛 PREREQUISITE_MISSING；provider 已被禁用抛 PREREQUISITE_DISABLED，已被卸载抛 PREREQUISITE_REMOVED。这些检查都在任何 install 执行之前完成。',
+                  "卸载一个仍被依赖的 provider，默认（policy: 'reject'）抛 DEPENDENCY_BLOCKED，error.detail.blockedBy 列出依赖它的插件。",
+                  "policy: 'cascade' 把依赖者一起卸载；policy: 'suspend' 只卸载 provider，把依赖者挂起保留实例，等新的 provider 装回来再恢复。",
+                  'dryRun: true 只返回计划（order 是将要卸载的顺序），不做任何修改。',
+                  '可选依赖用 provider.getFeature(名字, { optional: true }) 声明，缺少时不会阻止安装。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'rollback',
+            heading: '一批安装失败时整批回滚',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'host.use 一次安装的多个插件是一个整体：只要其中一个 install 抛错，已经安装的插件会按逆序回滚，它们登记的资源会被释放，然后 use 以 PLUGIN_INSTALL_FAILED 拒绝，原始错误在 error.cause 里。失败不会留下半安装的状态，修复原因后可以直接重新安装。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nconst cache = definePlugin({\n  name: 'cache',\n  install: (core) => {\n    console.log('cache: 已分配内存')\n    core.onDispose(() => console.log('cache: 已释放内存'))\n    return {}\n  }\n})\nconst remote = definePlugin({\n  name: 'remote',\n  install: () => {\n    throw new Error('无法连接远程服务')\n  }\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  await host.use(cache, remote) // 同一批安装：remote 失败，cache 也会回滚\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed) {\n    console.log('安装失败，原因:', (error.cause as Error).message)\n  }\n}\nconst [cacheHandle] = await host.use(cache) // 失败不留下半安装状态，可以重新安装\nconsole.log('重新安装成功:', cacheHandle.name)\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: '移除仍被使用的 provider 默认会拒绝。示例使用 policy: "cascade"，让 Host 一并移除 greeter 与 formatter。若只想修改配置，可保留插件并进入下一篇。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'cache: 已分配内存\n// remote 安装失败，整批回滚\ncache: 已释放内存\n安装失败，原因: 无法连接远程服务\ncache: 已分配内存\n重新安装成功: cache\n// host.dispose()\ncache: 已释放内存'
               }
             ]
           }
@@ -19222,58 +20287,111 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '更新问候语并让两个插件共享 casing',
-          path: 'configuration-and-shared'
+          label: '插件配置',
+          path: 'configuration'
         },
         {
-          label: '把已组合的服务接到 Runtime Peer',
-          path: '../rpc-core/getting-started'
+          label: '卸载、禁用与替换',
+          path: 'removal-and-rollback'
+        },
+        {
+          label: 'defineFeature API',
+          path: 'docs/plugin-host/defineFeature'
         }
       ]
     },
     en: {
-      title: 'Let greeter use the formatter capability',
-      lede: 'One plugin provides uppercase conversion. Another declares its dependency and produces Hello MIGAIA.',
+      title: 'Share capabilities between plugins',
+      lede: 'One plugin provides a capability as a Feature, another declares a dependency on it; the Host uses that to order installation and protect dependents on removal.',
       document: {
         sections: [
           {
-            id: 'order',
-            heading: 'Declare Feature dependencies and install both plugins',
+            id: 'feature',
+            heading: 'Providers and consumers',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
+                text: 'A Feature is a capability one plugin offers to others. The plugin offering it is the provider; the one using it is the consumer. The provider defines the capability with defineFeature and lists it under features; the consumer gets a dependency reference with provider.getFeature(name) and passes it as the second defineFeature argument.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (value: string) => value.toUpperCase() }))\nconst formatter = definePlugin({\n  name: 'formatter', features: { casing }, install: () => ({})\n})\nconst greeting = defineFeature(\n  (_core, dependencies) => ({ greet: (name: string) => `Hello ${dependencies.casing.upper(name)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst greeter = definePlugin({\n  name: 'greeter', features: { greeting },\n  install: (core) => ({ greet: (name: string) => core.features.greeting.greet(name) })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [greeterHandle, formatterHandle] = await host.use(greeter, formatter)\n  assert.equal(greeterHandle.extensions.greet('migaia'), 'Hello MIGAIA')\n  assert.equal(formatterHandle.getFeature('casing').upper('ready'), 'READY')\n  const removal = await host.unUse('formatter', { policy: 'cascade' })\n  assert.equal(removal.ok, true)\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\n// provider: formatter offers a capability named casing\nconst casing = defineFeature(() => ({ upper: (text: string) => text.toUpperCase() }))\nconst formatter = definePlugin({ name: 'formatter', features: { casing }, install: () => ({}) })\n\n// consumer: greeter declares that it depends on formatter.casing\nconst greeting = defineFeature(\n  (_core, dependencies) => ({ greet: (name: string) => `Hello ${dependencies.casing.upper(name)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst greeter = definePlugin({\n  name: 'greeter',\n  features: { greeting },\n  install: (core) => ({ greet: (name: string) => core.features.greeting.greet(name) })\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\n// Argument order does not matter: the Host installs formatter first\nconst [greeterHandle] = await host.use(greeter, formatter)\nconsole.log(greeterHandle.extensions.greet('migaia'))\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'formatter provides the capability and greeter consumes it. formatter.getFeature("casing") creates a dependency reference. The second defineFeature argument declares direct dependencies. The factory receives their outputs through its second argument.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'Hello MIGAIA'
               },
               {
                 type: 'paragraph',
-                text: 'The Host resolves these dependencies and installs formatter first. Returned handles retain input order, so the first handle belongs to greeter. The example supplies both plugins in one use call.'
+                text: 'The second parameter of the consumer’s factory, dependencies, holds the dependency outputs keyed by the names used when declaring them (casing here). In install the consumer reads its own Feature through core.features.greeting.'
+              },
+              {
+                type: 'paragraph',
+                text: 'The Host orders by dependency: even with greeter first, formatter installs first. Handles still follow the input order, so the first is greeter’s. After installation any code can read a plugin’s Feature with handle.getFeature(name).'
               }
             ]
           },
           {
-            id: 'ownership',
-            heading: 'Expose only the business methods the caller needs',
+            id: 'dependency-rules',
+            heading: 'Dependencies are protected',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The greeter install hook explicitly returns greet. The caller uses greeterHandle.extensions.greet. Feature dependencies do not automatically add their methods to extensions.'
+                text: 'Once declared, dependencies are checked on installation and removal:'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (text: string) => text.toUpperCase() }))\nconst formatter = definePlugin({ name: 'formatter', features: { casing }, install: () => ({}) })\nconst greeting = defineFeature(\n  (_core, dependencies) => ({ greet: (name: string) => `Hello ${dependencies.casing.upper(name)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst greeter = definePlugin({ name: 'greeter', features: { greeting }, install: () => ({}) })\nconst options = { host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } } }\n\n// 1. Missing provider: installation fails\nconst empty = defineHost(options)\ntry {\n  await empty.use(greeter)\n} catch (error) {\n  console.log('missing provider:', (error as { code: string }).code)\n}\n\n// 2. Provider still in use: removal is rejected by default\nconst host = defineHost(options)\nawait host.use(greeter, formatter)\ntry {\n  await host.unUse('formatter')\n} catch (error) {\n  console.log('removal rejected:', (error as { code: string }).code)\n}\n\n// 3. Preview the plan, then remove the provider with its dependents\nconst plan = await host.unUse('formatter', { policy: 'cascade', dryRun: true })\nconsole.log('removal order:', plan.order)\nconst removal = await host.unUse('formatter', { policy: 'cascade' })\nconsole.log('removed:', removal.ok)\nawait empty.dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'Declare cross-plugin relationships through getFeature references. The current contract does not use provide/requires metadata or shared.get. A missing required provider rejects installation.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "missing provider: PREREQUISITE_MISSING\nremoval rejected: DEPENDENCY_BLOCKED\nremoval order: [ 'greeter', 'formatter' ]\nremoved: true"
+              },
+              {
+                type: 'list',
+                items: [
+                  'A missing provider throws PREREQUISITE_MISSING when the consumer installs; a disabled one throws PREREQUISITE_DISABLED and a removed one PREREQUISITE_REMOVED. All checks run before any install.',
+                  "Removing a provider still in use throws DEPENDENCY_BLOCKED under the default policy: 'reject'; error.detail.blockedBy lists its dependents.",
+                  "policy: 'cascade' removes the dependents too; policy: 'suspend' removes only the provider and suspends dependents, keeping their instances until a new provider is installed.",
+                  'dryRun: true returns only the plan (order is the removal order) and changes nothing.',
+                  'Declare an optional dependency with provider.getFeature(name, { optional: true }); a missing provider then does not block installation.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'rollback',
+            heading: 'A failed batch rolls back as a whole',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Plugins installed in one host.use call form a unit: if any install throws, the installed ones roll back in reverse order, their resources are released, and use rejects with PLUGIN_INSTALL_FAILED with the original error in error.cause. Nothing is left half-installed, so you can install again once the cause is fixed.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nconst cache = definePlugin({\n  name: 'cache',\n  install: (core) => {\n    console.log('cache: memory allocated')\n    core.onDispose(() => console.log('cache: memory released'))\n    return {}\n  }\n})\nconst remote = definePlugin({\n  name: 'remote',\n  install: () => {\n    throw new Error('cannot reach the remote service')\n  }\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  await host.use(cache, remote) // one batch: remote fails, so cache is rolled back too\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed) {\n    console.log('install failed because:', (error.cause as Error).message)\n  }\n}\nconst [cacheHandle] = await host.use(cache) // a failure leaves nothing half-installed, so install again\nconsole.log('installed again:', cacheHandle.name)\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'Removing a provider that still has consumers is rejected by default. The example selects policy: "cascade" to remove greeter and formatter together. Keep the plugins installed when only their configuration needs to change.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'cache: memory allocated\n// remote fails, so the whole batch rolls back\ncache: memory released\ninstall failed because: cannot reach the remote service\ncache: memory allocated\ninstalled again: cache\n// host.dispose()\ncache: memory released'
               }
             ]
           }
@@ -19281,61 +20399,67 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Update greetings and share casing with two plugins',
-          path: 'configuration-and-shared'
+          label: 'Plugin configuration',
+          path: 'configuration'
         },
         {
-          label: 'Connect the composed service to a Runtime Peer',
-          path: '../rpc-core/getting-started'
+          label: 'Remove, disable, and replace',
+          path: 'removal-and-rollback'
+        },
+        {
+          label: 'defineFeature API',
+          path: 'docs/plugin-host/defineFeature'
         }
       ]
     }
   },
-  'plugin-host:configuration-and-shared': {
+  'plugin-host:configuration': {
     zh: {
-      title: '更新问候语，让插件复用格式化能力',
-      lede: '保留已经安装的插件，只更新它的 prefix。跨插件复用通过 Feature 依赖完成。',
+      title: '插件配置',
+      lede: '给插件一份初始配置，在运行时更新它；更新先经过插件校验，失败时旧配置保持不变。',
       document: {
         sections: [
           {
-            id: 'config',
-            heading: '更新 prefix，并检查下一次问候',
+            id: 'example',
+            heading: '读取和更新配置',
             blocks: [
-              {
-                type: 'paragraph',
-                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greeting = definePlugin({\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  install: (core) => ({ greet: (name: string) => `${core.config.get().prefix} ${name}` })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(greeting)\n  assert.equal(handle.extensions.greet('Migaia'), 'Hello Migaia')\n  const previous = handle.config.get()\n  await handle.config.update(() => ({ prefix: 'Welcome' }))\n  assert.equal(previous.prefix, 'Hello')\n  assert.equal(handle.config.get().prefix, 'Welcome')\n  assert.equal(handle.extensions.greet('Migaia'), 'Welcome Migaia')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greeting = definePlugin({\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  install: (core) => ({ greet: (name: string) => `${core.config.get().prefix}, ${name}` }),\n  update: (next) => console.log('update 钩子收到新配置:', next.prefix)\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst [handle] = await host.use(greeting)\nconsole.log(handle.extensions.greet('ada'))\n\nawait handle.config.update((previous) => ({ prefix: `${previous.prefix}!!` }))\nconsole.log(handle.extensions.greet('ada'))\nconsole.log(host.config.get('greeting.prefix'))\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'handle.config.get() 读取当前配置。handle.config.update(recipe) 接收修改函数，返回值作为配置 patch（要修改的字段）提交。示例只更新 prefix。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'Hello, ada\n// handle.config.update 先调用插件的 update 钩子，成功后才提交\nupdate 钩子收到新配置: Hello!!\nHello!!, ada\nHello!!'
               },
               {
                 type: 'paragraph',
-                text: '先前取得的配置对象仍保存 Hello。更新成功后再次读取 handle.config.get() 得到 Welcome，下一次 greet 使用新值。update hook 失败时旧配置继续保留。'
+                text: '对象形 definePlugin 的 config 字段是初始配置。插件在 install 里用 core.config.get() 读取当前配置；因为每次调用 greet 都重新读取，更新后的值会立刻生效。'
+              },
+              {
+                type: 'paragraph',
+                text: 'handle.config.update(recipe) 更新配置。recipe 是一个函数，收到当前配置 previous，同步返回要修改的字段（只写要改的字段即可）。Host 先把合并后的新配置交给插件的 update(next) 钩子；钩子成功返回才提交，钩子抛错则这次更新被拒绝，旧配置保持不变。'
               }
             ]
           },
           {
-            id: 'shared',
-            heading: '通过一个 provider 服务两个 consumer',
+            id: 'rules',
+            heading: '配置的规则',
             blocks: [
               {
-                type: 'paragraph',
-                text: '本节代码是独立脚本，沿用前面声明的 Node 24 ESM 环境。formatter 持有 casing，title 和 badge 分别声明依赖。两个业务结果都由断言检查。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (value: string) => value.toUpperCase() }))\nconst formatter = definePlugin({ name: 'formatter', features: { casing }, install: () => ({}) })\nconst title = defineFeature(\n  (_core, dependencies) => ({ render: (value: string) => `Title: ${dependencies.casing.upper(value)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst badge = defineFeature(\n  (_core, dependencies) => ({ render: (value: string) => `[${dependencies.casing.upper(value)}]` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst titlePlugin = definePlugin({ name: 'title', features: { title }, install: () => ({}) })\nconst badgePlugin = definePlugin({ name: 'badge', features: { badge }, install: () => ({}) })\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [titles, badges] = await host.use(titlePlugin, badgePlugin, formatter)\n  assert.equal(titles.getFeature('title').render('migaia'), 'Title: MIGAIA')\n  assert.equal(badges.getFeature('badge').render('migaia'), '[MIGAIA]')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'shared 字段和 shared.get 属于已移除的旧写法。使用 defineFeature 与 provider.getFeature，让 Host 记录真实依赖。每个插件通过自己的 handle.getFeature 读取已安装的根 Feature 输出。'
+                type: 'list',
+                items: [
+                  '配置以只读快照保存：对象和数组被冻结，安装后修改原始对象不会影响插件。',
+                  '配置只能包含普通数据：普通对象、数组、字符串、数字、布尔值。Date、Map、Set 会被拒绝（INVALID_CONFIG_VALUE），循环引用也会被拒绝（CONFIG_CYCLE_REJECTED）。',
+                  "host.config.get(path) 按路径读取：'greeting' 返回整份配置，'greeting.prefix' 返回一个字段；找不到时返回 undefined，不抛错。",
+                  'host.config.update(name, recipe) 和 handle.config.update(recipe) 作用相同；对不存在的插件更新会抛 PLUGIN_NOT_INSTALLED。',
+                  '在 update 钩子执行期间，参数 next 是候选的新配置，core.config.get() 仍返回已提交的旧配置。'
+                ]
               }
             ]
           }
@@ -19343,59 +20467,65 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '把转换步骤接入 pipeline',
+          label: '处理链',
           path: 'pipelines'
         },
         {
-          label: '卸载 provider 与 consumer',
+          label: '卸载、禁用与替换',
           path: 'removal-and-rollback'
+        },
+        {
+          label: 'definePlugin API',
+          path: 'docs/plugin-host/definePlugin'
         }
       ]
     },
     en: {
-      title: 'Update greetings and reuse formatting across plugins',
-      lede: 'Keep the installed plugin and update only its prefix. Reuse capabilities through Feature dependencies.',
+      title: 'Plugin configuration',
+      lede: 'Give a plugin initial configuration and update it at runtime; updates pass the plugin’s check first and the old value stays on failure.',
       document: {
         sections: [
           {
-            id: 'config',
-            heading: 'Update prefix and check the next greeting',
+            id: 'example',
+            heading: 'Read and update configuration',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greeting = definePlugin({\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  install: (core) => ({ greet: (name: string) => `${core.config.get().prefix} ${name}` })\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(greeting)\n  assert.equal(handle.extensions.greet('Migaia'), 'Hello Migaia')\n  const previous = handle.config.get()\n  await handle.config.update(() => ({ prefix: 'Welcome' }))\n  assert.equal(previous.prefix, 'Hello')\n  assert.equal(handle.config.get().prefix, 'Welcome')\n  assert.equal(handle.extensions.greet('Migaia'), 'Welcome Migaia')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst greeting = definePlugin({\n  name: 'greeting',\n  config: { prefix: 'Hello' },\n  install: (core) => ({ greet: (name: string) => `${core.config.get().prefix}, ${name}` }),\n  update: (next) => console.log('update hook received:', next.prefix)\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst [handle] = await host.use(greeting)\nconsole.log(handle.extensions.greet('ada'))\n\nawait handle.config.update((previous) => ({ prefix: `${previous.prefix}!!` }))\nconsole.log(handle.extensions.greet('ada'))\nconsole.log(host.config.get('greeting.prefix'))\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'handle.config.get() reads current configuration. handle.config.update(recipe) accepts a function whose result patches the configuration. The example changes only prefix.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'Hello, ada\n// handle.config.update calls the plugin update hook first and commits only if it succeeds\nupdate hook received: Hello!!\nHello!!, ada\nHello!!'
               },
               {
                 type: 'paragraph',
-                text: 'The previously read object retains Hello. After successful update, handle.config.get() reads Welcome and the next greet uses it. A failed update hook leaves the prior configuration in place.'
+                text: 'The config field of an object-form definePlugin is the initial configuration. In install the plugin reads the current value with core.config.get(); because greet reads it on every call, an update takes effect at once.'
+              },
+              {
+                type: 'paragraph',
+                text: 'handle.config.update(recipe) updates configuration. recipe receives the current value previous and synchronously returns the fields to change (only those). The Host passes the merged result to the plugin’s update(next) hook; it commits only if the hook returns, and a throwing hook rejects the update and keeps the old value.'
               }
             ]
           },
           {
-            id: 'shared',
-            heading: 'Serve two consumers through one provider',
+            id: 'rules',
+            heading: 'Configuration rules',
             blocks: [
               {
-                type: 'paragraph',
-                text: 'This independent script uses the same declared Node 24 ESM environment. formatter owns casing. title and badge declare their dependencies separately. Assertions check both business results.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst casing = defineFeature(() => ({ upper: (value: string) => value.toUpperCase() }))\nconst formatter = definePlugin({ name: 'formatter', features: { casing }, install: () => ({}) })\nconst title = defineFeature(\n  (_core, dependencies) => ({ render: (value: string) => `Title: ${dependencies.casing.upper(value)}` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst badge = defineFeature(\n  (_core, dependencies) => ({ render: (value: string) => `[${dependencies.casing.upper(value)}]` }),\n  { casing: formatter.getFeature('casing') }\n)\nconst titlePlugin = definePlugin({ name: 'title', features: { title }, install: () => ({}) })\nconst badgePlugin = definePlugin({ name: 'badge', features: { badge }, install: () => ({}) })\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [titles, badges] = await host.use(titlePlugin, badgePlugin, formatter)\n  assert.equal(titles.getFeature('title').render('migaia'), 'Title: MIGAIA')\n  assert.equal(badges.getFeature('badge').render('migaia'), '[MIGAIA]')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'The old shared field and shared.get have been removed. Use defineFeature and provider.getFeature so the Host records actual dependencies. Each plugin handle reads its installed root Feature output through getFeature.'
+                type: 'list',
+                items: [
+                  'Configuration is a read-only snapshot: objects and arrays are frozen, so changing the original object after installation does not affect the plugin.',
+                  'Only plain data is allowed: plain objects, arrays, strings, numbers, booleans. Date, Map, and Set are rejected (INVALID_CONFIG_VALUE), and so are cycles (CONFIG_CYCLE_REJECTED).',
+                  "host.config.get(path) reads by path: 'greeting' returns the whole object, 'greeting.prefix' one field; a missing path returns undefined instead of throwing.",
+                  'host.config.update(name, recipe) works like handle.config.update(recipe); updating a plugin that is not installed throws PLUGIN_NOT_INSTALLED.',
+                  'While the update hook runs, its next argument is the candidate value and core.config.get() still returns the committed old value.'
+                ]
               }
             ]
           }
@@ -19403,62 +20533,85 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Connect conversion steps to a pipeline',
+          label: 'Pipelines',
           path: 'pipelines'
         },
         {
-          label: 'Remove providers and consumers',
+          label: 'Remove, disable, and replace',
           path: 'removal-and-rollback'
+        },
+        {
+          label: 'definePlugin API',
+          path: 'docs/plugin-host/definePlugin'
         }
       ]
     }
   },
   'plugin-host:pipelines': {
     zh: {
-      title: '安装大写处理步骤，并读取转换结果',
-      lede: '用 sync pipeline 把 hello 变成 HELLO。卸载插件后，同一个入口恢复原始输入。',
+      title: '处理链：让插件参与处理每一个请求',
+      lede: '插件在安装时注册处理步骤，宿主用 runPipeline 让一个值依次经过这些步骤；卸载插件时它的步骤自动离开。',
       document: {
         sections: [
           {
-            id: 'modes',
-            heading: '先为这个任务选择 sync',
+            id: 'example',
+            heading: '例子：请求计时和鉴权',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'pipeline 是按顺序处理输入的管线。stage 是其中一个处理步骤。字符串转换无需等待，所以本例选择 sync，并通过 core.usePipeline 注册 stage。需要异步等待时选择 async 和 useAsyncPipeline。generator 与 async-generator 用于生成器控制流。'
-              }
-            ]
-          },
-          {
-            id: 'run-sync',
-            heading: '运行完整的安装、处理和卸载脚本',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
+                text: '处理链（pipeline）是一串按顺序执行的处理步骤（stage），规则和 middleware-pipeline 相同：每个步骤调用 next(值) 把值交给下一步，不调用就到此结束。下面的宿主选择 async 模式，timing 和 auth 两个插件各注册一个步骤。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst uppercase = definePlugin<Record<string, never>, Record<string, never>, string>({\n  name: 'uppercase',\n  install: (core) => {\n    core.usePipeline((value, next) => next(value.toUpperCase()))\n    return {}\n  }\n})\nconst host = defineHost<Record<string, never>, string>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: 'sync' }\n  }\n})\nconst output: string[] = []\ntry {\n  await host.use(uppercase)\n  await host.runPipeline('hello', (value) => output.push(value))\n  assert.deepEqual(output, ['HELLO'])\n  assert.equal((await host.unUse('uppercase')).ok, true)\n  output.length = 0\n  await host.runPipeline('hello', (value) => output.push(value))\n  assert.deepEqual(output, ['hello'])\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\ntype IRequest = { path: string; user?: string }\ntype INoCore = Record<string, never>\n\nconst host = defineHost<INoCore, IRequest>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: 'async' }\n  }\n})\n\nconst timing = definePlugin<INoCore, INoCore, IRequest>('timing', (core) => ({\n  install: () => {\n    core.useAsyncPipeline(async (request, next) => {\n      console.log('[timing] 开始', request.path)\n      await next(request)\n      console.log('[timing] 结束', request.path)\n    })\n    return {}\n  }\n}))\nconst auth = definePlugin<INoCore, INoCore, IRequest>('auth', (core) => ({\n  install: () => {\n    core.useAsyncPipeline(async (request, next) => next({ ...request, user: 'ada' }))\n    return {}\n  }\n}))\n\nconst handle = (request: IRequest) =>\n  host.runPipeline(request, (final) => console.log(`[handler] ${final.user ?? '匿名'} 访问 ${final.path}`))\n\nawait host.use(timing, auth)\nawait handle({ path: '/orders' })\n\nawait host.unUse('auth') // auth 的步骤随插件一起移除\nawait handle({ path: '/orders' })\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'defineHost 返回的 handle 提供 runPipeline。done callback（完成回调）接收最终值，本例把它放入 output 并检查 HELLO。卸载 uppercase 后再次运行，结果回到 hello。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[timing] 开始 /orders\n[handler] ada 访问 /orders\n[timing] 结束 /orders\n// 卸载 auth 之后\n[timing] 开始 /orders\n[handler] 匿名 访问 /orders\n[timing] 结束 /orders'
               },
               {
                 type: 'paragraph',
-                text: 'core.usePipeline 在安装期间登记步骤。Host 因而知道这个步骤属于 uppercase，并在卸载时从后续运行中移除它。'
+                text: '插件在 install 里通过 core.useAsyncPipeline(stage) 注册步骤，步骤按插件安装的顺序排列。host.runPipeline(value, done) 让 value 依次经过所有步骤，最后交给 done。卸载 auth 后，它的步骤从之后的运行中移除，所以第二次请求是匿名的。'
               }
             ]
           },
           {
-            id: 'drain',
-            heading: '清理前等待已经开始的处理',
+            id: 'modes',
+            heading: '选择模式并使用对应的注册方法',
             blocks: [
               {
+                type: 'table',
+                headers: ['host.pipeline.mode', '注册方法', '步骤写法'],
+                rows: [
+                  ["'sync'（默认）", 'core.usePipeline', '(value, next) => void'],
+                  ["'async'", 'core.useAsyncPipeline', 'async (value, next) => void'],
+                  ["'generator'", 'core.useGeneratorPipeline', 'function* (value) { ... }'],
+                  [
+                    "'async-generator'",
+                    'core.useAsyncGeneratorPipeline',
+                    'async function* (value) { ... }'
+                  ]
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  '同步步骤（usePipeline）可以用在任何模式的宿主上，Host 会自动转换；其他方法只能用于对应的模式，用错时抛 PIPELINE_MODE_MISMATCH。',
+                  '注册方法只能在 install 期间调用。宿主自己的步骤用 host.usePipeline 等同名方法注册。',
+                  '处理链正在执行时不能注册新步骤，否则抛 PIPELINE_EXECUTING。',
+                  'async 模式下同一步骤调用两次 next 抛 PIPELINE_NEXT_DUPLICATE；sync 模式下步骤返回后才调用 next 会被忽略，并以 PIPELINE_NEXT_LATE 报告给 diagnostic。',
+                  'Host 关闭时，正在执行的处理链在下一个检查点停止，以 HOST_DISPOSING 或 HOST_DISPOSED 拒绝。'
+                ]
+              },
+              {
                 type: 'paragraph',
-                text: '已经开始的 pipeline 保留自己的执行快照。卸载需要等待相关运行结束，再释放资源。execution.pipelineDrainTimeoutMs 控制等待时间。Host dispose 的 cleanupComplete 与 physicalCompletion 区分已经结束和仍在进行的清理。'
+                text: 'generator 模式中 return 的含义（GENERATOR_CONTINUE、GENERATOR_HALT、GENERATOR_UNDEFINED）和 middleware-pipeline 完全相同，plugin-host 直接转发这三个常量。'
               }
             ]
           }
@@ -19466,56 +20619,83 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '检查卸载结果和安装失败回滚',
+          label: '卸载、禁用与替换',
           path: 'removal-and-rollback'
+        },
+        {
+          label: 'middleware-pipeline 的模式说明',
+          path: '../middleware-pipeline/generators'
+        },
+        {
+          label: 'definePlugin API',
+          path: 'docs/plugin-host/definePlugin'
         }
       ]
     },
     en: {
-      title: 'Install an uppercase stage and consume its result',
-      lede: 'Use a sync pipeline to turn hello into HELLO. Removing the plugin restores the original input through the same entry.',
+      title: 'Pipelines: let plugins process every request',
+      lede: 'Plugins register processing stages on installation; the host passes a value through them with runPipeline, and removing a plugin removes its stages.',
       document: {
         sections: [
           {
-            id: 'modes',
-            heading: 'Choose sync for this task first',
+            id: 'example',
+            heading: 'Example: request timing and authentication',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'A pipeline processes input through ordered stages. String conversion needs no asynchronous wait, so this example selects sync and registers its stage with core.usePipeline. Choose async and useAsyncPipeline for asynchronous work. generator and async-generator serve generator control flow.'
-              }
-            ]
-          },
-          {
-            id: 'run-sync',
-            heading: 'Run the complete install, transform, and remove script',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
+                text: 'A pipeline is a series of stages run in order, with the same rules as middleware-pipeline: a stage calls next(value) to pass a value on and stops the chain by not calling it. The host below uses async mode, and the timing and auth plugins each register one stage.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst uppercase = definePlugin<Record<string, never>, Record<string, never>, string>({\n  name: 'uppercase',\n  install: (core) => {\n    core.usePipeline((value, next) => next(value.toUpperCase()))\n    return {}\n  }\n})\nconst host = defineHost<Record<string, never>, string>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: 'sync' }\n  }\n})\nconst output: string[] = []\ntry {\n  await host.use(uppercase)\n  await host.runPipeline('hello', (value) => output.push(value))\n  assert.deepEqual(output, ['HELLO'])\n  assert.equal((await host.unUse('uppercase')).ok, true)\n  output.length = 0\n  await host.runPipeline('hello', (value) => output.push(value))\n  assert.deepEqual(output, ['hello'])\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\ntype IRequest = { path: string; user?: string }\ntype INoCore = Record<string, never>\n\nconst host = defineHost<INoCore, IRequest>({\n  host: {\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n    pipeline: { mode: 'async' }\n  }\n})\n\nconst timing = definePlugin<INoCore, INoCore, IRequest>('timing', (core) => ({\n  install: () => {\n    core.useAsyncPipeline(async (request, next) => {\n      console.log('[timing] start', request.path)\n      await next(request)\n      console.log('[timing] end', request.path)\n    })\n    return {}\n  }\n}))\nconst auth = definePlugin<INoCore, INoCore, IRequest>('auth', (core) => ({\n  install: () => {\n    core.useAsyncPipeline(async (request, next) => next({ ...request, user: 'ada' }))\n    return {}\n  }\n}))\n\nconst handle = (request: IRequest) =>\n  host.runPipeline(request, (final) => console.log(`[handler] ${final.user ?? 'anonymous'} requested ${final.path}`))\n\nawait host.use(timing, auth)\nawait handle({ path: '/orders' })\n\nawait host.unUse('auth') // auth's stage leaves together with the plugin\nawait handle({ path: '/orders' })\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'The defineHost handle exposes runPipeline. Its completion callback receives the final value. The example stores that value in output and checks HELLO. Running again after uppercase removal produces hello.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[timing] start /orders\n[handler] ada requested /orders\n[timing] end /orders\n// after removing auth\n[timing] start /orders\n[handler] anonymous requested /orders\n[timing] end /orders'
               },
               {
                 type: 'paragraph',
-                text: 'core.usePipeline registers a stage during installation. The Host records uppercase as its owner and removes the stage from subsequent runs when the plugin is removed.'
+                text: 'Plugins register stages in install with core.useAsyncPipeline(stage), ordered by installation. host.runPipeline(value, done) passes value through every stage and finally to done. After auth is removed its stage leaves later runs, so the second request is anonymous.'
               }
             ]
           },
           {
-            id: 'drain',
-            heading: 'Wait for active processing before resource cleanup',
+            id: 'modes',
+            heading: 'Choose a mode and the matching registration method',
             blocks: [
               {
+                type: 'table',
+                headers: ['host.pipeline.mode', 'Registration', 'Stage shape'],
+                rows: [
+                  ["'sync' (default)", 'core.usePipeline', '(value, next) => void'],
+                  ["'async'", 'core.useAsyncPipeline', 'async (value, next) => void'],
+                  ["'generator'", 'core.useGeneratorPipeline', 'function* (value) { ... }'],
+                  [
+                    "'async-generator'",
+                    'core.useAsyncGeneratorPipeline',
+                    'async function* (value) { ... }'
+                  ]
+                ]
+              },
+              {
+                type: 'list',
+                items: [
+                  'Sync stages (usePipeline) work on a host of any mode, which converts them; the other methods only fit their own mode and throw PIPELINE_MODE_MISMATCH otherwise.',
+                  'Registration methods are callable only during install. The host registers its own stages with host.usePipeline and the matching methods.',
+                  'Registering while a pipeline runs throws PIPELINE_EXECUTING.',
+                  'In async mode calling next twice from one stage throws PIPELINE_NEXT_DUPLICATE; in sync mode a next after the stage returned is ignored and reported to diagnostic as PIPELINE_NEXT_LATE.',
+                  'When the Host shuts down, a running pipeline stops at the next checkpoint and rejects with HOST_DISPOSING or HOST_DISPOSED.'
+                ]
+              },
+              {
                 type: 'paragraph',
-                text: 'An active pipeline retains its execution snapshot. Removal waits for related runs before releasing resources. execution.pipelineDrainTimeoutMs controls the wait. Host disposal distinguishes finished and ongoing cleanup through cleanupComplete and physicalCompletion.'
+                text: 'The meaning of return values in generator modes (GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED) is identical to middleware-pipeline; plugin-host re-exports the same constants.'
               }
             ]
           }
@@ -19523,61 +20703,98 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Check removal results and installation rollback',
+          label: 'Remove, disable, and replace',
           path: 'removal-and-rollback'
+        },
+        {
+          label: 'middleware-pipeline modes',
+          path: '../middleware-pipeline/generators'
+        },
+        {
+          label: 'definePlugin API',
+          path: 'docs/plugin-host/definePlugin'
         }
       ]
     }
   },
   'plugin-host:removal-and-rollback': {
     zh: {
-      title: '移除插件，并在安装失败后重新开始',
-      lede: '让宿主释放插件登记的资源。检查移除结果，保留安装错误，并确认失败没有留下半安装插件。',
+      title: '卸载、禁用与替换',
+      lede: '卸载会释放插件的资源；禁用只是暂停；替换在不中断服务的情况下换上新版本。',
       document: {
         sections: [
           {
             id: 'remove',
-            heading: '移除 upper，确认清理只执行一次',
+            heading: '卸载插件并释放资源',
             blocks: [
               {
                 type: 'paragraph',
-                text: '以下完整示例在 Node 24 的 ESM 项目中运行。安装 @migaia/plugin-host 后保存为 main.ts，执行 node main.ts。node:assert/strict 用断言检查业务结果；通过时脚本没有输出。'
+                text: '插件在 install 里用 core.onDispose(清理函数) 登记要释放的资源。host.unUse(name) 卸载插件时，Host 先等待正在使用它的处理链结束，然后调用这些清理函数，每个只调用一次。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nlet releases = 0\nconst upper = definePlugin({\n  name: 'upper',\n  install: (core) => {\n    core.onDispose(() => { releases += 1 })\n    return { upper: (value: string) => value.toUpperCase() }\n  }\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(upper)\n  const captured = handle.extensions.upper\n  assert.equal(captured('migaia'), 'MIGAIA')\n  const result = await host.unUse('upper')\n  assert.equal(result.ok, true)\n  assert.equal(releases, 1)\n  assert.throws(() => captured('again'), (error: unknown) =>\n    error instanceof PluginHostError && error.code === PluginHostErrorCode.registrationRevoked\n  )\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst database = definePlugin({\n  name: 'database',\n  install: (core) => {\n    const connection = { open: true }\n    console.log('打开连接')\n    core.onDispose(() => {\n      connection.open = false\n      console.log('关闭连接')\n    })\n    return { query: (sql: string) => `执行: ${sql}` }\n  }\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst [db] = await host.use(database)\nconst query = db.extensions.query // 业务代码可能保存了这个方法\nconsole.log(query('select 1'))\n\nconst removal = await host.unUse('database')\nconsole.log('卸载成功:', removal.ok)\ntry {\n  query('select 2')\n} catch (error) {\n  console.log('卸载后调用:', (error as { code: string }).code)\n}\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'unUse 位于 Host，结果是 { ok, affected } 或 { ok: false, errors, affected }。cleanupComplete 和 physicalCompletion 属于 Host dispose 结果，不能套在 unUse 返回值上。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '打开连接\n执行: select 1\n关闭连接\n卸载成功: true\n卸载后调用: REGISTRATION_REVOKED'
               },
               {
                 type: 'paragraph',
-                text: '示例从 extensions 取出的 captured 绑定这一次安装。移除后调用它会抛 REGISTRATION_REVOKED。plugin handle 本身按名称读取当前安装，和这个已取出的函数有不同用途。'
+                text: 'unUse 返回 { ok, affected }：ok 为 false 时，errors 里是清理过程中的错误，但插件仍然已被移除。卸载后，业务代码之前保存的插件方法会抛 REGISTRATION_REVOKED，避免悄悄调用一个已经释放资源的插件。'
               }
             ]
           },
           {
-            id: 'rollback',
-            heading: '处理一次失败，再重新安装',
+            id: 'disable',
+            heading: '禁用：暂停而不释放',
             blocks: [
               {
                 type: 'paragraph',
-                text: '以下是独立脚本。invalid 的 install 用无效 JSON 模拟真实同步失败。assert.rejects 检查错误码，随后重新安装 upper 并消费 RECOVERED。'
+                text: 'host.plugin.disable(name) 返回一个 Promise，结果里的 token 用来恢复。禁用期间插件的方法、Feature 和处理步骤都不可用，但资源和配置保留；await token.enable() 让插件和它的步骤回到原来的位置。需要释放资源时用 unUse，而不是 disable。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nlet releases = 0\nconst upper = definePlugin({\n  name: 'upper',\n  install: (core) => {\n    core.onDispose(() => { releases += 1 })\n    return { upper: (value: string) => value.toUpperCase() }\n  }\n})\nconst invalid = definePlugin({ name: 'invalid', install: () => JSON.parse('{') })\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  await assert.rejects(host.use(upper, invalid), (error: unknown) =>\n    error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed\n  )\n  assert.equal(releases, 1)\n  const [handle] = await host.use(upper)\n  assert.equal(handle.extensions.upper('recovered'), 'RECOVERED')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost<Record<string, never>, string>({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst shout = definePlugin<Record<string, never>, Record<string, never>, string>('shout', (core) => ({\n  install: () => {\n    core.usePipeline((text, next) => next(text.toUpperCase()))\n    return {}\n  }\n}))\nconst print = (text: string) => host.runPipeline(text, (result) => console.log(result))\n\nawait host.use(shout)\nprint('hello')\n\nconst { token } = await host.plugin.disable('shout') // 暂停：不释放资源\nprint('hello')\nconsole.log('已禁用:', host.plugin.disabled())\n\nawait token.enable() // 恢复：插件和步骤回到原来的位置\nprint('hello')\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: '同一批次有 install 失败时，候选插件不会发布。Host 逆序清理已创建的安装资源，并把原始失败保留在 cause 链中。调用方应先处理失败原因，再开始新安装。'
+                text: '输出：'
               },
               {
+                type: 'code',
+                language: 'text',
+                code: "HELLO\n// 禁用之后\nhello\n已禁用: [ 'shout' ]\n// 恢复之后\nHELLO"
+              }
+            ]
+          },
+          {
+            id: 'replace',
+            heading: '替换和惰性激活',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'await host.replace(name, next) 先安装新版本 next（名字必须相同）。安装失败时旧版本继续服务；成功后之后的请求使用新版本，旧版本在正在处理的请求结束后才释放。依赖它的插件如果实现了 onDependencyReplaced 就原地换绑，否则会被重启。',
+                  "activation: 'lazy' 的插件在 use 时只登记、不安装，此时调用它的方法抛 PLUGIN_NOT_ACTIVATED；await host.activate(name) 时才安装。适合启动时不需要、首次使用时才初始化的重量级插件。"
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: '关闭 Host',
+            blocks: [
+              {
                 type: 'paragraph',
-                text: '清理失败需要读取 unUse.errors 或 dispose.cleanupErrors。不要仅因逻辑关闭完成就报告全部资源已经释放。'
+                text: 'host.dispose() 按依赖逆序卸载全部插件，返回 { logicalTerminal, cleanupComplete, cleanupErrors }。cleanupErrors 是清理中出现的错误；cleanupComplete 为 false 时说明还有清理在后台进行，需要继续 await 返回的 physicalCompletion，再确认资源已经释放。重复调用 dispose 返回同一个 Promise。'
               }
             ]
           }
@@ -19585,63 +20802,96 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: '组合需要互相调用的插件',
+          label: '排错与常见问题',
+          path: 'troubleshooting'
+        },
+        {
+          label: '插件之间共享能力',
           path: 'install-and-compose'
         },
         {
-          label: '把服务接到 Runtime Peer',
-          path: '../rpc-core/getting-started'
+          label: 'definePlugin API',
+          path: 'docs/plugin-host/definePlugin'
         }
       ]
     },
     en: {
-      title: 'Remove a plugin and recover from failed installation',
-      lede: 'Let the Host release resources registered by the plugin. Check removal results and confirm failure leaves no partially installed plugin.',
+      title: 'Remove, disable, and replace',
+      lede: 'Removal releases a plugin’s resources; disabling only pauses it; replacing swaps in a new version without stopping service.',
       document: {
         sections: [
           {
             id: 'remove',
-            heading: 'Remove upper and confirm one cleanup',
+            heading: 'Remove a plugin and release its resources',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Run this complete example in a Node 24 ESM project. Install @migaia/plugin-host, save it as main.ts, then run node main.ts. Assertions check the business result. A successful run is silent.'
+                text: 'A plugin registers resources with core.onDispose(cleanup) during install. When host.unUse(name) removes it, the Host waits for pipelines still using it, then calls each cleanup exactly once.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nlet releases = 0\nconst upper = definePlugin({\n  name: 'upper',\n  install: (core) => {\n    core.onDispose(() => { releases += 1 })\n    return { upper: (value: string) => value.toUpperCase() }\n  }\n})\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  const [handle] = await host.use(upper)\n  const captured = handle.extensions.upper\n  assert.equal(captured('migaia'), 'MIGAIA')\n  const result = await host.unUse('upper')\n  assert.equal(result.ok, true)\n  assert.equal(releases, 1)\n  assert.throws(() => captured('again'), (error: unknown) =>\n    error instanceof PluginHostError && error.code === PluginHostErrorCode.registrationRevoked\n  )\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst database = definePlugin({\n  name: 'database',\n  install: (core) => {\n    const connection = { open: true }\n    console.log('connection opened')\n    core.onDispose(() => {\n      connection.open = false\n      console.log('connection closed')\n    })\n    return { query: (sql: string) => `ran: ${sql}` }\n  }\n})\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst [db] = await host.use(database)\nconst query = db.extensions.query // application code may keep this method\nconsole.log(query('select 1'))\n\nconst removal = await host.unUse('database')\nconsole.log('removed:', removal.ok)\ntry {\n  query('select 2')\n} catch (error) {\n  console.log('called after removal:', (error as { code: string }).code)\n}\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'unUse belongs to the Host. It returns { ok, affected } or { ok: false, errors, affected }. cleanupComplete and physicalCompletion belong to Host disposal, not to unUse results.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'connection opened\nran: select 1\nconnection closed\nremoved: true\ncalled after removal: REGISTRATION_REVOKED'
               },
               {
                 type: 'paragraph',
-                text: 'The captured function from extensions belongs to this installation. Calling it after removal throws REGISTRATION_REVOKED. The plugin handle itself reads the current installation by name, which is a different access path.'
+                text: 'unUse returns { ok, affected }; when ok is false, errors lists cleanup failures, but the plugin is still removed. Afterwards any plugin method the application kept throws REGISTRATION_REVOKED instead of silently using a plugin whose resources are gone.'
               }
             ]
           },
           {
-            id: 'rollback',
-            heading: 'Handle one failure, then install again',
+            id: 'disable',
+            heading: 'Disable: pause without releasing',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'This is an independent script. The invalid install hook parses malformed JSON to produce a real synchronous failure. assert.rejects checks the error code. The script then installs upper again and consumes RECOVERED.'
+                text: 'host.plugin.disable(name) returns a Promise whose result holds a token for restoring. While disabled the plugin’s methods, Features, and stages are unavailable but resources and configuration stay; await token.enable() puts the plugin and its stages back in place. Use unUse, not disable, to release resources.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import assert from 'node:assert/strict'\nimport { defineHost, definePlugin, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nlet releases = 0\nconst upper = definePlugin({\n  name: 'upper',\n  install: (core) => {\n    core.onDispose(() => { releases += 1 })\n    return { upper: (value: string) => value.toUpperCase() }\n  }\n})\nconst invalid = definePlugin({ name: 'invalid', install: () => JSON.parse('{') })\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\ntry {\n  await assert.rejects(host.use(upper, invalid), (error: unknown) =>\n    error instanceof PluginHostError && error.code === PluginHostErrorCode.pluginInstallFailed\n  )\n  assert.equal(releases, 1)\n  const [handle] = await host.use(upper)\n  assert.equal(handle.extensions.upper('recovered'), 'RECOVERED')\n} finally {\n  const cleanup = await host.dispose()\n  for (const error of cleanup.cleanupErrors) console.error(error)\n  if (cleanup.physicalCompletion) {\n    const physical = await cleanup.physicalCompletion\n    for (const error of physical.cleanupErrors) console.error(error)\n  }\n}"
+                code: "import { defineHost, definePlugin } from '@migaia/plugin-host'\n\nconst host = defineHost<Record<string, never>, string>({\n  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }\n})\nconst shout = definePlugin<Record<string, never>, Record<string, never>, string>('shout', (core) => ({\n  install: () => {\n    core.usePipeline((text, next) => next(text.toUpperCase()))\n    return {}\n  }\n}))\nconst print = (text: string) => host.runPipeline(text, (result) => console.log(result))\n\nawait host.use(shout)\nprint('hello')\n\nconst { token } = await host.plugin.disable('shout') // pause: resources stay allocated\nprint('hello')\nconsole.log('disabled:', host.plugin.disabled())\n\nawait token.enable() // resume: the plugin and its stage return to their original position\nprint('hello')\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
-                text: 'When an install hook fails in a batch, candidate plugins are not published. The Host cleans created installation resources in reverse order and retains the original failure in the cause chain. Handle that failure before starting another installation.'
+                text: 'Output:'
               },
               {
+                type: 'code',
+                language: 'text',
+                code: "HELLO\n// after disable\nhello\ndisabled: [ 'shout' ]\n// after enable\nHELLO"
+              }
+            ]
+          },
+          {
+            id: 'replace',
+            heading: 'Replace and lazy activation',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'await host.replace(name, next) installs next first (same name required). If that fails the old version keeps serving; on success later requests use the new version, and the old one is released after in-flight requests finish. Dependents that implement onDependencyReplaced rebind in place; others restart.',
+                  "A plugin with activation: 'lazy' is only registered on use; calling its methods throws PLUGIN_NOT_ACTIVATED until await host.activate(name) installs it. Use it for heavy plugins that should initialize on first use rather than at startup."
+                ]
+              }
+            ]
+          },
+          {
+            id: 'dispose',
+            heading: 'Shut the Host down',
+            blocks: [
+              {
                 type: 'paragraph',
-                text: 'Read unUse.errors or dispose.cleanupErrors when cleanup fails. Logical closure alone cannot establish that every resource was released.'
+                text: 'host.dispose() removes every plugin in reverse dependency order and returns { logicalTerminal, cleanupComplete, cleanupErrors }. cleanupErrors lists cleanup failures; when cleanupComplete is false some cleanup is still running, so await the returned physicalCompletion before assuming resources are released. Calling dispose again returns the same Promise.'
               }
             ]
           }
@@ -19649,12 +20899,232 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Compose plugins that call each other',
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'Share capabilities between plugins',
           path: 'install-and-compose'
         },
         {
-          label: 'Connect the service to a Runtime Peer',
-          path: '../rpc-core/getting-started'
+          label: 'definePlugin API',
+          path: 'docs/plugin-host/definePlugin'
+        }
+      ]
+    }
+  },
+  'plugin-host:troubleshooting': {
+    zh: {
+      title: '排错与常见问题',
+      lede: '按现象查找原因和解决办法。',
+      document: {
+        sections: [
+          {
+            id: 'install-failed',
+            heading: 'use 抛出 PLUGIN_INSTALL_FAILED',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '同一批中有插件的 setup 或 install 抛错，整批已回滚。真正的原因在 error.cause；error.detail.failedName 是失败的插件名。修复后直接重新调用 use 即可。'
+              }
+            ]
+          },
+          {
+            id: 'types',
+            heading: 'core.usePipeline 的参数类型是 never',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'definePlugin 不知道处理链传递什么类型的值，需要用类型参数告诉它：definePlugin<TCore, TExtension, TValue>(...)。例如 definePlugin<Record<string, never>, Record<string, never>, string>(...) 表示没有应用能力、不返回方法、处理链传递 string。宿主一侧同样写 defineHost<TCore, TValue>(...)。'
+              }
+            ]
+          },
+          {
+            id: 'lifecycle-mutation',
+            heading: '在插件里调用 host.use 抛 LIFECYCLE_MUTATION',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '插件的生命周期钩子（setup、install、update、beforeRelease 等）里不能安装、卸载插件或更新配置，因为这会让 Host 等待自己。插件之间的联动应该放在应用代码里，在 use 完成之后再做。'
+              }
+            ]
+          },
+          {
+            id: 'extension',
+            heading: '插件的方法没有出现在 handle.extensions 上',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '只有 install 返回对象上可枚举的普通属性会发布到 handle.extensions。不可枚举的属性被忽略并以 EXTENSION_NON_ENUMERABLE_IGNORED 报告给 diagnostic；getter 会直接报错。名为 then 的方法会被拒绝（EXTENSION_RESERVED），否则 await host.use() 会把返回值误当成 Promise。'
+              }
+            ]
+          },
+          {
+            id: 'dispose-hangs',
+            heading: 'dispose 一直不结束',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '某个清理函数在等待一个永远不会完成的 Promise，或者反过来 await 了 host.dispose() 自己。每个清理步骤最多等待 disposeStepTimeoutMs（默认 5000 毫秒），超时记为 DISPOSE_STEP_TIMEOUT 并继续清理其余部分，dispose 最终会结束。检查 cleanupErrors 找出是哪一步。'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: '常见错误代码',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "协议和状态错误是 PluginHostError，带有 error.code 和 error.source（'@migaia/plugin-host'）；参数校验错误是原生 TypeError，error.code 为 INVALID_OPTION。请用 PluginHostErrorCode 常量比较。"
+              },
+              {
+                type: 'table',
+                headers: ['error.code', '什么时候出现'],
+                rows: [
+                  ['PLUGIN_INSTALL_FAILED', '一批安装中有插件失败，原因在 cause'],
+                  ['PLUGIN_DUPLICATE', '安装了一个同名插件'],
+                  [
+                    'PLUGIN_NOT_INSTALLED',
+                    '卸载或更新一个未安装的插件，或通过句柄访问已卸载的插件'
+                  ],
+                  [
+                    'PREREQUISITE_MISSING / DISABLED / REMOVED',
+                    '依赖的 provider 不存在、被禁用或已卸载'
+                  ],
+                  ['DEPENDENCY_BLOCKED', '要卸载或禁用的插件仍被依赖'],
+                  ['REGISTRATION_REVOKED', '调用了已卸载或已被替换的插件方法'],
+                  ['PLUGIN_DISABLED / PLUGIN_NOT_ACTIVATED', '调用了被禁用 / 尚未激活的插件'],
+                  ['LIFECYCLE_MUTATION', '在插件钩子里修改了 Host'],
+                  ['PIPELINE_MODE_MISMATCH', '注册的步骤与宿主模式不符'],
+                  ['HOST_DISPOSING / HOST_DISPOSED', 'Host 正在关闭或已关闭']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: 'PluginHostErrorCode',
+          path: 'docs/plugin-host/PluginHostErrorCode'
+        },
+        {
+          label: '卸载、禁用与替换',
+          path: 'removal-and-rollback'
+        }
+      ]
+    },
+    en: {
+      title: 'Troubleshooting and FAQ',
+      lede: 'Find the cause and the fix by symptom.',
+      document: {
+        sections: [
+          {
+            id: 'install-failed',
+            heading: 'use throws PLUGIN_INSTALL_FAILED',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A setup or install in the batch threw and the whole batch rolled back. The real cause is error.cause; error.detail.failedName names the failing plugin. Fix it and call use again.'
+              }
+            ]
+          },
+          {
+            id: 'types',
+            heading: 'The parameter type of core.usePipeline is never',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'definePlugin does not know the pipeline value type; tell it with type arguments: definePlugin<TCore, TExtension, TValue>(...). For example definePlugin<Record<string, never>, Record<string, never>, string>(...) means no application capabilities, no returned methods, and string values. Write defineHost<TCore, TValue>(...) on the host side too.'
+              }
+            ]
+          },
+          {
+            id: 'lifecycle-mutation',
+            heading: 'Calling host.use inside a plugin throws LIFECYCLE_MUTATION',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A plugin lifecycle hook (setup, install, update, beforeRelease, and so on) cannot install, remove, or reconfigure plugins, because the Host would wait on itself. Coordinate plugins in application code after use has completed.'
+              }
+            ]
+          },
+          {
+            id: 'extension',
+            heading: 'A plugin method is missing from handle.extensions',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Only enumerable plain properties of the object install returns are published to handle.extensions. Non-enumerable properties are ignored and reported to diagnostic as EXTENSION_NON_ENUMERABLE_IGNORED; getters throw. A method named then is rejected (EXTENSION_RESERVED), because await host.use() would otherwise treat the result as a Promise.'
+              }
+            ]
+          },
+          {
+            id: 'dispose-hangs',
+            heading: 'dispose never finishes',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A cleanup function waits for a Promise that never settles, or awaits host.dispose() itself. Each cleanup step waits at most disposeStepTimeoutMs (5000 ms by default); on timeout it is recorded as DISPOSE_STEP_TIMEOUT and cleanup continues, so dispose does finish. Check cleanupErrors to find the step.'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: 'Common error codes',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "Protocol and state errors are PluginHostError with error.code and error.source ('@migaia/plugin-host'); argument validation errors are native TypeError with error.code INVALID_OPTION. Compare against PluginHostErrorCode constants."
+              },
+              {
+                type: 'table',
+                headers: ['error.code', 'When it appears'],
+                rows: [
+                  ['PLUGIN_INSTALL_FAILED', 'A plugin in the batch failed; the cause is in cause'],
+                  ['PLUGIN_DUPLICATE', 'A plugin with the same name is already installed'],
+                  [
+                    'PLUGIN_NOT_INSTALLED',
+                    'Removing or updating a plugin that is not installed, or using the handle of a removed plugin'
+                  ],
+                  [
+                    'PREREQUISITE_MISSING / DISABLED / REMOVED',
+                    'A required provider is missing, disabled, or removed'
+                  ],
+                  ['DEPENDENCY_BLOCKED', 'The plugin to remove or disable still has dependents'],
+                  ['REGISTRATION_REVOKED', 'A method of a removed or replaced plugin was called'],
+                  [
+                    'PLUGIN_DISABLED / PLUGIN_NOT_ACTIVATED',
+                    'A disabled or not-yet-activated plugin was called'
+                  ],
+                  ['LIFECYCLE_MUTATION', 'The Host was changed from inside a plugin hook'],
+                  ['PIPELINE_MODE_MISMATCH', 'A registered stage does not match the host mode'],
+                  [
+                    'HOST_DISPOSING / HOST_DISPOSED',
+                    'The Host is shutting down or already shut down'
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'PluginHostErrorCode',
+          path: 'docs/plugin-host/PluginHostErrorCode'
+        },
+        {
+          label: 'Remove, disable, and replace',
+          path: 'removal-and-rollback'
         }
       ]
     }
@@ -20275,139 +21745,380 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'middleware-pipeline:index': {
     zh: {
-      title: 'Middleware Pipeline 学习路径',
-      lede: '先选择执行代数，再明确短路、取消与双失败语义；不要因为函数都叫 stage 就互换 runner。',
+      title: 'Middleware Pipeline：把一次处理拆成按顺序执行的步骤',
+      lede: '每个步骤自己决定要不要把数据交给下一步、交出去之前改成什么样、下一步做完之后还要不要收尾。',
       document: {
         sections: [
           {
-            id: 'choose-runner',
-            heading: '按控制流选择 runner',
+            id: 'what',
+            heading: '它解决什么问题',
             blocks: [
               {
-                type: 'table',
-                headers: ['需求', '入口', '关键语义'],
-                rows: [
-                  ['同步变换并显式 next', 'runSyncMiddleware', 'stage 返回前未 next 即短路'],
-                  ['异步洋葱调用', 'runAsyncMiddleware', 'await next() 后执行上游收尾'],
-                  [
-                    '同步 generator 状态机',
-                    'runGeneratorMiddleware',
-                    'yield 值与 return signal 分离'
-                  ],
-                  [
-                    '异步 generator 串行步骤',
-                    'runAsyncGeneratorMiddleware',
-                    '等待每个 iterator terminal 后才进入下一 stage'
-                  ]
+                type: 'paragraph',
+                text: '如果你用过 Express 或 Koa，会对这种写法很熟悉：一个请求先经过日志、鉴权、限流这些中间件，最后才到真正的业务处理函数。@migaia/middleware-pipeline 把同样的思路做成了通用工具，不绑定 HTTP，也不绑定 Node.js，在浏览器、Node.js、Bun、Deno 里都能用。migaia 自己的 plugin-host 就用它执行插件的中间件。'
+              },
+              {
+                type: 'paragraph',
+                text: '步骤固定、只有一个入口时，一个普通函数就够了。麻烦出现在步骤需要组合时：后台导入要跳过鉴权但要记录耗时，另一个入口要多一步过滤；记录耗时、释放连接这类收尾代码，又必须等后面所有步骤都完成。用 pipeline，每个步骤是一个独立函数，组合方式就是一个数组：'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'pipeline.run([trim, rejectEmpty, toUpperCase], text, save)'
+              },
+              {
+                type: 'paragraph',
+                text: '把步骤交给 pipeline 执行，你会得到几个手写时很难做对的保证：'
+              },
+              {
+                type: 'list',
+                items: [
+                  '步骤之间只通过 next 传值。调用 next(新值)，下一个步骤才会执行；不调用，整条链就停在这里，不需要抛异常。',
+                  '每个步骤最多往下传一次。不小心调用两次 next，第二次会被忽略并报告给你，而不是让“保存订单”执行两遍。',
+                  '在异步模式下，await next() 会等后面所有步骤都完成，所以写在它后面的代码天然就是收尾代码。',
+                  '传入一个 AbortSignal，取消后不会再开始新的步骤。'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'pipeline 处理的是一份数据沿着一条链往下传。如果你要的是“某件事发生了，通知所有关心它的模块”，各模块之间没有先后、也不互相传值，那是事件广播，请用 event-subscriber。'
               }
             ]
           },
           {
-            id: 'invariants',
-            heading: '先接受三个不变量',
+            id: 'api-shape',
+            heading: '一个函数，三个成员',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  '每次调用先快照 stages；运行中修改原数组不会改写当前链。',
-                  '重复 next 与 stage 返回后的 late next 都是 violation，不会变成第二次分发。',
-                  'AbortSignal 只在协作检查点生效，不抢占正在运行的同步代码或永不 settle 的 Promise。'
+                type: 'paragraph',
+                text: '这个包对外只有一个函数 createPipeline(options)。它返回一个 pipeline 对象，对象上只有三个成员。pipeline 不保存运行状态，通常在模块顶层创建一次，到处复用。'
+              },
+              {
+                type: 'table',
+                headers: ['成员', '作用'],
+                rows: [
+                  ['createPipeline(options)', '创建 pipeline；options.mode 必填，决定步骤怎么写'],
+                  [
+                    'pipeline.run(stages, value, done, control?)',
+                    '执行一次：把 value 依次交给 stages，最后交给 done；control.signal 可取消这次运行'
+                  ],
+                  [
+                    'pipeline.lift(stage, from)',
+                    '把为更简单模式写的步骤转换成当前模式可用的步骤，例如在异步 pipeline 里复用同步步骤'
+                  ],
+                  ['pipeline.mode', '只读，创建时选择的模式']
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: '每个选项和参数的完整说明见 createPipeline 的 API 页面。'
+              }
+            ]
+          },
+          {
+            id: 'choose-mode',
+            heading: '选择执行模式',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['你的步骤', 'mode', '步骤写法', 'run() 返回'],
+                rows: [
+                  [
+                    '全是同步计算',
+                    'MiddlewarePipelineMode.sync',
+                    '(value, next) => { ... }',
+                    'void'
+                  ],
+                  [
+                    '需要 await，或要在后续步骤完成后收尾',
+                    'MiddlewarePipelineMode.async',
+                    'async (value, next) => { ... }',
+                    'Promise<void>'
+                  ],
+                  [
+                    '要产出多个候选值，或要明确说“停止”',
+                    'MiddlewarePipelineMode.generator',
+                    'function* (value) { ... }',
+                    'void'
+                  ],
+                  [
+                    '同上，但需要 await',
+                    'MiddlewarePipelineMode.asyncGenerator',
+                    'async function* (value) { ... }',
+                    'Promise<void>'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '拿不准时：步骤里有 await 就选 async，没有就选 sync。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '五分钟建立异步洋葱链', path: 'getting-started' },
-        { label: '同步与异步 runner', path: 'sync-and-async' },
-        { label: '取消与错误组合', path: 'cancellation-and-errors' }
+        {
+          label: '快速开始：第一个 pipeline',
+          path: 'getting-started'
+        },
+        {
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
+        },
+        {
+          label: '同步、异步与洋葱模型',
+          path: 'sync-and-async'
+        }
       ]
     },
     en: {
-      title: 'Middleware Pipeline learning paths',
-      lede: 'Choose an execution algebra first, then make short-circuit, cancellation, and dual-failure semantics explicit. Stages are not interchangeable merely because they share a name.',
+      title: 'Middleware Pipeline: split one operation into ordered stages',
+      lede: 'Each stage decides whether the data moves on, what it becomes before it moves on, and whether to clean up after later stages finish.',
       document: {
         sections: [
           {
-            id: 'choose-runner',
-            heading: 'Choose a runner by control flow',
+            id: 'what',
+            heading: 'What problem it solves',
             blocks: [
               {
-                type: 'table',
-                headers: ['Requirement', 'Entry', 'Defining semantic'],
-                rows: [
-                  [
-                    'Synchronous transforms with explicit next',
-                    'runSyncMiddleware',
-                    'Returning without next short-circuits'
-                  ],
-                  [
-                    'Asynchronous onion composition',
-                    'runAsyncMiddleware',
-                    'Upstream cleanup runs after awaited next'
-                  ],
-                  [
-                    'Synchronous generator state machines',
-                    'runGeneratorMiddleware',
-                    'Yielded values and return signals are separate'
-                  ],
-                  [
-                    'Serial asynchronous generator steps',
-                    'runAsyncGeneratorMiddleware',
-                    'The next stage starts only after iterator terminal'
-                  ]
+                type: 'paragraph',
+                text: 'If you have used Express or Koa, the shape is familiar: a request passes logging, authentication, and rate limiting before it reaches the real handler. @migaia/middleware-pipeline makes the same idea a general tool that is tied to neither HTTP nor Node.js, so it runs in browsers, Node.js, Bun, and Deno. migaia plugin-host uses it to run plugin middleware.'
+              },
+              {
+                type: 'paragraph',
+                text: 'When the steps are fixed and there is one entry point, a plain function is enough. Trouble starts when steps must be combined: a background import skips authentication but records timing, another entry adds a filter, and cleanup such as timing or releasing a connection must wait until every later step finishes. With a pipeline, each stage is an independent function and a combination is just an array:'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: 'pipeline.run([trim, rejectEmpty, toUpperCase], text, save)'
+              },
+              {
+                type: 'paragraph',
+                text: 'Running stages through a pipeline gives you guarantees that are hard to get right by hand:'
+              },
+              {
+                type: 'list',
+                items: [
+                  'Stages pass values only through next. Calling next(newValue) runs the next stage; not calling it stops the chain without throwing.',
+                  'Each stage passes data on at most once. A second next call is ignored and reported instead of saving an order twice.',
+                  'In async mode await next() waits for every later stage, so code after it is natural cleanup code.',
+                  'Pass an AbortSignal and no new stage starts after cancellation.'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'A pipeline moves one value down one chain. If you need to tell every interested module that something happened, with no order between them and no value handed from one to the next, that is event broadcasting: use event-subscriber.'
               }
             ]
           },
           {
-            id: 'invariants',
-            heading: 'Accept three invariants first',
+            id: 'api-shape',
+            heading: 'One function, three members',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'Every call snapshots stages, so mutating the source array cannot rewrite the current run.',
-                  'A duplicate next or a late next after return is a violation, never a second dispatch.',
-                  'AbortSignal acts only at cooperative checkpoints; it cannot preempt synchronous work or a Promise that never settles.'
+                type: 'paragraph',
+                text: 'The package exposes one function, createPipeline(options). It returns a pipeline object with exactly three members. A pipeline keeps no run state, so you usually create it once at module level and reuse it everywhere.'
+              },
+              {
+                type: 'table',
+                headers: ['Member', 'Purpose'],
+                rows: [
+                  [
+                    'createPipeline(options)',
+                    'Creates a pipeline; options.mode is required and decides how stages are written'
+                  ],
+                  [
+                    'pipeline.run(stages, value, done, control?)',
+                    'Runs once: hands value through stages and finally to done; control.signal cancels this run'
+                  ],
+                  [
+                    'pipeline.lift(stage, from)',
+                    'Converts a stage written for a simpler mode into one this pipeline accepts, for example reusing a sync stage in an async pipeline'
+                  ],
+                  ['pipeline.mode', 'Read-only mode chosen at creation']
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'The createPipeline API page explains every option and parameter.'
+              }
+            ]
+          },
+          {
+            id: 'choose-mode',
+            heading: 'Choose an execution mode',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Your stages', 'mode', 'Stage shape', 'run() returns'],
+                rows: [
+                  [
+                    'Only synchronous work',
+                    'MiddlewarePipelineMode.sync',
+                    '(value, next) => { ... }',
+                    'void'
+                  ],
+                  [
+                    'Needs await, or cleanup after later stages',
+                    'MiddlewarePipelineMode.async',
+                    'async (value, next) => { ... }',
+                    'Promise<void>'
+                  ],
+                  [
+                    'Yields several candidates or says “stop” explicitly',
+                    'MiddlewarePipelineMode.generator',
+                    'function* (value) { ... }',
+                    'void'
+                  ],
+                  [
+                    'Same, but needs await',
+                    'MiddlewarePipelineMode.asyncGenerator',
+                    'async function* (value) { ... }',
+                    'Promise<void>'
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'If unsure: choose async when a stage awaits anything, otherwise sync.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Build an async onion chain in five minutes', path: 'getting-started' },
-        { label: 'Sync and async runners', path: 'sync-and-async' },
-        { label: 'Cancellation and error composition', path: 'cancellation-and-errors' }
+        {
+          label: 'Quick start: your first pipeline',
+          path: 'getting-started'
+        },
+        {
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
+        },
+        {
+          label: 'Sync, async and the onion model',
+          path: 'sync-and-async'
+        }
       ]
     }
   },
   'middleware-pipeline:getting-started': {
     zh: {
-      title: '五分钟建立异步洋葱 Pipeline',
-      lede: '让每个 stage 明确选择是否进入下游，并在 await next() 两侧组织进入与退出逻辑。',
+      title: '快速开始：第一个 pipeline',
+      lede: '安装包，跑通一个两步的 pipeline，并弄清 run() 每个参数的意思。',
       document: {
         sections: [
           {
-            id: 'onion',
-            heading: '把下游 Promise 当作当前 stage 的生命周期',
+            id: 'install',
+            heading: '安装',
             blocks: [
               {
                 type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/middleware-pipeline'
+              },
+              {
+                type: 'paragraph',
+                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: '第一个例子',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '下面的 pipeline 有两个步骤：第一步去掉首尾空格，第二步转成大写。'
+              },
+              {
+                type: 'code',
                 language: 'ts',
-                code: "import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\ntype IRequest = { path: string; authenticated?: boolean }\nconst incomingRequest: IRequest = { path: '/orders' }\nconst metrics = { observe: (milliseconds: number) => console.log('stage ms:', milliseconds) }\nconst diagnostics = { report: (violation: unknown) => console.error('middleware violation:', violation) }\nconst handleRequest = async (request: IRequest) => ({ status: 200, body: request.path })\nconst sendResponse = async (response: { status: number; body: string }) => console.log(response)\n\nawait runAsyncMiddleware(\n  [\n    async (request: IRequest, next) => {\n      const startedAt = performance.now()\n      try {\n        await next({ ...request, authenticated: true })\n      } finally {\n        metrics.observe(performance.now() - startedAt)\n      }\n    },\n    async (request: IRequest, next) => {\n      if (!request.authenticated) return\n      await next(request)\n    }\n  ],\n  incomingRequest,\n  async (request: IRequest) => sendResponse(await handleRequest(request)),\n  { onViolation: (violation) => diagnostics.report(violation) }\n)"
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.sync })\n\npipeline.run(\n  [(text, next) => next(text.trim()), (text, next) => next(text.toUpperCase())],\n  '  hello  ',\n  (result) => console.log(result)\n)"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'HELLO'
+              },
+              {
+                type: 'paragraph',
+                text: 'createPipeline<string>(...) 创建一个 pipeline，尖括号里的 string 是在步骤之间传递的数据类型；mode: MiddlewarePipelineMode.sync 表示所有步骤都是同步函数。'
+              },
+              {
+                type: 'paragraph',
+                text: 'pipeline.run(stages, value, done) 执行一次处理：'
               },
               {
                 type: 'list',
                 items: [
-                  '调用并 await next() 会等完整下游结束后再执行 finally。',
-                  '不调用 next() 是正常短路：后续 stage 与 done 都不会执行。',
-                  'onViolation 必填，用于观察 duplicate/late next；不要把它留成无声空函数。',
-                  'stage 或 done 的单一失败保持 exact identity，不额外包装。'
+                  'stages：步骤数组。每个步骤收到当前的值和一个 next 函数，调用 next(新值) 就是把新值交给下一个步骤。',
+                  "value：初始值，这里是 '  hello  '，交给第一个步骤。",
+                  'done：结束函数。所有步骤都调用了 next 之后执行，收到最后交出来的值。',
+                  'control（可选第四个参数）：{ signal }，用来取消这次运行。'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: '输出块里只有程序真实打印的内容；以 // 开头的行是说明或诊断信息，不是 done 的结果。'
+              },
+              {
+                type: 'paragraph',
+                text: "数据流向是：'  hello  ' → 'hello' → 'HELLO' → done 打印。同一个 pipeline 可以反复调用 run()，每次都是独立的。"
+              }
+            ]
+          },
+          {
+            id: 'short-circuit',
+            heading: '不调用 next，就提前结束',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '每个步骤可以决定“到此为止”：只要不调用 next，后面的步骤和 done 都不会执行。这叫短路，它不是错误，run() 正常返回。ISyncMiddlewareStage<string> 是同步步骤的类型，单独定义步骤数组时加上它，TypeScript 才能推断参数类型。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  type ISyncMiddlewareStage\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.sync })\n\nconst stages: ISyncMiddlewareStage<string>[] = [\n  (text, next) => next(text.trim()),\n  (text, next) => {\n    if (text === '') {\n      console.log(`'${text}'`) // 打印被拦下的值\n      return // 输入为空，停止处理：不调用 next，后面的步骤和 done 都不会执行\n    }\n    next(text)\n  },\n  (text, next) => next(text.toUpperCase())\n]\n\npipeline.run(stages, '  hi  ', (result) => console.log('结果:', result))\npipeline.run(stages, '    ', (result) => console.log('结果:', result))"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "结果: HI\n'' // 输入为空，停止处理"
+              }
+            ]
+          },
+          {
+            id: 'violation',
+            heading: '一个步骤最多调用一次 next',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '一个步骤调用两次 next，后面的步骤就会执行两遍，几乎总是 bug。pipeline 只接受第一次调用，之后的调用被忽略，并作为用法错误报告给 onViolation：duplicate 表示同一步骤调用了第二次，late 表示步骤返回之后才调用（常见于 setTimeout 或没有被等待的 Promise）。不传 onViolation 时这些错误被静默忽略，建议总是传入。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({\n  mode: MiddlewarePipelineMode.sync,\n  onViolation: (kind) => console.warn('中间件用法错误:', kind)\n})\n\npipeline.run(\n  [\n    (value, next) => {\n      next(value + 1)\n      next(value + 2) // 第二次调用被忽略，并报告 duplicate\n    }\n  ],\n  1,\n  (result) => console.log('结果:', result)\n)"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// 中间件用法错误: duplicate\n结果: 2'
               }
             ]
           }
@@ -20415,35 +22126,133 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'runAsyncMiddleware API',
-          path: 'docs/middleware-pipeline/runAsyncMiddleware'
+          label: '同步、异步与洋葱模型',
+          path: 'sync-and-async'
         },
-        { label: '同步与异步差异', path: 'sync-and-async' },
-        { label: '取消与错误组合', path: 'cancellation-and-errors' }
+        {
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
+        },
+        {
+          label: 'Generator 模式',
+          path: 'generators'
+        }
       ]
     },
     en: {
-      title: 'Build an asynchronous onion Pipeline in five minutes',
-      lede: 'Let every stage choose whether downstream runs, then place entry and exit behavior around await next().',
+      title: 'Quick start: your first pipeline',
+      lede: 'Install the package, run a two-stage pipeline, and learn what each run() argument means.',
       document: {
         sections: [
           {
-            id: 'onion',
-            heading: 'Treat the downstream Promise as the current stage lifetime',
+            id: 'install',
+            heading: 'Install',
             blocks: [
               {
                 type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/middleware-pipeline'
+              },
+              {
+                type: 'paragraph',
+                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: 'First example',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'This pipeline has two stages: the first trims whitespace, the second upper-cases the text.'
+              },
+              {
+                type: 'code',
                 language: 'ts',
-                code: "import { runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\ntype IRequest = { path: string; authenticated?: boolean }\nconst incomingRequest: IRequest = { path: '/orders' }\nconst metrics = { observe: (milliseconds: number) => console.log('stage ms:', milliseconds) }\nconst diagnostics = { report: (violation: unknown) => console.error('middleware violation:', violation) }\nconst handleRequest = async (request: IRequest) => ({ status: 200, body: request.path })\nconst sendResponse = async (response: { status: number; body: string }) => console.log(response)\n\nawait runAsyncMiddleware(\n  [\n    async (request: IRequest, next) => {\n      const startedAt = performance.now()\n      try {\n        await next({ ...request, authenticated: true })\n      } finally {\n        metrics.observe(performance.now() - startedAt)\n      }\n    },\n    async (request: IRequest, next) => {\n      if (!request.authenticated) return\n      await next(request)\n    }\n  ],\n  incomingRequest,\n  async (request: IRequest) => sendResponse(await handleRequest(request)),\n  { onViolation: (violation) => diagnostics.report(violation) }\n)"
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.sync })\n\npipeline.run(\n  [(text, next) => next(text.trim()), (text, next) => next(text.toUpperCase())],\n  '  hello  ',\n  (result) => console.log(result)\n)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'HELLO'
+              },
+              {
+                type: 'paragraph',
+                text: 'createPipeline<string>(...) creates a pipeline; string is the type of the value passed between stages. mode: MiddlewarePipelineMode.sync says every stage is a synchronous function.'
+              },
+              {
+                type: 'paragraph',
+                text: 'pipeline.run(stages, value, done) runs once:'
               },
               {
                 type: 'list',
                 items: [
-                  'Calling and awaiting next waits for the entire downstream lifetime before finally runs.',
-                  'Not calling next is a valid short circuit, so later stages and done never execute.',
-                  'onViolation is required to observe duplicate or late next calls; do not leave it as a silent no-op.',
-                  'A single stage or done failure preserves exact identity without an extra wrapper.'
+                  'stages: the stage array. Each stage receives the current value and a next function; calling next(newValue) hands newValue to the next stage.',
+                  "value: the initial value, here '  hello  ', handed to the first stage.",
+                  'done: the final callback. It runs after every stage called next and receives the last value.',
+                  'control (optional fourth argument): { signal }, which cancels this run.'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Output blocks show only what the program prints; lines starting with // are explanations or diagnostics, not results from done.'
+              },
+              {
+                type: 'paragraph',
+                text: "The value flows '  hello  ' → 'hello' → 'HELLO' → done prints it. You can call run() on the same pipeline many times; every run is independent."
+              }
+            ]
+          },
+          {
+            id: 'short-circuit',
+            heading: 'Not calling next ends the run early',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Any stage can decide to stop: without a next call, later stages and done never run. This short circuit is not an error, and run() returns normally. ISyncMiddlewareStage<string> types a synchronous stage; annotate a separately defined stage array with it so TypeScript infers the parameters.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import {\n  createPipeline,\n  MiddlewarePipelineMode,\n  type ISyncMiddlewareStage\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.sync })\n\nconst stages: ISyncMiddlewareStage<string>[] = [\n  (text, next) => next(text.trim()),\n  (text, next) => {\n    if (text === '') {\n      console.log(`'${text}'`) // print the rejected value\n      return // empty input, stop: no next(), so later stages and done never run\n    }\n    next(text)\n  },\n  (text, next) => next(text.toUpperCase())\n]\n\npipeline.run(stages, '  hi  ', (result) => console.log('result:', result))\npipeline.run(stages, '    ', (result) => console.log('result:', result))"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "result: HI\n'' // empty input, stop"
+              }
+            ]
+          },
+          {
+            id: 'violation',
+            heading: 'A stage calls next at most once',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Calling next twice would run later stages twice, which is almost always a bug. The pipeline accepts only the first call, ignores the rest, and reports them to onViolation: duplicate means a second call from the same stage, late means a call after the stage returned (often from setTimeout or an un-awaited Promise). Without onViolation these are silently ignored, so always pass one.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<number>({\n  mode: MiddlewarePipelineMode.sync,\n  onViolation: (kind) => console.warn('middleware next() misuse:', kind)\n})\n\npipeline.run(\n  [\n    (value, next) => {\n      next(value + 1)\n      next(value + 2) // ignored and reported as duplicate\n    }\n  ],\n  1,\n  (result) => console.log('result:', result)\n)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// middleware next() misuse: duplicate\nresult: 2'
               }
             ]
           }
@@ -20451,84 +22260,141 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'runAsyncMiddleware API',
-          path: 'docs/middleware-pipeline/runAsyncMiddleware'
+          label: 'Sync, async and the onion model',
+          path: 'sync-and-async'
         },
-        { label: 'Sync and async differences', path: 'sync-and-async' },
-        { label: 'Cancellation and error composition', path: 'cancellation-and-errors' }
+        {
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
+        },
+        {
+          label: 'Generator modes',
+          path: 'generators'
+        }
       ]
     }
   },
   'middleware-pipeline:sync-and-async': {
     zh: {
-      title: '在同步链和异步洋葱之间做出明确选择',
-      lede: '两种 runner 都使用 next，但同步 runner 提交下一值，异步 runner 返回完整下游 Promise。',
+      title: '同步、异步与洋葱模型',
+      lede: '异步模式下 next() 返回一个 Promise，它在后面所有步骤和 done 都完成后才完成，所以 await next() 之后的代码就是收尾代码。',
       document: {
         sections: [
           {
-            id: 'comparison',
-            heading: '不要用 async stage 填进同步 runner',
+            id: 'onion',
+            heading: '先看执行顺序',
             blocks: [
               {
-                type: 'table',
-                headers: ['行为', 'runSyncMiddleware', 'runAsyncMiddleware'],
-                rows: [
-                  ['next 返回', 'void', 'Promise<void>'],
-                  ['执行形状', '扁平、同步逐项', '递归洋葱'],
-                  [
-                    'stage 返回后 next',
-                    'late violation',
-                    'stage settlement 后 next 为 late violation'
-                  ],
-                  ['stage 与 downstream 同时失败', '不存在双 slot', '组合器或 AggregateError'],
-                  ['取消', '只在同步检查点观察', '不会 Promise.race 抢占 pending stage']
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\n\nawait pipeline.run(\n  [\n    async (value, next) => {\n      console.log('1. 外层：进入')\n      await next(value)\n      console.log('5. 外层：离开')\n    },\n    async (value, next) => {\n      console.log('2. 内层：进入')\n      await next(value)\n      console.log('4. 内层：离开')\n    }\n  ],\n  'order-42',\n  async (value) => console.log('3. done 收到:', value)\n)"
               },
               {
                 type: 'paragraph',
-                text: '已有同步 stage 要进入异步链时使用 adaptSyncStageToAsync。适配器保留短路和 violation，但不能把真正异步的 stage 降级为同步执行。'
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '1. 外层：进入\n2. 内层：进入\n3. done 收到: order-42\n4. 内层：离开\n5. 外层：离开'
+              },
+              {
+                type: 'paragraph',
+                text: '把每个步骤想成洋葱的一层，done 是中心：执行时从外往里穿过每一层，到达中心后再从里往外穿出来，先进入的层最后离开。“离开”那一段正好用来做必须等后续工作完成的事：统计耗时、释放连接、检查结果。'
+              },
+              {
+                type: 'paragraph',
+                text: '必须写 await next(value) 或 return next(value)。只写 next(value) 而不等待，当前步骤会立刻执行后面的代码，耗时会算错，资源会被提前释放。异步模式下 run() 返回 Promise，任何步骤或 done 抛出的错误都会让它被拒绝。'
               }
             ]
           },
           {
-            id: 'adapters',
-            heading: '只沿能保留控制语义的方向适配',
+            id: 'request',
+            heading: '例子：给请求处理加上计时和鉴权',
             blocks: [
               {
-                type: 'table',
-                headers: ['已有 stage', '目标 runner', 'Adapter 与约束'],
-                rows: [
-                  [
-                    '同步 next-style',
-                    '异步 next-style',
-                    'adaptSyncStageToAsync；等待已启动 downstream，内部 violation handler 默认静默，生产代码应显式传入'
-                  ],
-                  [
-                    '同步 next-style',
-                    '同步 generator',
-                    'adaptSyncStageToGenerator；onViolation 必填，未调用 next 转为 GENERATOR_HALT'
-                  ],
-                  [
-                    '同步 generator',
-                    '异步 generator',
-                    'adaptGeneratorStageToAsyncGenerator；保留 yield、terminal signal 与 throw identity'
-                  ],
-                  [
-                    '同步 next-style',
-                    '异步 generator',
-                    'adaptSyncStageToAsyncGenerator；复用 sync→generator 规则，onViolation 必填'
-                  ],
-                  [
-                    '异步 next-style',
-                    'generator',
-                    '不支持；递归 next、双失败 channel 与 active control 无法无损变成 stage-local yield'
-                  ]
-                ]
+                type: 'paragraph',
+                text: 'timing 放在数组第一个，所以它包住了 auth 和 handle，统计的是全部耗时；它用 try/finally，即使后续步骤抛错也会记录。auth 在令牌不对时直接返回，不调用 next，handle 不会执行；令牌正确时用展开语法把 user 加进一个新的请求对象再往下传。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { adaptSyncStageToAsync, runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (violation: unknown) => console.error(violation) }\nconst input = '  customer-42  '\nconst save = async (value: string) => console.log('saved:', value)\nconst normalized = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report(violation)\n)\n\nawait runAsyncMiddleware([normalized], input, save, {\n  onViolation: (violation) => diagnostics.report(violation)\n})"
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\ntype IRequest = { path: string; token?: string; user?: string }\ntype IStage = (request: IRequest, next: (request: IRequest) => Promise<void>) => Promise<void>\n\nconst pipeline = createPipeline<IRequest>({ mode: MiddlewarePipelineMode.async })\n\n/** 记录整次处理耗时；await next() 之后的代码在下游全部结束后才执行。 */\nconst timing: IStage = async (request, next) => {\n  const startedAt = Date.now()\n  try {\n    await next(request)\n  } finally {\n    console.log(`[timing] ${request.path} 用时 ${Date.now() - startedAt}ms`)\n  }\n}\n\n/** 没有 token 时直接回 401，不调用 next，后续步骤不会执行。 */\nconst auth: IStage = async (request, next) => {\n  if (request.token !== 'secret') {\n    console.log(`[auth] ${request.path} → 401`)\n    return\n  }\n  await next({ ...request, user: 'ada' })\n}\n\nconst handle = async (request: IRequest) => {\n  await new Promise((resolve) => setTimeout(resolve, 20)) // 模拟查询数据库\n  console.log(`[handler] ${request.user} 访问 ${request.path} → 200`)\n}\n\nawait pipeline.run([timing, auth], { path: '/orders', token: 'secret' }, handle)\nawait pipeline.run([timing, auth], { path: '/orders' }, handle)"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[handler] ada 访问 /orders → 200\n[timing] /orders 用时 23ms\n[auth] /orders → 401\n[timing] /orders 用时 0ms'
+              },
+              {
+                type: 'paragraph',
+                text: '耗时数字每次运行会略有不同。'
+              }
+            ]
+          },
+          {
+            id: 'lift',
+            heading: '在异步 pipeline 里复用同步步骤',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '同步步骤不能直接放进异步 pipeline，因为两种模式的 next 含义不同：同步的 next 没有返回值，异步的 next 返回一个要被等待的 Promise。用 pipeline.lift(步骤, 原来的模式) 转换，而不是重写。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\n/** 一个普通的同步步骤，可能已经在别的同步 pipeline 里使用。 */\nconst trim = (text: string, next: (value: string) => void) => next(text.trim())\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\n\nawait pipeline.run(\n  [\n    pipeline.lift(trim, MiddlewarePipelineMode.sync), // 把同步步骤提升为异步步骤\n    async (text, next) => next(`《${text}》`)\n  ],\n  '  三体  ',\n  async (result) => console.log(result)\n)"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '《三体》'
+              },
+              {
+                type: 'table',
+                headers: ['当前 pipeline 的模式', 'from 可以是'],
+                rows: [
+                  ['sync', 'sync'],
+                  ['async', 'sync, async'],
+                  ['generator', 'sync, generator'],
+                  ['async-generator', 'sync, generator, async-generator']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: '只能从简单的模式转换到复杂的模式：同步 pipeline 无法等待一个异步步骤。不支持的方向会被 TypeScript 报错；绕过类型检查时，运行时抛出 TypeError，error.code 为 INVALID_OPTION。'
+              }
+            ]
+          },
+          {
+            id: 'pitfall',
+            heading: '常见错误：在 sync 模式里写 async 步骤',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.sync })\n\npipeline.run(\n  [\n    // 错误示范：在 sync pipeline 里写 async 步骤\n    async (text, next) => {\n      await new Promise((resolve) => setTimeout(resolve, 10))\n      next(text)\n    }\n  ],\n  'hello',\n  (result) => console.log('结果:', result)\n)"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// 没有任何输出：done 永远不会执行'
+              },
+              {
+                type: 'paragraph',
+                text: '“结果”永远不会打印。sync 模式不等待步骤返回的 Promise：步骤遇到 await 就返回了，pipeline 认为它没调用 next，于是结束；10 毫秒后再调用 next 已经太晚，会作为 late 被忽略。TypeScript 不会报错，因为返回 Promise 的函数可以赋值给声明为返回 void 的函数类型。只要步骤里有 await，就用 async 模式，并配置 onViolation。'
               }
             ]
           }
@@ -20536,86 +22402,139 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'runSyncMiddleware API',
-          path: 'docs/middleware-pipeline/runSyncMiddleware'
+          label: '取消与错误',
+          path: 'cancellation-and-errors'
         },
-        { label: '同步转异步适配器', path: 'docs/middleware-pipeline/adaptSyncStageToAsync' },
-        { label: 'Generator runner', path: 'generators' }
+        {
+          label: 'Generator 模式',
+          path: 'generators'
+        },
+        {
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
+        }
       ]
     },
     en: {
-      title: 'Choose explicitly between a synchronous chain and an async onion',
-      lede: 'Both runners expose next, but the synchronous form submits the next value while the asynchronous form returns the complete downstream Promise.',
+      title: 'Sync, async and the onion model',
+      lede: 'In async mode next() returns a Promise that settles only after every later stage and done finish, so code after await next() is cleanup code.',
       document: {
         sections: [
           {
-            id: 'comparison',
-            heading: 'Do not place an async stage in the synchronous runner',
+            id: 'onion',
+            heading: 'Execution order first',
             blocks: [
               {
-                type: 'table',
-                headers: ['Behavior', 'runSyncMiddleware', 'runAsyncMiddleware'],
-                rows: [
-                  ['next returns', 'void', 'Promise<void>'],
-                  ['Execution shape', 'Flat synchronous sequence', 'Recursive onion'],
-                  ['next after stage return', 'Late violation', 'Late after stage settlement'],
-                  [
-                    'Stage and downstream both fail',
-                    'No dual slots exist',
-                    'Combiner or AggregateError'
-                  ],
-                  [
-                    'Cancellation',
-                    'Observed at synchronous checkpoints',
-                    'Never Promise.races a pending stage'
-                  ]
-                ]
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\n\nawait pipeline.run(\n  [\n    async (value, next) => {\n      console.log('1. outer: enter')\n      await next(value)\n      console.log('5. outer: leave')\n    },\n    async (value, next) => {\n      console.log('2. inner: enter')\n      await next(value)\n      console.log('4. inner: leave')\n    }\n  ],\n  'order-42',\n  async (value) => console.log('3. done received:', value)\n)"
               },
               {
                 type: 'paragraph',
-                text: 'Use adaptSyncStageToAsync when an existing synchronous stage belongs in an asynchronous chain. The adapter preserves short-circuit and violation behavior but cannot downgrade a truly asynchronous stage into synchronous execution.'
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '1. outer: enter\n2. inner: enter\n3. done received: order-42\n4. inner: leave\n5. outer: leave'
+              },
+              {
+                type: 'paragraph',
+                text: 'Think of each stage as an onion layer with done at the centre: execution passes inward through every layer, reaches the centre, then passes back outward, so the first layer entered is the last to leave. The leaving half is where work that must wait for later stages belongs: timing, releasing a connection, inspecting results.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Always write await next(value) or return next(value). Calling next(value) without waiting runs the rest of the stage immediately, so timing is wrong and resources are released too early. In async mode run() returns a Promise that rejects with any error a stage or done throws.'
               }
             ]
           },
           {
-            id: 'adapters',
-            heading: 'Adapt only in directions that preserve control semantics',
+            id: 'request',
+            heading: 'Example: timing and authentication for a request',
             blocks: [
               {
-                type: 'table',
-                headers: ['Existing stage', 'Target runner', 'Adapter and boundary'],
-                rows: [
-                  [
-                    'Synchronous next-style',
-                    'Asynchronous next-style',
-                    'adaptSyncStageToAsync waits for started downstream work; its inner violation handler defaults to silent, so production code supplies one'
-                  ],
-                  [
-                    'Synchronous next-style',
-                    'Synchronous generator',
-                    'adaptSyncStageToGenerator requires onViolation and maps missing next to GENERATOR_HALT'
-                  ],
-                  [
-                    'Synchronous generator',
-                    'Asynchronous generator',
-                    'adaptGeneratorStageToAsyncGenerator preserves yields, terminal signals, and throw identity'
-                  ],
-                  [
-                    'Synchronous next-style',
-                    'Asynchronous generator',
-                    'adaptSyncStageToAsyncGenerator reuses sync-to-generator rules and requires onViolation'
-                  ],
-                  [
-                    'Asynchronous next-style',
-                    'Generator',
-                    'Unsupported because recursive next, dual-failure channels, and active control cannot become stage-local yields without loss'
-                  ]
-                ]
+                type: 'paragraph',
+                text: 'timing is first in the array, so it wraps auth and handle and measures the whole request; its try/finally records timing even when a later stage throws. auth returns without next when the token is wrong, so handle never runs; with a valid token it passes on a new request object that adds user.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { adaptSyncStageToAsync, runAsyncMiddleware } from '@migaia/middleware-pipeline'\n\nconst diagnostics = { report: (violation: unknown) => console.error(violation) }\nconst input = '  customer-42  '\nconst save = async (value: string) => console.log('saved:', value)\nconst normalized = adaptSyncStageToAsync(\n  (value: string, next) => next(value.trim()),\n  (violation) => diagnostics.report(violation)\n)\n\nawait runAsyncMiddleware([normalized], input, save, {\n  onViolation: (violation) => diagnostics.report(violation)\n})"
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\ntype IRequest = { path: string; token?: string; user?: string }\ntype IStage = (request: IRequest, next: (request: IRequest) => Promise<void>) => Promise<void>\n\nconst pipeline = createPipeline<IRequest>({ mode: MiddlewarePipelineMode.async })\n\n/** Measures the whole request; code after await next() runs once downstream finishes. */\nconst timing: IStage = async (request, next) => {\n  const startedAt = Date.now()\n  try {\n    await next(request)\n  } finally {\n    console.log(`[timing] ${request.path} took ${Date.now() - startedAt}ms`)\n  }\n}\n\n/** Answers 401 without a token; skipping next() stops the chain. */\nconst auth: IStage = async (request, next) => {\n  if (request.token !== 'secret') {\n    console.log(`[auth] ${request.path} → 401`)\n    return\n  }\n  await next({ ...request, user: 'ada' })\n}\n\nconst handle = async (request: IRequest) => {\n  await new Promise((resolve) => setTimeout(resolve, 20)) // simulate a database query\n  console.log(`[handler] ${request.user} requested ${request.path} → 200`)\n}\n\nawait pipeline.run([timing, auth], { path: '/orders', token: 'secret' }, handle)\nawait pipeline.run([timing, auth], { path: '/orders' }, handle)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[handler] ada requested /orders → 200\n[timing] /orders took 23ms\n[auth] /orders → 401\n[timing] /orders took 0ms'
+              },
+              {
+                type: 'paragraph',
+                text: 'Timing numbers vary between runs.'
+              }
+            ]
+          },
+          {
+            id: 'lift',
+            heading: 'Reuse a sync stage in an async pipeline',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A sync stage cannot go straight into an async pipeline because next means different things: the sync next returns nothing, the async next returns a Promise to await. Convert it with pipeline.lift(stage, originalMode) instead of rewriting it.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\n/** A plain synchronous stage, possibly already used by a sync pipeline. */\nconst trim = (text: string, next: (value: string) => void) => next(text.trim())\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\n\nawait pipeline.run(\n  [\n    pipeline.lift(trim, MiddlewarePipelineMode.sync), // lift the sync stage into an async stage\n    async (text, next) => next(`\"${text}\"`)\n  ],\n  '  Dune  ',\n  async (result) => console.log(result)\n)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '"Dune"'
+              },
+              {
+                type: 'table',
+                headers: ['Pipeline mode', 'Allowed from'],
+                rows: [
+                  ['sync', 'sync'],
+                  ['async', 'sync, async'],
+                  ['generator', 'sync, generator'],
+                  ['async-generator', 'sync, generator, async-generator']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'Conversion only goes from a simpler mode to a richer one, because a sync pipeline cannot wait for an async stage. TypeScript rejects unsupported directions; if the type check is bypassed, the runtime throws a TypeError whose code is INVALID_OPTION.'
+              }
+            ]
+          },
+          {
+            id: 'pitfall',
+            heading: 'Common mistake: an async stage in sync mode',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.sync })\n\npipeline.run(\n  [\n    // wrong: an async stage inside a sync pipeline\n    async (text, next) => {\n      await new Promise((resolve) => setTimeout(resolve, 10))\n      next(text)\n    }\n  ],\n  'hello',\n  (result) => console.log('result:', result)\n)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// no output: done never runs'
+              },
+              {
+                type: 'paragraph',
+                text: 'The result never prints. Sync mode does not wait for the Promise a stage returns: the stage returns at its first await, the pipeline sees no next call and ends, and the next call 10 ms later is ignored as late. TypeScript does not catch this, because a function returning a Promise is assignable to a function type that returns void. Use async mode whenever a stage awaits, and configure onViolation.'
               }
             ]
           }
@@ -20623,40 +22542,81 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'runSyncMiddleware API',
-          path: 'docs/middleware-pipeline/runSyncMiddleware'
+          label: 'Cancellation and errors',
+          path: 'cancellation-and-errors'
         },
         {
-          label: 'Sync-to-async adapter',
-          path: 'docs/middleware-pipeline/adaptSyncStageToAsync'
+          label: 'Generator modes',
+          path: 'generators'
         },
-        { label: 'Generator runners', path: 'generators' }
+        {
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
+        }
       ]
     }
   },
   'middleware-pipeline:generators': {
     zh: {
-      title: '用 generator 明确区分候选值与控制信号',
-      lede: 'yield 只更新本 stage 的候选值，return 决定继续、停止、传播 undefined 或直接提交新值。',
+      title: 'Generator 模式：用 return 决定下一步',
+      lede: 'generator 步骤不收到 next：yield 产出候选值，return 决定继续、停止还是换一个值。',
       document: {
         sections: [
           {
-            id: 'signals',
-            heading: '阅读 return，而不是只看 yield',
+            id: 'rules',
+            heading: '两条规则',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '用 function* 定义的函数叫 generator 函数，它可以用 yield 多次产出值，最后用 return 结束。在 MiddlewarePipelineMode.generator 模式下，yield 值产出一个候选值，可以产出多次，后一次覆盖前一次；return 告诉 pipeline 接下来怎么做：'
+              },
+              {
+                type: 'table',
+                headers: ['return', '含义'],
+                rows: [
+                  ['普通值', '用这个值继续，交给下一个步骤'],
+                  ['GENERATOR_CONTINUE', '用最后一次 yield 的候选值继续'],
+                  ['GENERATOR_HALT', '停止整个 pipeline，done 不会执行'],
+                  ['什么都不返回', '和 GENERATOR_HALT 一样，停止'],
+                  [
+                    'GENERATOR_UNDEFINED',
+                    '用 undefined 这个值继续（数据本身可能是 undefined 时使用）'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: '例子',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import {\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  runGeneratorMiddleware\n} from '@migaia/middleware-pipeline'\n\nrunGeneratorMiddleware(\n  [\n    function* normalize(value: string) {\n      yield value.trim()\n      yield value.trim().toLowerCase()\n      return GENERATOR_CONTINUE // 采用最后一次 yield\n    },\n    function* requireValue(value: string) {\n      return value.length === 0 ? GENERATOR_HALT : value\n    }\n  ],\n  input,\n  (value) => save(value)\n)"
+                code: "import {\n  createPipeline,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  MiddlewarePipelineMode,\n  type IGeneratorMiddlewareStage\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.generator })\n\nconst stages: IGeneratorMiddlewareStage<string>[] = [\n  function* (name) {\n    yield name.trim() // 候选值 1\n    yield name.trim().toLowerCase() // 候选值 2（最后一次 yield）\n    return GENERATOR_CONTINUE // 用最后一次 yield 的值继续\n  },\n  function* (name) {\n    if (name === 'admin') return GENERATOR_HALT // 停止整条 pipeline\n    return `user:${name}` // 直接返回一个新值继续\n  }\n]\n\npipeline.run(stages, '  Ada ', (result) => console.log('结果:', result))\npipeline.run(stages, ' ADMIN ', (result) => console.log('结果:', result)) // 被 GENERATOR_HALT 停止，没有输出"
               },
               {
-                type: 'list',
-                items: [
-                  'GENERATOR_CONTINUE 采用最后一次 yield；零 yield 时保持输入。',
-                  'GENERATOR_HALT 或隐式 return undefined 会短路且不调用 done。',
-                  'GENERATOR_UNDEFINED 才表示显式把 undefined 传给下一 stage。',
-                  'async generator 仍严格串行；yield 不是 streaming fan-out。'
-                ]
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '结果: user:ada\n// 第二次运行被 GENERATOR_HALT 停止，没有输出'
+              },
+              {
+                type: 'paragraph',
+                text: "第一次运行：第一步先后产出 'Ada' 和 'ada'，返回 GENERATOR_CONTINUE，于是用 'ada' 继续；第二步返回 'user:ada'，交给 done。第二次运行：第二步收到 'admin'，返回 GENERATOR_HALT，done 没有执行。"
+              }
+            ]
+          },
+          {
+            id: 'compare',
+            heading: '和 sync 模式的区别',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '两种模式都是同步执行。sync 模式用“调不调用 next”表达继续或停止；generator 模式用 return 的值表达，所以不可能出现调用两次 next 的错误。generator 模式没有洋葱模型：步骤 return 之后就结束了，需要收尾逻辑请用 async 模式。步骤里需要 await 时，用 MiddlewarePipelineMode.asyncGenerator 和 async function*，规则相同，run() 返回 Promise。'
               }
             ]
           }
@@ -20664,38 +22624,79 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'runGeneratorMiddleware API',
-          path: 'docs/middleware-pipeline/runGeneratorMiddleware'
+          label: '取消与错误',
+          path: 'cancellation-and-errors'
         },
         {
-          label: '异步 Generator API',
-          path: 'docs/middleware-pipeline/runAsyncGeneratorMiddleware'
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
         },
-        { label: '取消与清理', path: 'cancellation-and-errors' }
+        {
+          label: '同步、异步与洋葱模型',
+          path: 'sync-and-async'
+        }
       ]
     },
     en: {
-      title: 'Separate candidate values from control signals with generators',
-      lede: 'yield updates only the current stage candidate; return decides whether to continue, halt, propagate undefined, or submit another value.',
+      title: 'Generator modes: return decides what happens next',
+      lede: 'Generator stages receive no next: yield produces candidates and return decides whether to continue, stop, or continue with another value.',
       document: {
         sections: [
           {
-            id: 'signals',
-            heading: 'Read the return value, not only each yield',
+            id: 'rules',
+            heading: 'Two rules',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A function* is a generator function: it can yield values several times and finishes with return. In MiddlewarePipelineMode.generator, yield produces a candidate value, and a later yield replaces an earlier one; return tells the pipeline what to do next:'
+              },
+              {
+                type: 'table',
+                headers: ['return', 'Meaning'],
+                rows: [
+                  ['A plain value', 'Continue with this value'],
+                  ['GENERATOR_CONTINUE', 'Continue with the last yielded candidate'],
+                  ['GENERATOR_HALT', 'Stop the whole pipeline; done never runs'],
+                  ['Nothing', 'Same as GENERATOR_HALT: stop'],
+                  [
+                    'GENERATOR_UNDEFINED',
+                    'Continue with the value undefined, for value types that include undefined'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'example',
+            heading: 'Example',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import {\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  runGeneratorMiddleware\n} from '@migaia/middleware-pipeline'\n\nrunGeneratorMiddleware(\n  [\n    function* normalize(value: string) {\n      yield value.trim()\n      yield value.trim().toLowerCase()\n      return GENERATOR_CONTINUE // use the last yield\n    },\n    function* requireValue(value: string) {\n      return value.length === 0 ? GENERATOR_HALT : value\n    }\n  ],\n  input,\n  (value) => save(value)\n)"
+                code: "import {\n  createPipeline,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  MiddlewarePipelineMode,\n  type IGeneratorMiddlewareStage\n} from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.generator })\n\nconst stages: IGeneratorMiddlewareStage<string>[] = [\n  function* (name) {\n    yield name.trim() // candidate 1\n    yield name.trim().toLowerCase() // candidate 2 (the last yield)\n    return GENERATOR_CONTINUE // continue with the last yielded value\n  },\n  function* (name) {\n    if (name === 'admin') return GENERATOR_HALT // stop the whole pipeline\n    return `user:${name}` // continue with a new value\n  }\n]\n\npipeline.run(stages, '  Ada ', (result) => console.log('result:', result))\npipeline.run(stages, ' ADMIN ', (result) => console.log('result:', result)) // stopped by GENERATOR_HALT, prints nothing"
               },
               {
-                type: 'list',
-                items: [
-                  'GENERATOR_CONTINUE adopts the last yield and keeps the input when there was no yield.',
-                  'GENERATOR_HALT or an implicit return undefined short-circuits without done.',
-                  'Only GENERATOR_UNDEFINED explicitly passes undefined to the next stage.',
-                  'An async generator remains strictly serial; yielding is not streaming fan-out.'
-                ]
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'result: user:ada\n// the second run is stopped by GENERATOR_HALT and prints nothing'
+              },
+              {
+                type: 'paragraph',
+                text: "First run: stage one yields 'Ada' then 'ada' and returns GENERATOR_CONTINUE, so 'ada' moves on; stage two returns 'user:ada' for done. Second run: stage two receives 'admin', returns GENERATOR_HALT, and done never runs."
+              }
+            ]
+          },
+          {
+            id: 'compare',
+            heading: 'How it differs from sync mode',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Both modes run synchronously. Sync mode expresses continue or stop by calling next or not; generator mode expresses it with the return value, so a double next is impossible. Generator mode has no onion: a stage ends when it returns, so use async mode when you need cleanup. When a stage must await, use MiddlewarePipelineMode.asyncGenerator with async function*; the rules are the same and run() returns a Promise.'
               }
             ]
           }
@@ -20703,45 +22704,136 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'runGeneratorMiddleware API',
-          path: 'docs/middleware-pipeline/runGeneratorMiddleware'
+          label: 'Cancellation and errors',
+          path: 'cancellation-and-errors'
         },
         {
-          label: 'Async Generator API',
-          path: 'docs/middleware-pipeline/runAsyncGeneratorMiddleware'
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
         },
-        { label: 'Cancellation and cleanup', path: 'cancellation-and-errors' }
+        {
+          label: 'Sync, async and the onion model',
+          path: 'sync-and-async'
+        }
       ]
     }
   },
   'middleware-pipeline:cancellation-and-errors': {
     zh: {
-      title: '组合协作取消与双失败，而不丢失原始错误',
-      lede: 'Pipeline 不提供硬终止；它只在边界检查 signal，并在 stage 与 downstream 同时失败时保留两个原因。',
+      title: '取消一次运行，并处理错误',
+      lede: '用 AbortSignal 取消运行；步骤自己抛出的错误原样传给你，两个错误同时出现时一个也不会丢。',
       document: {
         sections: [
           {
-            id: 'abort',
-            heading: '把 signal 当作共享只读上下文',
+            id: 'cancel',
+            heading: '取消一次正在进行的运行',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  '预先 aborted 会在第一个 stage 前失败；运行中在 stage-entry 与 transition 检查。',
-                  'Error reason 保持 exact identity；primitive reason 才包装为带 ABORTED code 的 Error。',
-                  'generator 中止时先调用 iterator.return() 并耗尽 cleanup yields；清理也失败则得到 [abort, cleanup] 顺序的 AggregateError。',
-                  '永不 settle 的非协作 stage 仍会卡住调用，signal 不是抢占机制。'
-                ]
+                type: 'paragraph',
+                text: '把 AbortController 的 signal 作为 run() 的第四个参数传入：{ signal: controller.signal }。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\nconst controller = new AbortController()\n\nconst slowStep = async (value: string, next: (value: string) => Promise<void>) => {\n  console.log('慢步骤开始')\n  await new Promise((resolve) => setTimeout(resolve, 50))\n  console.log('慢步骤结束')\n  await next(value)\n}\n\nsetTimeout(() => controller.abort(new Error('用户离开了页面')), 10)\n\ntry {\n  await pipeline.run([slowStep, async (v, next) => next(v)], 'report', async () => {\n    console.log('不会执行到这里')\n  }, { signal: controller.signal })\n} catch (error) {\n  console.log('run() 被拒绝:', (error as Error).message)\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '慢步骤开始\n慢步骤结束\nrun() 被拒绝: 用户离开了页面'
+              },
+              {
+                type: 'paragraph',
+                text: '取消在第 10 毫秒发生，但慢步骤仍然执行完了：pipeline 不会强行打断正在执行的函数，只在开始运行时、每个步骤开始前和返回后、调用 done 之前检查。检查到已取消，就停止后续工作，并以 abort() 传入的原因拒绝 run()；没有传原因时，拒绝的是标准 AbortError。创建 pipeline 时传入的 signal 选项对所有运行生效，run() 传入的优先。'
+              }
+            ]
+          },
+          {
+            id: 'cooperate',
+            heading: '让正在执行的步骤尽快停下',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '步骤的第三个参数 context 里有本次运行的 signal。把它交给 fetch 等支持 AbortSignal 的 API，步骤内部的等待也能被取消。context 只在本次运行有 signal 时才会传入，所以要写 context?.signal。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\nconst controller = new AbortController()\n\nsetTimeout(() => controller.abort(new Error('超时')), 10)\n\ntry {\n  await pipeline.run(\n    [\n      async (url, next, context) => {\n        // context.signal 就是本次 run() 使用的 signal，可以直接交给 fetch 等 API\n        const wait = new Promise<void>((resolve, reject) => {\n          const timer = setTimeout(resolve, 1000)\n          context?.signal.addEventListener('abort', () => {\n            clearTimeout(timer)\n            reject(context.signal.reason)\n          })\n        })\n        await wait\n        await next(url)\n      }\n    ],\n    '/slow',\n    async () => console.log('不会执行到这里'),\n    { signal: controller.signal }\n  )\n} catch (error) {\n  console.log('提前结束:', (error as Error).message)\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '提前结束: 超时'
+              },
+              {
+                type: 'paragraph',
+                text: '输出大约在 10 毫秒后出现，而不是 1 秒后。实际项目里最常见的写法是 await fetch(url, { signal: context?.signal })。'
               }
             ]
           },
           {
             id: 'dual-failure',
-            heading: '同时失败时保留两个 failure slot',
+            heading: '两个错误同时出现',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'runAsyncMiddleware 中 stage 自身和已经启动的 downstream 都失败时，默认抛 AggregateError。只有宿主已有稳定错误组合契约时才提供 combineStageAndDownstreamError；返回值会被原样抛出。assertActive 属于控制流，不占用普通 failure slot。'
+                text: '在异步模式下，后续步骤抛出错误，当前步骤在 finally 里收尾时又抛出一个错误，就同时有了两个错误。pipeline 把它们装进一个 AggregateError，errors[0] 是当前步骤的错误，errors[1] 是后续步骤的错误。只有一个错误时，run() 直接以那个错误本身拒绝，不做包装。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\n\ntry {\n  await pipeline.run(\n    [\n      async (value, next) => {\n        try {\n          await next(value)\n        } finally {\n          throw new Error('清理连接失败')\n        }\n      }\n    ],\n    'job-1',\n    async () => {\n      throw new Error('写入数据库失败')\n    }\n  )\n} catch (error) {\n  const failure = error as AggregateError & { code: string }\n  console.log(failure.name, failure.code)\n  console.log(failure.errors.map((item: Error) => item.message))\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "AggregateError EXECUTION_FAILED\n[ '清理连接失败', '写入数据库失败' ]"
+              },
+              {
+                type: 'paragraph',
+                text: '如果项目有自己的错误格式，创建 pipeline 时传入 combineStageAndDownstreamError(stageError, downstreamError) 自己合并，并让返回的错误仍能找到两个原始错误。'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: '这个包的错误代码',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "包抛出的错误带有 error.source（'@migaia/middleware-pipeline'）和 error.code，错误本身仍是原生类型。请用 MiddlewarePipelineErrorCode 常量比较。"
+              },
+              {
+                type: 'table',
+                headers: ['error.code', '什么时候出现'],
+                rows: [
+                  ['INVALID_OPTION', '选项不合法，或 lift 的方向不支持'],
+                  [
+                    'EXECUTION_FAILED',
+                    '异步模式下当前步骤和后续步骤都失败；从 error.errors 取出两个原始错误'
+                  ],
+                  [
+                    'ABORTED',
+                    "运行被取消，且 abort() 的原因不是错误对象（例如 abort('bye')）；原因在 error.cause 里"
+                  ],
+                  [
+                    'ABORT_CLEANUP_FAILED',
+                    '取消后清理时又出错；这是一个 AggregateError，按顺序查看 error.errors'
+                  ]
+                ]
               }
             ]
           }
@@ -20749,43 +22841,134 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'runAsyncMiddleware 配置',
-          path: 'docs/middleware-pipeline/runAsyncMiddleware'
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
         },
         {
-          label: '异步 Generator 取消',
-          path: 'docs/middleware-pipeline/runAsyncGeneratorMiddleware'
+          label: '同步、异步与洋葱模型',
+          path: 'sync-and-async'
         },
-        { label: 'Runner 选择', path: 'sync-and-async' }
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        }
       ]
     },
     en: {
-      title: 'Compose cooperative cancellation and dual failures without losing causes',
-      lede: 'Pipeline provides no hard termination. It checks a signal at boundaries and retains both reasons when a stage and downstream fail together.',
+      title: 'Cancel a run and handle errors',
+      lede: 'Cancel a run with an AbortSignal; errors thrown by stages reach you unchanged, and when two errors happen together neither is lost.',
       document: {
         sections: [
           {
-            id: 'abort',
-            heading: 'Treat signal as shared read-only context',
+            id: 'cancel',
+            heading: 'Cancel a run in progress',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'A pre-aborted signal fails before the first stage; an active run checks at stage entry and transitions.',
-                  'An Error reason preserves exact identity; only a primitive reason is wrapped with an ABORTED code.',
-                  'Generator abort first calls iterator.return() and drains cleanup yields; cleanup failure produces AggregateError ordered [abort, cleanup].',
-                  'A non-cooperative stage that never settles still blocks the call because signal is not preemption.'
-                ]
+                type: 'paragraph',
+                text: 'Pass the AbortController signal as the fourth run() argument: { signal: controller.signal }.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\nconst controller = new AbortController()\n\nconst slowStep = async (value: string, next: (value: string) => Promise<void>) => {\n  console.log('slow stage started')\n  await new Promise((resolve) => setTimeout(resolve, 50))\n  console.log('slow stage finished')\n  await next(value)\n}\n\nsetTimeout(() => controller.abort(new Error('the user left the page')), 10)\n\ntry {\n  await pipeline.run([slowStep, async (v, next) => next(v)], 'report', async () => {\n    console.log('never reached')\n  }, { signal: controller.signal })\n} catch (error) {\n  console.log('run() rejected:', (error as Error).message)\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'slow stage started\nslow stage finished\nrun() rejected: the user left the page'
+              },
+              {
+                type: 'paragraph',
+                text: 'Cancellation happens at 10 ms, yet the slow stage still finishes: the pipeline never interrupts a running function. It checks when the run starts, before and after each stage, and before done. Once it sees cancellation it stops and rejects run() with the reason passed to abort(), or with a standard AbortError when no reason was given. A signal passed to createPipeline applies to every run; a signal passed to run() takes precedence.'
+              }
+            ]
+          },
+          {
+            id: 'cooperate',
+            heading: 'Let a running stage stop early',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A stage receives the signal of the current run in its third argument, context. Pass it to fetch or any API that accepts an AbortSignal so waiting inside the stage stops too. context is present only when the run has a signal, so write context?.signal.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\nconst controller = new AbortController()\n\nsetTimeout(() => controller.abort(new Error('timeout')), 10)\n\ntry {\n  await pipeline.run(\n    [\n      async (url, next, context) => {\n        // context.signal is the signal of this run; pass it to fetch and similar APIs\n        const wait = new Promise<void>((resolve, reject) => {\n          const timer = setTimeout(resolve, 1000)\n          context?.signal.addEventListener('abort', () => {\n            clearTimeout(timer)\n            reject(context.signal.reason)\n          })\n        })\n        await wait\n        await next(url)\n      }\n    ],\n    '/slow',\n    async () => console.log('never reached'),\n    { signal: controller.signal }\n  )\n} catch (error) {\n  console.log('stopped early:', (error as Error).message)\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'stopped early: timeout'
+              },
+              {
+                type: 'paragraph',
+                text: 'The output appears after about 10 ms, not 1 s. In real code this is usually await fetch(url, { signal: context?.signal }).'
               }
             ]
           },
           {
             id: 'dual-failure',
-            heading: 'Keep two failure slots when both paths fail',
+            heading: 'Two errors at once',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'When runAsyncMiddleware sees both the stage and an already-started downstream fail, it throws AggregateError by default. Provide combineStageAndDownstreamError only when the host already owns a stable combination contract; its return value is thrown unchanged. assertActive is control flow and does not consume a normal failure slot.'
+                text: 'In async mode, a later stage can throw while the current stage throws again in its finally block. The pipeline wraps both in an AggregateError: errors[0] is the current stage error, errors[1] the later one. With only one error, run() rejects with that error itself, unwrapped.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\n\ntry {\n  await pipeline.run(\n    [\n      async (value, next) => {\n        try {\n          await next(value)\n        } finally {\n          throw new Error('closing the connection failed')\n        }\n      }\n    ],\n    'job-1',\n    async () => {\n      throw new Error('writing to the database failed')\n    }\n  )\n} catch (error) {\n  const failure = error as AggregateError & { code: string }\n  console.log(failure.name, failure.code)\n  console.log(failure.errors.map((item: Error) => item.message))\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "AggregateError EXECUTION_FAILED\n[ 'closing the connection failed', 'writing to the database failed' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'If your project has its own error format, pass combineStageAndDownstreamError(stageError, downstreamError) to createPipeline and keep both originals reachable from the error it returns.'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: 'Error codes of this package',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "Errors thrown by the package carry error.source ('@migaia/middleware-pipeline') and error.code while keeping their native type. Compare against the MiddlewarePipelineErrorCode constants."
+              },
+              {
+                type: 'table',
+                headers: ['error.code', 'When it appears'],
+                rows: [
+                  ['INVALID_OPTION', 'An invalid option, or an unsupported lift direction'],
+                  [
+                    'EXECUTION_FAILED',
+                    'In async mode both the current and a later stage failed; read both from error.errors'
+                  ],
+                  [
+                    'ABORTED',
+                    "The run was cancelled with a reason that is not an error object, such as abort('bye'); the reason is in error.cause"
+                  ],
+                  [
+                    'ABORT_CLEANUP_FAILED',
+                    'Cleanup failed after cancellation; this is an AggregateError, so read error.errors in order'
+                  ]
+                ]
               }
             ]
           }
@@ -20793,14 +22976,17 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'runAsyncMiddleware configuration',
-          path: 'docs/middleware-pipeline/runAsyncMiddleware'
+          label: 'createPipeline API',
+          path: 'docs/middleware-pipeline/createPipeline'
         },
         {
-          label: 'Async Generator cancellation',
-          path: 'docs/middleware-pipeline/runAsyncGeneratorMiddleware'
+          label: 'Sync, async and the onion model',
+          path: 'sync-and-async'
         },
-        { label: 'Choose a runner', path: 'sync-and-async' }
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        }
       ]
     }
   },
@@ -21764,268 +23950,319 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'event-subscriber:index': {
     zh: {
-      title: 'Event Subscriber 学习路径',
-      lede: '先选择单一 Channel 或按名称路由的 Hub，再根据顺序、失败与订阅生命周期选择具体操作。',
+      title: 'Event Subscriber：通知所有关心这件事的模块',
+      lede: '一个模块调用 publish(数据)，所有事先 subscribe 过的函数都会收到同一份数据；发布方不需要知道订阅方是谁。',
       document: {
         sections: [
           {
-            id: 'choose-boundary',
-            heading: '先选择事件边界',
+            id: 'what',
+            heading: '它解决什么问题',
             blocks: [
               {
-                type: 'table',
-                headers: ['需求', '入口', '原因'],
-                rows: [
-                  [
-                    '一种 payload 与一组订阅者',
-                    'createEventChannel',
-                    '最小分发边界，订阅和发布语义直接'
-                  ],
-                  [
-                    '多种具名事件并保留 payload 推导',
-                    'createEventHub',
-                    '按 key 惰性拥有 Channel，统一错误出口'
-                  ],
-                  [
-                    '只执行一次或执行到取消',
-                    'subscribeOnce / subscribeUntil',
-                    '把订阅寿命写进 helper，而不是散落判断'
-                  ],
-                  ['等待异步 listener 结果', 'invoke*', '显式选择并行/串行及 reject/settled 策略']
+                type: 'paragraph',
+                text: '发出通知的一方叫发布者，它调用 publish(数据)。关心这件事的一方事先用 subscribe(函数) 登记一个函数，这个函数叫 listener（监听函数）。如果你用过 DOM 的 addEventListener 或 Node.js 的 EventEmitter，这就是同一种模式；区别是这个包不依赖浏览器或 Node.js，类型更严格，并且把“listener 出错怎么办”“listener 是异步函数怎么办”都规定清楚了。'
+              },
+              {
+                type: 'paragraph',
+                text: '例如订单支付成功后，要发收据、加积分、记统计。直接在支付代码里依次调用，支付模块就必须认识这三个模块，每加一件“支付后要做的事”都要回来改支付代码。用 event-subscriber，支付模块只调用 orderPaid.publish(order)，其他模块各自订阅；新增功能只需新增订阅。'
+              },
+              {
+                type: 'list',
+                items: [
+                  'publish() 是同步的，按订阅顺序调用每个 listener，返回时它们都已被调用。',
+                  '一个 listener 出错不影响其他 listener；全部执行完后才统一抛出错误。',
+                  'publish() 不等待异步 listener，但它们之后的错误会交给你配置的 report，不会悄悄丢失。',
+                  '每次发布开始时固定一份 listener 名单，发布过程中订阅变化不会打乱这一次发布。',
+                  '需要等待异步 listener 或收集返回值时，用 invokeParallel、invokeSerial 等函数。'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'channel 只处理瞬时的通知：发布那一刻在场的 listener 收到数据，之后订阅的收不到以前的数据，包也不保存“当前值”。需要随时读取最新状态，用 reactive；需要一份数据依次经过多个步骤加工，用 middleware-pipeline。'
               }
             ]
           },
           {
-            id: 'invariants',
-            heading: '保持三个不变量',
+            id: 'api',
+            heading: 'API 一览',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  '订阅返回的 handle/disposer 由创建订阅的所有者释放。',
-                  '需要稳定本轮听众时使用 snapshot 语义；只有明确需要实时遍历时使用 live 语义。',
-                  '业务失败、迟到失败和 report 失败是不同通道，不要互相覆盖。'
+                type: 'table',
+                headers: ['API', '作用'],
+                rows: [
+                  [
+                    'createEventChannel<T, R>(options?)',
+                    '创建一种事件的 channel；T 是发布的数据类型，R 是 listener 返回值类型（默认 void）'
+                  ],
+                  ['channel.subscribe(listener, { taskId? })', '登记 listener，返回退订函数'],
+                  [
+                    'channel.subscribeOnce / subscribeUntil(signal, …)',
+                    '只接收一次 / signal 取消时自动退订'
+                  ],
+                  ['channel.publish(value)', '同步通知所有 listener，不等待异步 listener'],
+                  [
+                    'channel.filterTaskId(taskId) / clear() / size',
+                    '按 taskId 选出部分订阅 / 移除全部订阅 / 当前订阅数'
+                  ],
+                  [
+                    'invokeParallel, invokeSerial, invokeTask …',
+                    '发布并等待 listener 完成，收集返回值'
+                  ],
+                  ['createEventHub<Events>(options?)', '用一个对象管理多种事件，按事件名订阅和发布']
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: '每个参数和选项的完整说明在下面几篇指南和 createEventChannel 的 API 页面里。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: '五分钟建立 Channel', path: 'getting-started' },
-        { label: 'createEventChannel API', path: 'docs/event-subscriber/createEventChannel' },
-        { label: 'createEventHub API', path: 'docs/event-subscriber/createEventHub' }
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        },
+        {
+          label: '订阅与退订',
+          path: 'subscriptions'
+        },
+        {
+          label: 'createEventChannel API',
+          path: 'docs/event-subscriber/createEventChannel'
+        }
       ]
     },
     en: {
-      title: 'Event Subscriber learning paths',
-      lede: 'Choose a single Channel or a keyed Hub first, then select ordering, failure, and subscription-lifetime behavior explicitly.',
+      title: 'Event Subscriber: notify every module that cares',
+      lede: 'One module calls publish(data) and every function that subscribed earlier receives the same data; the publisher never needs to know who subscribed.',
       document: {
         sections: [
           {
-            id: 'choose-boundary',
-            heading: 'Choose the event boundary first',
+            id: 'what',
+            heading: 'What problem it solves',
             blocks: [
               {
-                type: 'table',
-                headers: ['Need', 'Entry', 'Why'],
-                rows: [
-                  [
-                    'One payload shape and one subscriber set',
-                    'createEventChannel',
-                    'The smallest boundary with direct subscribe and publish semantics'
-                  ],
-                  [
-                    'Several named events with inferred payloads',
-                    'createEventHub',
-                    'Owns keyed channels lazily with one error outlet'
-                  ],
-                  [
-                    'Run once or until cancellation',
-                    'subscribeOnce / subscribeUntil',
-                    'Keeps subscription lifetime in a helper instead of scattered branches'
-                  ],
-                  [
-                    'Await asynchronous listener results',
-                    'invoke*',
-                    'Makes parallel/serial and reject/settled policy explicit'
-                  ]
+                type: 'paragraph',
+                text: 'The side that announces something is the publisher; it calls publish(data). Each interested side registers a function with subscribe(fn); that function is a listener. If you know DOM addEventListener or the Node.js EventEmitter, this is the same pattern, except that this package depends on neither the browser nor Node.js, is strictly typed, and defines what happens when a listener throws or is asynchronous.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Say a paid order must trigger a receipt, loyalty points, and revenue stats. Calling all three from the payment code makes payment depend on every one of them and forces a payment change for each new follow-up. With event-subscriber the payment module only calls orderPaid.publish(order), and the other modules subscribe; a new feature is just a new subscription.'
+              },
+              {
+                type: 'list',
+                items: [
+                  'publish() is synchronous: it calls every listener in subscription order, and all have been called when it returns.',
+                  'One failing listener does not stop the others; errors are thrown together after all have run.',
+                  'publish() does not wait for async listeners, but their later errors go to your report callback instead of disappearing.',
+                  'Each publish fixes its listener list when it starts, so subscribing or unsubscribing during a publish does not disturb it.',
+                  'Use invokeParallel, invokeSerial, and related functions to wait for async listeners or collect their results.'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'A channel carries momentary notifications: listeners present at publish time receive the data, later subscribers never see earlier publishes, and no current value is stored. For a readable latest state use reactive; to process one value through ordered steps use middleware-pipeline.'
               }
             ]
           },
           {
-            id: 'invariants',
-            heading: 'Preserve three invariants',
+            id: 'api',
+            heading: 'API at a glance',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'The owner that creates a subscription also owns its handle or disposer.',
-                  'Use snapshot semantics for a stable invocation cohort; choose live traversal only when current mutation must be observed.',
-                  'Business failures, late failures, and reporter failures remain separate channels and never replace one another.'
+                type: 'table',
+                headers: ['API', 'Purpose'],
+                rows: [
+                  [
+                    'createEventChannel<T, R>(options?)',
+                    'Creates a channel for one event; T is the published data type, R the listener return type (default void)'
+                  ],
+                  [
+                    'channel.subscribe(listener, { taskId? })',
+                    'Registers a listener and returns an unsubscribe function'
+                  ],
+                  [
+                    'channel.subscribeOnce / subscribeUntil(signal, …)',
+                    'Receive once / unsubscribe automatically when the signal aborts'
+                  ],
+                  [
+                    'channel.publish(value)',
+                    'Notifies every listener synchronously without waiting for async ones'
+                  ],
+                  [
+                    'channel.filterTaskId(taskId) / clear() / size',
+                    'Selects subscriptions by taskId / removes all / current count'
+                  ],
+                  [
+                    'invokeParallel, invokeSerial, invokeTask …',
+                    'Publish, wait for listeners, and collect results'
+                  ],
+                  [
+                    'createEventHub<Events>(options?)',
+                    'Manages several events in one object, keyed by event name'
+                  ]
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'The guides below and the createEventChannel API page explain every parameter and option.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'Build a Channel in five minutes', path: 'getting-started' },
-        { label: 'createEventChannel API', path: 'docs/event-subscriber/createEventChannel' },
-        { label: 'createEventHub API', path: 'docs/event-subscriber/createEventHub' }
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'Subscribing and unsubscribing',
+          path: 'subscriptions'
+        },
+        {
+          label: 'createEventChannel API',
+          path: 'docs/event-subscriber/createEventChannel'
+        }
       ]
     }
   },
   'event-subscriber:getting-started': {
     zh: {
-      title: '五分钟建立类型安全的 Channel',
-      lede: '完成订阅、发布、取消订阅与错误出口的最小生产闭环。',
+      title: '快速开始：第一次订阅和发布',
+      lede: '安装包，跑通一次订阅、发布和退订，并弄清 createEventChannel 的每个选项。',
       document: {
         sections: [
           {
-            id: 'first-channel',
-            heading: '创建并拥有一个 Channel',
+            id: 'install',
+            heading: '安装',
             blocks: [
               {
                 type: 'code',
-                language: 'ts',
-                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IUserSaved = { id: string; revision: number }\n\nconst saved = createEventChannel<IUserSaved>({\n  report: (error) => reportLateFailure(error)\n})\n\nconst subscription = saved.subscribe(({ value }) => {\n  console.log(value.id, value.revision)\n})\n\nsaved.publish({ id: 'user-42', revision: 3 })\nsubscription.off()"
-              },
-              {
-                type: 'list',
-                items: [
-                  'subscribe 的回调接收事件上下文，payload 位于 value。',
-                  'publish 同步遍历本轮订阅快照；后续新增或移除订阅不会改写已经开始的快照。',
-                  'off() 幂等；创建订阅的组件、请求或领域对象负责调用。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'choose-next',
-            heading: '从需求选择下一步',
-            blocks: [
-              {
-                type: 'list',
-                items: [
-                  '事件只应消费一次：subscribeOnce。',
-                  'AbortSignal 结束时自动退订：subscribeUntil。',
-                  'listener 返回 Promise 且需要结果：根据顺序与失败策略选择 invokeSerial、invokeParallel 或 settled 版本。',
-                  '事件种类增多：使用 createEventHub，而不是手工维护 Channel 字典。'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'style',
-            heading: 'Style 只投影方法名，不建立第二套 Channel',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['style', '订阅 / 发布 / 退订', '适用命名'],
-                rows: [
-                  [
-                    'subscribe-publish（默认）',
-                    'subscribe / publish / unsubscribe',
-                    'canonical API'
-                  ],
-                  ['on-emit', 'on / emit / off', '事件发射器习惯'],
-                  ['on-trigger', 'on / trigger / off', '触发器语义'],
-                  ['listen-fire', 'listen / fire / unlisten', '监听/触发词汇'],
-                  ['defineEventApiStyle({...})', '调用方定义三个互异且非保留的方法名', '领域语言']
-                ]
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IUserSaved = { id: string; revision: number }\nconst audit = (event: IUserSaved) => console.log(event.id, event.revision)\nconst saved = createEventChannel<IUserSaved>({ style: 'on-emit' })\nconst subscription = saved.on(({ value }) => audit(value))\n\nsaved.emit({ id: 'user-42', revision: 3 })\nsubscription.off()\n\n// Canonical methods remain available on the same Channel.\nconst second = saved.subscribe(({ value }) => audit(value))\nsaved.publish({ id: 'user-43', revision: 1 })\nsecond.unsubscribe()"
+                language: 'bash',
+                code: 'pnpm add @migaia/event-subscriber'
               },
               {
                 type: 'paragraph',
-                text: 'style 在构造时增加别名；不会改变 snapshot 顺序、dispatchPolicy、publishBudget、错误通道或订阅所有权。自定义名必须互不相同，且不能覆盖 clear、size、subscribeOnce、subscribeUntil 等保留成员。'
+                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
               }
             ]
-          }
-        ]
-      },
-      next: [
-        { label: 'Channel 完整配置', path: 'docs/event-subscriber/createEventChannel' },
-        { label: '一次订阅', path: 'docs/event-subscriber/subscribeOnce' },
-        { label: '取消驱动订阅', path: 'docs/event-subscriber/subscribeUntil' }
-      ]
-    },
-    en: {
-      title: 'Build a type-safe Channel in five minutes',
-      lede: 'Complete the smallest production loop for subscription, publication, unsubscription, and late-failure reporting.',
-      document: {
-        sections: [
+          },
           {
-            id: 'first-channel',
-            heading: 'Create and own one Channel',
+            id: 'first',
+            heading: '第一个例子',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IUserSaved = { id: string; revision: number }\n\nconst saved = createEventChannel<IUserSaved>({\n  report: (error) => reportLateFailure(error)\n})\n\nconst subscription = saved.subscribe(({ value }) => {\n  console.log(value.id, value.revision)\n})\n\nsaved.publish({ id: 'user-42', revision: 3 })\nsubscription.off()"
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst cartChanged = createEventChannel<number>()\n\nconst unsubscribe = cartChanged.subscribe((event) => console.log('购物车数量:', event.value))\ncartChanged.publish(1)\ncartChanged.publish(2)\n\nunsubscribe()\ncartChanged.publish(3) // 已退订，不会输出"
               },
               {
-                type: 'list',
-                items: [
-                  'The subscribe callback receives an event context whose payload is value.',
-                  'publish synchronously traverses the current subscription snapshot; later mutation cannot rewrite an invocation already in progress.',
-                  'off() is idempotent and belongs to the component, request, or domain owner that created the subscription.'
-                ]
-              }
-            ]
-          },
-          {
-            id: 'choose-next',
-            heading: 'Choose the next step from the requirement',
-            blocks: [
+                type: 'paragraph',
+                text: '输出：'
+              },
               {
-                type: 'list',
-                items: [
-                  'Consume only one event with subscribeOnce.',
-                  'Unsubscribe when an AbortSignal ends with subscribeUntil.',
-                  'For Promise-returning listeners, choose invokeSerial, invokeParallel, or a settled variant by ordering and failure policy.',
-                  'When event kinds multiply, use createEventHub instead of maintaining a Channel dictionary by hand.'
-                ]
+                type: 'code',
+                language: 'text',
+                code: '购物车数量: 1\n购物车数量: 2\n// 第 3 次发布前已退订，没有输出'
+              },
+              {
+                type: 'paragraph',
+                text: '输出块里只有程序真实打印的内容；以 // 开头的行是说明，不是程序输出。'
+              },
+              {
+                type: 'paragraph',
+                text: 'createEventChannel<number>() 创建一个 channel，一个 channel 代表一种事件，这里是“购物车数量变了”；number 是这种事件携带的数据类型。channel.subscribe(listener) 登记一个 listener，listener 收到一个 event 对象，发布的数据在 event.value 里；subscribe 返回一个函数，调用它就是退订，重复调用没有副作用。channel.publish(数据) 把数据同步交给当前所有 listener。'
+              },
+              {
+                type: 'paragraph',
+                text: '每种事件通常建一个 channel，放在模块里导出，让发布方和订阅方导入同一个 channel。每次调用 createEventChannel() 都会得到一个新的、独立的 channel。'
               }
             ]
           },
           {
-            id: 'style',
-            heading: 'Style projects method names without creating another Channel',
+            id: 'event',
+            heading: 'listener 收到的 event 对象',
             blocks: [
               {
                 type: 'table',
-                headers: ['style', 'Subscribe / publish / unsubscribe', 'Vocabulary'],
+                headers: ['字段', '说明'],
                 rows: [
                   [
-                    'subscribe-publish (default)',
-                    'subscribe / publish / unsubscribe',
-                    'Canonical API'
+                    'event.value',
+                    '本次发布的数据。所有 listener 收到同一个对象，listener 应只读不改'
                   ],
-                  ['on-emit', 'on / emit / off', 'Event-emitter vocabulary'],
-                  ['on-trigger', 'on / trigger / off', 'Trigger vocabulary'],
-                  ['listen-fire', 'listen / fire / unlisten', 'Listener/fire vocabulary'],
+                  ['event.taskId', '这次订阅的 taskId（订阅时通过 { taskId } 传入）'],
                   [
-                    'defineEventApiStyle({...})',
-                    'Three distinct caller-defined non-reserved method names',
-                    'Domain language'
+                    'event.abort(reason?)',
+                    '在 listener 里退订自己：本次调用正常执行完，之后不再收到'
+                  ],
+                  ['event.aborted / event.abortReason', '是否已调用过 abort()，以及传入的原因'],
+                  ['event.setTaskId(taskId)', '修改这次订阅的 taskId，从下一次发布起生效']
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'createEventChannel 的选项',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '所有选项都可选，大多数项目只需要 report。'
+              },
+              {
+                type: 'table',
+                headers: ['选项', '默认值', '作用'],
+                rows: [
+                  [
+                    'report',
+                    '交给运行环境报告',
+                    '接收异步 listener 在 publish() 返回之后的失败，参数是 { event, error }'
+                  ],
+                  ['terminalReport', '交给运行环境报告', 'report 未配置或自己出错时的最后兜底'],
+                  [
+                    'dispatchPolicy',
+                    "'recursive'",
+                    'listener 里再次 publish 时，新事件立即交付（recursive）还是排在当前发布之后（queued）'
+                  ],
+                  [
+                    'admissionPolicy',
+                    "'multiple'",
+                    '同一个函数订阅两次算两次（multiple）还是只算一次（unique）'
+                  ],
+                  [
+                    'removalPolicy',
+                    "'handle'",
+                    '退订只移除这一次订阅（handle），还是移除这个函数的所有订阅（listener-all）'
+                  ],
+                  [
+                    'publishBudget',
+                    '100000',
+                    '一次发布连同嵌套发布最多调用多少次 listener，防止无限循环；超出时抛 PUBLISH_FAILED'
+                  ],
+                  [
+                    'throwOnAborted',
+                    'false',
+                    '用已取消的 signal 调用 subscribeUntil 时是否抛 ABORTED，默认静默不订阅'
+                  ],
+                  [
+                    'style',
+                    "'subscribe-publish'",
+                    "给方法起别名，行为不变。内置 'subscribe-publish'、'on-emit'（on / emit / off）、'on-trigger'、'listen-fire'，也可用 defineEventApiStyle 自定义"
+                  ],
+                  [
+                    'valueConfig',
+                    '无',
+                    "在 event 上增加一个只读字段，直接读取数据里的某个路径，例如 { readPath: 'data.id', alias: 'id' }"
                   ]
                 ]
               },
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IUserSaved = { id: string; revision: number }\nconst audit = (event: IUserSaved) => console.log(event.id, event.revision)\nconst saved = createEventChannel<IUserSaved>({ style: 'on-emit' })\nconst subscription = saved.on(({ value }) => audit(value))\n\nsaved.emit({ id: 'user-42', revision: 3 })\nsubscription.off()\n\n// Canonical methods remain available on the same Channel.\nconst second = saved.subscribe(({ value }) => audit(value))\nsaved.publish({ id: 'user-43', revision: 1 })\nsecond.unsubscribe()"
-              },
-              {
                 type: 'paragraph',
-                text: 'style adds aliases during construction and never changes snapshot order, dispatchPolicy, publishBudget, error channels, or subscription ownership. Custom names must be distinct and cannot shadow reserved members such as clear, size, subscribeOnce, or subscribeUntil.'
+                text: '选项不合法时，createEventChannel 同步抛出 TypeError，error.code 为 INVALID_OPTIONS。'
               }
             ]
           }
@@ -22033,169 +24270,772 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'Complete Channel configuration',
-          path: 'docs/event-subscriber/createEventChannel'
+          label: '订阅与退订',
+          path: 'subscriptions'
         },
-        { label: 'One-shot subscription', path: 'docs/event-subscriber/subscribeOnce' },
         {
-          label: 'Cancellation-owned subscription',
-          path: 'docs/event-subscriber/subscribeUntil'
+          label: '发布与错误',
+          path: 'publish-and-errors'
+        },
+        {
+          label: 'createEventChannel API',
+          path: 'docs/event-subscriber/createEventChannel'
+        }
+      ]
+    },
+    en: {
+      title: 'Quick start: your first subscribe and publish',
+      lede: 'Install the package, subscribe, publish, and unsubscribe once, and learn every createEventChannel option.',
+      document: {
+        sections: [
+          {
+            id: 'install',
+            heading: 'Install',
+            blocks: [
+              {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm add @migaia/event-subscriber'
+              },
+              {
+                type: 'paragraph',
+                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
+              }
+            ]
+          },
+          {
+            id: 'first',
+            heading: 'First example',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst cartChanged = createEventChannel<number>()\n\nconst unsubscribe = cartChanged.subscribe((event) => console.log('cart size:', event.value))\ncartChanged.publish(1)\ncartChanged.publish(2)\n\nunsubscribe()\ncartChanged.publish(3) // unsubscribed, prints nothing"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'cart size: 1\ncart size: 2\n// unsubscribed before the third publish, so nothing prints'
+              },
+              {
+                type: 'paragraph',
+                text: 'Output blocks show only what the program prints; lines starting with // are explanations, not output.'
+              },
+              {
+                type: 'paragraph',
+                text: 'createEventChannel<number>() creates a channel; one channel represents one kind of event, here “the cart size changed”, and number is the data type it carries. channel.subscribe(listener) registers a listener that receives an event object with the published data in event.value; subscribe returns a function that unsubscribes, and calling it again does nothing. channel.publish(data) hands the data synchronously to every current listener.'
+              },
+              {
+                type: 'paragraph',
+                text: 'Usually each kind of event gets one channel exported from a module, so publishers and subscribers import the same channel. Every createEventChannel() call returns a new, independent channel.'
+              }
+            ]
+          },
+          {
+            id: 'event',
+            heading: 'The event object a listener receives',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Field', 'Meaning'],
+                rows: [
+                  [
+                    'event.value',
+                    'The published data. Every listener receives the same object, so listeners should read it, not modify it'
+                  ],
+                  [
+                    'event.taskId',
+                    'The taskId of this subscription, passed as { taskId } when subscribing'
+                  ],
+                  [
+                    'event.abort(reason?)',
+                    'Unsubscribes this listener from inside it: the current call finishes, later publishes are not delivered'
+                  ],
+                  [
+                    'event.aborted / event.abortReason',
+                    'Whether abort() was called and the reason passed to it'
+                  ],
+                  [
+                    'event.setTaskId(taskId)',
+                    'Changes this subscription taskId from the next publish on'
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            id: 'options',
+            heading: 'createEventChannel options',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Every option is optional; most projects only need report.'
+              },
+              {
+                type: 'table',
+                headers: ['Option', 'Default', 'Purpose'],
+                rows: [
+                  [
+                    'report',
+                    'runtime error reporting',
+                    'Receives async listener failures after publish() returned, as { event, error }'
+                  ],
+                  [
+                    'terminalReport',
+                    'runtime error reporting',
+                    'Last resort when report is missing or throws'
+                  ],
+                  [
+                    'dispatchPolicy',
+                    "'recursive'",
+                    'Whether an event published inside a listener is delivered immediately (recursive) or after the current publish (queued)'
+                  ],
+                  [
+                    'admissionPolicy',
+                    "'multiple'",
+                    'Whether subscribing the same function twice counts twice (multiple) or once (unique)'
+                  ],
+                  [
+                    'removalPolicy',
+                    "'handle'",
+                    'Whether unsubscribing removes only that subscription (handle) or every subscription of that function (listener-all)'
+                  ],
+                  [
+                    'publishBudget',
+                    '100000',
+                    'Maximum listener calls in one publish including nested ones, guarding against infinite loops; exceeding it throws PUBLISH_FAILED'
+                  ],
+                  [
+                    'throwOnAborted',
+                    'false',
+                    'Whether subscribeUntil with an already aborted signal throws ABORTED; by default it silently does not subscribe'
+                  ],
+                  [
+                    'style',
+                    "'subscribe-publish'",
+                    "Adds method aliases without changing behavior. Built-in styles are 'subscribe-publish', 'on-emit' (on / emit / off), 'on-trigger', and 'listen-fire'; defineEventApiStyle defines custom names"
+                  ],
+                  [
+                    'valueConfig',
+                    'none',
+                    "Adds a read-only field on event that reads a path in the data, for example { readPath: 'data.id', alias: 'id' }"
+                  ]
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'An invalid option makes createEventChannel throw a TypeError synchronously with error.code INVALID_OPTIONS.'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Subscribing and unsubscribing',
+          path: 'subscriptions'
+        },
+        {
+          label: 'Publishing and errors',
+          path: 'publish-and-errors'
+        },
+        {
+          label: 'createEventChannel API',
+          path: 'docs/event-subscriber/createEventChannel'
         }
       ]
     }
   },
   'event-subscriber:subscriptions': {
     zh: {
-      title: '把订阅寿命交给明确的所有者',
-      lede: '普通订阅、一次订阅和取消驱动订阅解决的是三种不同寿命；选择 helper 后，不要再在 listener 内复制状态判断。',
+      title: '订阅与退订',
+      lede: '订阅有三种结束方式；每次发布开始时会固定 listener 名单，发布过程中的订阅变化从下一次发布起生效。',
       document: {
         sections: [
           {
-            id: 'choose-lifetime',
-            heading: '先选择订阅何时结束',
+            id: 'end',
+            heading: '三种结束订阅的方式',
             blocks: [
               {
-                type: 'table',
-                headers: ['需求', 'API', '释放责任'],
-                rows: [
-                  ['由组件或服务手动停止', 'channel.subscribe', '所有者保存 handle 并调用 off()'],
-                  ['成功接收第一条后立即停止', 'subscribeOnce', 'helper 在首次调用前先解除订阅'],
-                  [
-                    '跟随 AbortSignal 停止',
-                    'subscribeUntil',
-                    'signal 与返回 handle 任一路径都可结束订阅'
-                  ]
+                type: 'list',
+                items: [
+                  '调用 subscribe() 返回的退订函数：适合订阅和退订写在同一处。',
+                  'subscribeUntil(signal, listener)：signal 取消时自动退订。组件里的多个订阅绑定同一个 AbortController，卸载时调用一次 abort() 即可。',
+                  '在 listener 里调用 event.abort()：要看收到的数据才知道是否继续监听时使用。'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'subscribeOnce(listener) 只接收第一次事件，之后自动退订，适合“等待初始化完成”这类只关心一次的事件。下面的例子同时用到了这几种方式：'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst updates = createEventChannel<IUpdate>()\nconst lifetime = new AbortController()\n\nconst subscription = subscribeUntil(updates, lifetime.signal, ({ value }) => {\n  renderUpdate(value)\n})\n\n// owner 销毁时统一结束；重复结束安全\nlifetime.abort('view disposed')\nsubscription.off()"
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst ready = createEventChannel<string>()\n\nready.subscribeOnce((event) => console.log('只执行一次:', event.value))\n\nconst controller = new AbortController()\nready.subscribeUntil(controller.signal, (event) => console.log('页面打开期间:', event.value))\n\nready.subscribe((event) => {\n  console.log('收到后退订自己:', event.value)\n  event.abort()\n})\n\nready.publish('第 1 次')\ncontroller.abort() // 例如组件卸载\nready.publish('第 2 次') // 三个 listener 都已退订，没有输出\nconsole.log('当前订阅数:', ready.size)"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '只执行一次: 第 1 次\n页面打开期间: 第 1 次\n收到后退订自己: 第 1 次\n// 第 2 次发布：三个 listener 都已退订，没有输出\n当前订阅数: 0'
+              },
+              {
+                type: 'paragraph',
+                text: '如果 subscribeUntil 收到的 signal 已经被取消，不会登记 listener，直接返回一个什么都不做的退订函数；设置 throwOnAborted: true 则改为抛出 ABORTED。'
               }
             ]
           },
           {
-            id: 'mutation',
-            heading: '理解快照，而不是依赖遍历副作用',
+            id: 'snapshot',
+            heading: '发布开始时，先固定 listener 名单',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'publish 使用本轮订阅快照：listener 内新增或移除订阅不会改写已经开始的分发。只有确实需要观察实时集合变化时才使用 invokeEachLive，并把重入与停止条件写成显式规则。'
+                text: '每次 publish() 开始时复制一份当时的 listener 名单，再按名单逐个调用。所以在发布过程中订阅或退订，只影响之后的发布：新订阅的 listener 收不到这一次事件，被退订但还没轮到的 listener 仍会收到这一次事件。这样一次发布的结果总是确定的。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst tick = createEventChannel<number>()\ntick.subscribe((event) => {\n  console.log('A 收到', event.value)\n  if (event.value === 1) tick.subscribe((later) => console.log('C 收到', later.value))\n})\ntick.publish(1) // C 是在这次发布过程中加入的，不会收到 1\ntick.publish(2) // C 从下一次发布开始收到"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'A 收到 1\nA 收到 2\nC 收到 2'
+              }
+            ]
+          },
+          {
+            id: 'duplicates',
+            heading: '同一个函数订阅两次',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "默认（admissionPolicy: 'multiple'）每次订阅都独立：同一个函数订阅两次会被调用两次，退订也要退订两次。订阅代码可能被重复执行（例如组件重复挂载）时，设置 admissionPolicy: 'unique'，同一个函数只登记一次。removalPolicy: 'listener-all' 则让一次退订移除这个函数的全部订阅。"
+              },
+              {
+                type: 'paragraph',
+                text: 'channel 不保存已经发布过的数据：listener 只能收到它订阅之后的发布。需要订阅时立刻拿到当前值，请用保存状态的工具，例如 reactive。'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'subscribeOnce API', path: 'docs/event-subscriber/subscribeOnce' },
-        { label: 'subscribeUntil API', path: 'docs/event-subscriber/subscribeUntil' },
-        { label: '异步调用策略', path: 'async-invocation' }
+        {
+          label: '发布与错误',
+          path: 'publish-and-errors'
+        },
+        {
+          label: '等待 listener 的结果',
+          path: 'async-invocation'
+        },
+        {
+          label: 'createEventChannel API',
+          path: 'docs/event-subscriber/createEventChannel'
+        }
       ]
     },
     en: {
-      title: 'Give every subscription an explicit lifetime owner',
-      lede: 'Manual, one-shot, and cancellation-owned subscriptions solve different lifetimes. Once a helper owns that rule, do not duplicate state checks inside the listener.',
+      title: 'Subscribing and unsubscribing',
+      lede: 'A subscription can end in three ways; each publish fixes its listener list when it starts, so changes made during a publish apply from the next one.',
       document: {
         sections: [
           {
-            id: 'choose-lifetime',
-            heading: 'Choose when the subscription ends first',
+            id: 'end',
+            heading: 'Three ways to end a subscription',
             blocks: [
               {
-                type: 'table',
-                headers: ['Requirement', 'API', 'Release responsibility'],
-                rows: [
-                  [
-                    'A component or service stops it manually',
-                    'channel.subscribe',
-                    'The owner retains the handle and calls off()'
-                  ],
-                  [
-                    'Stop immediately after receiving the first event',
-                    'subscribeOnce',
-                    'The helper unsubscribes before the first listener call'
-                  ],
-                  [
-                    'Stop with an AbortSignal',
-                    'subscribeUntil',
-                    'Either the signal or returned handle can end the subscription'
-                  ]
+                type: 'list',
+                items: [
+                  'Call the function returned by subscribe(): best when subscribing and unsubscribing happen in one place.',
+                  'subscribeUntil(signal, listener): unsubscribes when the signal aborts. Bind all subscriptions of a component to one AbortController and call abort() once on unmount.',
+                  'Call event.abort() inside the listener: for when the data decides whether to keep listening.'
                 ]
+              },
+              {
+                type: 'paragraph',
+                text: 'subscribeOnce(listener) receives only the first event and then unsubscribes, which suits one-time events such as “initialization finished”. The example uses all of them:'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst updates = createEventChannel<IUpdate>()\nconst lifetime = new AbortController()\n\nconst subscription = subscribeUntil(updates, lifetime.signal, ({ value }) => {\n  renderUpdate(value)\n})\n\n// End everything when the owner is disposed; repeated cleanup is safe.\nlifetime.abort('view disposed')\nsubscription.off()"
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst ready = createEventChannel<string>()\n\nready.subscribeOnce((event) => console.log('once only:', event.value))\n\nconst controller = new AbortController()\nready.subscribeUntil(controller.signal, (event) => console.log('while the page is open:', event.value))\n\nready.subscribe((event) => {\n  console.log('unsubscribes itself after:', event.value)\n  event.abort()\n})\n\nready.publish('first')\ncontroller.abort() // for example, the component unmounts\nready.publish('second') // all three listeners are gone, prints nothing\nconsole.log('subscriptions:', ready.size)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'once only: first\nwhile the page is open: first\nunsubscribes itself after: first\n// second publish: all three listeners are gone, nothing prints\nsubscriptions: 0'
+              },
+              {
+                type: 'paragraph',
+                text: 'If the signal passed to subscribeUntil is already aborted, no listener is registered and a no-op unsubscribe is returned; with throwOnAborted: true it throws ABORTED instead.'
               }
             ]
           },
           {
-            id: 'mutation',
-            heading: 'Rely on snapshot semantics, not traversal side effects',
+            id: 'snapshot',
+            heading: 'A publish fixes its listener list first',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'publish uses the current subscription snapshot. Adding or removing a listener during a callback cannot rewrite the dispatch already in progress. Use invokeEachLive only when observing live collection mutation is the requirement, with explicit reentrancy and stop rules.'
+                text: 'Every publish() copies the current listener list and calls it in order. Subscribing or unsubscribing during a publish therefore affects only later publishes: a new listener misses the current event, and a listener removed before its turn still receives it. The result of one publish is always deterministic.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst tick = createEventChannel<number>()\ntick.subscribe((event) => {\n  console.log('A got', event.value)\n  if (event.value === 1) tick.subscribe((later) => console.log('C got', later.value))\n})\ntick.publish(1) // C joined during this publish, so it does not get 1\ntick.publish(2) // C receives from the next publish on"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'A got 1\nA got 2\nC got 2'
+              }
+            ]
+          },
+          {
+            id: 'duplicates',
+            heading: 'Subscribing the same function twice',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "By default (admissionPolicy: 'multiple') every subscription is independent: subscribing a function twice calls it twice and needs two unsubscribes. When subscription code may run more than once, for example on a remount, set admissionPolicy: 'unique' so a function is registered once. removalPolicy: 'listener-all' makes one unsubscribe remove every subscription of that function."
+              },
+              {
+                type: 'paragraph',
+                text: 'A channel stores no past data: a listener only receives publishes after it subscribed. To get a current value on subscription, use a stateful tool such as reactive.'
               }
             ]
           }
         ]
       },
       next: [
-        { label: 'subscribeOnce API', path: 'docs/event-subscriber/subscribeOnce' },
-        { label: 'subscribeUntil API', path: 'docs/event-subscriber/subscribeUntil' },
-        { label: 'Async invocation policies', path: 'async-invocation' }
+        {
+          label: 'Publishing and errors',
+          path: 'publish-and-errors'
+        },
+        {
+          label: 'Waiting for listener results',
+          path: 'async-invocation'
+        },
+        {
+          label: 'createEventChannel API',
+          path: 'docs/event-subscriber/createEventChannel'
+        }
+      ]
+    }
+  },
+  'event-subscriber:publish-and-errors': {
+    zh: {
+      title: '发布与错误',
+      lede: 'publish() 同步调用每个 listener；同步错误在全部执行完后统一抛出，异步错误交给 report。',
+      document: {
+        sections: [
+          {
+            id: 'order',
+            heading: '一次发布，按顺序调用每个 listener',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IOrder = { id: string; total: number }\nconst orderPaid = createEventChannel<IOrder>()\n\n// 三个互不认识的模块各自订阅同一个事件\norderPaid.subscribe((event) => console.log('[邮件] 发送收据给订单', event.value.id))\norderPaid.subscribe((event) => console.log('[积分] 增加', Math.floor(event.value.total / 10), '分'))\norderPaid.subscribe((event) => console.log('[统计] 记录一笔收入', event.value.total))\n\norderPaid.publish({ id: 'A-1001', total: 128 }) // 返回时，三个 listener 都已执行完"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[邮件] 发送收据给订单 A-1001\n[积分] 增加 12 分\n[统计] 记录一笔收入 128'
+              },
+              {
+                type: 'paragraph',
+                text: '三个 listener 收到的是同一个对象。如果某个 listener 修改了 event.value，后面的 listener 会看到修改后的数据，所以 listener 应只读不改。'
+              }
+            ]
+          },
+          {
+            id: 'sync-error',
+            heading: '同步 listener 出错：其他 listener 照常执行',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst saved = createEventChannel<string>()\nsaved.subscribe(() => {\n  throw new Error('写缓存失败')\n})\nsaved.subscribe((event) => console.log('第二个 listener 照常执行:', event.value))\n\ntry {\n  saved.publish('doc-7')\n} catch (error) {\n  const failure = error as AggregateError & { code: string }\n  console.log(failure.code)\n  console.log(failure.errors.map((item: Error) => item.message))\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "第二个 listener 照常执行: doc-7\nPUBLISH_FAILED\n[ '写缓存失败' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'publish() 抛出的是 AggregateError，code 为 PUBLISH_FAILED；errors 数组按订阅顺序列出每个原始错误，cause 是第一个原始错误。publish() 后面还有必须执行的代码时，用 try/catch 包住它。'
+              }
+            ]
+          },
+          {
+            id: 'async-error',
+            heading: '异步 listener 出错：交给 report',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'publish() 会调用 async listener，但不等待它返回的 Promise。Promise 被拒绝时 publish() 早已返回，错误只能交给创建 channel 时配置的 report。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst uploaded = createEventChannel<string>({\n  report: ({ event, error }) => console.log('异步 listener 失败:', event.value, (error as Error).message)\n})\n\nuploaded.subscribe(async () => {\n  await new Promise((resolve) => setTimeout(resolve, 10))\n  throw new Error('生成缩略图失败')\n})\n\nuploaded.publish('photo.png') // 立即返回，不等待异步 listener"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// publish() 立即返回；约 10 毫秒后 listener 失败，交给 report：\n异步 listener 失败: photo.png 生成缩略图失败'
+              },
+              {
+                type: 'paragraph',
+                text: '没有配置 report 时，错误交给运行环境的全局错误报告（浏览器控制台或 Node.js 错误输出），code 为 UNHANDLED_LISTENER_FAILURE，原始错误在 cause 里。它不会被悄悄吞掉，但业务代码也捕获不到；生产环境请用 report 接入监控。需要等待异步 listener 时，不要用 publish()，改用 invokeParallel 或 invokeSerial。'
+              }
+            ]
+          },
+          {
+            id: 'reentrant',
+            heading: 'listener 里再次 publish',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "默认 dispatchPolicy: 'recursive'，在 listener 里再次 publish 的事件会立即交付给所有 listener，然后才回到原来的发布，所以后面的 listener 会先收到新事件、再收到旧事件。设置 dispatchPolicy: 'queued'，新事件排在当前发布之后，每个 listener 都按发布顺序收到。"
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\n// 默认 recursive：listener 里再次 publish 的事件立即交付\nconst recursive = createEventChannel<number>()\nrecursive.subscribe((event) => {\n  console.log('A 收到', event.value)\n  if (event.value === 1) recursive.publish(2)\n})\nrecursive.subscribe((event) => console.log('B 收到', event.value))\nrecursive.publish(1)\n\n// queued：等当前发布的所有 listener 执行完，再交付新事件\nconst queued = createEventChannel<number>({ dispatchPolicy: 'queued' })\nqueued.subscribe((event) => {\n  console.log('A 收到', event.value)\n  if (event.value === 1) queued.publish(2)\n})\nqueued.subscribe((event) => console.log('B 收到', event.value))\nqueued.publish(1)"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// recursive（默认）\nA 收到 1\nA 收到 2\nB 收到 2\nB 收到 1\n// queued\nA 收到 1\nB 收到 1\nA 收到 2\nB 收到 2'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '等待 listener 的结果',
+          path: 'async-invocation'
+        },
+        {
+          label: '排错',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'createEventChannel API',
+          path: 'docs/event-subscriber/createEventChannel'
+        }
+      ]
+    },
+    en: {
+      title: 'Publishing and errors',
+      lede: 'publish() calls each listener synchronously; synchronous errors are thrown together after all run, asynchronous errors go to report.',
+      document: {
+        sections: [
+          {
+            id: 'order',
+            heading: 'One publish calls every listener in order',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\ntype IOrder = { id: string; total: number }\nconst orderPaid = createEventChannel<IOrder>()\n\n// Three modules that do not know each other subscribe to the same event\norderPaid.subscribe((event) => console.log('[email] receipt for order', event.value.id))\norderPaid.subscribe((event) => console.log('[points] add', Math.floor(event.value.total / 10)))\norderPaid.subscribe((event) => console.log('[stats] revenue', event.value.total))\n\norderPaid.publish({ id: 'A-1001', total: 128 }) // all three listeners have run when this returns"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '[email] receipt for order A-1001\n[points] add 12\n[stats] revenue 128'
+              },
+              {
+                type: 'paragraph',
+                text: 'All three listeners receive the same object. If one modifies event.value, later listeners see the change, so listeners should only read it.'
+              }
+            ]
+          },
+          {
+            id: 'sync-error',
+            heading: 'A synchronous listener throws: the others still run',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst saved = createEventChannel<string>()\nsaved.subscribe(() => {\n  throw new Error('cache write failed')\n})\nsaved.subscribe((event) => console.log('second listener still runs:', event.value))\n\ntry {\n  saved.publish('doc-7')\n} catch (error) {\n  const failure = error as AggregateError & { code: string }\n  console.log(failure.code)\n  console.log(failure.errors.map((item: Error) => item.message))\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "second listener still runs: doc-7\nPUBLISH_FAILED\n[ 'cache write failed' ]"
+              },
+              {
+                type: 'paragraph',
+                text: 'publish() throws an AggregateError whose code is PUBLISH_FAILED; errors lists every original error in subscription order and cause is the first one. Wrap publish() in try/catch when code after it must still run.'
+              }
+            ]
+          },
+          {
+            id: 'async-error',
+            heading: 'An asynchronous listener fails: report receives it',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'publish() calls async listeners but does not wait for their Promises. By the time one rejects, publish() has returned, so the error can only go to the report callback configured on the channel.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst uploaded = createEventChannel<string>({\n  report: ({ event, error }) => console.log('async listener failed:', event.value, (error as Error).message)\n})\n\nuploaded.subscribe(async () => {\n  await new Promise((resolve) => setTimeout(resolve, 10))\n  throw new Error('thumbnail generation failed')\n})\n\nuploaded.publish('photo.png') // returns at once without waiting for the async listener"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// publish() returns at once; about 10 ms later the listener fails and report receives it:\nasync listener failed: photo.png thumbnail generation failed'
+              },
+              {
+                type: 'paragraph',
+                text: 'Without report the error goes to the runtime global error reporting (browser console or Node.js stderr) with code UNHANDLED_LISTENER_FAILURE and the original error in cause. It is not swallowed, but your code cannot catch it either; connect report to monitoring in production. To wait for async listeners, use invokeParallel or invokeSerial instead of publish().'
+              }
+            ]
+          },
+          {
+            id: 'reentrant',
+            heading: 'Publishing from inside a listener',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "With the default dispatchPolicy: 'recursive', an event published inside a listener reaches every listener immediately before the original publish continues, so later listeners see the new event before the old one. With dispatchPolicy: 'queued' the new event waits until the current publish ends, and every listener sees events in publish order."
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\n// Default recursive: an event published inside a listener is delivered immediately\nconst recursive = createEventChannel<number>()\nrecursive.subscribe((event) => {\n  console.log('A got', event.value)\n  if (event.value === 1) recursive.publish(2)\n})\nrecursive.subscribe((event) => console.log('B got', event.value))\nrecursive.publish(1)\n\n// queued: the new event waits until every listener of the current publish has run\nconst queued = createEventChannel<number>({ dispatchPolicy: 'queued' })\nqueued.subscribe((event) => {\n  console.log('A got', event.value)\n  if (event.value === 1) queued.publish(2)\n})\nqueued.subscribe((event) => console.log('B got', event.value))\nqueued.publish(1)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// recursive (default)\nA got 1\nA got 2\nB got 2\nB got 1\n// queued\nA got 1\nB got 1\nA got 2\nB got 2'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Waiting for listener results',
+          path: 'async-invocation'
+        },
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'createEventChannel API',
+          path: 'docs/event-subscriber/createEventChannel'
+        }
       ]
     }
   },
   'event-subscriber:async-invocation': {
     zh: {
-      title: '显式选择异步 listener 的顺序与失败结果',
-      lede: '并行/串行决定启动顺序，throwing/settled 决定失败形状；两者是独立选择，不能由 Promise 偶然决定。',
+      title: '等待 listener 的结果',
+      lede: 'publish() 只负责通知；需要等待异步 listener、收集返回值或只交给某一个处理者时，用 invoke* 函数。',
       document: {
         sections: [
           {
-            id: 'matrix',
-            heading: '用两条轴选择 API',
+            id: 'functions',
+            heading: '六个函数怎么选',
             blocks: [
               {
                 type: 'table',
-                headers: ['API', '启动顺序', '失败结果'],
+                headers: ['函数', '执行方式', '有 listener 失败时', '返回'],
                 rows: [
                   [
-                    'invokeParallel',
-                    '同时启动全部 snapshot listener',
-                    '全部结束后，任一失败则抛 AggregateError'
+                    'invokeParallel(channel, value)',
+                    '同时启动所有 listener',
+                    '等全部结束后拒绝，code 为 PUBLISH_FAILED',
+                    '返回值数组'
                   ],
-                  ['invokeParallelSettled', '同时启动', '逐项返回 fulfilled / rejected'],
-                  ['invokeSerial', '上一项 settled 后再启动下一项', '全部执行后，失败聚合抛出'],
-                  ['invokeSerialSettled', '严格串行', '逐项返回 settled 结果'],
                   [
-                    'invokeTask / invokeTaskSettled',
-                    '按 taskId 精确选择一个',
-                    '未找到或不唯一同步失败；执行结果按 variant 返回'
-                  ]
+                    'invokeParallelSettled(channel, value)',
+                    '同时启动所有 listener',
+                    '不拒绝',
+                    '结果对象数组'
+                  ],
+                  [
+                    'invokeSerial(channel, value)',
+                    '前一个完成后才启动下一个',
+                    '全部执行完后拒绝，code 为 PUBLISH_FAILED',
+                    '返回值数组'
+                  ],
+                  [
+                    'invokeSerialSettled(channel, value)',
+                    '前一个完成后才启动下一个',
+                    '不拒绝',
+                    '结果对象数组'
+                  ],
+                  [
+                    'invokeTask(channel, taskId, value)',
+                    '只调用 taskId 匹配的那一个 listener',
+                    '拒绝，code 为 PUBLISH_FAILED',
+                    '该 listener 的返回值'
+                  ],
+                  ['invokeTaskSettled(channel, taskId, value)', '同上', '不拒绝', '一个结果对象']
                 ]
               },
               {
-                type: 'code',
-                language: 'ts',
-                code: "import {\n  EventSubscriberState,\n  createEventChannel,\n  invokeParallelSettled\n} from '@migaia/event-subscriber'\n\nconst jobs = createEventChannel<IJob, Promise<IReceipt>>()\njobs.subscribe(({ value }) => persistJob(value))\njobs.subscribe(({ value }) => indexJob(value))\n\nconst results = await invokeParallelSettled(jobs, job)\nfor (const result of results) {\n  if (result.status === EventSubscriberState.rejected) {\n    reportJobFailure(result.reason)\n  }\n}"
+                type: 'paragraph',
+                text: "channel 是 createEventChannel() 创建的 channel，或它的 filterTaskId(taskId) 视图；value 是发布的数据。数组按订阅顺序排列，不按完成先后。结果对象的形状和 Promise.allSettled 相同：{ status: 'fulfilled', value } 或 { status: 'rejected', reason }；判断 status 时用 EventSubscriberState.fulfilled 和 EventSubscriberState.rejected 常量。"
               }
             ]
           },
           {
-            id: 'snapshot',
-            heading: '异步等待开始前就封闭目标集合',
+            id: 'collect',
+            heading: '收集所有 listener 的返回值',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  '所有 invoke* 先拍摄不可变订阅快照，再开始任何 await。',
-                  'serial 约束 listener 启动顺序，不代表遇到首错就跳过后续 listener。',
-                  'settled 适合逐项补偿或展示；throwing 适合把整轮分发视为一个失败边界。',
-                  'task variant 要求 taskId 恰好匹配一个订阅，不能把重复注册当作广播。'
-                ]
+                type: 'paragraph',
+                text: 'createEventChannel 的第二个类型参数声明 listener 的返回值类型。只要有一个 listener 失败，invokeParallel 就会被拒绝；希望部分失败也拿到其他结果时，用 invokeParallelSettled。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel, invokeParallel, invokeParallelSettled } from '@migaia/event-subscriber'\n\n// 第二个类型参数是 listener 的返回值类型\nconst validate = createEventChannel<string, boolean>()\nvalidate.subscribe(async (event) => event.value.length >= 3)\nvalidate.subscribe(async (event) => /^[a-z]+$/.test(event.value))\n\nconsole.log(await invokeParallel(validate, 'ada'))\nconsole.log(await invokeParallel(validate, 'A1'))\n\nvalidate.subscribe(async () => {\n  throw new Error('校验服务不可用')\n})\nconst settled = await invokeParallelSettled(validate, 'ada')\nconsole.log(settled.map((result) => result.status))"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "[ true, true ]\n[ false, false ]\n[ 'fulfilled', 'fulfilled', 'rejected' ]"
+              }
+            ]
+          },
+          {
+            id: 'serial',
+            heading: '按顺序执行异步 listener',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel, invokeParallel, invokeSerial } from '@migaia/event-subscriber'\n\nconst sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))\nconst shutdown = createEventChannel<string>()\n\nshutdown.subscribe(async () => {\n  console.log('开始保存草稿')\n  await sleep(20)\n  console.log('草稿已保存')\n})\nshutdown.subscribe(async () => {\n  console.log('开始关闭连接')\n  await sleep(5)\n  console.log('连接已关闭')\n})\n\nawait invokeSerial(shutdown, 'bye') // 一个结束后才开始下一个\nawait invokeParallel(shutdown, 'bye') // 同时开始"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// invokeSerial\n开始保存草稿\n草稿已保存\n开始关闭连接\n连接已关闭\n// invokeParallel\n开始保存草稿\n开始关闭连接\n连接已关闭\n草稿已保存'
+              },
+              {
+                type: 'paragraph',
+                text: 'invokeSerial 是“一个接一个执行”，不是“把上一个的返回值传给下一个”：每个 listener 收到的都是同一个 value。前一个失败时它仍会执行后面的 listener，最后统一拒绝。需要逐步加工数据或“失败就停”，请用 middleware-pipeline。'
+              }
+            ]
+          },
+          {
+            id: 'task',
+            heading: '把一件事交给指定的处理者',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '订阅时用 { taskId } 给处理者起名字，invokeTask 按名字只调用那一个。没有匹配时同步抛出 TASK_NOT_FOUND，有多个匹配时抛出 TASK_NOT_UNIQUE，都在调用任何 listener 之前检查。多个订阅本来就该共用名字时，用 invokeParallel(channel.filterTaskId(taskId), value)。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel, invokeTask } from '@migaia/event-subscriber'\n\nconst exporters = createEventChannel<string[], string>()\nexporters.subscribe((event) => event.value.join(','), { taskId: 'csv' })\nexporters.subscribe((event) => JSON.stringify(event.value), { taskId: 'json' })\n\nconsole.log(await invokeTask(exporters, 'csv', ['a', 'b']))\nconsole.log(await invokeTask(exporters, 'json', ['a', 'b']))\n\ntry {\n  await invokeTask(exporters, 'xml', ['a'])\n} catch (error) {\n  console.log((error as { code: string }).code)\n}"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'a,b\n["a","b"]\nTASK_NOT_FOUND'
+              }
+            ]
+          },
+          {
+            id: 'object',
+            heading: '用一个类的实例做 listener',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'subscribeSubscriber(channel, 对象) 订阅一个带有 handle(event) 方法的对象，handle 里的 this 指向这个对象。直接写 channel.subscribe(counter.handle) 会丢失 this。它从子路径 @migaia/event-subscriber/subscriber 导入。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nclass UnreadCounter {\n  count = 0\n  handle(event: { readonly value: number }) {\n    this.count += event.value // this 指向 counter 实例\n  }\n}\n\nconst newMessages = createEventChannel<number>()\nconst counter = new UnreadCounter()\nsubscribeSubscriber(newMessages, counter)\n\nnewMessages.publish(2)\nnewMessages.publish(3)\nconsole.log('未读:', counter.count)"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '未读: 5'
               }
             ]
           }
@@ -22203,67 +25043,457 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'invokeParallelSettled API',
-          path: 'docs/event-subscriber/invokeParallelSettled'
+          label: '用 Hub 管理多种事件',
+          path: 'hub'
         },
-        { label: 'invokeSerial API', path: 'docs/event-subscriber/invokeSerial' },
-        { label: '订阅生命周期', path: 'subscriptions' }
+        {
+          label: '排错',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'invokeParallel API',
+          path: 'docs/event-subscriber/invokeParallel'
+        }
       ]
     },
     en: {
-      title: 'Choose async listener ordering and failure shape explicitly',
-      lede: 'Parallel versus serial controls start order; throwing versus settled controls the result shape. These are independent choices, not accidental Promise behavior.',
+      title: 'Waiting for listener results',
+      lede: 'publish() only notifies; use the invoke* functions to wait for async listeners, collect results, or hand work to one handler.',
       document: {
         sections: [
           {
-            id: 'matrix',
-            heading: 'Choose an API on two axes',
+            id: 'functions',
+            heading: 'Choosing among six functions',
             blocks: [
               {
                 type: 'table',
-                headers: ['API', 'Start order', 'Failure result'],
+                headers: ['Function', 'Execution', 'When a listener fails', 'Returns'],
                 rows: [
                   [
-                    'invokeParallel',
-                    'Starts every snapshot listener together',
-                    'After all settle, any failure throws an AggregateError'
+                    'invokeParallel(channel, value)',
+                    'start all at once',
+                    'rejects after all finish, code PUBLISH_FAILED',
+                    'array of results'
                   ],
                   [
-                    'invokeParallelSettled',
-                    'Starts together',
-                    'Returns fulfilled / rejected per listener'
+                    'invokeParallelSettled(channel, value)',
+                    'start all at once',
+                    'never rejects',
+                    'array of result objects'
                   ],
                   [
-                    'invokeSerial',
-                    'Starts the next only after the previous settles',
-                    'Runs all, then aggregates failures'
+                    'invokeSerial(channel, value)',
+                    'one after another',
+                    'rejects after all ran, code PUBLISH_FAILED',
+                    'array of results'
                   ],
-                  ['invokeSerialSettled', 'Strictly serial', 'Returns each settled result'],
                   [
-                    'invokeTask / invokeTaskSettled',
-                    'Selects exactly one taskId',
-                    'Missing or duplicate selection throws synchronously; execution follows the chosen variant'
+                    'invokeSerialSettled(channel, value)',
+                    'one after another',
+                    'never rejects',
+                    'array of result objects'
+                  ],
+                  [
+                    'invokeTask(channel, taskId, value)',
+                    'only the listener with that taskId',
+                    'rejects, code PUBLISH_FAILED',
+                    'that listener result'
+                  ],
+                  [
+                    'invokeTaskSettled(channel, taskId, value)',
+                    'same',
+                    'never rejects',
+                    'one result object'
                   ]
                 ]
               },
               {
-                type: 'code',
-                language: 'ts',
-                code: "import {\n  EventSubscriberState,\n  createEventChannel,\n  invokeParallelSettled\n} from '@migaia/event-subscriber'\n\nconst jobs = createEventChannel<IJob, Promise<IReceipt>>()\njobs.subscribe(({ value }) => persistJob(value))\njobs.subscribe(({ value }) => indexJob(value))\n\nconst results = await invokeParallelSettled(jobs, job)\nfor (const result of results) {\n  if (result.status === EventSubscriberState.rejected) {\n    reportJobFailure(result.reason)\n  }\n}"
+                type: 'paragraph',
+                text: "channel is a channel created by createEventChannel() or its filterTaskId(taskId) view; value is the published data. Arrays follow subscription order, not completion order. Result objects match Promise.allSettled: { status: 'fulfilled', value } or { status: 'rejected', reason }; compare status against the EventSubscriberState.fulfilled and EventSubscriberState.rejected constants."
               }
             ]
           },
           {
-            id: 'snapshot',
-            heading: 'Close the target set before asynchronous waiting begins',
+            id: 'collect',
+            heading: 'Collect every listener result',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'The second createEventChannel type argument declares the listener return type. invokeParallel rejects if any listener fails; use invokeParallelSettled to keep the other results.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel, invokeParallel, invokeParallelSettled } from '@migaia/event-subscriber'\n\n// The second type argument is the listener return type\nconst validate = createEventChannel<string, boolean>()\nvalidate.subscribe(async (event) => event.value.length >= 3)\nvalidate.subscribe(async (event) => /^[a-z]+$/.test(event.value))\n\nconsole.log(await invokeParallel(validate, 'ada'))\nconsole.log(await invokeParallel(validate, 'A1'))\n\nvalidate.subscribe(async () => {\n  throw new Error('validation service unavailable')\n})\nconst settled = await invokeParallelSettled(validate, 'ada')\nconsole.log(settled.map((result) => result.status))"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: "[ true, true ]\n[ false, false ]\n[ 'fulfilled', 'fulfilled', 'rejected' ]"
+              }
+            ]
+          },
+          {
+            id: 'serial',
+            heading: 'Run async listeners in order',
+            blocks: [
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel, invokeParallel, invokeSerial } from '@migaia/event-subscriber'\n\nconst sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))\nconst shutdown = createEventChannel<string>()\n\nshutdown.subscribe(async () => {\n  console.log('saving draft')\n  await sleep(20)\n  console.log('draft saved')\n})\nshutdown.subscribe(async () => {\n  console.log('closing connection')\n  await sleep(5)\n  console.log('connection closed')\n})\n\nawait invokeSerial(shutdown, 'bye') // the next starts after the previous finishes\nawait invokeParallel(shutdown, 'bye') // all start at once"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '// invokeSerial\nsaving draft\ndraft saved\nclosing connection\nconnection closed\n// invokeParallel\nsaving draft\nclosing connection\nconnection closed\ndraft saved'
+              },
+              {
+                type: 'paragraph',
+                text: 'invokeSerial runs listeners one after another; it does not pass one result to the next, and every listener receives the same value. A failure does not stop later listeners; it rejects at the end. To transform data step by step or stop on failure, use middleware-pipeline.'
+              }
+            ]
+          },
+          {
+            id: 'task',
+            heading: 'Hand work to one named handler',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Name a handler with { taskId } when subscribing, and invokeTask calls only that one. No match throws TASK_NOT_FOUND synchronously and several matches throw TASK_NOT_UNIQUE, both before any listener runs. When several subscriptions should share a name, use invokeParallel(channel.filterTaskId(taskId), value).'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel, invokeTask } from '@migaia/event-subscriber'\n\nconst exporters = createEventChannel<string[], string>()\nexporters.subscribe((event) => event.value.join(','), { taskId: 'csv' })\nexporters.subscribe((event) => JSON.stringify(event.value), { taskId: 'json' })\n\nconsole.log(await invokeTask(exporters, 'csv', ['a', 'b']))\nconsole.log(await invokeTask(exporters, 'json', ['a', 'b']))\n\ntry {\n  await invokeTask(exporters, 'xml', ['a'])\n} catch (error) {\n  console.log((error as { code: string }).code)\n}"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'a,b\n["a","b"]\nTASK_NOT_FOUND'
+              }
+            ]
+          },
+          {
+            id: 'object',
+            heading: 'Use a class instance as a listener',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'subscribeSubscriber(channel, object) subscribes an object with a handle(event) method and keeps this bound to the object; channel.subscribe(counter.handle) would lose this. Import it from the @migaia/event-subscriber/subscriber subpath.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nclass UnreadCounter {\n  count = 0\n  handle(event: { readonly value: number }) {\n    this.count += event.value // this is the counter instance\n  }\n}\n\nconst newMessages = createEventChannel<number>()\nconst counter = new UnreadCounter()\nsubscribeSubscriber(newMessages, counter)\n\nnewMessages.publish(2)\nnewMessages.publish(3)\nconsole.log('unread:', counter.count)"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'unread: 5'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Manage several events with a Hub',
+          path: 'hub'
+        },
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'invokeParallel API',
+          path: 'docs/event-subscriber/invokeParallel'
+        }
+      ]
+    }
+  },
+  'event-subscriber:hub': {
+    zh: {
+      title: '用 Hub 管理多种事件',
+      lede: 'Hub 把多种事件放在一个对象里，用事件名区分，并按一个类型检查每次订阅和发布。',
+      document: {
+        sections: [
+          {
+            id: 'example',
+            heading: '例子',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '先用一个类型描述“有哪些事件、每种事件携带什么数据”：键是事件名，值是数据类型。事件名拼错或数据缺少字段，TypeScript 都会报错。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventHub } from '@migaia/event-subscriber'\n\ntype IAppEvents = {\n  login: { user: string }\n  logout: { user: string; reason: 'manual' | 'expired' }\n}\n\nconst events = createEventHub<IAppEvents>()\n\nevents.subscribe('login', (event) => console.log('欢迎回来,', event.value.user))\nevents.subscribe('logout', (event) => console.log(event.value.user, '已退出:', event.value.reason))\n\nevents.publish('login', { user: 'ada' })\nevents.publish('logout', { user: 'ada', reason: 'expired' })\n// events.publish('logout', { user: 'ada' }) // 类型错误：缺少 reason"
+              },
+              {
+                type: 'paragraph',
+                text: '输出：'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: '欢迎回来, ada\nada 已退出: expired'
+              }
+            ]
+          },
+          {
+            id: 'methods',
+            heading: 'Hub 的方法',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['方法', '作用'],
+                rows: [
+                  [
+                    'hub.subscribe(key, listener)',
+                    '订阅名为 key 的事件；返回退订句柄，可继续 .subscribe(otherKey, listener) 串联，一次退订全部'
+                  ],
+                  ['hub.publish(key, value)', '发布名为 key 的事件；还没有订阅者时什么都不做'],
+                  ['hub.clear(key?)', '传 key 只移除这种事件的订阅，不传移除全部'],
+                  ['hub.size(key?)', '传 key 返回这种事件的订阅数，不传返回总数']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'createEventHub 支持 report、terminalReport、style、valueConfig 选项，含义与 channel 相同；report 收到的对象多一个 key 字段，告诉你是哪种事件出的错。'
+              }
+            ]
+          },
+          {
+            id: 'choose',
+            heading: 'Hub 和 channel 怎么选',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Hub 内部为每个事件名维护一个 channel，订阅、发布、错误处理和名单固定的行为都相同，区别只在组织方式：分散在不同模块的独立事件，各自导出 channel 更清晰；一组相关事件（例如应用级事件），用一个 Hub 集中定义类型。Hub 的 listener 不能返回结果，也不能配合 invoke* 函数；需要收集结果的事件，单独用 createEventChannel<T, R>()。'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: '排错',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'createEventHub API',
+          path: 'docs/event-subscriber/createEventHub'
+        },
+        {
+          label: '快速开始',
+          path: 'getting-started'
+        }
+      ]
+    },
+    en: {
+      title: 'Manage several events with a Hub',
+      lede: 'A Hub keeps several events in one object, keyed by event name, and type-checks every subscribe and publish against one map.',
+      document: {
+        sections: [
+          {
+            id: 'example',
+            heading: 'Example',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Describe the events in one type: keys are event names, values are the data types. A misspelled name or a missing field is a TypeScript error.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createEventHub } from '@migaia/event-subscriber'\n\ntype IAppEvents = {\n  login: { user: string }\n  logout: { user: string; reason: 'manual' | 'expired' }\n}\n\nconst events = createEventHub<IAppEvents>()\n\nevents.subscribe('login', (event) => console.log('welcome back,', event.value.user))\nevents.subscribe('logout', (event) => console.log(event.value.user, 'signed out:', event.value.reason))\n\nevents.publish('login', { user: 'ada' })\nevents.publish('logout', { user: 'ada', reason: 'expired' })\n// events.publish('logout', { user: 'ada' }) // type error: reason is missing"
+              },
+              {
+                type: 'paragraph',
+                text: 'Output:'
+              },
+              {
+                type: 'code',
+                language: 'text',
+                code: 'welcome back, ada\nada signed out: expired'
+              }
+            ]
+          },
+          {
+            id: 'methods',
+            heading: 'Hub methods',
+            blocks: [
+              {
+                type: 'table',
+                headers: ['Method', 'Purpose'],
+                rows: [
+                  [
+                    'hub.subscribe(key, listener)',
+                    'Subscribes to key; returns an unsubscribe handle that can chain .subscribe(otherKey, listener) and removes all at once'
+                  ],
+                  [
+                    'hub.publish(key, value)',
+                    'Publishes key; does nothing when nobody subscribed yet'
+                  ],
+                  ['hub.clear(key?)', 'Removes subscriptions of key, or all without key'],
+                  ['hub.size(key?)', 'Count for key, or the total without key']
+                ]
+              },
+              {
+                type: 'paragraph',
+                text: 'createEventHub accepts report, terminalReport, style, and valueConfig with the same meaning as for a channel; report also receives key, the event name that failed.'
+              }
+            ]
+          },
+          {
+            id: 'choose',
+            heading: 'Hub or channel',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'A Hub keeps one channel per event name, so subscribing, publishing, error handling, and list fixing behave the same; only organization differs. Independent events owned by different modules read better as exported channels; a related group such as application events fits one Hub. Hub listeners cannot return results or be used with invoke*; give an event that needs results its own createEventChannel<T, R>().'
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Troubleshooting',
+          path: 'troubleshooting'
+        },
+        {
+          label: 'createEventHub API',
+          path: 'docs/event-subscriber/createEventHub'
+        },
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        }
+      ]
+    }
+  },
+  'event-subscriber:troubleshooting': {
+    zh: {
+      title: '排错与常见问题',
+      lede: '按现象查找原因和解决办法。',
+      document: {
+        sections: [
+          {
+            id: 'not-called',
+            heading: 'listener 没有被调用',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  'Every invoke* captures an immutable subscription snapshot before the first await.',
-                  'Serial controls listener start order; it does not skip later listeners after the first rejection.',
-                  'Use settled for per-listener compensation or display, and throwing when the whole dispatch is one failure boundary.',
-                  'A task variant requires exactly one taskId match; duplicate registration is not treated as broadcast.'
+                  '发布方和订阅方是不是同一个 channel？每次调用 createEventChannel() 都会创建新的独立 channel，请从一个模块导出、双方导入。',
+                  '订阅是不是发生在发布之后？channel 不保存过去的事件。',
+                  '订阅是不是已经结束？检查退订函数、subscribeUntil 的 signal、subscribeOnce 是否已执行过。用 channel.size 查看当前订阅数。',
+                  '是不是在这次发布过程中才订阅的？新订阅从下一次发布起生效。'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'async',
+            heading: 'publish() 之后异步 listener 还没执行完 / 错误不见了',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'publish() 只启动 listener，不等待它们的 Promise。要等待，用 await invokeParallel(channel, value) 或 invokeSerial。publish() 返回之后才发生的错误交给 report；没配置时出现在控制台，code 为 UNHANDLED_LISTENER_FAILURE，原始错误在 cause 里。'
+              }
+            ]
+          },
+          {
+            id: 'publish-failed',
+            heading: 'publish() 抛出 PUBLISH_FAILED',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '至少一个同步 listener 抛出了错误，其他 listener 都已执行过，从 error.errors 查看每个原始错误。如果 error.errors 为空，说明超过了 publishBudget：listener 里又发布了同一个事件，形成无限循环。'
+              }
+            ]
+          },
+          {
+            id: 'order',
+            heading: 'listener 里再次 publish，顺序乱了',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "默认新事件立即交付，后面的 listener 会先收到新事件再收到旧事件；如果它负责“显示最新值”，最后显示的会是旧值。创建 channel 时设置 dispatchPolicy: 'queued'。例子见“发布与错误”。"
+              }
+            ]
+          },
+          {
+            id: 'task',
+            heading: 'invokeTask 抛出 TASK_NOT_FOUND 或 TASK_NOT_UNIQUE',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'invokeTask 要求恰好一个订阅使用这个 taskId。NOT_FOUND：检查 taskId 拼写，以及订阅是否已结束。NOT_UNIQUE：通常是订阅代码执行了两次（例如组件挂载两次）；如果本来就该共用名字，改用 invokeParallel(channel.filterTaskId(taskId), value)。'
+              }
+            ]
+          },
+          {
+            id: 'twice',
+            heading: '同一个 listener 被调用了两次',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "同一个函数订阅了两次，默认每次订阅都独立。修复重复订阅的地方；难以避免时设置 admissionPolicy: 'unique'。"
+              }
+            ]
+          },
+          {
+            id: 'invalid-channel',
+            heading: 'invoke* 抛出 INVALID_CHANNEL',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'invoke* 只接受 createEventChannel() 创建的 channel 或它的 filterTaskId() 视图。传入自己写的对象、Hub，或另一份重复安装的 @migaia/event-subscriber 创建的 channel 都会报这个错；后一种情况用 pnpm dedupe 去重。'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: '这个包的错误代码',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "包抛出的错误带有 error.source（'@migaia/event-subscriber'）和 error.code，错误本身仍是原生类型：参数错误是 TypeError，多个错误的聚合是 AggregateError。请用 EventSubscriberErrorCode 常量比较。"
+              },
+              {
+                type: 'table',
+                headers: ['error.code', '什么时候出现'],
+                rows: [
+                  [
+                    'PUBLISH_FAILED',
+                    '有 listener 失败（publish() 的同步失败或 invoke* 的任何失败），或超过 publishBudget'
+                  ],
+                  ['UNHANDLED_LISTENER_FAILURE', '异步 listener 失败但没有配置 report'],
+                  ['INVALID_LISTENER', '传给 subscribe 的不是函数'],
+                  ['INVALID_OPTIONS', 'channel 或 Hub 的选项不合法'],
+                  ['INVALID_CHANNEL', '传给 invoke* 的不是本包创建的 channel'],
+                  ['TASK_NOT_FOUND / TASK_NOT_UNIQUE', 'invokeTask 找不到或找到多个 taskId'],
+                  ['ABORTED', '设置了 throwOnAborted 时，用已取消的 signal 调用 subscribeUntil'],
+                  ['INVALID_SUBSCRIBER', '传给 subscribeSubscriber 的对象没有 handle 方法']
                 ]
               }
             ]
@@ -22272,11 +25502,153 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          label: 'invokeParallelSettled API',
-          path: 'docs/event-subscriber/invokeParallelSettled'
+          label: '快速开始',
+          path: 'getting-started'
         },
-        { label: 'invokeSerial API', path: 'docs/event-subscriber/invokeSerial' },
-        { label: 'Subscription lifetimes', path: 'subscriptions' }
+        {
+          label: 'EventSubscriberErrorCode',
+          path: 'docs/event-subscriber/EventSubscriberErrorCode'
+        },
+        {
+          label: '发布与错误',
+          path: 'publish-and-errors'
+        }
+      ]
+    },
+    en: {
+      title: 'Troubleshooting and FAQ',
+      lede: 'Find the cause and the fix by symptom.',
+      document: {
+        sections: [
+          {
+            id: 'not-called',
+            heading: 'A listener is not called',
+            blocks: [
+              {
+                type: 'list',
+                items: [
+                  'Do the publisher and subscriber use the same channel? Every createEventChannel() call creates a new independent channel; export it from one module and import it on both sides.',
+                  'Did the subscription happen after the publish? A channel keeps no past events.',
+                  'Has the subscription ended? Check the unsubscribe function, the subscribeUntil signal, and whether subscribeOnce already fired. channel.size shows the current count.',
+                  'Was it added during this publish? New subscriptions apply from the next publish.'
+                ]
+              }
+            ]
+          },
+          {
+            id: 'async',
+            heading: 'Async listeners are still running after publish() / errors disappear',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'publish() starts listeners without waiting for their Promises. To wait, use await invokeParallel(channel, value) or invokeSerial. Errors after publish() returns go to report; without it they appear in the console with code UNHANDLED_LISTENER_FAILURE and the original error in cause.'
+              }
+            ]
+          },
+          {
+            id: 'publish-failed',
+            heading: 'publish() throws PUBLISH_FAILED',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'At least one synchronous listener threw and every other listener already ran; read each original error from error.errors. If error.errors is empty, publishBudget was exceeded: a listener publishes the same event again and loops forever.'
+              }
+            ]
+          },
+          {
+            id: 'order',
+            heading: 'Publishing inside a listener scrambles the order',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "By default the new event is delivered immediately, so later listeners see it before the old one; a listener that shows the latest value ends up showing the old one. Create the channel with dispatchPolicy: 'queued'. See Publishing and errors for an example."
+              }
+            ]
+          },
+          {
+            id: 'task',
+            heading: 'invokeTask throws TASK_NOT_FOUND or TASK_NOT_UNIQUE',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'invokeTask needs exactly one subscription with that taskId. NOT_FOUND: check the spelling and whether the subscription ended. NOT_UNIQUE: usually the subscription code ran twice, for example on a double mount; if the name is meant to be shared, use invokeParallel(channel.filterTaskId(taskId), value).'
+              }
+            ]
+          },
+          {
+            id: 'twice',
+            heading: 'The same listener runs twice',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "The function was subscribed twice and subscriptions are independent by default. Fix the duplicate subscribe, or set admissionPolicy: 'unique' when it cannot be avoided."
+              }
+            ]
+          },
+          {
+            id: 'invalid-channel',
+            heading: 'invoke* throws INVALID_CHANNEL',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'invoke* accepts only channels created by createEventChannel() or their filterTaskId() views. A hand-written object, a Hub, or a channel from a second installed copy of @migaia/event-subscriber all fail; fix a duplicate install with pnpm dedupe.'
+              }
+            ]
+          },
+          {
+            id: 'codes',
+            heading: 'Error codes of this package',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: "Errors thrown by the package carry error.source ('@migaia/event-subscriber') and error.code while keeping their native type: argument errors are TypeError, aggregated failures are AggregateError. Compare against EventSubscriberErrorCode constants."
+              },
+              {
+                type: 'table',
+                headers: ['error.code', 'When it appears'],
+                rows: [
+                  [
+                    'PUBLISH_FAILED',
+                    'A listener failed (synchronously in publish() or at all in invoke*), or publishBudget was exceeded'
+                  ],
+                  [
+                    'UNHANDLED_LISTENER_FAILURE',
+                    'An async listener failed and no report is configured'
+                  ],
+                  ['INVALID_LISTENER', 'subscribe received something that is not a function'],
+                  ['INVALID_OPTIONS', 'Invalid channel or Hub options'],
+                  [
+                    'INVALID_CHANNEL',
+                    'invoke* received something other than a channel from this package'
+                  ],
+                  [
+                    'TASK_NOT_FOUND / TASK_NOT_UNIQUE',
+                    'invokeTask found no or several matching taskIds'
+                  ],
+                  [
+                    'ABORTED',
+                    'subscribeUntil with an already aborted signal while throwOnAborted is set'
+                  ],
+                  ['INVALID_SUBSCRIBER', 'subscribeSubscriber received an object without handle']
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      next: [
+        {
+          label: 'Quick start',
+          path: 'getting-started'
+        },
+        {
+          label: 'EventSubscriberErrorCode',
+          path: 'docs/event-subscriber/EventSubscriberErrorCode'
+        },
+        {
+          label: 'Publishing and errors',
+          path: 'publish-and-errors'
+        }
       ]
     }
   },

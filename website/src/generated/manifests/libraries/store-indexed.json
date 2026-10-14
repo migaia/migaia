@@ -1155,8 +1155,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-indexed/getting-started",
-      "architecturePath": "/en/architecture/store-indexed",
+      "guidePath": "/en/docs/store-indexed/getting-started",
+      "architecturePath": "/en/docs/store-indexed",
       "symbols": [
         {
           "name": "createStoreIndexedError",

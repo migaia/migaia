@@ -14,8 +14,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "CAPABILITY_SOURCE",
@@ -3870,8 +3870,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "CAPABILITY_GRAPH_SOURCE",
@@ -5141,8 +5141,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "collectPlanEdges",
@@ -6758,8 +6758,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "createDynamicCapabilityGraph",
@@ -7874,8 +7874,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/capability/getting-started",
-      "architecturePath": "/en/architecture/capability",
+      "guidePath": "/en/docs/capability/getting-started",
+      "architecturePath": "/en/docs/capability",
       "symbols": [
         {
           "name": "buildCapabilityTopology",
@@ -8859,8 +8859,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/event-subscriber/getting-started",
-      "architecturePath": "/en/architecture/event-subscriber",
+      "guidePath": "/en/docs/event-subscriber/getting-started",
+      "architecturePath": "/en/docs/event-subscriber",
       "symbols": [
         {
           "name": "createEventChannel",
@@ -9129,7 +9129,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+                  "code": "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
                 },
                 {
                   "type": "paragraph",
@@ -9163,6 +9163,10 @@
                 {
                   "type": "paragraph",
                   "text": "`removalPolicy` 决定调用一个订阅句柄时解除多少登记。默认 `handle` 只解除该句柄所属的单次登记；`listener-all` 会同时解除同一 listener 在该 channel 上的全部登记。需要精确管理重复订阅时保持默认值；只有兼容“按函数整体移除”的调用方才选择 `listener-all`。其他值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
                 },
                 {
                   "type": "paragraph",
@@ -9246,7 +9250,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -9290,6 +9294,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -9434,9 +9443,9 @@
               "name": "throwOnAborted",
               "type": "boolean",
               "optional": true,
-              "description": "Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners.",
+              "description": "`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。",
               "descriptionEn": "Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners.",
-              "descriptionZh": ""
+              "descriptionZh": "`throwOnAborted` 默认 `false`：用已经 aborted 的 signal 调用 `subscribeUntil` 时不建立 registration，直接返回空操作的 unsubscribe。设为 `true` 时改为同步抛出 `ABORTED` `TypeError`，适合把“用已取消的 signal 订阅”视为调用方 bug 的场景。非布尔值在构造阶段以 `INVALID_OPTIONS` 拒绝。"
             },
             {
               "name": "style",
@@ -9751,7 +9760,7 @@
           "errors": ["No documented errors are declared for defineEventApiStyle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineEventApiStyle.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
             "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()",
             "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
           ],
@@ -9964,7 +9973,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -10008,6 +10017,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -10075,11 +10089,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -10111,7 +10125,7 @@
           "errors": ["No documented errors are declared for EventAdmissionPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for EventAdmissionPolicy.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "EventAdmissionPolicy",
@@ -10328,7 +10342,7 @@
           "errors": ["No documented errors are declared for EventDispatchPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for EventDispatchPolicy.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "EventDispatchPolicy",
@@ -10454,7 +10468,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -10498,6 +10512,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -10565,11 +10584,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -10680,11 +10699,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -10717,7 +10736,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICanonicalEventChannel.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
             "function invokeParallelSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeParallel<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeSerialSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeSerial<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeTaskSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<IListenerResult<R>>\nfunction invokeTask<T, R>(\n  channel: ICanonicalEventChannel<T, R>,\n  taskId: string,\n  value: T\n): Promise<Awaited<R>>"
@@ -10850,7 +10869,7 @@
           "errors": ["No documented errors are declared for IEventApiStyle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventApiStyle.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "IEventApiStyle",
@@ -10916,7 +10935,7 @@
           "errors": ["No documented errors are declared for IEventApiStyleNames."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventApiStyleNames.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "IEventApiStyleNames",
@@ -11051,7 +11070,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventChannelOptions.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "IEventChannelOptions",
@@ -11713,7 +11732,7 @@
           "errors": ["No documented errors are declared for IEventReport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventReport.",
           "examples": [
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }"
           ],
           "members": [],
           "aliasOf": "IEventReport",
@@ -11838,7 +11857,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -11882,6 +11901,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -11949,11 +11973,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -12324,7 +12348,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -12368,6 +12392,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -12556,7 +12585,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -12600,6 +12629,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -12787,7 +12821,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -12831,6 +12865,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -12949,7 +12988,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -12993,6 +13032,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -13348,8 +13392,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/event-subscriber/getting-started",
-      "architecturePath": "/en/architecture/event-subscriber",
+      "guidePath": "/en/docs/event-subscriber/getting-started",
+      "architecturePath": "/en/docs/event-subscriber",
       "symbols": [
         {
           "name": "IEventAbortSignal",
@@ -13502,7 +13546,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventContext.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
+            "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
             "type IEventContext<T> = {\n  readonly value: T\n  readonly aborted: boolean\n  readonly abortReason: unknown\n  readonly taskId: string | undefined\n  abort(reason?: unknown): void\n  setTaskId(taskId: string | undefined): void\n}",
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }",
             "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
@@ -13702,7 +13746,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -13746,6 +13790,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -13813,11 +13862,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`publishFailed`(`PUBLISH_FAILED`)、"
+                  "text": "全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -14144,7 +14193,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -14188,6 +14237,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -14332,7 +14386,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，16 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
+                  "text": "稳定错误码表，17 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `EVENT_SUBSCRIBER_SOURCE`（值 `'@migaia/event-subscriber'`）。所有包边界错误都携带 `source`/`code` 两个附加字段，不替换原生错误类型（输入校验错误是 `TypeError`，发布聚合错误是 `AggregateError`）；`AggregateError.errors[0]` 与 `cause` 恒为触发失败的原始错误。"
                 },
                 {
                   "type": "table",
@@ -14376,6 +14430,11 @@
                     ],
                     ["`invalidTaskId`", "`INVALID_TASK_ID`", "传入的 `taskId` 为空或不是字符串"],
                     ["`invalidOptions`", "`INVALID_OPTIONS`", "公开 options 对象或字段结构非法"],
+                    [
+                      "`aborted`",
+                      "`ABORTED`",
+                      "设置了 `throwOnAborted: true` 的 channel 用已经 aborted 的 signal 调用 `subscribeUntil`"
+                    ],
                     [
                       "`publishFailed`",
                       "`PUBLISH_FAILED`",
@@ -14466,7 +14525,7 @@
               ]
             }
           ],
-          "usageScore": 134,
+          "usageScore": 144,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--subscribeUntil"
         }
@@ -14486,8 +14545,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "boundedWait",
@@ -19330,8 +19389,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createAbortController",
@@ -19757,8 +19816,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createDisposeTransaction",
@@ -20841,8 +20900,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "containAsyncRejection",
@@ -23493,8 +23552,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createGenerationController",
@@ -23935,8 +23994,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createObjectLeaseRegistry",
@@ -24502,8 +24561,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "addSchedulerTime",
@@ -25131,8 +25190,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/lifecycle/getting-started",
-      "architecturePath": "/en/architecture/lifecycle",
+      "guidePath": "/en/docs/lifecycle/getting-started",
+      "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
           "name": "createLifecycleScope",
@@ -25527,8 +25586,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/logger/getting-started",
-      "architecturePath": "/en/architecture/logger",
+      "guidePath": "/en/docs/logger/getting-started",
+      "architecturePath": "/en/docs/logger",
       "symbols": [
         {
           "name": "getLoggerRuntimeManager",
@@ -28527,8 +28586,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/logger/getting-started",
-      "architecturePath": "/en/architecture/logger",
+      "guidePath": "/en/docs/logger/getting-started",
+      "architecturePath": "/en/docs/logger",
       "symbols": [
         {
           "name": "ANSIS_PLUGIN_NAME",
@@ -31715,8 +31774,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/logger/getting-started",
-      "architecturePath": "/en/architecture/logger",
+      "guidePath": "/en/docs/logger/getting-started",
+      "architecturePath": "/en/docs/logger",
       "symbols": [
         {
           "name": "file",
@@ -32156,8 +32215,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/middleware-pipeline/getting-started",
-      "architecturePath": "/en/architecture/middleware-pipeline",
+      "guidePath": "/en/docs/middleware-pipeline/getting-started",
+      "architecturePath": "/en/docs/middleware-pipeline",
       "symbols": [
         {
           "name": "createPipeline",
@@ -34273,8 +34332,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/plugin-host/getting-started",
-      "architecturePath": "/en/architecture/plugin-host",
+      "guidePath": "/en/docs/plugin-host/getting-started",
+      "architecturePath": "/en/docs/plugin-host",
       "symbols": [
         {
           "name": "asyncDisposeKey",
@@ -44779,8 +44838,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/plugin-host/getting-started",
-      "architecturePath": "/en/architecture/plugin-host",
+      "guidePath": "/en/docs/plugin-host/getting-started",
+      "architecturePath": "/en/docs/plugin-host",
       "symbols": [
         {
           "name": "buildManagedPort",
@@ -45755,8 +45814,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "defaultRuntime",
@@ -46740,8 +46799,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "assertNoForeignOwnershipBrand",
@@ -47338,8 +47397,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "internalsOf",
@@ -47753,8 +47812,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "IInternalRuntime",
@@ -48052,8 +48111,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "mutableDeps",
@@ -48854,8 +48913,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "assertOwnedBy",
@@ -49235,8 +49294,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "Computed",
@@ -50462,8 +50521,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "createObserverBinding",
@@ -54524,8 +54583,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/reactive/getting-started",
-      "architecturePath": "/en/architecture/reactive",
+      "guidePath": "/en/docs/reactive/getting-started",
+      "architecturePath": "/en/docs/reactive",
       "symbols": [
         {
           "name": "createFieldSource",
@@ -54632,8 +54691,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/resource/getting-started",
-      "architecturePath": "/en/architecture/resource",
+      "guidePath": "/en/docs/resource/getting-started",
+      "architecturePath": "/en/docs/resource",
       "symbols": [
         {
           "name": "IResourceCacheSnapshot",
@@ -56225,8 +56284,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-bridge-jsonrpc/getting-started",
-      "architecturePath": "/en/architecture/rpc-bridge-jsonrpc",
+      "guidePath": "/en/docs/rpc-bridge-jsonrpc/getting-started",
+      "architecturePath": "/en/docs/rpc-bridge-jsonrpc",
       "symbols": [
         {
           "name": "createJsonRpcAdapterChannel",
@@ -56827,8 +56886,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createBrowserPeer",
@@ -57786,8 +57845,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createBroadcastChannelTransport",
@@ -57885,8 +57944,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createRtcDataChannelTransport",
@@ -58044,8 +58103,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createServiceWorkerTransport",
@@ -58380,8 +58439,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createSharedWorkerTransport",
@@ -58539,8 +58598,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createWebTransportDatagramTransport",
@@ -58700,8 +58759,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-browser/getting-started",
-      "architecturePath": "/en/architecture/rpc-browser",
+      "guidePath": "/en/docs/rpc-browser/getting-started",
+      "architecturePath": "/en/docs/rpc-browser",
       "symbols": [
         {
           "name": "createWindowMessageTransport",
@@ -59046,8 +59105,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "createDescriptor",
@@ -60458,8 +60517,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "captureRpcBinaryData",
@@ -61547,8 +61606,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [],
       "aliases": [
         {
@@ -61626,8 +61685,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "assertRpcNativeBinaryFrameSize",
@@ -62337,8 +62396,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "prepareRpcBinary",
@@ -62809,8 +62868,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "classifyRpcContractError",
@@ -65173,8 +65232,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "assertRpcPhysicalFrameSize",
@@ -66489,8 +66548,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "createJsonRpcFrameDecoder",
@@ -67197,8 +67256,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "createRpcBootstrapFrameReceiver",
@@ -68155,8 +68214,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "messageFramer",
@@ -68399,8 +68458,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "acceptRpcHandshake",
@@ -69505,8 +69564,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "IRpcPortableBytes",
@@ -69987,8 +70046,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "IRpcByteRuntimeBootstrap",
@@ -72578,8 +72637,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "normalizeRuntimeEnvelope",
@@ -73011,8 +73070,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "createRuntimeCallEnvelope",
@@ -73239,8 +73298,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [],
       "aliases": []
     },
@@ -73257,8 +73316,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "checkRpcRuntimeStreamFinish",
@@ -74697,8 +74756,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "IRpcDiscoveryEnvelope",
@@ -75379,8 +75438,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-contract/getting-started",
-      "architecturePath": "/en/architecture/rpc-contract",
+      "guidePath": "/en/docs/rpc-contract/getting-started",
+      "architecturePath": "/en/docs/rpc-contract",
       "symbols": [
         {
           "name": "IRpcApplicationPayload",
@@ -77538,8 +77597,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "abort",
@@ -86503,8 +86562,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "defineByteAdapter",
@@ -87131,8 +87190,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createMemoryTransportPair",
@@ -87297,8 +87356,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createBrowserMessagePortTransport",
@@ -87688,8 +87747,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createWebWorkerTransport",
@@ -88030,8 +88089,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createClientEndpoint",
@@ -88113,8 +88172,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createComposedEndpoint",
@@ -88444,8 +88503,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createControlFeature",
@@ -88589,8 +88648,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createDiscoveryFeature",
@@ -88734,8 +88793,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createOneWayFeature",
@@ -88942,8 +89001,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createOutboundFeature",
@@ -89087,8 +89146,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createProviderAdmissionScope",
@@ -89426,8 +89485,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createFullEndpoint",
@@ -89570,8 +89629,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "IIpcBacklogEvent",
@@ -90219,8 +90278,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createIpcLogFeature",
@@ -90317,8 +90376,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createIpcSendQueueFeature",
@@ -90500,8 +90559,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "defineProbe",
@@ -92296,8 +92355,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createProviderEndpoint",
@@ -92377,8 +92436,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createCoroutinePlugin",
@@ -98788,8 +98847,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createCanonicalChunkFeature",
@@ -99191,8 +99250,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "createPeerPair",
@@ -99379,8 +99438,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "IRpcCandidateStatus",
@@ -100217,8 +100276,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-core/getting-started",
-      "architecturePath": "/en/architecture/rpc-core",
+      "guidePath": "/en/docs/rpc-core/getting-started",
+      "architecturePath": "/en/docs/rpc-core",
       "symbols": [
         {
           "name": "collectListenerCleanupFailures",
@@ -101522,8 +101581,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-devtools/getting-started",
-      "architecturePath": "/en/architecture/rpc-devtools",
+      "guidePath": "/en/docs/rpc-devtools/getting-started",
+      "architecturePath": "/en/docs/rpc-devtools",
       "symbols": [
         {
           "name": "createRpcDevtools",
@@ -101783,8 +101842,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-devtools/getting-started",
-      "architecturePath": "/en/architecture/rpc-devtools",
+      "guidePath": "/en/docs/rpc-devtools/getting-started",
+      "architecturePath": "/en/docs/rpc-devtools",
       "symbols": [
         {
           "name": "decodeRpcDevtoolsRecord",
@@ -103009,8 +103068,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-devtools/getting-started",
-      "architecturePath": "/en/architecture/rpc-devtools",
+      "guidePath": "/en/docs/rpc-devtools/getting-started",
+      "architecturePath": "/en/docs/rpc-devtools",
       "symbols": [
         {
           "name": "createRpcDevtoolsHub",
@@ -103552,8 +103611,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-devtools/getting-started",
-      "architecturePath": "/en/architecture/rpc-devtools",
+      "guidePath": "/en/docs/rpc-devtools/getting-started",
+      "architecturePath": "/en/docs/rpc-devtools",
       "symbols": [
         {
           "name": "createRpcLogProbe",
@@ -103789,8 +103848,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-pool/getting-started",
-      "architecturePath": "/en/architecture/rpc-pool",
+      "guidePath": "/en/docs/rpc-pool/getting-started",
+      "architecturePath": "/en/docs/rpc-pool",
       "symbols": [
         {
           "name": "createProcessPool",
@@ -104607,8 +104666,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createAdapterProcessLaunch",
@@ -110615,8 +110674,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [],
       "aliases": [
         {
@@ -110654,8 +110713,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createBunProcessLauncher",
@@ -110828,8 +110887,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createDenoProcessLauncher",
@@ -111070,8 +111129,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "dialProcessByteChannel",
@@ -111234,8 +111293,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createElectronUtilityProcessLauncher",
@@ -111379,8 +111438,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createAdapterChildStdio",
@@ -112015,8 +112074,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createAdapterSocketByteIO",
@@ -112261,8 +112320,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-process/getting-started",
-      "architecturePath": "/en/architecture/rpc-process",
+      "guidePath": "/en/docs/rpc-process/getting-started",
+      "architecturePath": "/en/docs/rpc-process",
       "symbols": [
         {
           "name": "createWindowsJobProcessLauncher",
@@ -112343,8 +112402,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "AdapterNodeThreadParentChannel",
@@ -115634,8 +115693,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createBrowserThreadChannelFactory",
@@ -115939,8 +115998,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createBunThreadChannelFactory",
@@ -116137,8 +116196,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createDenoThreadChannelFactory",
@@ -116335,8 +116394,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createElectronMainThreadChannelFactory",
@@ -116564,8 +116623,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createElectronRendererThreadChannelFactory",
@@ -116764,8 +116823,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createNodeThreadChannelFactory",
@@ -116963,8 +117022,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "emitOutput",
@@ -118473,8 +118532,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "asCodecValue",
@@ -119436,8 +119495,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineCBORCodec",
@@ -119595,8 +119654,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "identityCodec",
@@ -119744,8 +119803,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [],
       "aliases": [
         {
@@ -119773,8 +119832,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineJsonCodec",
@@ -119932,8 +119991,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineMessagePackCodec",
@@ -120091,8 +120150,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineProtobufCodec",
@@ -120317,8 +120376,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "assertSerializeType",
@@ -125276,8 +125335,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "IJsonPluginOptions",
@@ -125650,8 +125709,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "chunkToBytes",
@@ -127128,8 +127187,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-contract/getting-started",
-      "architecturePath": "/en/architecture/storage-contract",
+      "guidePath": "/en/docs/storage-contract/getting-started",
+      "architecturePath": "/en/docs/storage-contract",
       "symbols": [
         {
           "name": "asChangeFeedStore",
@@ -133915,8 +133974,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "IExtensionStage",
@@ -135321,8 +135380,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "cookiesHost",
@@ -135598,8 +135657,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "defineEntity",
@@ -136963,8 +137022,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "assertStorageBackendId",
@@ -139499,8 +139558,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "IIndexedDbOptions",
@@ -139764,8 +139823,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "ILocalStorageOptions",
@@ -140227,8 +140286,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "memoryStorageHost",
@@ -140348,8 +140407,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "cookieBackendPlugin",
@@ -140488,8 +140547,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "indexedDbBackendPlugin",
@@ -140735,8 +140794,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "localStorageBackendPlugin",
@@ -140833,8 +140892,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "memoryBackendPlugin",
@@ -140919,8 +140978,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [],
       "aliases": [
         {
@@ -140988,8 +141047,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "cookiesReactive",
@@ -141128,8 +141187,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "indexedDbReactive",
@@ -141313,8 +141372,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "localStorageReactive",
@@ -141411,8 +141470,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "memoryReactive",
@@ -141493,8 +141552,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "sessionStorageReactive",
@@ -141591,8 +141650,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "sessionStorageBackendPlugin",
@@ -141689,8 +141748,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "defineReactiveAdapterFeature",
@@ -141918,8 +141977,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "fromStandardSchema",
@@ -142500,8 +142559,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "binaryCodec",
@@ -142969,8 +143028,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/storage-web/getting-started",
-      "architecturePath": "/en/architecture/storage-web",
+      "guidePath": "/en/docs/storage-web/getting-started",
+      "architecturePath": "/en/docs/storage-web",
       "symbols": [
         {
           "name": "ISessionStorageOptions",
@@ -143161,8 +143220,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-devtools/getting-started",
-      "architecturePath": "/en/architecture/store-devtools",
+      "guidePath": "/en/docs/store-devtools/getting-started",
+      "architecturePath": "/en/docs/store-devtools",
       "symbols": [
         {
           "name": "createStoreDevTools",
@@ -144812,8 +144871,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-indexed/getting-started",
-      "architecturePath": "/en/architecture/store-indexed",
+      "guidePath": "/en/docs/store-indexed/getting-started",
+      "architecturePath": "/en/docs/store-indexed",
       "symbols": [
         {
           "name": "createStoreIndexedError",
@@ -147619,8 +147678,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-keyed/getting-started",
-      "architecturePath": "/en/architecture/store-keyed",
+      "guidePath": "/en/docs/store-keyed/getting-started",
+      "architecturePath": "/en/docs/store-keyed",
       "symbols": [
         {
           "name": "AtomKind",
@@ -152238,8 +152297,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-keyed/getting-started",
-      "architecturePath": "/en/architecture/store-keyed",
+      "guidePath": "/en/docs/store-keyed/getting-started",
+      "architecturePath": "/en/docs/store-keyed",
       "symbols": [
         {
           "name": "assertNotThenable",
@@ -154294,8 +154353,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-keyed/getting-started",
-      "architecturePath": "/en/architecture/store-keyed",
+      "guidePath": "/en/docs/store-keyed/getting-started",
+      "architecturePath": "/en/docs/store-keyed",
       "symbols": [
         {
           "name": "createAtomStore",
@@ -154541,8 +154600,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-keyed/getting-started",
-      "architecturePath": "/en/architecture/store-keyed",
+      "guidePath": "/en/docs/store-keyed/getting-started",
+      "architecturePath": "/en/docs/store-keyed",
       "symbols": [
         {
           "name": "atomGetter",
@@ -155509,8 +155568,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-light/getting-started",
-      "architecturePath": "/en/architecture/store-light",
+      "guidePath": "/en/docs/store-light/getting-started",
+      "architecturePath": "/en/docs/store-light",
       "symbols": [
         {
           "name": "createAsyncStore",
@@ -160134,8 +160193,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-middleware/getting-started",
-      "architecturePath": "/en/architecture/store-middleware",
+      "guidePath": "/en/docs/store-middleware/getting-started",
+      "architecturePath": "/en/docs/store-middleware",
       "symbols": [
         {
           "name": "bindStoreMiddleware",
@@ -162764,8 +162823,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-middleware/getting-started",
-      "architecturePath": "/en/architecture/store-middleware",
+      "guidePath": "/en/docs/store-middleware/getting-started",
+      "architecturePath": "/en/docs/store-middleware",
       "symbols": [
         {
           "name": "ClonePolicy",
@@ -163210,8 +163269,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-persist/getting-started",
-      "architecturePath": "/en/architecture/store-persist",
+      "guidePath": "/en/docs/store-persist/getting-started",
+      "architecturePath": "/en/docs/store-persist",
       "symbols": [
         {
           "name": "assertEnvelope",
@@ -166622,8 +166681,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-persist/getting-started",
-      "architecturePath": "/en/architecture/store-persist",
+      "guidePath": "/en/docs/store-persist/getting-started",
+      "architecturePath": "/en/docs/store-persist",
       "symbols": [
         {
           "name": "IPersistableCollection",
@@ -166935,8 +166994,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-persist/getting-started",
-      "architecturePath": "/en/architecture/store-persist",
+      "guidePath": "/en/docs/store-persist/getting-started",
+      "architecturePath": "/en/docs/store-persist",
       "symbols": [
         {
           "name": "clearFamily",
@@ -167453,8 +167512,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-persist/getting-started",
-      "architecturePath": "/en/architecture/store-persist",
+      "guidePath": "/en/docs/store-persist/getting-started",
+      "architecturePath": "/en/docs/store-persist",
       "symbols": [
         {
           "name": "IPersistableStore",
@@ -167854,8 +167913,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-react/getting-started",
-      "architecturePath": "/en/architecture/store-react",
+      "guidePath": "/en/docs/store-react/getting-started",
+      "architecturePath": "/en/docs/store-react",
       "symbols": [
         {
           "name": "assertStoreFeature",
@@ -174572,8 +174631,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-shared/getting-started",
-      "architecturePath": "/en/architecture/store-shared",
+      "guidePath": "/en/docs/store-shared/getting-started",
+      "architecturePath": "/en/docs/store-shared",
       "symbols": [
         {
           "name": "createStoreSharedError",
@@ -176361,8 +176420,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-ssr/getting-started",
-      "architecturePath": "/en/architecture/store-ssr",
+      "guidePath": "/en/docs/store-ssr/getting-started",
+      "architecturePath": "/en/docs/store-ssr",
       "symbols": [
         {
           "name": "assertSSRState",
@@ -180578,8 +180637,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-wasm/getting-started",
-      "architecturePath": "/en/architecture/store-wasm",
+      "guidePath": "/en/docs/store-wasm/getting-started",
+      "architecturePath": "/en/docs/store-wasm",
       "symbols": [
         {
           "name": "array",
@@ -184002,8 +184061,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-worker/getting-started",
-      "architecturePath": "/en/architecture/store-worker",
+      "guidePath": "/en/docs/store-worker/getting-started",
+      "architecturePath": "/en/docs/store-worker",
       "symbols": [
         {
           "name": "createStoreWorkerAggregateError",
@@ -185689,8 +185748,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-worker/getting-started",
-      "architecturePath": "/en/architecture/store-worker",
+      "guidePath": "/en/docs/store-worker/getting-started",
+      "architecturePath": "/en/docs/store-worker",
       "symbols": [
         {
           "name": "createSerializeWorkerHandler",
@@ -186774,8 +186833,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/supervision/getting-started",
-      "architecturePath": "/en/architecture/supervision",
+      "guidePath": "/en/docs/supervision/getting-started",
+      "architecturePath": "/en/docs/supervision",
       "symbols": [
         {
           "name": "BudgetOverflow",
@@ -190101,8 +190160,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/supervision/getting-started",
-      "architecturePath": "/en/architecture/supervision",
+      "guidePath": "/en/docs/supervision/getting-started",
+      "architecturePath": "/en/docs/supervision",
       "symbols": [
         {
           "name": "coroutineCapabilities",
@@ -191241,8 +191300,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/supervision/getting-started",
-      "architecturePath": "/en/architecture/supervision",
+      "guidePath": "/en/docs/supervision/getting-started",
+      "architecturePath": "/en/docs/supervision",
       "symbols": [
         {
           "name": "BootstrapVia",
@@ -194307,8 +194366,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/supervision/getting-started",
-      "architecturePath": "/en/architecture/supervision",
+      "guidePath": "/en/docs/supervision/getting-started",
+      "architecturePath": "/en/docs/supervision",
       "symbols": [
         {
           "name": "createThreadSupervisor",
@@ -195665,8 +195724,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "createTray",
@@ -200592,8 +200651,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "defineAdapter",
@@ -200819,8 +200878,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "createHost",
@@ -202440,8 +202499,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "defineLoader",
@@ -203051,8 +203110,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/tray/getting-started",
-      "architecturePath": "/en/architecture/tray",
+      "guidePath": "/en/docs/tray/getting-started",
+      "architecturePath": "/en/docs/tray",
       "symbols": [
         {
           "name": "createRuntime",
@@ -203705,8 +203764,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "collect",
@@ -205818,8 +205877,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "base64ToBytes",
@@ -206605,8 +206664,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "combineConfig",
@@ -212256,8 +212315,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "attachErrorIdentity",
@@ -217237,8 +217296,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "assimilateCapturedThen",
@@ -218151,8 +218210,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "createNumberFormatter",
@@ -219065,8 +219124,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "createSafeRecord",
@@ -220182,8 +220241,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "createPathAccessor",
@@ -222674,8 +222733,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "admitAbortSignal",
@@ -224978,8 +225037,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "createManualScheduler",
@@ -225495,8 +225554,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "format",
@@ -226119,8 +226178,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "IDiscriminatedByField",
@@ -226439,8 +226498,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/utils/getting-started",
-      "architecturePath": "/en/architecture/utils",
+      "guidePath": "/en/docs/utils/getting-started",
+      "architecturePath": "/en/docs/utils",
       "symbols": [
         {
           "name": "IPrimitive",
@@ -226854,8 +226913,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/wasm/getting-started",
-      "architecturePath": "/en/architecture/wasm",
+      "guidePath": "/en/docs/wasm/getting-started",
+      "architecturePath": "/en/docs/wasm",
       "symbols": [
         {
           "name": "alloc_bytes",

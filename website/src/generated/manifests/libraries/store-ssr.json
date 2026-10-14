@@ -1411,8 +1411,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-ssr/getting-started",
-      "architecturePath": "/en/architecture/store-ssr",
+      "guidePath": "/en/docs/store-ssr/getting-started",
+      "architecturePath": "/en/docs/store-ssr",
       "symbols": [
         {
           "name": "assertSSRState",

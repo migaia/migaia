@@ -789,8 +789,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "AdapterNodeThreadParentChannel",
@@ -4080,8 +4080,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createBrowserThreadChannelFactory",
@@ -4385,8 +4385,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createBunThreadChannelFactory",
@@ -4583,8 +4583,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createDenoThreadChannelFactory",
@@ -4781,8 +4781,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createElectronMainThreadChannelFactory",
@@ -5010,8 +5010,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createElectronRendererThreadChannelFactory",
@@ -5210,8 +5210,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-threads/getting-started",
-      "architecturePath": "/en/architecture/rpc-threads",
+      "guidePath": "/en/docs/rpc-threads/getting-started",
+      "architecturePath": "/en/docs/rpc-threads",
       "symbols": [
         {
           "name": "createNodeThreadChannelFactory",

@@ -191,8 +191,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-pool/getting-started",
-      "architecturePath": "/en/architecture/rpc-pool",
+      "guidePath": "/en/docs/rpc-pool/getting-started",
+      "architecturePath": "/en/docs/rpc-pool",
       "symbols": [
         {
           "name": "createProcessPool",

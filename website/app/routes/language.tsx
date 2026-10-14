@@ -30,11 +30,8 @@ function Language({ params }: ILanguageRouteProps) {
       <h1>{copy.homeTitle}</h1>
       <p className="lede">{copy.homeDescription}</p>
       <div className="actions">
-        <Link className="button button-primary" to={domainPath(locale, 'docs')}>
+        <Link className="button button-primary" to={domainPath(locale)}>
           {chinese ? '开始查文档' : 'Start with Docs'}
-        </Link>
-        <Link className="button button-secondary" to={domainPath(locale, 'guides')}>
-          {chinese ? '浏览指南' : 'Browse Guides'}
         </Link>
       </div>
       <section className="section-block" aria-labelledby="capabilities">
@@ -47,11 +44,7 @@ function Language({ params }: ILanguageRouteProps) {
               <p>{scenario.body}</p>
               <nav className="actions home-scenario-links" aria-label={scenario.title}>
                 {scenario.libraries.map((library) => (
-                  <Link
-                    className="text-link"
-                    key={library}
-                    to={domainPath(locale, 'docs', library)}
-                  >
+                  <Link className="text-link" key={library} to={domainPath(locale, library)}>
                     {library}
                   </Link>
                 ))}
@@ -66,7 +59,7 @@ function Language({ params }: ILanguageRouteProps) {
           <h2 id="quickstart">{copy.smallResult}</h2>
           <p>{copy.quickstartBody}</p>
         </div>
-        <Link className="callout" to={domainPath(locale, 'docs', STARTER_LIBRARY)}>
+        <Link className="callout" to={domainPath(locale, STARTER_LIBRARY)}>
           <span>{STARTER_LIBRARY}</span>
           <strong>
             {chinese
@@ -80,19 +73,19 @@ function Language({ params }: ILanguageRouteProps) {
         <p className="eyebrow">{copy.commonCombinations}</p>
         <h2 id="combinations">{copy.combinationTitle}</h2>
         <div className="capability-grid">
-          <Link className="capability-item" to={domainPath(locale, 'architecture', 'resource')}>
+          <Link className="capability-item" to={domainPath(locale, 'resource')}>
             <strong>{copy.reactiveResource}</strong>
             <span>{copy.reactiveResourceText}</span>
           </Link>
-          <Link className="capability-item" to={domainPath(locale, 'architecture', 'plugin-host')}>
+          <Link className="capability-item" to={domainPath(locale, 'plugin-host')}>
             <strong>{copy.capabilityPluginHost}</strong>
             <span>{copy.capabilityPluginHostText}</span>
           </Link>
-          <Link className="capability-item" to={domainPath(locale, 'architecture', 'rpc-core')}>
+          <Link className="capability-item" to={domainPath(locale, 'rpc-core')}>
             <strong>{copy.rpcPeerSerialize}</strong>
             <span>{copy.rpcPeerSerializeText}</span>
           </Link>
-          <Link className="capability-item" to={domainPath(locale, 'architecture', 'tray')}>
+          <Link className="capability-item" to={domainPath(locale, 'tray')}>
             <strong>{copy.traySupervision}</strong>
             <span>{copy.traySupervisionText}</span>
           </Link>

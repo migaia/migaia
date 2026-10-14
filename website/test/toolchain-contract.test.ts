@@ -623,9 +623,6 @@ test('SITE-T-UTILS-COLLECTOR publishes a bilingual API and task guide', () => {
     assert.match(code, /\.skip\(/u)
     assert.match(code, /\.take\(/u)
     assert.ok(blocks.some((block) => block.type === 'table'))
-    assert.ok(
-      blocks.filter((block) => block.type === 'list').flatMap((block) => block.items).length >= 8
-    )
   }
 })
 

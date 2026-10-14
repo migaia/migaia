@@ -224,11 +224,7 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
         <nav className="global-nav" aria-label={copy.primaryNavigation}>
           {DOMAINS.map((domain) => (
             <Link key={domain} to={`/${locale}/${domain}`}>
-              {domain === 'docs'
-                ? copy.docs
-                : domain === 'guides'
-                  ? copy.guides
-                  : copy.architecture}
+              {copy.docs}
             </Link>
           ))}
         </nav>
@@ -296,11 +292,7 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
                 onClick={() => setMobileNavOpen(false)}
                 to={`/${locale}/${domain}`}
               >
-                {domain === 'docs'
-                  ? copy.docs
-                  : domain === 'guides'
-                    ? copy.guides
-                    : copy.architecture}
+                {copy.docs}
               </Link>
             ))}
           </nav>
@@ -410,9 +402,6 @@ export function ErrorBoundary() {
       <div className="actions">
         <Link className="button button-primary" to={`/${locale}/docs`}>
           Browse Docs
-        </Link>
-        <Link className="button button-secondary" to={`/${locale}/guides`}>
-          Browse Guides
         </Link>
         <Link className="button button-secondary" to={`/${locale}`}>
           Language home

@@ -854,8 +854,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-persist/getting-started",
-      "architecturePath": "/en/architecture/store-persist",
+      "guidePath": "/en/docs/store-persist/getting-started",
+      "architecturePath": "/en/docs/store-persist",
       "symbols": [
         {
           "name": "assertEnvelope",
@@ -4266,8 +4266,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-persist/getting-started",
-      "architecturePath": "/en/architecture/store-persist",
+      "guidePath": "/en/docs/store-persist/getting-started",
+      "architecturePath": "/en/docs/store-persist",
       "symbols": [
         {
           "name": "IPersistableCollection",
@@ -4579,8 +4579,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-persist/getting-started",
-      "architecturePath": "/en/architecture/store-persist",
+      "guidePath": "/en/docs/store-persist/getting-started",
+      "architecturePath": "/en/docs/store-persist",
       "symbols": [
         {
           "name": "clearFamily",
@@ -5097,8 +5097,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/store-persist/getting-started",
-      "architecturePath": "/en/architecture/store-persist",
+      "guidePath": "/en/docs/store-persist/getting-started",
+      "architecturePath": "/en/docs/store-persist",
       "symbols": [
         {
           "name": "IPersistableStore",

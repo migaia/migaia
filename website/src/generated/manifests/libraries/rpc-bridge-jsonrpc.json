@@ -569,8 +569,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/rpc-bridge-jsonrpc/getting-started",
-      "architecturePath": "/en/architecture/rpc-bridge-jsonrpc",
+      "guidePath": "/en/docs/rpc-bridge-jsonrpc/getting-started",
+      "architecturePath": "/en/docs/rpc-bridge-jsonrpc",
       "symbols": [
         {
           "name": "createJsonRpcAdapterChannel",

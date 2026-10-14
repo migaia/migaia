@@ -1819,8 +1819,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "emitOutput",
@@ -3329,8 +3329,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "asCodecValue",
@@ -4292,8 +4292,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineCBORCodec",
@@ -4451,8 +4451,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "identityCodec",
@@ -4600,8 +4600,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [],
       "aliases": [
         {
@@ -4629,8 +4629,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineJsonCodec",
@@ -4788,8 +4788,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineMessagePackCodec",
@@ -4947,8 +4947,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "defineProtobufCodec",
@@ -5173,8 +5173,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "assertSerializeType",
@@ -10132,8 +10132,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "IJsonPluginOptions",
@@ -10506,8 +10506,8 @@
         "core-usage",
         "advanced-usage"
       ],
-      "guidePath": "/en/guides/serialize/getting-started",
-      "architecturePath": "/en/architecture/serialize",
+      "guidePath": "/en/docs/serialize/getting-started",
+      "architecturePath": "/en/docs/serialize",
       "symbols": [
         {
           "name": "chunkToBytes",
