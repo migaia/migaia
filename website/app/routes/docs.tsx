@@ -397,10 +397,35 @@ const GUIDE_STARTERS = [
 /** Library families group packages by the architectural role readers use to discover them. */
 const ARCHITECTURE_FAMILIES = [
   {
+    titleEn: 'Utilities, serialization, and logging',
+    titleZh: '通用工具、序列化与日志',
+    bodyEn:
+      'Reuse common operations, encode values for storage or transport, and compose log output.',
+    bodyZh: '复用通用操作，将值编码为可存储或传输的数据，并组合日志输出。',
+    libraries: ['utils', 'serialize', 'logger']
+  },
+  {
+    titleEn: 'Lifecycle, reactivity, and events',
+    titleZh: '生命周期、响应式与事件',
+    bodyEn:
+      'Own and release resources, update derived values, cancel stale async work, and notify local listeners.',
+    bodyZh: '明确资源归属与释放，更新派生值，取消过期异步工作，并通知本地监听器。',
+    libraries: ['lifecycle', 'reactive', 'resource', 'event-subscriber']
+  },
+  {
+    titleEn: 'Storage and WebAssembly',
+    titleZh: '存储与 WebAssembly',
+    bodyEn:
+      'Access browser storage through shared contracts and use WASM byte buffers and transcoding.',
+    bodyZh: '通过共享契约访问浏览器存储，并使用 WASM 字节暂存区与转码能力。',
+    libraries: ['storage-contract', 'storage-web', 'wasm']
+  },
+  {
     titleEn: 'Store family',
     titleZh: 'Store 家族',
-    bodyEn: 'Application state, persistence, framework bindings, workers, and diagnostics.',
-    bodyZh: '应用状态、持久化、框架绑定、Worker、WASM 与诊断工具。',
+    bodyEn:
+      'Manage application state, subscribe to relevant changes, persist snapshots, and connect React, SSR, Workers, and WASM.',
+    bodyZh: '管理应用状态，按需订阅变化，持久化快照，并接入 React、SSR、Worker 与 WASM。',
     libraries: [
       'store-light',
       'store-keyed',
@@ -416,35 +441,37 @@ const ARCHITECTURE_FAMILIES = [
     ]
   },
   {
-    titleEn: 'Pipeline and composition',
-    titleZh: 'Pipeline 与组合',
+    titleEn: 'RPC family',
+    titleZh: 'RPC 家族',
     bodyEn:
-      'Event flow, middleware, capabilities, plugins, reactive derivation, and resource ownership.',
-    bodyZh: '事件流、中间件、能力图、插件、响应式推导与资源所有权。',
+      'Call functions across windows, Workers, processes, and other languages with shared protocols, bounded pools, and diagnostics.',
+    bodyZh: '用统一协议跨窗口、Worker、进程与语言调用函数，并组合有限并发池与诊断工具。',
     libraries: [
-      'event-subscriber',
-      'middleware-pipeline',
-      'capability',
-      'plugin-host',
-      'tray',
-      'reactive',
-      'resource',
-      'lifecycle'
+      'rpc-contract',
+      'rpc-core',
+      'rpc-browser',
+      'rpc-threads',
+      'rpc-process',
+      'rpc-pool',
+      'rpc-devtools',
+      'rpc-bridge-jsonrpc'
     ]
   },
   {
-    titleEn: 'Browser and platform',
-    titleZh: 'Browser 与平台',
-    bodyEn: 'Browser storage, cross-runtime communication, and WebAssembly boundaries.',
-    bodyZh: '浏览器存储、跨运行时通信以及 WebAssembly 边界。',
-    libraries: ['storage-contract', 'storage-web', 'rpc-core', 'wasm']
+    titleEn: 'Capabilities and pipelines',
+    titleZh: '能力与中间件管线',
+    bodyEn:
+      'Enable optional features, order capability dependencies, and compose reusable processing steps.',
+    bodyZh: '启停可选功能，安排能力依赖顺序，并组合可复用的处理步骤。',
+    libraries: ['capability', 'middleware-pipeline']
   },
   {
-    titleEn: 'Other foundations',
-    titleZh: '其他基础能力',
-    bodyEn: 'General utilities, serialization contracts, and observability shared across families.',
-    bodyZh: '由多个家族共同复用的通用工具、序列化契约与可观测能力。',
-    libraries: ['utils', 'serialize', 'logger']
+    titleEn: 'Plugin hosts and execution management',
+    titleZh: '插件宿主与执行治理',
+    bodyEn:
+      'Install plugins, supervise execution budgets and health, and manage discoverable host instances with ordered startup and cleanup.',
+    bodyZh: '安装插件，监督执行预算与健康，并按依赖启动、发现、调用和释放宿主实例。',
+    libraries: ['plugin-host', 'supervision', 'tray']
   }
 ] as const
 
@@ -2433,45 +2460,43 @@ function errorReferencePath(locale: ILocale, library: string | undefined): strin
   return undefined
 }
 
-/** Chinese role summaries shown wherever prose explicitly references another public library. */
+/** README-backed Chinese summaries explain what each library helps readers accomplish. */
 const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
-  supervision: '通过原生适配器治理进程、线程与协程的准入、启动、健康、退出和逆序释放。',
-  capability: '管理功能开关、能力依赖图及其启动和替换生命周期。',
-  'event-subscriber': '提供事件订阅、发布、取消订阅与监听器错误隔离。',
-  lifecycle: '提供资源所有权、释放顺序、静默期和终态关闭原语。',
-  logger: '提供结构化日志、日志级别以及诊断输出边界。',
-  'middleware-pipeline': '按确定顺序组合中间件阶段，并处理转换和错误传播。',
-  'plugin-host': '负责插件定义、安装、管线组合、回滚与释放。',
-  reactive: '提供响应式依赖追踪、派生值和 effect 调度。',
-  resource: '把异步资源的创建、读取、刷新和释放统一成生命周期契约。',
-  serialize: '提供文本、结构化数据和二进制数据的编解码契约。',
-  'storage-contract': '定义与具体平台无关的存储通道和适配器边界。',
-  'storage-web': '提供浏览器内存、Web Storage、Cookie 与 IndexedDB 后端。',
-  'store-devtools': '为 Store 提供调试快照、检查和诊断集成。',
-  'store-indexed': '提供按索引组织和查询的响应式状态容器。',
-  'store-keyed': '提供按业务键创建、缓存和释放状态实例的 Store 家族。',
-  'store-light': '提供轻量响应式状态、派生值与资源组合入口。',
-  'store-middleware': '把 Store 的读写过程接入可组合中间件。',
-  'store-persist': '负责 Store 状态的持久化、恢复与水合时序。',
-  'store-react': '把 Store 状态和生命周期接入 React。',
-  'store-shared': '提供 Store 家族共同复用的底层类型与运行时原语。',
-  'store-ssr': '处理服务端渲染期间的状态隔离、快照与水合边界。',
-  'store-wasm': '把 Store 状态与 WebAssembly 内存和转换边界连接起来。',
-  'store-worker': '把 Store 操作投射到 Worker，并管理消息与关闭边界。',
-  tray: '组合条目定义、适配器与 Host 安装流程。',
-  utils: '提供取消、并发、错误、集合、字符串等通用基础工具。',
-  wasm: '管理 WebAssembly 初始化、内存所有权、值转换与清理。',
-  'rpc-core':
-    '用四个 Peer/Plugin 工厂连接进程和线程，以显式 provide/expose 共享方法；core/browser 提供自定义连接、编解码和安全边界。',
-  'rpc-contract': '提供平台无关的 RPC envelope、握手、framing、二进制数据与错误链协议工具。',
-  'rpc-process': '连接实际进程的字节或消息通道，提供进程 Peer、Plugin 与平台启动入口。',
-  'rpc-threads': '连接实际 Worker 或线程，提供线程 Peer、Plugin 与原生执行资源适配器。',
-  /** Pool references describe the public composition layer and its client-side scheduling role. */
-  'rpc-pool': '以公开线程和进程 Peer 组成池，管理有限 FIFO、成员调用槽与资源回收。',
-  'rpc-bridge-jsonrpc': '把外部语言的 JSON-RPC peer 接到实际有序字节通道，保留协商和错误链。',
-  'rpc-browser': '提供 Window、共享 Worker、ServiceWorker、广播与浏览器网络通道适配器。',
-  'rpc-devtools':
-    '提供 RPC 观察工具的 service 与录制契约、NDJSON codec；当前 collector 与 hub 工厂仍为占位入口。'
+  capability: '按开关启停可选功能，为不同租户隔离功能开关，并按依赖启动和释放功能。',
+  'event-subscriber': '在本地模块间订阅和广播事件，并协调同步或异步监听器的执行。',
+  lifecycle: '将多项资源交给同一作用域管理，并在退出时等待任务结束和释放资源。',
+  logger: '将日志输出到控制台或服务，按需要过滤和格式化，并等待异步输出完成。',
+  'middleware-pipeline':
+    '把处理步骤组合为同步、异步或生成器中间件管线，并在需要时提前结束或取消处理。',
+  'plugin-host': '为库或应用安装和卸载插件，配置共享能力与处理步骤，并在安装失败时回滚。',
+  reactive: '让状态变化自动更新派生值和副作用，并为不同使用场景隔离状态。',
+  resource: '随输入变化加载异步数据，取消过期请求、重试失败请求并刷新缓存。',
+  'rpc-bridge-jsonrpc': '通过 JSON-RPC 调用 Python、Go、Rust 等语言实现的子进程或本机服务。',
+  'rpc-browser': '在浏览器窗口、iframe、SharedWorker 与可靠有序的 WebRTC 通道之间调用函数。',
+  'rpc-contract': '为自定义 RPC 实现校验和编解码消息，让不同对端按同一协议通信。',
+  'rpc-core': '跨运行时调用远程函数，并为调用设置超时、取消和流式结果处理。',
+  'rpc-devtools': '采集、查询和录制 RPC 元数据，并查看多个宿主的时间线与调用统计。',
+  'rpc-pool': '将 RPC 调用分配到线程池或进程池，并用有限队列承接繁忙时的请求。',
+  'rpc-process': '在子进程或本机服务中运行隔离任务，并通过 RPC 调用和管理它们。',
+  'rpc-threads': '把重计算移到 Worker，并通过 RPC 调用、管理和重启线程。',
+  serialize: '把应用数据编码为可存储或传输的格式，并在读取时解码。',
+  'storage-contract': '为键值和记录存储定义统一接口，让应用可以接入不同存储后端。',
+  'storage-web': '通过统一接口读写 Web Storage、cookie、IndexedDB 和内存中的数据。',
+  'store-devtools': '查看 Store 的状态与 action 历史，通过时间旅行和依赖树定位状态变化。',
+  'store-indexed': '在对象、数组、Map 和 Set 中按键或索引订阅变化，让相关计算随集合更新。',
+  'store-keyed': '在独立作用域中按业务 key 管理状态，并只订阅需要的部分。',
+  'store-light': '管理对象状态、异步数据和更新操作，让相关计算随字段变化自动更新。',
+  'store-middleware': '跟踪 Store 的状态与 action、约束写入规则，并接入 Redux DevTools。',
+  'store-persist': '自动保存和恢复对象、按键管理的状态与集合，并在版本变化时迁移已保存数据。',
+  'store-react': '在 React 组件中使用 Store、Atom 与异步资源，并管理订阅和退出时的清理。',
+  'store-shared': '让主线程与 Worker 共同读写同一组响应式 32 位整数状态。',
+  'store-ssr': '隔离每个 SSR 请求的 Store 与 Resource，并将服务端初始状态恢复到浏览器。',
+  'store-wasm': '在 WASM 中管理可订阅的数值、字符串、数组和记录状态。',
+  'store-worker': '把耗时计算和数据编解码移到 Worker，并为请求使用取消、去重和缓存功能。',
+  supervision: '限制执行单元数量，检查健康状态，重启故障单元，并按时限管理关闭过程。',
+  tray: '启动、查找、调用和重启一组插件宿主，包括 Node Worker 与子进程，并在退出时释放它们。',
+  utils: '为代码添加超时、取消与错误追踪，并处理常见的数据转换和对象更新。',
+  wasm: '分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Architecture-page summaries explain the pain, core capability, and governing design up front. */
@@ -2546,12 +2571,72 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
     '用于让 RPC 观察工具共享同一套 service、事件与离线录制契约。当前 layer 1 提供版本 1 的 NDJSON 纯函数 codec，复用 Core 的 Probe 类型与 Contract 的错误链编解码，不依赖载体包，也不创建 transport；Core 观察点、collector 与 hub 运行时由后续实现提供，当前两个 devtools 工厂均以 CLOSED 拒绝。'
 } as const satisfies Readonly<Record<string, string>>
 
-/** Missing English package descriptions are explicit instead of slogan fallbacks. */
+/** README-backed English summaries mirror the same user-facing responsibilities. */
 const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
+  capability:
+    'Enable or disable optional features, keep tenant feature settings separate, and start and release features in dependency order.',
+  'event-subscriber':
+    'Subscribe to and broadcast events between local modules and coordinate synchronous or asynchronous listeners.',
+  lifecycle:
+    'Manage resources within a shared scope and wait for ongoing work and cleanup when shutting down.',
   logger:
-    'Structured logging with stable levels, diagnostic context, sinks, batching, and flush ownership.',
-  tray: 'Composes entry definitions and adapters into explicit Host installation, mutation, and cleanup flows.',
-  wasm: 'Owns WebAssembly initialization, memory allocation, value conversion, and deterministic cleanup.'
+    'Send logs to a console or service, filter and format them as needed, and wait for asynchronous output to finish.',
+  'middleware-pipeline':
+    'Combine processing steps into synchronous, asynchronous, or generator middleware pipelines and stop or cancel processing when needed.',
+  'plugin-host':
+    'Install and remove plugins for libraries or applications, configure shared features and processing steps, and roll back failed installations.',
+  reactive:
+    'Update derived values and effects when state changes and keep state separate across contexts.',
+  resource:
+    'Load asynchronous data as inputs change, cancel stale requests, retry failures, and refresh cached results.',
+  'rpc-bridge-jsonrpc':
+    'Call child processes or local services implemented in Python, Go, Rust, and other languages through JSON-RPC.',
+  'rpc-browser':
+    'Call functions across browser windows, iframes, SharedWorkers, and reliable ordered WebRTC channels.',
+  'rpc-contract':
+    'Validate, encode, and decode messages for custom RPC implementations so peers can communicate through the same protocol.',
+  'rpc-core':
+    'Call remote functions across runtimes with timeouts, cancellation, and streaming results.',
+  'rpc-devtools':
+    'Collect, query, and record RPC metadata and inspect timelines and call statistics across hosts.',
+  'rpc-pool':
+    'Distribute RPC calls across thread or process pools and queue requests within bounded limits when busy.',
+  'rpc-process':
+    'Run isolated work in child processes or local services and call and manage them through RPC.',
+  'rpc-threads':
+    'Move heavy computation into Workers and call, manage, and restart threads through RPC.',
+  serialize: 'Encode application data for storage or transmission and decode it when reading.',
+  'storage-contract':
+    'Define common interfaces for key-value and record storage so applications can use different backends.',
+  'storage-web':
+    'Read and write data in Web Storage, cookies, IndexedDB, and memory through a common interface.',
+  'store-devtools':
+    'Inspect Store state and action history and use time travel and dependency trees to investigate changes.',
+  'store-indexed':
+    'Subscribe to keys or indices in objects, arrays, Maps, and Sets so related computations respond to collection updates.',
+  'store-keyed':
+    'Manage state by business key in separate scopes and subscribe only to the parts you need.',
+  'store-light':
+    'Manage object state, asynchronous data, and updates so related computations respond to field changes.',
+  'store-middleware':
+    'Trace Store state and actions, enforce write rules, and connect to Redux DevTools.',
+  'store-persist':
+    'Automatically save and restore object, keyed, and collection state and migrate saved data when versions change.',
+  'store-react':
+    'Use Stores, Atoms, and asynchronous resources in React components and manage subscriptions and cleanup.',
+  'store-shared':
+    'Read and write the same reactive 32-bit integer state from the main thread and Workers.',
+  'store-ssr':
+    "Keep Stores and Resources separate for each SSR request and restore the server's initial state in the browser.",
+  'store-wasm': 'Manage observable numbers, strings, arrays, and records in WASM.',
+  'store-worker':
+    'Move expensive computation and data encoding and decoding into Workers and use cancellation, deduplication, and caching for requests.',
+  supervision:
+    'Limit execution units, check their health, restart failures, and manage shutdown within a time budget.',
+  tray: 'Start, find, call, and restart plugin hosts, including Node Workers and child processes, and release them on shutdown.',
+  utils:
+    'Add deadlines, cancellation, and error tracing to code and handle common data conversions and object updates.',
+  wasm: 'Allocate reusable byte buffers and transcode between JSON and MessagePack.'
 } as const satisfies Readonly<Record<string, string>>
 
 /** Unambiguous public product names that may appear without an npm package path. */
