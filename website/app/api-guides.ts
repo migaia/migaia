@@ -1071,11 +1071,11 @@ const optionTranslations: Readonly<
     en: 'Maximum number of outbound request identifiers retained for replay protection; increase only when measured traffic requires a larger bounded window.',
     zh: '为 replay protection 保留的出站 request identifier 最大数量；仅在有测量依据表明流量需要更大 bounded window 时调高。'
   },
-  'reactive:reactive:Computed:equals': {
+  'reactive:index:IReactiveComputed:equals': {
     en: 'Equality policy used to suppress unchanged computed values.',
     zh: '用于抑制未变化 computed value 的 equality policy。'
   },
-  'reactive:reactive:Computed:keepAlive': {
+  'reactive:index:IReactiveComputed:keepAlive': {
     en: 'Keeps the computed node active after observers detach; use it only when retained cache lifetime is intentional.',
     zh: 'observer 解除后保持 computed node active；仅在确实需要延长 cache lifetime 时使用。'
   },
@@ -1272,6 +1272,14 @@ const reactiveRuntimeOptions: Readonly<Record<IGuideLocale, readonly IApiOptionG
       whenToUse:
         '宿主希望在 requestIdleCallback、测试队列或自己的回收时段断开未观察派生节点时设置。',
       example: 'createRuntime({ scheduleIdle: (task) => requestIdleCallback(task) })'
+    },
+    {
+      name: 'schedulerStrategy',
+      description:
+        '在创建时决定失效副作用何时自动冲刷。策略收到 flush 回调；未提供时使用默认微任务策略。',
+      defaultValue: 'undefined（默认微任务）',
+      whenToUse: '宿主需要在 animation frame 或自己的调度队列执行副作用时设置。',
+      example: 'createRuntime({ schedulerStrategy: (flush) => requestAnimationFrame(flush) })'
     }
   ],
   en: [
@@ -1320,6 +1328,14 @@ const reactiveRuntimeOptions: Readonly<Record<IGuideLocale, readonly IApiOptionG
       whenToUse:
         'Set it when a host wants reclamation in requestIdleCallback, a deterministic test queue, or another owned idle window.',
       example: 'createRuntime({ scheduleIdle: (task) => requestIdleCallback(task) })'
+    },
+    {
+      name: 'schedulerStrategy',
+      description:
+        'Selects automatic effect flushing at runtime creation. The strategy receives a flush callback; omission keeps the default microtask policy.',
+      defaultValue: 'undefined (default microtask)',
+      whenToUse: 'Set it when the host schedules effects in an animation frame or its own queue.',
+      example: 'createRuntime({ schedulerStrategy: (flush) => requestAnimationFrame(flush) })'
     }
   ]
 }
@@ -13166,7 +13182,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         description: 'Stable writable Signal; its own Runtime supplies ownership and subscription.',
         defaultValue: 'required',
         optional: false,
-        type: 'ISignal<T>',
+        type: 'IReactiveSignal<T>',
         whenToUse: 'Bind one Signal value to React.',
         example: 'countSignal'
       }
@@ -13177,7 +13193,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         description: '稳定 writable Signal；其 Runtime 提供 ownership 与 subscription。',
         defaultValue: '必填',
         optional: false,
-        type: 'ISignal<T>',
+        type: 'IReactiveSignal<T>',
         whenToUse: '把一个 Signal value 绑定到 React。',
         example: 'countSignal'
       }
@@ -13418,7 +13434,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       'Reads one stable Reactive node with ownership validation and a fixed dependency subscription. Disabling observation preserves hook order while returning the current non-tracking peek value.',
     purposeZh:
       '通过 ownership validation 与 fixed dependency subscription 读取一个 stable Reactive node。禁用 observation 时仍保持 hook order，并返回当前 non-tracking peek value。',
-    quickStart: `import { createRuntime, Signal } from '@migaia/reactive'\nimport { useNodeValue } from '@migaia/store-react'\n\nconst runtime = createRuntime()\nconst countSignal = new Signal(0, runtime)\n\nfunction Counter() {\n  const count = useNodeValue(countSignal, runtime)\n  return count\n}\n\nconsole.log(Counter) // React 渲染 Counter 时读取当前值，并订阅该 node 的变化`,
+    quickStart:
+      "import { createRuntime } from '@migaia/reactive'\nimport { useNodeValue } from '@migaia/store-react'\n\nconst runtime = createRuntime()\nconst countSignal = runtime.signal(0)\n\nfunction Counter() {\n  const count = useNodeValue(countSignal, runtime)\n  return count\n}\n\nconsole.log(Counter) // React 渲染 Counter 时读取当前值，并订阅该 node 的变化",
     scenariosEn: [
       'An adapter binds a stable node to React.',
       'Hook order must remain fixed while a Provider source replaces direct observation.',
@@ -22357,7 +22374,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates the recommended realm-local reactive view over one shared signed int32. Local reads participate in Reactive tracking while explicit sync or watch imports remote writes from the same ABI buffer.',
-      quickStart: `import { createRuntime, effect } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst stopEffect = effect(() => console.log(counter.value), runtime)\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  stopEffect()\n  counter.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst stopEffect = runtime.effect(() => console.log(counter.value))\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  stopEffect.dispose()\n  counter.dispose()\n}`,
       scenarios: [
         'A counter, flag, cursor, or state code must be shared across workers or realms.',
         'Realm-local Effects should track reads and rerun when remote writes are synchronized.',
@@ -22373,7 +22390,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建单个共享有符号 int32 的推荐 realm-local 响应式 view。本地读取参与 Reactive 追踪，显式 sync 或 watch 把同一 ABI buffer 的远端写入拉入当前 Runtime。',
-      quickStart: `import { createRuntime, effect } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst stopEffect = effect(() => console.log(counter.value), runtime)\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  stopEffect()\n  counter.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst stopEffect = runtime.effect(() => console.log(counter.value))\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  stopEffect.dispose()\n  counter.dispose()\n}`,
       scenarios: [
         'counter、flag、cursor 或状态码需要跨 worker/realm 共享。',
         'realm-local Effect 应追踪读取，并在远端写入同步后重跑。',
@@ -25206,7 +25223,8 @@ try {
     en: {
       purpose:
         'Owns one cancellable asynchronous value as a reactive state machine. It tracks reactive reads made before the fetcher first awaits, supersedes stale generations, and keeps loading, retry, cache, hydration, and disposal semantics in one place.',
-      quickStart: `import { Resource, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst userId = new Signal('42', runtime)\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(\`/api/users/\${userId.value}\`, { signal })\n    if (!response.ok) throw new Error(\`HTTP \${response.status}\`)\n    return response.json() as Promise<{ id: string; name: string }>\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\nconst data = await user.promise\nconsole.log('loaded user:', data)\nuser.dispose()`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('42')\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal })\n    if (!response.ok) throw new Error(`HTTP ${response.status}`)\n    return response.json() as Promise<{ id: string; name: string }>\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\nconst data = await user.promise\nconsole.log('loaded user:', data)\nuser.dispose()",
       scenarios: [
         'An asynchronous value depends on Signal or Computed input and must refetch when that input changes.',
         'Old requests must never overwrite a newer generation after input changes or an explicit refetch.',
@@ -25313,7 +25331,8 @@ try {
     zh: {
       purpose:
         '把一个可取消的异步值作为响应式状态机统一托管。它追踪 fetcher 首次 await 前的响应式读取、淘汰过期请求代，并统一 loading、重试、缓存、hydrate 与释放语义。',
-      quickStart: `import { Resource, Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst userId = new Signal('42', runtime)\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(\`/api/users/\${userId.value}\`, { signal })\n    if (!response.ok) throw new Error(\`HTTP \${response.status}\`)\n    return response.json() as Promise<{ id: string; name: string }>\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\nconst data = await user.promise\nconsole.log('加载用户:', data)\nuser.dispose()`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('42')\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal })\n    if (!response.ok) throw new Error(`HTTP ${response.status}`)\n    return response.json() as Promise<{ id: string; name: string }>\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\nconst data = await user.promise\nconsole.log('加载用户:', data)\nuser.dispose()",
       scenarios: [
         '异步值依赖 Signal 或 Computed，并且输入变化后必须自动重新请求。',
         '输入变化或显式刷新后，旧请求即使更晚完成也不能覆盖新一代结果。',
@@ -28300,11 +28319,12 @@ try {
       options: []
     }
   },
-  'reactive:reactive:Signal': {
+  'reactive:index:IReactiveSignal': {
     zh: {
       purpose:
-        '表示响应式图中的可写事实来源。可直接 new Signal(initialValue, runtime, options) 保留完整实例，也可用 runtime.signal(initialValue, options) 创建同一实现。读取 value 会把当前 Computed 或 Effect 登记为订阅者；写入真正不同的值会领取新版本，并通知同一 Runtime 中受影响的下游。Object.is 相等的写入会被短路，不增加 version，也不触发重算；peek() 只读取当前值而不建立依赖。Signal 还公开 observed、订阅边界 hook 与终态 dispose()，供资源宿主管理状态节点生命周期。',
-      quickStart: `import { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst selectedProductId = new Signal<string | null>(\n  null,\n  runtime,\n  { debugName: 'catalog.selected-product' }\n)\n\nconst stopSelectionLog = runtime.effect(() => {\n  console.log('selected:', selectedProductId.value)\n})\n\nconst initialVersion = selectedProductId.version\nselectedProductId.value = 'sku-42'\nruntime.flush() // effect 输出 selected: sku-42\n\nselectedProductId.value = 'sku-42' // Object.is 相等：不通知\nconsole.log(selectedProductId.version === initialVersion + 1) // true\n\nstopSelectionLog()\nselectedProductId.dispose()\nconsole.log(selectedProductId.disposed) // true`,
+        '表示响应式图中的可写事实来源。通过 runtime.signal(initialValue, options) 创建 IReactiveSignal 句柄。读取 value 会把当前 Computed 或 Effect 登记为订阅者；写入真正不同的值会领取新版本，并通知同一 Runtime 中受影响的下游。Object.is 相等的写入会被短路，不增加 version，也不触发重算；peek() 只读取当前值而不建立依赖。Signal 还公开 observed、订阅边界 hook 与终态 dispose()，供资源宿主管理状态节点生命周期。',
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst selectedProductId = runtime.signal<string | null>(null, { debugName: 'catalog.selected-product' })\n\nconst stopSelectionLog = runtime.effect(() => {\n  console.log('selected:', selectedProductId.value)\n})\n\nconst initialVersion = selectedProductId.version\nselectedProductId.value = 'sku-42'\nruntime.flush() // effect 输出 selected: sku-42\n\nselectedProductId.value = 'sku-42' // Object.is 相等：不通知\nconsole.log(selectedProductId.version === initialVersion + 1) // true\n\nstopSelectionLog.dispose()\nselectedProductId.dispose()\nconsole.log(selectedProductId.disposed) // true",
       scenarios: [
         '表单字段、当前筛选器、选中项、分页游标等由用户事件直接修改，并驱动校验、派生结果或 UI 同步。',
         '连接状态、重试次数、播放位置或任务进度由命令式回调更新，同时需要多个 Computed 和 Effect 消费。',
@@ -28329,7 +28349,7 @@ try {
           title: '非追踪快照与观察者边界',
           description:
             'peek() 适合命令处理中的一次性快照；addObservedHooks() 在首个消费者出现和最后一个消费者离开时触发，可把轮询等资源绑定到真实需求。',
-          code: "import { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst stockPrice = new Signal(100, runtime)\nconst removeHooks = stockPrice.addObservedHooks({\n  onObserved: () => console.log('start price feed'),\n  onUnobserved: () => console.log('pause price feed')\n})\nconst stop = runtime.effect(() => console.log(stockPrice.value))\n\nconsole.log(stockPrice.observed) // true\nconsole.log(stockPrice.peek()) // 100，不增加新订阅\nstop()\nconsole.log(stockPrice.observed) // false\nremoveHooks()\nstockPrice.dispose()"
+          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst stockPrice = runtime.signal(100)\nconst removeHooks = stockPrice.addObservedHooks({\n  onObserved: () => console.log('start price feed'),\n  onUnobserved: () => console.log('pause price feed')\n})\nconst stop = runtime.effect(() => console.log(stockPrice.value))\n\nconsole.log(stockPrice.observed) // true\nconsole.log(stockPrice.peek()) // 100，不增加新订阅\nstop.dispose()\nconsole.log(stockPrice.observed) // false\nremoveHooks()\nstockPrice.dispose()"
         }
       ],
       options: [
@@ -28364,7 +28384,7 @@ try {
             '幂等地把 Signal 置为终态并断开全部订阅。释放后的 value 读取、赋值和 peek() 都抛出 NODE_DISPOSED，避免静默使用永不更新的旧值。',
           whenToUse:
             'Signal 由组件、缓存单元或领域对象持有时，在该所有者终止后释放；先停止仍会读取它的 Effect。',
-          example: 'stopEffect(); signal.dispose()'
+          example: 'stopEffect.dispose(); signal.dispose()'
         },
         {
           name: 'debugName',
@@ -28378,8 +28398,9 @@ try {
     },
     en: {
       purpose:
-        'A writable reactive source. new Signal(initialValue, runtime, options) and runtime.signal() share one implementation. Reading value tracks dependencies; changed writes advance version and notify the same Runtime. Object.is-equal writes do nothing. peek() reads without tracking, observed and edge hooks report subscriptions, and dispose() permanently ends ownership.',
-      quickStart: `import { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst selectedProductId = new Signal<string | null>(\n  null,\n  runtime,\n  { debugName: 'catalog.selected-product' }\n)\n\nconst stopSelectionLog = runtime.effect(() => {\n  console.log('selected:', selectedProductId.value)\n})\n\nconst initialVersion = selectedProductId.version\nselectedProductId.value = 'sku-42'\nruntime.flush() // effect logs selected: sku-42\n\nselectedProductId.value = 'sku-42' // Object.is equal: no notification\nconsole.log(selectedProductId.version === initialVersion + 1) // true\n\nstopSelectionLog()\nselectedProductId.dispose()\nconsole.log(selectedProductId.disposed) // true`,
+        'A writable reactive source created by runtime.signal(initialValue, options), with the IReactiveSignal contract. Reading value tracks dependencies; changed writes advance version and notify the same Runtime. Object.is-equal writes do nothing. peek() reads without tracking, observed and edge hooks report subscriptions, and dispose() permanently ends ownership.',
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst selectedProductId = runtime.signal<string | null>(null, { debugName: 'catalog.selected-product' })\n\nconst stopSelectionLog = runtime.effect(() => {\n  console.log('selected:', selectedProductId.value)\n})\n\nconst initialVersion = selectedProductId.version\nselectedProductId.value = 'sku-42'\nruntime.flush() // effect logs selected: sku-42\n\nselectedProductId.value = 'sku-42' // Object.is equal: no notification\nconsole.log(selectedProductId.version === initialVersion + 1) // true\n\nstopSelectionLog.dispose()\nselectedProductId.dispose()\nconsole.log(selectedProductId.disposed) // true",
       scenarios: [
         'Form fields, active filters, selections, and pagination cursors are changed directly by user events and drive validation, derived results, or UI synchronization.',
         'Connection state, retry count, playback position, or task progress is updated by imperative callbacks and consumed by several Computeds and Effects.',
@@ -28404,7 +28425,7 @@ try {
           title: 'Untracked snapshots and observer boundaries',
           description:
             'peek() provides a one-time command snapshot. addObservedHooks() runs when the first consumer arrives and the last leaves, allowing polling and similar resources to follow real demand.',
-          code: "import { Signal, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst stockPrice = new Signal(100, runtime)\nconst removeHooks = stockPrice.addObservedHooks({\n  onObserved: () => console.log('start price feed'),\n  onUnobserved: () => console.log('pause price feed')\n})\nconst stop = runtime.effect(() => console.log(stockPrice.value))\n\nconsole.log(stockPrice.observed) // true\nconsole.log(stockPrice.peek()) // 100, without a new subscription\nstop()\nconsole.log(stockPrice.observed) // false\nremoveHooks()\nstockPrice.dispose()"
+          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst stockPrice = runtime.signal(100)\nconst removeHooks = stockPrice.addObservedHooks({\n  onObserved: () => console.log('start price feed'),\n  onUnobserved: () => console.log('pause price feed')\n})\nconst stop = runtime.effect(() => console.log(stockPrice.value))\n\nconsole.log(stockPrice.observed) // true\nconsole.log(stockPrice.peek()) // 100, without a new subscription\nstop.dispose()\nconsole.log(stockPrice.observed) // false\nremoveHooks()\nstockPrice.dispose()"
         }
       ],
       options: [
@@ -28439,7 +28460,7 @@ try {
             'Idempotently makes Signal terminal and disconnects all subscribers. Reading or assigning value, or calling peek(), then throws NODE_DISPOSED instead of returning stale state.',
           whenToUse:
             'Dispose a Signal after its component, cache cell, or domain owner terminates, stopping Effects that still read it first.',
-          example: 'stopEffect(); signal.dispose()'
+          example: 'stopEffect.dispose(); signal.dispose()'
         },
         {
           name: 'debugName',
@@ -28453,7 +28474,7 @@ try {
       ]
     }
   },
-  'reactive:reactive:Computed': {
+  'reactive:index:IReactiveComputed': {
     zh: {
       purpose:
         '声明一个只读派生值，把多个事实来源组合成唯一、不可直接赋值的结果。Computed 构造时不求值；首次读取 value 才执行计算并自动追踪本轮实际读取的依赖，之后复用缓存。依赖变化只会标脏，下一次读取才重算；条件分支改变时依赖集合也会随本轮读取自动切换。value 会让当前观察者订阅该结果，peek() 只读取而不建立这条下游依赖，dispose() 则永久断开上下游并禁止继续读取。',
@@ -28479,10 +28500,10 @@ try {
         },
         {
           id: 'direct-instance-and-peek',
-          title: '直接实例：持有生命周期并进行非追踪读取',
+          title: '派生句柄：持有生命周期并进行非追踪读取',
           description:
-            '直接构造 Computed 可显式持有实例、检查 disposed，并在宿主销毁时释放。peek() 会取得最新值，但不会让当前观察者订阅这个 Computed。',
-          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => `${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
+            'runtime.computed() 返回 IReactiveComputed 句柄，可检查 disposed，并在宿主销毁时释放。peek() 会取得最新值，但不会让当前观察者订阅这个 Computed。',
+          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = runtime.computed(() => `${firstName.value} ${lastName.value}`, { debugName: 'profile.full-name' })\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
         }
       ],
       options: [
@@ -28504,10 +28525,10 @@ try {
         {
           name: '实例生命周期',
           description:
-            'new Computed(fn, runtime, config) 与 runtime.computed(fn, config) 使用同一实现。dispose() 幂等断开全部依赖和观察者；之后读取会抛出 NODE_DISPOSED，而不是返回过期缓存。',
+            'runtime.computed(fn, config) 返回 IReactiveComputed 句柄。dispose() 幂等断开全部依赖和观察者；之后读取会抛出 NODE_DISPOSED，而不是返回过期缓存。',
           whenToUse:
-            '宿主需要检查 disposed 或显式掌控对象生命周期时直接构造；一般业务派生使用 runtime.computed()。',
-          example: 'const total = new Computed(calculateTotal, runtime); total.dispose()'
+            '通过 runtime.computed() 创建派生值；宿主保留句柄，并在不再需要时调用 dispose()。',
+          example: 'const total = runtime.computed(calculateTotal); total.dispose()'
         },
         {
           name: 'equals',
@@ -28535,7 +28556,7 @@ try {
     },
     en: {
       purpose:
-        'A lazy, read-only derived value. new Computed(callback, runtime, options) calculates on the first value read, tracks only dependencies read during that run and caches the result. Changes mark it dirty; the next read recomputes and replaces conditional dependencies. value tracks the observer, peek() does not, and dispose() disconnects both sides and rejects later reads.',
+        'A lazy, read-only derived value. runtime.computed(callback, options) calculates on the first value read, tracks only dependencies read during that run and caches the result. Changes mark it dirty; the next read recomputes and replaces conditional dependencies. value tracks the observer, peek() does not, and dispose() disconnects both sides and rejects later reads.',
       quickStart: `import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unitPrice = runtime.signal(12)\nconst quantity = runtime.signal(2)\nconst freeShipping = runtime.signal(false)\nlet calculationCount = 0\n\nconst checkoutTotal = runtime.computed(() => {\n  calculationCount += 1\n  const subtotal = unitPrice.value * quantity.value\n  return freeShipping.value ? subtotal : subtotal + 5\n}, { debugName: 'checkout.total' })\n\nconsole.log(calculationCount) // 0: construction is lazy\nconsole.log(checkoutTotal.value) // 29: the first read calculates\nconsole.log(checkoutTotal.value) // 29: cached\nconsole.log(calculationCount) // 1\n\nfreeShipping.value = true // mark dirty without calculating\nconsole.log(checkoutTotal.value) // 24: recompute on read\nconsole.log(calculationCount) // 2\ncheckoutTotal.dispose()`,
       scenarios: [
         'A cart derives the payable amount from unit prices, quantities, discounts, tax, and shipping rules while the application maintains only source facts.',
@@ -28558,10 +28579,10 @@ try {
         },
         {
           id: 'direct-instance-and-peek',
-          title: 'Direct instance: own the lifecycle and read without tracking',
+          title: 'Computed handle: own the lifecycle and read without tracking',
           description:
-            'Direct construction retains the Computed instance, exposes disposed, and allows explicit host teardown. peek() returns the latest value without subscribing the current observer to this Computed.',
-          code: "import { Computed, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = new Computed(\n  () => `${firstName.value} ${lastName.value}`,\n  runtime,\n  { debugName: 'profile.full-name' }\n)\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
+            'runtime.computed() returns an IReactiveComputed handle with disposed and explicit host teardown. peek() returns the latest value without subscribing the current observer to this Computed.',
+          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst firstName = runtime.signal('Ada')\nconst lastName = runtime.signal('Lovelace')\nconst fullName = runtime.computed(() => `${firstName.value} ${lastName.value}`, { debugName: 'profile.full-name' })\n\nconsole.log(fullName.peek()) // Ada Lovelace\nfullName.dispose()\nconsole.log(fullName.disposed) // true"
         }
       ],
       options: [
@@ -28584,10 +28605,10 @@ try {
         {
           name: 'Instance lifecycle',
           description:
-            'new Computed(fn, runtime, config) and runtime.computed(fn, config) use the same implementation. dispose() idempotently disconnects all dependencies and observers; later reads throw NODE_DISPOSED instead of returning stale cache.',
+            'runtime.computed(fn, config) returns an IReactiveComputed handle. dispose() idempotently disconnects all dependencies and observers; later reads throw NODE_DISPOSED instead of returning stale cache.',
           whenToUse:
-            'Construct directly when a host must inspect disposed or explicitly own the object. Use runtime.computed() for ordinary application derivations.',
-          example: 'const total = new Computed(calculateTotal, runtime); total.dispose()'
+            'Create derived values with runtime.computed(), retain the handle, and call dispose() when the host no longer needs it.',
+          example: 'const total = runtime.computed(calculateTotal); total.dispose()'
         },
         {
           name: 'equals',
@@ -28619,15 +28640,16 @@ try {
       ]
     }
   },
-  'reactive:reactive:Effect': {
+  'reactive:index:IReactiveEffect': {
     zh: {
       purpose:
-        '把响应式状态同步到外部世界。可从 @migaia/reactive 根包导入 Effect 与 createRuntime：直接 new Effect(callback, runtime, options) 可保留实例并检查 disposed，runtime.effect(callback, options) 则返回停止函数。两种入口都会立即执行，自动订阅本次执行读取的节点；依赖变化后由 Runtime 调度重跑，重跑前先执行上一次返回的 cleanup，dispose() 后永久停止；显式 runtime.flush() 可在同步边界立即冲刷已排队的副作用。',
-      quickStart: `import { Effect, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// 构造时立即连接；读取 roomId.value 会把它登记为依赖。\nconst roomConnection = new Effect(() => {\n  const events = new EventSource(\n    \`/api/rooms/\${encodeURIComponent(roomId.value)}/events\`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // 换房间重跑前、以及 dispose() 时，都会先关闭旧连接。\n  return () => events.close()\n}, runtime, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // 关闭 general，再连接 support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true`,
+        '把响应式状态同步到外部世界。从 @migaia/reactive 根入口导入 createRuntime，再通过 runtime.effect(callback, options) 创建 IReactiveEffect 句柄。创建时立即执行，自动订阅本次执行读取的节点；依赖变化后由 Runtime 调度重跑，重跑前先执行上一次返回的 cleanup，dispose() 后永久停止；显式 runtime.flush() 可在同步边界立即冲刷已排队的副作用。',
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// 构造时立即连接；读取 roomId.value 会把它登记为依赖。\nconst roomConnection = runtime.effect(() => {\n  const events = new EventSource(\n    `/api/rooms/${encodeURIComponent(roomId.value)}/events`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // 换房间重跑前、以及 dispose() 时，都会先关闭旧连接。\n  return () => events.close()\n}, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // 关闭 general，再连接 support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true",
       scenarios: [
         '聊天室、行情或协作页面根据当前 roomId / symbol / documentId 重建 WebSocket、EventSource 或事件监听，并在切换前关闭旧订阅。',
         '把主题、语言、标题或表单状态同步到 DOM、localStorage、日志和第三方命令式组件。',
-        '在应用根或组件挂载期启动可撤销的外部资源，并在宿主卸载时通过 dispose() 或停止函数统一释放。'
+        '在应用根或组件挂载期启动可撤销的外部资源，并在宿主卸载时调用句柄的 dispose() 统一释放。'
       ],
       avoidWhen: [
         '只是计算另一个值；使用 Computed，避免把派生状态写回 Signal。',
@@ -28639,15 +28661,15 @@ try {
           id: 'runtime-convenience',
           title: '便捷入口：同步浏览器标题',
           description:
-            'runtime.effect() 与直接构造拥有相同的追踪、重跑和 cleanup 语义，但只返回停止函数，适合不需要读取实例状态的宿主代码。',
-          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unreadCount = runtime.signal(0)\nconst stopTitleSync = runtime.effect(() => {\n  document.title = `消息 (${unreadCount.value})`\n}, { debugName: 'document.unread-title' })\n\nunreadCount.value = 3\nruntime.flush()\nstopTitleSync()"
+            'runtime.effect() 返回 IReactiveEffect 句柄；句柄提供 disposed 与幂等 dispose()，宿主在卸载时统一释放。',
+          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unreadCount = runtime.signal(0)\nconst stopTitleSync = runtime.effect(() => {\n  document.title = `消息 (${unreadCount.value})`\n}, { debugName: 'document.unread-title' })\n\nunreadCount.value = 3\nruntime.flush()\nstopTitleSync.dispose()"
         },
         {
           id: 'abort-stale-request',
           title: '生产场景：取消过期请求',
           description:
             'Effect 本身不等待 Promise；同步返回 cleanup，在筛选条件变化时先 abort 上一轮请求，避免旧响应覆盖新页面。',
-          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('typescript')\nconst stopSearch = runtime.effect(() => {\n  const controller = new AbortController()\n  const url = `/api/search?q=${encodeURIComponent(query.value)}`\n\n  void fetch(url, { signal: controller.signal })\n    .then((response) => response.json())\n    .then((result) => console.log(result))\n    .catch((error) => {\n      if (error instanceof DOMException && error.name === 'AbortError') return\n      console.error(error)\n    })\n\n  return () => controller.abort()\n})\n\nquery.value = 'reactive runtime'\nruntime.flush()\nstopSearch()"
+          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('typescript')\nconst stopSearch = runtime.effect(() => {\n  const controller = new AbortController()\n  const url = `/api/search?q=${encodeURIComponent(query.value)}`\n\n  void fetch(url, { signal: controller.signal })\n    .then((response) => response.json())\n    .then((result) => console.log(result))\n    .catch((error) => {\n      if (error instanceof DOMException && error.name === 'AbortError') return\n      console.error(error)\n    })\n\n  return () => controller.abort()\n})\n\nquery.value = 'reactive runtime'\nruntime.flush()\nstopSearch.dispose()"
         }
       ],
       options: [
@@ -28656,22 +28678,21 @@ try {
           description:
             '同步执行的副作用函数。执行期间读取的 Signal 或 Computed 会成为依赖；可返回同步 cleanup，Runtime 会在下一次重跑前及最终释放时调用它。',
           whenToUse: '所有 Effect 都必须提供；把外部资源的创建和对应释放写在同一个回调内。',
-          example: 'new Effect(() => { const off = subscribe(); return off }, runtime)'
+          example: 'runtime.effect(() => { const off = subscribe(); return off })'
         },
         {
-          name: 'Effect 实例与 runtime.effect()',
+          name: 'IReactiveEffect 句柄与 runtime.effect()',
           description:
-            'new Effect(callback, runtime, options) 返回含 run()、dispose()、disposed 的实例；runtime.effect(callback, options) 使用同一实现，但只返回幂等停止函数。',
+            'runtime.effect(callback, options) 返回 IReactiveEffect 句柄，提供 dispose()、disposed、runtime 与 debugName，不公开图内部运行方法。',
           whenToUse:
-            '需要显式持有实例或检查 disposed 时直接构造；宿主只需登记一个 disposer 时使用 runtime.effect()。',
-          example: 'const stop = runtime.effect(syncTitle); stop()'
+            '宿主保留 runtime.effect() 返回的句柄；释放资源时调用 dispose()，检查终态时读取 disposed。',
+          example: 'const stop = runtime.effect(syncTitle); stop.dispose()'
         },
         {
           name: '调度与 flush()',
           description:
             '首次执行发生在创建期间；依赖变化会把 Effect 放入 Runtime 调度队列。默认微任务会冲刷队列，测试、批处理边界或需要立即观察结果时可调用 runtime.flush()。',
-          whenToUse:
-            '不要手动调用 run() 模拟依赖变更；让调度器合并写入，仅在明确的同步边界 flush。',
+          whenToUse: '让调度器合并依赖写入，仅在明确的同步边界调用 runtime.flush()。',
           example: "roomId.value = 'support'; runtime.flush()"
         },
         {
@@ -28685,12 +28706,13 @@ try {
     },
     en: {
       purpose:
-        'Synchronizes reactive state with external resources. Import Effect and createRuntime from @migaia/reactive. new Effect(callback, runtime, options) exposes disposed; runtime.effect() returns a stop function. Both run immediately, track reads, rerun through Runtime scheduling and clean up before reruns and disposal. runtime.flush() observes queued effects at a synchronous boundary.',
-      quickStart: `import { Effect, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// Construction connects immediately; reading roomId.value registers it as a dependency.\nconst roomConnection = new Effect(() => {\n  const events = new EventSource(\n    \`/api/rooms/\${encodeURIComponent(roomId.value)}/events\`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // This closes the old connection before a rerun and during dispose().\n  return () => events.close()\n}, runtime, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // close general, then connect support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true`,
+        'Synchronizes reactive state with external resources. Import createRuntime from @migaia/reactive and create an IReactiveEffect handle with runtime.effect(callback, options). It runs immediately, track reads, rerun through Runtime scheduling and clean up before reruns and disposal. runtime.flush() observes queued effects at a synchronous boundary.',
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst roomId = runtime.signal('general')\n\n// Construction connects immediately; reading roomId.value registers it as a dependency.\nconst roomConnection = runtime.effect(() => {\n  const events = new EventSource(\n    `/api/rooms/${encodeURIComponent(roomId.value)}/events`\n  )\n  events.onmessage = ({ data }) => console.log(JSON.parse(data))\n\n  // This closes the old connection before a rerun and during dispose().\n  return () => events.close()\n}, { debugName: 'chat.room-events' })\n\nroomId.value = 'support'\nruntime.flush() // close general, then connect support\n\nroomConnection.dispose()\nconsole.log(roomConnection.disposed) // true",
       scenarios: [
         'Chat, market-data, or collaboration screens rebuild a WebSocket, EventSource, or event listener from the current roomId, symbol, or documentId and close the previous subscription first.',
         'Theme, locale, title, or form state must be synchronized with the DOM, localStorage, logs, or an imperative third-party widget.',
-        'An application root or component starts a disposable external resource and releases it with dispose() or the stop function during host teardown.'
+        'An application root or component starts a disposable external resource and calls the effect handle’s dispose() during host teardown.'
       ],
       avoidWhen: [
         'Only another value is being calculated; use Computed instead of writing derived state back into a Signal.',
@@ -28702,15 +28724,15 @@ try {
           id: 'runtime-convenience',
           title: 'Convenience API: synchronize the browser title',
           description:
-            'runtime.effect() has the same tracking, rerun, and cleanup behavior as direct construction, but returns only a stop function for hosts that do not need instance state.',
-          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unreadCount = runtime.signal(0)\nconst stopTitleSync = runtime.effect(() => {\n  document.title = `Messages (${unreadCount.value})`\n}, { debugName: 'document.unread-title' })\n\nunreadCount.value = 3\nruntime.flush()\nstopTitleSync()"
+            'runtime.effect() returns an IReactiveEffect handle with disposed and idempotent dispose(), so the host can release it during teardown.',
+          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst unreadCount = runtime.signal(0)\nconst stopTitleSync = runtime.effect(() => {\n  document.title = `Messages (${unreadCount.value})`\n}, { debugName: 'document.unread-title' })\n\nunreadCount.value = 3\nruntime.flush()\nstopTitleSync.dispose()"
         },
         {
           id: 'abort-stale-request',
           title: 'Production scenario: cancel stale requests',
           description:
             'Effect does not await a Promise. Return a synchronous cleanup that aborts the previous request when the filter changes, preventing stale responses from replacing the new page.',
-          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('typescript')\nconst stopSearch = runtime.effect(() => {\n  const controller = new AbortController()\n  const url = `/api/search?q=${encodeURIComponent(query.value)}`\n\n  void fetch(url, { signal: controller.signal })\n    .then((response) => response.json())\n    .then((result) => console.log(result))\n    .catch((error) => {\n      if (error instanceof DOMException && error.name === 'AbortError') return\n      console.error(error)\n    })\n\n  return () => controller.abort()\n})\n\nquery.value = 'reactive runtime'\nruntime.flush()\nstopSearch()"
+          code: "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst query = runtime.signal('typescript')\nconst stopSearch = runtime.effect(() => {\n  const controller = new AbortController()\n  const url = `/api/search?q=${encodeURIComponent(query.value)}`\n\n  void fetch(url, { signal: controller.signal })\n    .then((response) => response.json())\n    .then((result) => console.log(result))\n    .catch((error) => {\n      if (error instanceof DOMException && error.name === 'AbortError') return\n      console.error(error)\n    })\n\n  return () => controller.abort()\n})\n\nquery.value = 'reactive runtime'\nruntime.flush()\nstopSearch.dispose()"
         }
       ],
       options: [
@@ -28720,22 +28742,22 @@ try {
             'A synchronous side-effect function. Signals and Computeds read during execution become dependencies. It may return a synchronous cleanup invoked before the next run and at final disposal.',
           whenToUse:
             'Every Effect requires one; keep acquisition and release of an external resource together in this callback.',
-          example: 'new Effect(() => { const off = subscribe(); return off }, runtime)'
+          example: 'runtime.effect(() => { const off = subscribe(); return off })'
         },
         {
-          name: 'Effect instance vs runtime.effect()',
+          name: 'IReactiveEffect handle and runtime.effect()',
           description:
-            'new Effect(callback, runtime, options) returns an instance with run(), dispose(), and disposed. runtime.effect(callback, options) uses the same implementation but returns only an idempotent stop function.',
+            'runtime.effect(callback, options) returns an IReactiveEffect handle with dispose(), disposed, runtime, and debugName. Graph execution methods remain internal.',
           whenToUse:
-            'Construct directly when instance state is required; use runtime.effect() when a host only needs a disposer to register.',
-          example: 'const stop = runtime.effect(syncTitle); stop()'
+            'Retain the handle returned by runtime.effect(), call dispose() to release resources, and read disposed to inspect its terminal state.',
+          example: 'const stop = runtime.effect(syncTitle); stop.dispose()'
         },
         {
           name: 'Scheduling and flush()',
           description:
             'The first run happens during creation. Dependency changes enqueue the Effect in the Runtime scheduler. The default microtask drains it; tests, batch boundaries, or immediate observation can call runtime.flush().',
           whenToUse:
-            'Do not call run() to imitate dependency changes. Let the scheduler coalesce writes and flush only at an intentional synchronous boundary.',
+            'Let the scheduler coalesce dependency writes and call runtime.flush() only at an intentional synchronous boundary.',
           example: "roomId.value = 'support'; runtime.flush()"
         },
         {
@@ -28749,7 +28771,7 @@ try {
       ]
     }
   },
-  'reactive:runtime:createRuntime': {
+  'reactive:index:createRuntime': {
     zh: {
       purpose:
         '创建一张独立的响应式图以及它自己的版本时钟、依赖追踪器和调度队列。SSR 请求、测试、Worker 或相互隔离的应用根应各自拥有 Runtime。',
@@ -28779,7 +28801,7 @@ try {
       options: reactiveRuntimeOptions.en
     }
   },
-  'reactive:runtime:Runtime': {
+  'reactive:index:IRuntime': {
     zh: {
       purpose:
         'Runtime 是 Signal、Computed 与 Effect 的所有权和执行边界。通常通过 createRuntime() 获得实例；其方法确保所有节点加入同一张图，并提供 batch、untracked、flush 与诊断能力。',
@@ -28812,8 +28834,9 @@ try {
   'reactive:index:defaultRuntime': {
     zh: {
       purpose:
-        '提供进程级共享的默认 Runtime，供 signal()、computed() 与 effect() 便捷函数使用。它降低简单客户端模块的启动成本，但其状态、队列和诊断通道会被同一进程中的所有使用者共享。',
-      quickStart: `import { computed, effect, signal } from '@migaia/reactive'\n\nconst count = signal(0)\nconst doubled = computed(() => count.value * 2)\nconst stop = effect(() => console.log(doubled.value))\n\ncount.value = 1\nstop()`,
+        '提供进程级共享的默认 Runtime，通过 defaultRuntime.signal()、defaultRuntime.computed() 与 defaultRuntime.effect() 创建节点。它降低简单客户端模块的启动成本，但其状态、队列和诊断通道会被同一进程中的所有使用者共享。',
+      quickStart:
+        "import { defaultRuntime } from '@migaia/reactive'\n\nconst count = defaultRuntime.signal(0)\nconst doubled = defaultRuntime.computed(() => count.value * 2)\nconst stop = defaultRuntime.effect(() => console.log(doubled.value))\n\ncount.value = 1\nstop.dispose()",
       scenarios: [
         '单一客户端应用根接受全局共享的响应式图。',
         '小型模块需要最少样板代码，且不存在请求级或测试级隔离要求。'
@@ -28826,8 +28849,9 @@ try {
     },
     en: {
       purpose:
-        'Provides the process-wide default Runtime used by the signal(), computed(), and effect() convenience functions. It minimizes setup for simple clients but shares graph state, queues, and diagnostics across all users in the process.',
-      quickStart: `import { computed, effect, signal } from '@migaia/reactive'\n\nconst count = signal(0)\nconst doubled = computed(() => count.value * 2)\nconst stop = effect(() => console.log(doubled.value))\n\ncount.value = 1\nstop()`,
+        'Provides the process-wide default Runtime with defaultRuntime.signal(), defaultRuntime.computed(), and defaultRuntime.effect() node factories. It minimizes setup for simple clients but shares graph state, queues, and diagnostics across all users in the process.',
+      quickStart:
+        "import { defaultRuntime } from '@migaia/reactive'\n\nconst count = defaultRuntime.signal(0)\nconst doubled = defaultRuntime.computed(() => count.value * 2)\nconst stop = defaultRuntime.effect(() => console.log(doubled.value))\n\ncount.value = 1\nstop.dispose()",
       scenarios: [
         'One client application root deliberately shares a global reactive graph.',
         'A small module needs minimal setup and has no request-level or test-level isolation requirement.'
@@ -28902,10 +28926,10 @@ export function findApiGuide(
         })
     ]
   }
-  if (library === 'reactive' && symbolName === 'Signal' && guide) {
+  if (library === 'reactive' && symbolName === 'IReactiveSignal' && guide) {
     return { ...guide, options: guide.options.filter((option) => option.name === 'debugName') }
   }
-  if (library === 'reactive' && symbolName === 'Computed' && guide) {
+  if (library === 'reactive' && symbolName === 'IReactiveComputed' && guide) {
     return {
       ...guide,
       options: guide.options.filter((option) =>
@@ -28913,7 +28937,7 @@ export function findApiGuide(
       )
     }
   }
-  if (library === 'reactive' && symbolName === 'Effect' && guide) {
+  if (library === 'reactive' && symbolName === 'IReactiveEffect' && guide) {
     return { ...guide, options: guide.options.filter((option) => option.name === 'debugName') }
   }
   if (library === 'logger' && symbolName === 'setLoggerRuntimeManager' && guide) {

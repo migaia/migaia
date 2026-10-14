@@ -6,7 +6,7 @@
 
 **适用**：表格行、消息列表一类大规模集合，但只有少数条目被 UI 订阅；需要"改一个 key/索引，只有读过它的地方重算"的细粒度依赖；需要跟 `@migaia/store-light` 的 `IMutationGuard` 集成，把"只能在 action 内写"这类策略下沉到集合层。
 
-**不适用**：只需要一个普通的响应式对象/数组、不关心细粒度依赖或容量——直接用 `@migaia/reactive` 的 `Signal<T>` 更省事；需要"按值稳定标识、删除/插入不改变其余成员定位"的实体集合——`ObservableArray` 是纯索引语义，`splice`/`pop`/`replace` 会移动后续索引对应的值，这不是本包的设计目标。
+**不适用**：只需要一个普通的响应式对象/数组、不关心细粒度依赖或容量——直接用 `runtime.signal(value)` 创建 `IReactiveSignal<T>` 更省事；需要"按值稳定标识、删除/插入不改变其余成员定位"的实体集合——`ObservableArray` 是纯索引语义，`splice`/`pop`/`replace` 会移动后续索引对应的值，这不是本包的设计目标。
 
 ## 安装
 
@@ -14,7 +14,7 @@
 pnpm add @migaia/store-indexed
 ```
 
-依赖 `@migaia/reactive`（响应式运行时，提供 `IRuntime`/`defaultRuntime`/`Signal`）与 `@migaia/store-light`（提供 `IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。
+依赖 `@migaia/reactive`（响应式运行时，提供 `IRuntime`/`defaultRuntime`/`IReactiveSignal`）与 `@migaia/store-light`（提供 `IMutationGuard` 类型），二者通常已经在同一个 monorepo 里作为对等依赖存在。
 
 ## 目录
 
@@ -211,7 +211,6 @@ throw createStoreIndexedTypeError(
 
 ```ts
 import { ObservableArray } from '@migaia/store-indexed';
-import { Effect } from '@migaia/reactive';
 
 const rows = new ObservableArray<{ id: string; name: string }>(
   Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))
@@ -219,7 +218,7 @@ const rows = new ObservableArray<{ id: string; name: string }>(
 
 // 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal
 const watched = [0, 1, 2, 3, 4].map(
-  (index) => new Effect(() => render(index, rows.at(index)), rows.runtime)
+  (index) => rows.runtime.effect(() => render(index, rows.at(index)))
 );
 
 rows.splice(0, 1); // 索引语义整体后移一位
@@ -252,14 +251,14 @@ try {
 ### 3. 多 Runtime 隔离 + 跨 Runtime 保护
 
 ```ts
-import { createRuntime, Effect } from '@migaia/reactive';
+import { createRuntime } from '@migaia/reactive';
 import { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';
 
 const runtimeA = createRuntime();
 const runtimeB = createRuntime();
 const tagsInA = new ObservableSet(['a', 'b'], runtimeA);
 
-new Effect(() => {
+runtimeB.effect(() => {
   try {
     tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合
   } catch (error) {
@@ -267,7 +266,7 @@ new Effect(() => {
       // 预期内的跨 Runtime 保护
     }
   }
-}, runtimeB);
+});
 ```
 
 ### 4. 自定义错误保留同一套 `(source, code)` 约定

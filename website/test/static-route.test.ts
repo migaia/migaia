@@ -3246,7 +3246,7 @@ test('SITE-T-REACTIVE-START flushes the queued rerun before disposing the Effect
       'utf8'
     )
     const flush = page.indexOf('runtime.flush')
-    const stop = page.indexOf('stop()')
+    const stop = page.indexOf('stop.dispose()')
 
     assert.ok(flush >= 0, `/${locale}/docs/reactive/getting-started misses runtime.flush()`)
     assert.ok(stop > flush, `/${locale}/docs/reactive/getting-started disposes before flush`)

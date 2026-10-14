@@ -473,7 +473,6 @@ const rows = new ObservableArray([1, 2, 3], runtime);
 ## 组合工作流示例：细粒度订阅 + `prune()` + `mutationGuard`
 
 ```ts
-import { Effect } from '@migaia/reactive';
 import { ObservableArray } from '@migaia/store-indexed';
 import { MutationPolicy } from '@migaia/store-middleware';
 
@@ -485,7 +484,7 @@ const rows = new ObservableArray<{ id: string }>(
 );
 
 // 只订阅索引 0：改其余索引不会让这个 effect 重算
-const effect = new Effect(() => console.log('row0', rows.at(0)), rows.runtime);
+const effect = rows.runtime.effect(() => console.log('row0', rows.at(0)));
 
 guard.runInAction(() => {
   rows.splice(0, 1); // 删除首行，触发结构信号与修订信号

@@ -92,13 +92,13 @@ const count = useStore(counterStore, (state) => state.count);
 
 全部参数：`store: IReactiveStore<S>`（必填）、`selector: (state: IStoreShape<S>) => R`（必填，引用应稳定）、`isEqual?: (a: R, b: R) => boolean`（默认 `Object.is`）。不需要 `StoreProvider`；`store.$async === true` 时会先 `use(storeReady(store))`，组件在 Store 就绪前 Suspend。
 
-**`useSignal(signal)`｜3 秒上手** —— 订阅单个 `ISignal`，返回 `[值, 设置函数]`：
+**`useSignal(signal)`｜3 秒上手** —— 订阅单个 `IReactiveSignal`，返回 `[值, 设置函数]`：
 
 ```tsx
 const [name, setName] = useSignal(nameSignal);
 ```
 
-单参数 `signal: ISignal<T>`（必填），无其他选项；依赖集合恒为该 Signal 自己，走比 `useTracked` 更轻的直连路径。
+单参数 `signal: IReactiveSignal<T>`（必填），无其他选项；依赖集合恒为该 Signal 自己，走比 `useTracked` 更轻的直连路径。
 
 **`useTracked(read, isEqual?, runtime?)`｜10 秒上手** —— 最底层的通用订阅 hook，`read()` 内访问到的任意响应式节点都会被自动追踪为依赖；`useStore`/`useResource` 都是它的薄封装：
 
@@ -348,10 +348,10 @@ function Dashboard() {
 
 ```tsx
 import { useTracked } from '@migaia/store-react';
-import { Signal } from '@migaia/reactive';
+import { defaultRuntime } from '@migaia/reactive';
 
-const priceSignal = new Signal(10);
-const qtySignal = new Signal(2);
+const priceSignal = defaultRuntime.signal(10);
+const qtySignal = defaultRuntime.signal(2);
 
 function Total() {
   const total = useTracked(() => priceSignal.value * qtySignal.value);

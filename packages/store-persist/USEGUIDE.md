@@ -251,9 +251,9 @@ async function logout(userId: string) {
 
 | 成员                                 | 类型                                                            | 同步/异步 | 说明                                                              |
 | ------------------------------------ | --------------------------------------------------------------- | --------- | ----------------------------------------------------------------- |
-| `status`                             | `IComputedValue<'loading' \| 'ready' \| 'error' \| 'disposed'>` | —         | 整体状态机                                                        |
-| `error`                              | `IComputedValue<unknown>`                                       | —         | hydration/write 任一失败时的错误；两者都失败返回 `AggregateError` |
-| `hydrated`                           | `IComputedValue<boolean>`                                       | —         | 等价于 `hydrationStatus.value === 'success'`                      |
+| `status`                             | `IReactiveComputed<'loading' \| 'ready' \| 'error' \| 'disposed'>` | —         | 整体状态机                                                        |
+| `error`                              | `IReactiveComputed<unknown>`                                       | —         | hydration/write 任一失败时的错误；两者都失败返回 `AggregateError` |
+| `hydrated`                           | `IReactiveComputed<boolean>`                                       | —         | 等价于 `hydrationStatus.value === 'success'`                      |
 | `hydrationStatus` / `hydrationError` | `IReadonlyPersistValue<...>`                                    | —         | 首次读取的结果，只变化一次                                        |
 | `writeStatus` / `writeError`         | `IReadonlyPersistValue<...>`                                    | —         | 最近一次写操作的结果，会反复变化                                  |
 | `ready`                              | `Promise<void>`                                                 | 异步      | hydrate 成功 resolve，失败 reject                                 |

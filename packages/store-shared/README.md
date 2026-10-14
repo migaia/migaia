@@ -35,7 +35,7 @@ pnpm add @migaia/store-shared
 
 ```ts
 import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';
-import { createRuntime, Effect } from '@migaia/reactive';
+import { createRuntime } from '@migaia/reactive';
 ```
 
 **`sharedInt32`｜5 秒上手** —— 新建一个单值共享 int32，像普通 `Signal` 一样在 `Effect` 里被自动追踪：
@@ -44,7 +44,7 @@ import { createRuntime, Effect } from '@migaia/reactive';
 const runtime = createRuntime();
 const counter = sharedInt32(runtime, 0);
 
-const stop = new Effect(() => console.log('counter =', counter.value), runtime);
+const stop = runtime.effect(() => console.log('counter =', counter.value));
 counter.value = 1; // 本地写入，Effect 自动重跑
 
 stop.dispose();
@@ -79,7 +79,7 @@ counter.dispose();
 
 ```ts
 import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';
-import { createRuntime, Effect } from '@migaia/reactive';
+import { createRuntime } from '@migaia/reactive';
 ```
 
 **`sharedInt32Array`｜10 秒上手** —— 定长共享 int32 数组，每个下标独立追踪、独立通知：
@@ -88,9 +88,9 @@ import { createRuntime, Effect } from '@migaia/reactive';
 const runtime = createRuntime();
 const positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });
 
-const render = new Effect(() => {
+const render = runtime.effect(() => {
   drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标
-}, runtime);
+});
 
 positions.set(0, 10); // 只惊动依赖下标 0 的观察者
 positions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试
@@ -226,7 +226,7 @@ throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length mu
 
 ```ts
 // main.ts
-import { createRuntime, Effect } from '@migaia/reactive';
+import { createRuntime } from '@migaia/reactive';
 import { sharedInt32Array } from '@migaia/store-shared';
 
 const runtime = createRuntime();
@@ -236,7 +236,7 @@ const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'modu
 worker.postMessage({ buffer: positions.buffer });
 
 const stopWatch = positions.watch(); // worker 的写入自动推送进来
-const render = new Effect(() => drawEntity(0, positions.get(0), positions.get(1)), runtime);
+const render = runtime.effect(() => drawEntity(0, positions.get(0), positions.get(1)));
 
 window.addEventListener('beforeunload', () => {
   render.dispose();
@@ -300,13 +300,11 @@ mirror.watch();
 ### 4. 高频轮换下标读取：`prune()` 主动回收响应式 cell
 
 ```ts
-import { Effect } from '@migaia/reactive';
-
-const probe = new Effect(() => {
+const probe = runtime.effect(() => {
   for (let index = 0; index < positions.length; index += 37) {
     positions.get(index); // 遍历式探测，每次命中不同下标
   }
-}, runtime);
+});
 
 setInterval(() => {
   const removed = positions.prune(); // 清理已无订阅者的 cell，避免累积

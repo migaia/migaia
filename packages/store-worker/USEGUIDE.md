@@ -434,12 +434,12 @@ self.onmessage = (event) => {
 ```ts
 // main.ts
 import { WorkerAdapter, workerComputed } from '@migaia/store-worker';
-import { Signal, defaultRuntime } from '@migaia/reactive';
+import { defaultRuntime } from '@migaia/reactive';
 
 const worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });
 const adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });
 
-const rows = new Signal<readonly Row[]>([], defaultRuntime);
+const rows = defaultRuntime.signal<readonly Row[]>([]);
 
 const totals = workerComputed(adapter, () => rows.value, {
   ttl: 30_000, // 30 秒内复用结果,不重新触发 Worker 计算

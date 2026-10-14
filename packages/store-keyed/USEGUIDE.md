@@ -522,7 +522,7 @@ store.dispose();
 
 ### 9.4 override 与 preview 的相互影响
 
-`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有"还没有真实实例"的定义才会走推测计算路径，且该路径产出的值只在当前 `runtime.currentVersion()` 内复用，一个 microtask 后如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。
+`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有"还没有真实实例"的定义才会走推测计算路径，且该路径产出的值只在当前版本时钟值内复用（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取），一个 microtask 后如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。
 
 ---
 

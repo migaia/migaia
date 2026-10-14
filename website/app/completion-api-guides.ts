@@ -49,7 +49,7 @@ function nodeFieldGuide(input: {
   const register = guide({
     purposeEn: `Registers the private mutable ${input.nounEn} owned by a custom reactive node and returns its read-only public view. Registration rejects a second backing collection for the same node.`,
     purposeZh: `为自定义 reactive node 登记其私有、可变的${input.nounZh}，并返回只读公开视图。同一 node 再次登记另一份集合会被拒绝。`,
-    quickStart: `import { ${input.registerName}, ${input.mutableName} } from '@migaia/reactive/node-internals'\n\nconst node = {}\nconst state = ${input.valueExpression}\nconst readonlyState = ${input.registerName}(node, state)\n${input.mutableName}(node, readonlyState).clear()`,
+    quickStart: `import { ${input.registerName}, ${input.mutableName} } from '@migaia/reactive/internals'\n\nconst node = {}\nconst state = ${input.valueExpression}\nconst readonlyState = ${input.registerName}(node, state)\n${input.mutableName}(node, readonlyState).clear()`,
     scenariosEn: [
       'A library author is implementing a new node type that participates in the Migaia dependency graph.',
       `The node must expose read-only ${input.nounEn} while its implementation retains controlled mutation.`
@@ -70,7 +70,7 @@ function nodeFieldGuide(input: {
   const mutable = guide({
     purposeEn: `Returns the exact mutable ${input.nounEn} previously registered for a custom node. The supplied fallback is accepted only for an unregistered node, so callers can initialize and then mutate one canonical collection.`,
     purposeZh: `取得此前为自定义 node 登记的同一份可变${input.nounZh}。仅当 node 尚未登记时才采用 fallback，从而保证实现层只修改一份规范集合。`,
-    quickStart: `import { ${input.registerName}, ${input.mutableName} } from '@migaia/reactive/node-internals'\n\nconst node = {}\nconst state = ${input.valueExpression}\nconst readonlyState = ${input.registerName}(node, state)\nconst writableState = ${input.mutableName}(node, readonlyState)\nwritableState.clear()`,
+    quickStart: `import { ${input.registerName}, ${input.mutableName} } from '@migaia/reactive/internals'\n\nconst node = {}\nconst state = ${input.valueExpression}\nconst readonlyState = ${input.registerName}(node, state)\nconst writableState = ${input.mutableName}(node, readonlyState)\nwritableState.clear()`,
     scenariosEn: [
       'A custom node implementation must update graph bookkeeping after registration.',
       `The public node shape keeps ${input.nounEn} read-only while the implementation needs the original collection.`
@@ -3731,7 +3731,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
         registerName: 'registerDeps',
         valueExpression: 'new Set<object>()'
       })
-    ).map(([name, value]) => [`reactive:node-internals:${name}`, value])
+    ).map(([name, value]) => [`reactive:internals:${name}`, value])
   ),
   ...Object.fromEntries(
     Object.entries(
@@ -3742,7 +3742,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
         registerName: 'registerDepVersions',
         valueExpression: 'new Map<object, number>()'
       })
-    ).map(([name, value]) => [`reactive:node-internals:${name}`, value])
+    ).map(([name, value]) => [`reactive:internals:${name}`, value])
   ),
   ...Object.fromEntries(
     Object.entries(
@@ -3753,15 +3753,15 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
         registerName: 'registerSubs',
         valueExpression: 'new Set()'
       })
-    ).map(([name, value]) => [`reactive:node-internals:${name}`, value])
+    ).map(([name, value]) => [`reactive:internals:${name}`, value])
   ),
-  'reactive:node-internals:registerVersion': guide({
+  'reactive:internals:registerVersion': guide({
     purposeEn:
       'Registers the initial version held by a custom reactive node. Version updates must use setVersion so graph readers observe one canonical counter.',
     purposeZh:
       '登记自定义 reactive node 的初始版本。后续更新必须使用 setVersion，确保依赖图读取的是同一个规范计数器。',
     quickStart:
-      "import { registerVersion, readVersion, setVersion } from '@migaia/reactive/node-internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)\nconsole.log(readVersion(node, 0))",
+      "import { registerVersion, readVersion, setVersion } from '@migaia/reactive/internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)\nconsole.log(readVersion(node, 0))",
     scenariosEn: [
       'A custom node participates in invalidation and must expose a monotonically changing version.',
       'The implementation keeps version storage private from consumers.'
@@ -3776,13 +3776,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['普通应用应让 Signal 与 Runtime 管理版本。', '不要对同一 node 重复登记。']
   }),
-  'reactive:node-internals:setVersion': guide({
+  'reactive:internals:setVersion': guide({
     purposeEn:
       'Updates the registered version of a custom reactive node after its value or topology changes. It refuses unregistered nodes instead of creating hidden state implicitly.',
     purposeZh:
       '在自定义 reactive node 的值或连接关系变化后更新已登记版本。未登记 node 会被拒绝，不会静默创建隐藏状态。',
     quickStart:
-      "import { registerVersion, setVersion, readVersion } from '@migaia/reactive/node-internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)\nconsole.log(readVersion(node))",
+      "import { registerVersion, setVersion, readVersion } from '@migaia/reactive/internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)\nconsole.log(readVersion(node))",
     scenariosEn: [
       'A custom node has committed a real change and must invalidate version-aware readers.',
       'Version ownership was established during node construction.'
@@ -3797,13 +3797,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['Object.is 相等的写入不要推进版本。', '不要在 registerVersion 之前调用。']
   }),
-  'reactive:node-internals:readVersion': guide({
+  'reactive:internals:readVersion': guide({
     purposeEn:
       'Reads the version registered for a custom node, using the supplied fallback only when the node has no private registration. It never advances the graph clock.',
     purposeZh:
       '读取自定义 node 已登记的版本；仅当没有私有登记时才返回 fallback。该操作不会推进依赖图时钟。',
     quickStart:
-      "import { readVersion, registerVersion } from '@migaia/reactive/node-internals'\n\nconst node = {}\nregisterVersion(node, 4)\nconsole.log(readVersion(node, 0)) // 4",
+      "import { readVersion, registerVersion } from '@migaia/reactive/internals'\n\nconst node = {}\nregisterVersion(node, 4)\nconsole.log(readVersion(node, 0)) // 4",
     scenariosEn: [
       'An extension compares captured dependency versions before reusing a result.',
       'A custom node exposes read-only version observation.'
@@ -3815,83 +3815,17 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['不要把它当作普通计数器。', '不要认为 fallback 会覆盖已登记版本。']
   }),
-  'reactive:runtime:VersionClock': guide({
-    purposeEn:
-      'Allocates monotonically increasing safe-integer versions for committed reactive changes. Exhaustion fails before mutation so the graph never contains a changed value with an unchanged version.',
-    purposeZh:
-      '为已经提交的响应式变化分配单调递增的安全整数版本。耗尽时会在修改前失败，避免出现“值已变化但版本未变化”的依赖图。',
-    quickStart:
-      "import { VersionClock } from '@migaia/reactive/runtime'\n\nconst clock = new VersionClock()\nconst first = clock.next()\nconsole.log(first, clock.current())",
-    scenariosEn: [
-      'A custom Runtime implementation needs one authoritative version source.',
-      'Tests need a deliberately small maximum version to verify exhaustion.'
-    ],
-    scenariosZh: [
-      '自定义 Runtime 实现需要唯一的权威版本来源。',
-      '测试需要较小的最大版本来验证耗尽行为。'
-    ],
-    avoidEn: [
-      'Application code should use createRuntime instead of managing versions.',
-      'Do not reset a live graph clock; create a new Runtime after releasing the old graph.'
-    ],
-    avoidZh: [
-      '普通应用应使用 createRuntime，而不是自行管理版本。',
-      '不要重置仍在使用的图时钟；释放旧图后创建新 Runtime。'
-    ]
-  }),
-  'reactive:runtime:Scheduler': guide({
-    purposeEn:
-      'Queues invalidated reactive work, coalesces repeated requests, and flushes items in bounded passes. Runtime owns the normal Scheduler; this constructor exists for custom runtime infrastructure and deterministic tests.',
-    purposeZh:
-      '排队处理已失效的响应式工作、合并重复请求，并用有上限的轮次完成 flush。普通 Scheduler 由 Runtime 持有；该构造器面向自定义运行时基础设施和确定性测试。',
-    quickStart:
-      "import { Scheduler } from '@migaia/reactive/runtime'\n\nconst scheduler = new Scheduler(console.error, 100, queueMicrotask)\nscheduler.enqueue({ flush: () => console.log('updated') })\nscheduler.requestFlush()",
-    scenariosEn: [
-      'A custom runtime adapter injects its own microtask implementation or error reporter.',
-      'A test must control flush scheduling deterministically.'
-    ],
-    scenariosZh: [
-      '自定义运行时适配器需要注入 microtask 实现或错误报告函数。',
-      '测试需要确定性控制 flush 调度。'
-    ],
-    avoidEn: [
-      'Application code should call Runtime.batch or Runtime.flush.',
-      'Do not enqueue arbitrary long-running application jobs.'
-    ],
-    avoidZh: ['普通应用应调用 Runtime.batch 或 Runtime.flush。', '不要用它排队任意长时间业务任务。']
-  }),
-  'reactive:runtime:DependencyTracker': guide({
-    purposeEn:
-      'Captures observable reads during one computation and atomically replaces the observer dependency edges after success. Runtime uses it internally; extension authors use it only when implementing a new node kind.',
-    purposeZh:
-      '捕获一次计算期间读取的 observable，并在成功后原子替换 observer 的依赖边。Runtime 会在内部使用它；扩展作者只在实现新节点类型时直接使用。',
-    quickStart:
-      "import { DependencyTracker, createRuntime } from '@migaia/reactive/runtime'\n\nconst runtime = createRuntime()\nconst tracker = new DependencyTracker(runtime)\nconsole.log(tracker.isTracking())",
-    scenariosEn: [
-      'A custom computed-like node must rebuild dependencies after each evaluation.',
-      'Dispose must disconnect every edge owned by one observer.'
-    ],
-    scenariosZh: [
-      '自定义 computed 类节点需要在每次求值后重建依赖。',
-      'dispose 需要断开一个 observer 持有的全部依赖边。'
-    ],
-    avoidEn: [
-      'Application code only needs derived values; use Computed.',
-      'Do not join nodes from different Runtime instances.'
-    ],
-    avoidZh: ['普通应用只需要派生值；应使用 Computed。', '不要连接来自不同 Runtime 的节点。']
-  }),
-  'reactive:runtime:createObserverBinding': guide({
+  'reactive:extension:createObserverBinding': guide({
     purposeEn:
       'Bridges render-and-commit hosts to one reactive observer. capture records reads without publishing edges, commit validates the snapshot, and observe owns the live Effect used after host subscription.',
     purposeZh:
       '把具有 render/commit 阶段的宿主接入一个 reactive observer。capture 只记录读取而不发布依赖边，commit 校验快照，observe 持有订阅后的活动 Effect。',
     quickStart:
-      "import { createObserverBinding, createRuntime } from '@migaia/reactive/runtime'\n\nconst runtime = createRuntime()\nconst value = runtime.signal(1)\nconst binding = createObserverBinding(runtime)\nconst stop = binding.observe(() => value.value)\nconst capture = binding.capture(() => value.value)\nif (binding.commit(capture) === 'stale') binding.retrack()\nstop()",
+      "import { createRuntime } from '@migaia/reactive'\nimport { createObserverBinding } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst value = runtime.signal(1)\nconst binding = createObserverBinding(runtime)\nconst stop = binding.observe(() => value.value)\nconst capture = binding.capture(() => value.value)\nif (binding.commit(capture) === 'stale') binding.retrack()\nstop()",
     quickStartEn:
-      "// Import the binding primitive and the Runtime that owns every dependency.\nimport { createObserverBinding, createRuntime } from '@migaia/reactive/runtime'\n\n// Create one isolated reactive graph for this UI root.\nconst runtime = createRuntime()\n\n// Create the source that the render phase will read.\nconst value = runtime.signal(1)\n\n// Allocate one binding for one host observer; do not share it across components.\nconst binding = createObserverBinding(runtime)\n\n// Render: capture the value and dependency versions without publishing subscriptions.\nconst capture = binding.capture(() => value.value)\n\n// Use capture.result as the render snapshot; an abandoned render leaves no graph edges.\nconsole.log('rendered value:', capture.result)\n\n// Subscription/commit: install the one live Effect that will own committed dependencies.\nconst stop = binding.observe(() => console.log('schedule host update:', value.value))\n\n// Validate and publish the captured dependency set to that observer.\nconst commitResult = binding.commit(capture)\n\n// If a dependency changed after render, discard the token and force a fresh observer pass.\nif (commitResult === 'stale') binding.retrack()\n\n// Host unmount: dispose the observer and remove every dependency edge it owns.\nstop()\n\n// Release the example source after no observer can read it again.\nvalue.dispose()",
+      "// Import the binding primitive and the Runtime that owns every dependency.\nimport { createRuntime } from '@migaia/reactive'\nimport { createObserverBinding } from '@migaia/reactive/extension'\n\n// Create one isolated reactive graph for this UI root.\nconst runtime = createRuntime()\n\n// Create the source that the render phase will read.\nconst value = runtime.signal(1)\n\n// Allocate one binding for one host observer; do not share it across components.\nconst binding = createObserverBinding(runtime)\n\n// Render: capture the value and dependency versions without publishing subscriptions.\nconst capture = binding.capture(() => value.value)\n\n// Use capture.result as the render snapshot; an abandoned render leaves no graph edges.\nconsole.log('rendered value:', capture.result)\n\n// Subscription/commit: install the one live Effect that will own committed dependencies.\nconst stop = binding.observe(() => console.log('schedule host update:', value.value))\n\n// Validate and publish the captured dependency set to that observer.\nconst commitResult = binding.commit(capture)\n\n// If a dependency changed after render, discard the token and force a fresh observer pass.\nif (commitResult === 'stale') binding.retrack()\n\n// Host unmount: dispose the observer and remove every dependency edge it owns.\nstop()\n\n// Release the example source after no observer can read it again.\nvalue.dispose()",
     quickStartZh:
-      "// 导入三阶段绑定原语，以及拥有全部依赖节点的 Runtime 工厂。\nimport { createObserverBinding, createRuntime } from '@migaia/reactive/runtime'\n\n// 为这一棵 UI root 创建隔离的响应式图。\nconst runtime = createRuntime()\n\n// 创建 render 阶段会读取的事实来源。\nconst value = runtime.signal(1)\n\n// 一个 binding 只服务一个宿主 observer，不要跨组件复用。\nconst binding = createObserverBinding(runtime)\n\n// render：读取值并捕获依赖版本，但此时绝不发布订阅边。\nconst capture = binding.capture(() => value.value)\n\n// capture.result 是本次 render 快照；render 被丢弃也不会污染依赖图。\nconsole.log('rendered value:', capture.result)\n\n// subscription/commit：安装唯一的活动 Effect，之后由它持有正式依赖。\nconst stop = binding.observe(() => console.log('schedule host update:', value.value))\n\n// 校验 capture 仍新鲜，并把它记录的依赖原子安装到 observer。\nconst commitResult = binding.commit(capture)\n\n// render 后若依赖已变化，stale token 已作废，强制 observer 重新追踪当前值。\nif (commitResult === 'stale') binding.retrack()\n\n// 宿主卸载：释放 observer，并删除它拥有的全部依赖边。\nstop()\n\n// 确认没有 observer 会再次读取后，再释放示例 Signal。\nvalue.dispose()",
+      "// 导入三阶段绑定原语，以及拥有全部依赖节点的 Runtime 工厂。\nimport { createRuntime } from '@migaia/reactive'\nimport { createObserverBinding } from '@migaia/reactive/extension'\n\n// 为这一棵 UI root 创建隔离的响应式图。\nconst runtime = createRuntime()\n\n// 创建 render 阶段会读取的事实来源。\nconst value = runtime.signal(1)\n\n// 一个 binding 只服务一个宿主 observer，不要跨组件复用。\nconst binding = createObserverBinding(runtime)\n\n// render：读取值并捕获依赖版本，但此时绝不发布订阅边。\nconst capture = binding.capture(() => value.value)\n\n// capture.result 是本次 render 快照；render 被丢弃也不会污染依赖图。\nconsole.log('rendered value:', capture.result)\n\n// subscription/commit：安装唯一的活动 Effect，之后由它持有正式依赖。\nconst stop = binding.observe(() => console.log('schedule host update:', value.value))\n\n// 校验 capture 仍新鲜，并把它记录的依赖原子安装到 observer。\nconst commitResult = binding.commit(capture)\n\n// render 后若依赖已变化，stale token 已作废，强制 observer 重新追踪当前值。\nif (commitResult === 'stale') binding.retrack()\n\n// 宿主卸载：释放 observer，并删除它拥有的全部依赖边。\nstop()\n\n// 确认没有 observer 会再次读取后，再释放示例 Signal。\nvalue.dispose()",
     scenariosEn: [
       'A UI adapter renders before it is allowed to publish subscriptions.',
       'The host must detect a dependency change between render and commit.'
@@ -3909,13 +3843,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       'commit 返回 stale 后不要复用同一个 capture token。'
     ]
   }),
-  'reactive:source:createFieldSource': guide({
+  'reactive:extension:createFieldSource': guide({
     purposeEn:
       'Creates a controlled dependency source for data stored outside JavaScript, such as WASM memory. Readers call track; writers call commit so version allocation, mutation, and notification happen as one ordered operation.',
     purposeZh:
       '为 WASM memory 等存放在 JavaScript 之外的数据创建受控依赖源。读取方调用 track；写入方调用 commit，使版本分配、实际写入和通知按一个有序操作完成。',
     quickStart:
-      "import { createFieldSource, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst field = createFieldSource(runtime, 'counter')\nlet stored = 0\nconst read = () => { field.track(); return stored }\nconst write = (value: number) => field.commit(() => { stored = value })\nwrite(1)\nconsole.log(read())\nfield.dispose()",
+      "import { createRuntime } from '@migaia/reactive'\nimport { createFieldSource } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst field = createFieldSource(runtime, 'counter')\nlet stored = 0\nconst read = () => { field.track(); return stored }\nconst write = (value: number) => field.commit(() => { stored = value })\nwrite(1)\nconsole.log(read())\nfield.dispose()",
     scenariosEn: [
       'A custom storage adapter must make external mutable data observable.',
       'The extension must not receive direct access to graph nodes or subscriber sets.'
@@ -3930,82 +3864,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['数据已经存放在 JavaScript 中；应使用 Signal。', '实际写入无法与通知组成原子操作。']
   }),
-  'reactive:copy-check:brandOwnedValue': guide({
-    purposeEn:
-      'Adds the immutable Migaia ownership brand to an object created by the current reactive module copy. Another installed copy can then reject that object instead of treating it as an ordinary unowned value.',
-    purposeZh:
-      '给当前 reactive 模块副本创建的对象附加不可变 Migaia 所有权品牌。另一份已安装副本遇到它时会明确拒绝，而不会把它误当作普通无主值。',
-    quickStart:
-      "import { brandOwnedValue, assertNoForeignOwnershipBrand } from '@migaia/reactive/copy-check'\n\nconst managedNode = {}\nbrandOwnedValue(managedNode)\nassertNoForeignOwnershipBrand(managedNode)\nconsole.log('ownership brand admitted')",
-    scenariosEn: [
-      'A custom reactive node factory creates values that must never cross between duplicate runtime copies.',
-      'A graph entry guard needs to distinguish plain objects from managed objects created elsewhere.'
-    ],
-    scenariosZh: [
-      '自定义 reactive 节点工厂创建的值绝不能跨重复 Runtime 副本使用。',
-      '依赖图入口需要区分普通对象与其他副本创建的受管对象。'
-    ],
-    avoidEn: [
-      'Do not brand ordinary application data.',
-      'Do not use branding as authorization or a security boundary.'
-    ],
-    avoidZh: ['不要给普通应用数据加该品牌。', '不要把品牌当作权限或安全边界。']
-  }),
-  'reactive:copy-check:assertNoForeignOwnershipBrand': guide({
-    purposeEn:
-      'Rejects a managed reactive object branded by another installed module copy. Plain unbranded values and values branded by the current copy pass unchanged.',
-    purposeZh:
-      '拒绝由另一份已安装 reactive 模块副本创建的受管对象。普通无品牌值和当前副本创建的值会原样通过。',
-    quickStart:
-      "import { assertNoForeignOwnershipBrand, brandOwnedValue } from '@migaia/reactive/copy-check'\n\nconst candidate = {}\nbrandOwnedValue(candidate)\nassertNoForeignOwnershipBrand(candidate)\nconsole.log('local managed value admitted')",
-    scenariosEn: [
-      'A Registry or graph boundary accepts unknown objects but must fail closed for foreign reactive nodes.',
-      'A duplicate dependency could otherwise produce permanently stale reads.'
-    ],
-    scenariosZh: [
-      'Registry 或依赖图入口接收 unknown object，但必须拒绝外来 reactive node。',
-      '重复依赖副本可能导致读取永久陈旧，需要在入口直接失败。'
-    ],
-    avoidEn: [
-      'Do not call it for primitives; the API expects an object.',
-      'Do not use it as a substitute for assertReactiveOwnedBy inside one Runtime copy.'
-    ],
-    avoidZh: [
-      '不要传入 primitive；该 API 只接受 object。',
-      '同一 Runtime 副本内的所有权校验应使用 assertReactiveOwnedBy。'
-    ]
-  }),
-  'reactive:copy-check:noteRuntimeCopy': guide({
-    purposeEn:
-      'Registers one reactive module-copy identity in the process-wide copy detector. The operation is idempotent for the same identity; the optional argument exists for deterministic duplicate-copy tests.',
-    purposeZh:
-      '在进程级副本检测器中登记一个 reactive 模块副本身份。同一身份重复登记是幂等的；可选参数仅用于确定性模拟重复副本。',
-    quickStart:
-      "import { noteRuntimeCopy, runtimeCopyCount } from '@migaia/reactive/copy-check'\n\nnoteRuntimeCopy()\nconsole.log(runtimeCopyCount)",
-    scenariosEn: [
-      'A custom Runtime construction path must participate in duplicate-copy diagnostics.',
-      'A test needs to model two separately loaded copies without changing the installed dependency graph.'
-    ],
-    scenariosZh: [
-      '自定义 Runtime 构造路径需要参与重复副本诊断。',
-      '测试需要在不改动依赖安装的情况下模拟两份独立模块。'
-    ],
-    avoidEn: [
-      'Normal applications do not need to call it; createRuntime registers the current copy.',
-      'Do not pass invented symbols in production.'
-    ],
-    avoidZh: [
-      '普通应用无需调用；createRuntime 会登记当前副本。',
-      '生产代码不要传入自行创建的 symbol。'
-    ]
-  }),
-  'reactive:copy-check:assertSingleRuntimeCopy': guide({
+  'reactive:index:assertSingleRuntimeCopy': guide({
     purposeEn:
       'Fails immediately when more than one reactive runtime module copy has been registered. Applications that prefer startup failure over possible cross-copy stale state can run this after dependency initialization.',
     purposeZh:
       '检测到已登记的 reactive runtime 模块副本超过一份时立即失败。宁可启动失败、也不接受跨副本陈旧状态的应用，可在依赖初始化后调用。',
     quickStart:
-      "import { assertSingleRuntimeCopy } from '@migaia/reactive/copy-check'\n\nassertSingleRuntimeCopy() // call once during application startup\nconsole.log('single runtime copy admitted')",
+      "import { assertSingleRuntimeCopy } from '@migaia/reactive'\n\nassertSingleRuntimeCopy() // call once during application startup\nconsole.log('single runtime copy admitted')",
     scenariosEn: [
       'A deployed bundle must guarantee one reactive runtime copy.',
       'Micro-frontends share objects and cannot safely isolate duplicate Runtime copies.'
@@ -4022,72 +3887,6 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       '多份副本被刻意隔离，且不会交换受管对象。',
       '若把结果作为部署门禁，不要在全部应用 bundle 加载前调用。'
     ]
-  }),
-  'reactive:copy-check:resetRuntimeCopiesForTest': guide({
-    purposeEn:
-      'Clears simulated copy identities created by tests so one test cannot affect the next. It is test-only and must never be used to make a live duplicate-copy deployment appear valid.',
-    purposeZh:
-      '清除测试模拟的副本身份，避免一个用例污染下一个用例。它仅供测试使用，绝不能用来把真实的重复副本部署伪装成有效状态。',
-    quickStart:
-      "import { resetRuntimeCopiesForTest, runtimeCopyCount } from '@migaia/reactive/copy-check'\n\n// Repository test teardown only; never reset a live application registry.\nresetRuntimeCopiesForTest()\nconsole.log(runtimeCopyCount()) // 0",
-    scenariosEn: [
-      'A copy-conflict unit test registered synthetic module identities.',
-      'Parallel test isolation gives each test its own detector lifetime.'
-    ],
-    scenariosZh: [
-      '副本冲突单元测试登记了模拟模块身份。',
-      '测试隔离要求每个用例拥有独立检测器生命周期。'
-    ],
-    avoidEn: [
-      'Never call it in application or library runtime code.',
-      'Do not use it to recover a live graph after a real copy conflict.'
-    ],
-    avoidZh: [
-      '应用或库运行时代码绝不能调用。',
-      '真实副本冲突发生后，不要用它尝试恢复仍在使用的依赖图。'
-    ]
-  }),
-  'reactive:copy-check:runtimeCopyCount': guide({
-    purposeEn:
-      'Returns how many reactive module copies have entered a Runtime or ownership correctness boundary. Merely importing a copy does not increment the count.',
-    purposeZh:
-      '返回已经进入 Runtime 或所有权正确性边界的 reactive 模块副本数量。仅仅 import 某份副本不会增加计数。',
-    quickStart:
-      "import { runtimeCopyCount } from '@migaia/reactive/copy-check'\n\nconsole.log(runtimeCopyCount())",
-    scenariosEn: [
-      'Startup diagnostics report whether bundling produced duplicate active copies.',
-      'Tests verify that an ownership boundary registers its module copy.'
-    ],
-    scenariosZh: [
-      '启动诊断需要报告 bundle 是否产生多份活动副本。',
-      '测试需要验证所有权入口会登记当前模块副本。'
-    ],
-    avoidEn: [
-      'Do not use the count as proof that objects can safely cross copies.',
-      'Do not poll it as application state.'
-    ],
-    avoidZh: ['不要把计数当作对象可以安全跨副本传递的证明。', '不要把它作为应用状态持续轮询。']
-  }),
-  'reactive:copy-check:consumePendingCopyWarning': guide({
-    purposeEn:
-      'Returns and clears the pending duplicate-copy warning produced before a Runtime could report it. Runtime construction consumes this once and forwards it to the configured diagnostics channel.',
-    purposeZh:
-      '取出并清除 Runtime 能够报告之前产生的重复副本警告。Runtime 构造时只消费一次，并把它转发到已配置的诊断通道。',
-    quickStart:
-      "import { consumePendingCopyWarning } from '@migaia/reactive/copy-check'\n\nconst warning = consumePendingCopyWarning()\nif (warning) console.warn(warning)",
-    scenariosEn: [
-      'A custom Runtime constructor must forward an early copy warning exactly once.',
-      'A test verifies warning consumption and clearing.'
-    ],
-    scenariosZh: [
-      '自定义 Runtime 构造器需要把早期副本警告准确转发一次。',
-      '测试需要验证警告被读取后已经清除。'
-    ],
-    avoidEn: [
-      'Normal applications should receive the warning through Runtime diagnostics.',
-      'Do not repeatedly consume it from several owners.'
-    ],
-    avoidZh: ['普通应用应通过 Runtime 诊断接收警告。', '不要由多个 owner 重复消费。']
   }),
   'reactive:internals:registerInternals': guide({
     purposeEn:
@@ -4158,13 +3957,36 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['普通应用可以直接接受公开 IRuntime contract。', '不要把检测结果当作安全决策。']
   }),
-  'reactive:node-factories:internalRuntimeOf': guide({
+  'reactive:extension:currentRuntimeVersion': guide({
+    purposeEn:
+      'Reads the current version of one registered Runtime without exposing its clock object or changing graph state.',
+    purposeZh: '读取一个已登记 Runtime 的当前版本，不暴露时钟对象，也不修改依赖图状态。',
+    quickStart:
+      "import { createRuntime } from '@migaia/reactive'\nimport { currentRuntimeVersion } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst value = runtime.signal(0)\nconst before = currentRuntimeVersion(runtime)\nvalue.value = 1\nconsole.log(currentRuntimeVersion(runtime) > before) // true\nvalue.dispose()",
+    scenariosEn: [
+      'An implementation cache compares its captured version with the owning Runtime.',
+      'An extension needs read-only version observation without mutable graph services.'
+    ],
+    scenariosZh: [
+      '实现层缓存需要把捕获的版本与所属 Runtime 的当前版本比较。',
+      '扩展需要只读版本观察，不需要可变依赖图服务。'
+    ],
+    avoidEn: [
+      'Ordinary application derivations should use runtime.computed.',
+      'Do not pass a structural imitation; an unregistered Runtime throws NOT_RUNTIME_OWNED.'
+    ],
+    avoidZh: [
+      '普通应用派生值应使用 runtime.computed。',
+      '不要传入结构伪造对象；未登记的 Runtime 会抛 NOT_RUNTIME_OWNED。'
+    ]
+  }),
+  'reactive:extension:internalRuntimeOf': guide({
     purposeEn:
       'Validates that a Runtime was created by this library copy and returns the concrete internal node-factory surface. This keeps unsafe implementation casts in one guarded location.',
     purposeZh:
       '先确认 Runtime 由当前库副本创建，再返回具体的节点工厂内部能力。这样不安全的实现层类型转换只存在于一个受保护入口。',
     quickStart:
-      "import { internalRuntimeOf } from '@migaia/reactive/node-factories'\n\nconst internal = internalRuntimeOf(runtime)\nconst signal = internal.signal(0)",
+      "import { internalRuntimeOf } from '@migaia/reactive/extension'\n\nconst internal = internalRuntimeOf(runtime)\nconst signal = internal.signal(0)",
     scenariosEn: [
       'A built-in or third-party node factory must call the concrete Runtime implementation.',
       'The factory must reject structural Runtime lookalikes.'
@@ -4182,13 +4004,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       '不要在工厂操作结束后长期保存内部能力。'
     ]
   }),
-  'reactive:node-factories:isRuntimeTracking': guide({
+  'reactive:extension:isRuntimeTracking': guide({
     purposeEn:
       'Reports whether the specified Runtime is currently collecting dependency reads. It is a read-only implementation query and does not start, stop, or alter tracking.',
     purposeZh:
       '报告指定 Runtime 当前是否正在收集依赖读取。它只是只读实现层查询，不会开始、停止或改变 tracking。',
     quickStart:
-      "import { isRuntimeTracking } from '@migaia/reactive/node-factories'\n\nif (isRuntimeTracking(runtime)) source.track()",
+      "import { isRuntimeTracking } from '@migaia/reactive/extension'\n\nif (isRuntimeTracking(runtime)) source.track()",
     scenariosEn: [
       'A custom source avoids bookkeeping when no dependency frame is active.',
       'Diagnostics need to report tracking state for one Runtime.'
@@ -4203,13 +4025,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['不要让应用业务行为依赖 tracking 状态。', '进程级诊断应使用 isAnyRuntimeTracking。']
   }),
-  'reactive:node-factories:isAnyRuntimeTracking': guide({
+  'reactive:extension:isAnyRuntimeTracking': guide({
     purposeEn:
       'Reports whether any Runtime in the current module copy has an active dependency frame. It is intended for implementation diagnostics and never mutates tracking state.',
     purposeZh:
       '报告当前模块副本中的任意 Runtime 是否存在活动依赖帧。它面向实现层诊断，绝不会修改 tracking 状态。',
     quickStart:
-      "import { isAnyRuntimeTracking } from '@migaia/reactive/node-factories'\n\nconsole.debug({ tracking: isAnyRuntimeTracking() })",
+      "import { isAnyRuntimeTracking } from '@migaia/reactive/extension'\n\nconsole.debug({ tracking: isAnyRuntimeTracking() })",
     scenariosEn: [
       'Development diagnostics need to detect reads performed during dependency collection.',
       'A test verifies tracking frames are always closed after failure.'
@@ -4227,13 +4049,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       '需要指定 Runtime 的结果时，不要使用进程级结果。'
     ]
   }),
-  'reactive:ownership:claimOwnership': guide({
+  'reactive:extension:claimOwnership': guide({
     purposeEn:
       'Records that a managed object belongs to one Runtime. Reclaiming the same object for another Runtime fails because one reactive node cannot safely participate in two independent graphs.',
     purposeZh:
       '登记一个受管对象属于某个 Runtime。若再把同一对象登记给另一个 Runtime 会失败，因为一个 reactive node 无法安全加入两张独立依赖图。',
     quickStart:
-      "import { claimOwnership, ownerOf } from '@migaia/reactive/ownership'\n\nconst node = {}\nclaimOwnership(node, runtime)\nconsole.log(ownerOf(node) === runtime)",
+      "import { claimOwnership, ownerOf } from '@migaia/reactive/extension'\n\nconst node = {}\nclaimOwnership(node, runtime)\nconsole.log(ownerOf(node) === runtime)",
     scenariosEn: [
       'A custom node factory has finished constructing a node for one Runtime.',
       'Later graph guards must verify exact owner identity.'
@@ -4248,13 +4070,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['永远不会进入依赖图的普通应用值无需登记。', '不要在仍存活的 Runtime 之间转移所有权。']
   }),
-  'reactive:ownership:ownerOf': guide({
+  'reactive:extension:ownerOf': guide({
     purposeEn:
       'Returns the Runtime that owns a managed object, or undefined for unregistered and non-object values. It distinguishes plain Registry values from nodes that must obey graph ownership.',
     purposeZh:
       '返回受管对象所属的 Runtime；未登记值和非对象返回 undefined。它用于区分普通 Registry 值与必须遵守依赖图所有权的节点。',
     quickStart:
-      "import { ownerOf } from '@migaia/reactive/ownership'\n\nconst owner = ownerOf(candidate)\nif (owner) console.log('managed by a Runtime')",
+      "import { ownerOf } from '@migaia/reactive/extension'\n\nconst owner = ownerOf(candidate)\nif (owner) console.log('managed by a Runtime')",
     scenariosEn: [
       'An adapter accepts both plain values and managed reactive nodes.',
       'Diagnostics need to report the owner without changing graph state.'
@@ -4269,13 +4091,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['undefined 不能证明对象可以安全加入依赖图。', '修改依赖图的入口应使用严格断言。']
   }),
-  'reactive:ownership:assertOwnedBy': guide({
+  'reactive:extension:assertOwnedBy': guide({
     purposeEn:
       'Rejects a registered object when its Runtime differs from the expected owner, while allowing unregistered plain values. Use it at boundaries that legitimately accept both ordinary and managed values.',
     purposeZh:
       '已登记对象所属 Runtime 与预期不同时拒绝，但允许普通未登记值通过。适用于同时接受普通值与受管值的边界。',
     quickStart:
-      "import { createRuntime } from '@migaia/reactive'\nimport { assertOwnedBy } from '@migaia/reactive/ownership'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.value)\nnode.dispose()",
+      "import { createRuntime } from '@migaia/reactive'\nimport { assertOwnedBy } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.value)\nnode.dispose()",
     scenariosEn: [
       'A Registry accepts plain application values plus Runtime-owned nodes.',
       'A helpful label is required in cross-Runtime diagnostics.'
@@ -4293,13 +4115,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       '不要把它当作通用对象校验器。'
     ]
   }),
-  'reactive:ownership:assertReactiveOwnedBy': guide({
+  'reactive:extension:assertReactiveOwnedBy': guide({
     purposeEn:
       'Strictly requires a reactive object to be registered to the expected Runtime. Both unowned structural imitations and nodes owned by another Runtime are rejected before graph edges are changed.',
     purposeZh:
       '严格要求 reactive object 已登记给预期 Runtime。未登记的结构伪造对象和属于其他 Runtime 的节点都会在修改依赖边前被拒绝。',
     quickStart:
-      "import { createRuntime } from '@migaia/reactive'\nimport { assertReactiveOwnedBy } from '@migaia/reactive/ownership'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertReactiveOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.value)\nnode.dispose()",
+      "import { createRuntime } from '@migaia/reactive'\nimport { assertReactiveOwnedBy } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst node = runtime.signal(1)\nassertReactiveOwnedBy(node, runtime, 'owned signal')\nconsole.log(node.value)\nnode.dispose()",
     scenariosEn: [
       'A dependency, subscriber, or source is about to enter the reactive graph.',
       'Structural lookalikes must not gain access to mutable graph state.'

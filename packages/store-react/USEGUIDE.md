@@ -174,10 +174,10 @@ function useStore<S extends Record<string, unknown>, R>(
 ### 3.2 `useSignal(signal)`
 
 ```ts
-function useSignal<T>(s: ISignal<T>): readonly [T, (next: T) => void];
+function useSignal<T>(s: IReactiveSignal<T>): readonly [T, (next: T) => void];
 ```
 
-订阅单个 `ISignal`，返回 `[当前值, 设置函数]`。因为依赖集合恒为"这一个 Signal 自己"，内部直接走 `useNodeValue` 快路径，不经过 `useTracked` 的捕获/提交记账——比 `useTracked(() => signal.value)` 更轻。`set` 函数引用在 `signal` 不变时保持稳定。
+订阅单个 `IReactiveSignal`，返回 `[当前值, 设置函数]`。因为依赖集合恒为"这一个 Signal 自己"，内部直接走 `useNodeValue` 快路径，不经过 `useTracked` 的捕获/提交记账——比 `useTracked(() => signal.value)` 更轻。`set` 函数引用在 `signal` 不变时保持稳定。
 
 ### 3.3 `useTracked(read, isEqual?, runtime?)`
 
@@ -192,7 +192,7 @@ function useTracked<T>(
 最底层的通用订阅 hook：`read()` 内部访问到的**任意**响应式节点都会被自动追踪为依赖，不限于单个 Signal。`useStore`/`useResource` 都是基于它实现的一层薄封装。
 
 - `runtime` 变化时会整体重建内部追踪实例——旧实例留给旧 effect 用到 cleanup 为止，新实例从当前 `read`/`isEqual` 初始化，绝不会让新 Runtime 执行旧 Runtime 捕获到的 selector。
-- 内部使用 `@migaia/reactive/runtime` 导出的公开 `createObserverBinding` 三段式绑定（capture/commit/retrack），不依赖任何内部私有 API——第三方要写等价的自定义适配层也能做到同样的并发安全。
+- 内部使用 `@migaia/reactive/extension` 导出的公开 `createObserverBinding` 三段式绑定（capture/commit/retrack），不依赖任何内部私有 API——第三方要写等价的自定义适配层也能做到同样的并发安全。
 - 自己直接用这个 hook 时，把 `read`/`isEqual` 的引用稳定下来（`useCallback`/模块级函数），身份变化会触发一次重新捕获依赖（仍然正确，但多一次工作）。
 
 ### 3.4 `useResource(resource)` / `useResourceValue(resource)`

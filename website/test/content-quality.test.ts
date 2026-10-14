@@ -251,7 +251,7 @@ test('plugin-host PluginHost teaches business core, handle consumption, Host rem
 
 test('reactive Computed guide covers imports, lazy caching, dynamic dependencies, and lifecycle', () => {
   for (const locale of ['zh', 'en'] as const) {
-    const guide = findApiGuide('reactive', 'reactive', 'Computed', locale)
+    const guide = findApiGuide('reactive', 'index', 'IReactiveComputed', locale)
     assert.ok(guide?.quickStart)
     assert.match(guide.quickStart, /import \{ createRuntime \} from '@migaia\/reactive'/)
     assert.match(guide.quickStart, /const runtime = createRuntime\(\)/)
@@ -262,8 +262,8 @@ test('reactive Computed guide covers imports, lazy caching, dynamic dependencies
 
     const examples = guide.examples ?? []
     assert.ok(examples.some((example) => /signedIn\.value \?/.test(example.code)))
-    assert.ok(examples.some((example) => /import \{ Computed, createRuntime \}/.test(example.code)))
-    assert.ok(examples.some((example) => /new Computed\(/.test(example.code)))
+    assert.ok(examples.some((example) => /import \{ createRuntime \}/.test(example.code)))
+    assert.ok(examples.some((example) => /runtime\.computed\(/.test(example.code)))
     assert.ok(examples.some((example) => /fullName\.peek\(\)/.test(example.code)))
     assert.ok(examples.some((example) => /fullName\.disposed/.test(example.code)))
 
@@ -282,12 +282,12 @@ test('reactive Computed guide covers imports, lazy caching, dynamic dependencies
   }
 })
 
-test('reactive Signal guide covers direct construction, update semantics, observation, and applications', () => {
+test('reactive Signal guide covers factory creation, update semantics, observation, and applications', () => {
   for (const locale of ['zh', 'en'] as const) {
-    const guide = findApiGuide('reactive', 'reactive', 'Signal', locale)
+    const guide = findApiGuide('reactive', 'index', 'IReactiveSignal', locale)
     assert.ok(guide?.quickStart)
-    assert.match(guide.quickStart, /import \{ Signal, createRuntime \} from '@migaia\/reactive'/)
-    assert.match(guide.quickStart, /new Signal<string \| null>\(/)
+    assert.match(guide.quickStart, /import \{ createRuntime \} from '@migaia\/reactive'/)
+    assert.match(guide.quickStart, /runtime\.signal<string \| null>\(/)
     assert.match(guide.quickStart, /selectedProductId\.version/)
     assert.match(guide.quickStart, /runtime\.flush\(\)/)
     assert.match(guide.quickStart, /selectedProductId\.dispose\(\)/)
@@ -325,7 +325,7 @@ test('reactive Signal guide covers direct construction, update semantics, observ
 
 test('createObserverBinding quick start keeps authored comments and host phases without generated filler', () => {
   for (const locale of ['zh', 'en'] as const) {
-    const guide = findApiGuide('reactive', 'runtime', 'createObserverBinding', locale)
+    const guide = findApiGuide('reactive', 'extension', 'createObserverBinding', locale)
     assert.ok(guide?.quickStart)
     assert.match(guide.quickStart, /^\s*\/\//m)
     assert.doesNotMatch(
@@ -344,43 +344,46 @@ test('createObserverBinding quick start keeps authored comments and host phases 
   }
 })
 
-test('class pages expose structured instance APIs and Scheduler documents its operations', () => {
-  const scheduler = typedApiManifest.apis
-    .find((api) => api.library === 'reactive' && api.module === 'runtime')
-    ?.symbols.find((symbol) => symbol.name === 'Scheduler')
-  assert.ok(scheduler)
+test('class pages expose structured instance APIs and reactive publishes only its three surfaces', () => {
+  /** The generated website contract must follow the package's converged entry boundaries. */
+  const reactiveApis = typedApiManifest.apis.filter((api) => api.library === 'reactive')
+  assert.deepEqual(reactiveApis.map((api) => api.module).sort(), [
+    'extension',
+    'index',
+    'internals'
+  ])
 
-  const members = new Map(scheduler.members.map((member) => [member.name, member]))
+  /** Application references expose node contracts and factories without internal constructors. */
+  const root = reactiveApis.find((api) => api.module === 'index')
+  assert.ok(root)
   for (const name of [
-    'batchDepth',
-    'setStrategy',
-    'enqueue',
-    'dequeue',
-    'requestFlush',
-    'flush',
-    'runBatched',
-    'runDeferred'
+    'IReactiveSignal',
+    'IReactiveComputed',
+    'IReactiveEffect',
+    'IRuntime',
+    'createRuntime'
   ]) {
-    assert.ok(members.has(name), `Missing Scheduler.${name}`)
+    assert.ok(
+      root.symbols.some((symbol) => symbol.name === name),
+      `Missing reactive root ${name}`
+    )
   }
 
-  assert.deepEqual(members.get('enqueue')?.parameterDetails, [
-    { name: 'item', type: 'IFlushable', optional: false }
-  ])
-  assert.equal(members.get('enqueue')?.returns, 'void')
-  assert.match(
-    members.get('enqueue')?.description ?? '',
-    /Enqueues an item.*requests a flush.*when no batch is active/
+  /** Removed constructors must disappear from every public website API page. */
+  const publicNames = new Set(
+    reactiveApis.flatMap((api) => api.symbols.map((symbol) => symbol.name))
   )
-  assert.match(
-    members.get('requestFlush')?.description ?? '',
-    /Scheduling and flushing flags deduplicate repeated requests/
-  )
-  assert.equal(members.get('flush')?.returns, 'IFlushResult')
-  assert.match(
-    members.get('flush')?.description ?? '',
-    /reentrant call during flushing returns `deferred`/
-  )
+  for (const name of [
+    'Signal',
+    'Computed',
+    'Effect',
+    'Runtime',
+    'Scheduler',
+    'DependencyTracker',
+    'VersionClock'
+  ]) {
+    assert.equal(publicNames.has(name), false, `Internal constructor ${name} is still public`)
+  }
 
   const classSymbols = typedApiManifest.apis.flatMap((api) =>
     api.symbols.filter((symbol) => symbol.kind === 'class')
@@ -410,12 +413,12 @@ test('class pages expose structured instance APIs and Scheduler documents its op
   }
 })
 
-test('reactive Effect guide covers imports, direct lifecycle, convenience API, and production cleanup', () => {
+test('reactive Effect guide covers imports, handle lifecycle, factory API, and production cleanup', () => {
   for (const locale of ['zh', 'en'] as const) {
-    const guide = findApiGuide('reactive', 'reactive', 'Effect', locale)
+    const guide = findApiGuide('reactive', 'index', 'IReactiveEffect', locale)
     assert.ok(guide?.quickStart)
-    assert.match(guide.quickStart, /import \{ Effect, createRuntime \} from '@migaia\/reactive'/)
-    assert.match(guide.quickStart, /new Effect\(\(\) =>/)
+    assert.match(guide.quickStart, /import \{ createRuntime \} from '@migaia\/reactive'/)
+    assert.match(guide.quickStart, /runtime\.effect\(\(\) =>/)
     assert.match(guide.quickStart, /new EventSource\(/)
     assert.match(guide.quickStart, /return \(\) => events\.close\(\)/)
     assert.match(guide.quickStart, /runtime\.flush\(\)/)

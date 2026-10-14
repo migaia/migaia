@@ -90,7 +90,7 @@ import {
 } from '@migaia/store-devtools';
 ```
 
-这两个函数**不依赖 `createStoreDevTools`**，可独立使用，只需要一个 `@migaia/reactive/runtime` 的 `IObservable`/`IObserver` 实例（Signal/Computed/Effect 的内部图节点）。
+这两个函数**不依赖 `createStoreDevTools`**，可独立使用。`getDependencyTree` 接受 `runtime.effect()` 或 `runtime.computed()` 的公开句柄；`getObserverTree` 接受 `runtime.signal()` 或 `runtime.computed()` 的公开句柄。实现层也可传入 `@migaia/reactive/extension` 的 `IObservable`/`IObserver` 图节点。
 
 **`getDependencyTree`｜5 秒上手** —— 从一个 observer（Effect/Computed）出发，向上展开它依赖的每个 observable：
 

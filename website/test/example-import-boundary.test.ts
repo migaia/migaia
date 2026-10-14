@@ -97,7 +97,7 @@ test('SITE-T-EXAMPLE-IMPORTS uses the narrowest public subpath for documented sy
   assert.deepEqual(violations, [])
 })
 
-test('SITE-T-EXAMPLE-IMPORTS splits mixed root imports and resolves wildcard exports', () => {
+test('SITE-T-EXAMPLE-IMPORTS splits mixed root imports and resolves public entries', () => {
   const lifecycle = normalizeExampleImports(
     "import { createLifecycleScope, createGenerationController, boundedWait } from '@migaia/lifecycle'"
   )
@@ -105,7 +105,9 @@ test('SITE-T-EXAMPLE-IMPORTS splits mixed root imports and resolves wildcard exp
   assert.match(lifecycle, /from '@migaia\/lifecycle\/generation'/u)
   assert.match(lifecycle, /import \{ boundedWait \} from '@migaia\/lifecycle'/u)
 
-  const reactive = normalizeExampleImports("import { Signal } from '@migaia/reactive'")
-  assert.match(reactive, /from '@migaia\/reactive\/reactive\/signal\.class'/u)
+  const reactive = normalizeExampleImports(
+    "import { claimOwnership, createRuntime } from '@migaia/reactive'"
+  )
+  assert.match(reactive, /from '@migaia\/reactive\/extension'/u)
   assert.doesNotMatch(reactive, /\*/u)
 })
