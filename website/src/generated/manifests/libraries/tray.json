@@ -1640,7 +1640,7 @@
           "name": "IAnyTrayHost",
           "kind": "type",
           "signature": "export type IAnyTrayHost = ITrayHost<any, any, any, any, any>;",
-          "declarationLine": 116,
+          "declarationLine": 130,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Existential host used internally without erasing concrete consumer signatures.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAnyTrayHost.",
@@ -1700,8 +1700,8 @@
         {
           "name": "ITray",
           "kind": "type",
-          "signature": "export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: AbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;",
-          "declarationLine": 176,
+          "signature": "export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: IAbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;",
+          "declarationLine": 190,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Registry contract exposes lifecycle observations without any event trigger.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITray.",
@@ -1715,7 +1715,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: AbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;"
+            "export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: IAbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1754,7 +1754,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/typing.d.ts:ITray:export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: AbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;",
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITray:export type ITray<THosts extends readonly IAnyTrayHost[], TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ routing: ITrayRouting<ITrayParentRoutingNames<THosts, TRouting>, THosts>; publish(topic: string, payload?: unknown): void; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void; spawn<N extends THosts[number]['name']>(host: N, options: ITraySpawnOptions<IHostByName<THosts, N>>): Promise<ITrayRemote<IHostByName<THosts, N>>>; instance<H extends THosts[number]>(host: H, id: string): ITrayRemote<H>; remove(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; list(filter?: Readonly<{ host?: THosts[number]['name']; runtime?: ITrayRuntime; state?: TrayInstanceState; }>): readonly ITrayInstance[]; get(id: string): Promise<ITrayInstanceDetail>; stop(id: string, options?: Readonly<{ graceMs?: number; }>): Promise<void>; restart(id: string): Promise<ITrayInstance>; replace(id: string, options?: Readonly<{ config?: unknown; }>): Promise<ITrayInstance>; on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void; watch(options?: Readonly<{ signal?: IAbortSignal; }>): AsyncIterableIterator<ITrayInstanceEventRecord>; dispose(options?: Readonly<{ graceMs?: number; }>): Promise<void>; [Symbol.asyncDispose](): Promise<void>; }>;",
           "guidance": [
             {
               "id": "host-定义与构造选项",
@@ -1890,7 +1890,7 @@
         {
           "name": "ITrayCallOptions",
           "kind": "type",
-          "signature": "export type ITrayCallOptions = Readonly<{ signal?: AbortSignal; timeoutMs?: number; }>;",
+          "signature": "export type ITrayCallOptions = Readonly<{ signal?: IAbortSignal; timeoutMs?: number; }>;",
           "declarationLine": 7,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Caller cancellation and deadline occupy only the third public call position.",
@@ -1905,7 +1905,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITrayCallOptions = Readonly<{ signal?: AbortSignal; timeoutMs?: number; }>;"
+            "export type ITrayCallOptions = Readonly<{ signal?: IAbortSignal; timeoutMs?: number; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -1944,7 +1944,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayCallOptions:export type ITrayCallOptions = Readonly<{ signal?: AbortSignal; timeoutMs?: number; }>;",
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayCallOptions:export type ITrayCallOptions = Readonly<{ signal?: IAbortSignal; timeoutMs?: number; }>;",
           "guidance": [
             {
               "id": "hosts-实例发现与生命周期",
@@ -2015,7 +2015,7 @@
           "name": "ITrayClient",
           "kind": "type",
           "signature": "export type ITrayClient<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = Readonly<{ self(): ITrayInstanceInfo; to<H extends IAnyTrayHost>(host: H, id: string): Promise<ITrayRemote<H>>; exit(error?: unknown): void; /** Existential internal host views erase callbacks; concrete tuples retain closed policy names. */ routing: 0 extends 1 & TRouting ? any : ITrayRouting<IBuiltInRoutingName | IPolicyNames<TRouting>, readonly IAnyTrayHost[]>; publish(topic: string, payload?: unknown): Promise<void>; subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): Promise<() => Promise<void>>; }>;",
-          "declarationLine": 150,
+          "declarationLine": 164,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Per-generation child Feature keeps its declared policy names.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayClient.",
@@ -2139,7 +2139,7 @@
           "name": "ITrayClientPlugin",
           "kind": "type",
           "signature": "export type ITrayClientPlugin<TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = IDefinedPluginConstraint<object, never, Record<never, never>, IPluginConfig, Record<never, never>, 'trayClient', Readonly<{ tray: IFeature<Record<never, never>, ITrayClient<TRouting>>; }>>;",
-          "declarationLine": 160,
+          "declarationLine": 174,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Per-init PluginHost definition exposes one precise native `tray` Feature.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayClientPlugin.",
@@ -2730,7 +2730,7 @@
           "name": "ITrayHost",
           "kind": "type",
           "signature": "export type ITrayHost<TName extends string, TConfig, TPlugins extends ITrayPlugins, TExposes extends string, TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = ITrayHostDefinition<TName, TConfig, TPlugins, TExposes, TRouting> & Readonly<{ runtime: ITrayRuntime; [trayHostBrand]: true; }>;",
-          "declarationLine": 111,
+          "declarationLine": 125,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Frozen host DSL created only by defineTrayHost.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHost.",
@@ -2860,7 +2860,7 @@
           "name": "ITrayHostDefinition",
           "kind": "type",
           "signature": "export type ITrayHostDefinition<TName extends string, TConfig, TPlugins extends ITrayPlugins, TExposes extends string, TRouting extends readonly ITrayRoutingPolicy[] = readonly []> = ITrayRuntimeOptions & Readonly<{ name: TName; config?: (input: unknown) => TConfig; plugins(instance: ITrayInstanceInfo<TName, TConfig>, trayPlugin: ITrayClientPlugin<TRouting>): TPlugins; exposes: readonly TExposes[]; supervisor?: ITraySupervisorPolicy; routing?: TRouting; }>;",
-          "declarationLine": 100,
+          "declarationLine": 114,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Public DSL definition preserves policy and plugin tuples for caller inference.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDefinition.",
@@ -3242,6 +3242,69 @@
           "fragment": "tray-index--ITrayKey"
         },
         {
+          "name": "ITrayLaunchCommand",
+          "kind": "type",
+          "signature": "export type ITrayLaunchCommand = Readonly<{ command: string; args: readonly string[]; cwd?: string; env: Readonly<{ inherit: readonly string[]; set: Readonly<Record<string, string>>; }>; }>;",
+          "declarationLine": 75,
+          "source": "packages/tray/dist/hosts/typing.d.ts",
+          "purpose": "The launch command a sandbox may rewrite. Structurally identical to rpc-process `IProcessLaunchCommand`; declared here so Tray's public types do not pull in rpc-process declarations and their Node types.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayLaunchCommand.",
+          "advanced": "No additional advanced behavior is declared for ITrayLaunchCommand.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITrayLaunchCommand."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayLaunchCommand.",
+          "examples": [],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ITrayLaunchCommand = Readonly<{ command: string; args: readonly string[]; cwd?: string; env: Readonly<{ inherit: readonly string[]; set: Readonly<Record<string, string>>; }>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITrayLaunchCommand when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITrayLaunchCommand does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The launch command a sandbox may rewrite. Structurally identical to rpc-process `IProcessLaunchCommand`; declared here so Tray's public types do not pull in rpc-process declarations and their Node types."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITrayLaunchCommand from @migaia/tray, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITrayLaunchCommand when its type contract and declared inputs match the result you need. Choose a different public symbol when ITrayLaunchCommand does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayLaunchCommand."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITrayLaunchCommand."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayLaunchCommand:export type ITrayLaunchCommand = Readonly<{ command: string; args: readonly string[]; cwd?: string; env: Readonly<{ inherit: readonly string[]; set: Readonly<Record<string, string>>; }>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "tray-index--ITrayLaunchCommand"
+        },
+        {
           "name": "ITrayMethodPath",
           "kind": "type",
           "signature": "export type ITrayMethodPath<TPlugins extends ITrayPlugins, TExposes extends string> = TExposes extends string ? { [M in keyof IFeatureAt<TPlugins, TExposes> & string]: IFeatureAt<TPlugins, TExposes>[M] extends (...args: any[]) => any ? `${TExposes}.${M}` : never; }[keyof IFeatureAt<TPlugins, TExposes> & string] : never;",
@@ -3308,7 +3371,7 @@
           "name": "ITrayParentRoutingNames",
           "kind": "type",
           "signature": "export type ITrayParentRoutingNames<THosts, TRouting> = IBuiltInRoutingName | IPolicyNames<TRouting> | IHostRoutingNames<THosts>;",
-          "declarationLine": 144,
+          "declarationLine": 158,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Parent registration combines explicit policies and all host declarations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayParentRoutingNames.",
@@ -3434,7 +3497,7 @@
           "name": "ITrayRemote",
           "kind": "type",
           "signature": "export type ITrayRemote<H extends IAnyTrayHost> = Readonly<{ id: string; request<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<IResult<IMethodAt<IHostPlugins<H>, P>>>; notify<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): Promise<void>; stream<P extends ITrayMethodPath<IHostPlugins<H>, IHostExposes<H>>>(path: P, ...args: IArgs<IMethodAt<IHostPlugins<H>, P>>): AsyncIterableIterator<IStreamItem<IMethodAt<IHostPlugins<H>, P>>>; }>;",
-          "declarationLine": 124,
+          "declarationLine": 138,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Typed methods bound to one registry record admission.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRemote.",
@@ -3497,7 +3560,7 @@
           "name": "ITrayRoutedRemote",
           "kind": "type",
           "signature": "export type ITrayRoutedRemote<H extends IAnyTrayHost> = Readonly<{ host: string; }> & Omit<ITrayRemote<H>, 'id'>;",
-          "declarationLine": 132,
+          "declarationLine": 146,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Routed remote retains the same method grammar but selects a candidate for every operation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRoutedRemote.",
@@ -3560,7 +3623,7 @@
           "name": "ITrayRouting",
           "kind": "type",
           "signature": "export type ITrayRouting<TNames extends string, THosts extends readonly IAnyTrayHost[]> = (<N extends TNames, H extends THosts[number]>(name: N, host: H) => ITrayRoutedRemote<H>) & Readonly<{ [N in TNames]: <H extends THosts[number]>(host: H) => ITrayRoutedRemote<H>; }>;",
-          "declarationLine": 146,
+          "declarationLine": 160,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "The callable and member forms share the same host domain and routed remote signature.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRouting.",
@@ -3947,8 +4010,8 @@
         {
           "name": "ITrayRuntimeOptions",
           "kind": "type",
-          "signature": "export type ITrayRuntimeOptions = Readonly<{ runtime?: 'coroutine'; entry?: never; limits?: never; sandbox?: never; }> | Readonly<{ runtime: 'thread'; entry: URL | string; limits?: Readonly<{ heapBytes?: number; }>; sandbox?: never; }> | Readonly<{ runtime: 'process'; entry: URL | string; limits?: never; sandbox?: ITraySandbox; }>;",
-          "declarationLine": 71,
+          "signature": "export type ITrayRuntimeOptions = Readonly<{ runtime?: 'coroutine'; entry?: never; limits?: never; sandbox?: never; }> | Readonly<{ runtime: 'thread'; entry: IUrlLike; limits?: Readonly<{ heapBytes?: number; }>; sandbox?: never; }> | Readonly<{ runtime: 'process'; entry: IUrlLike; limits?: never; sandbox?: ITraySandbox; }>;",
+          "declarationLine": 85,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Runtime-specific options reject launch fields outside their owning family.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayRuntimeOptions.",
@@ -3962,7 +4025,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITrayRuntimeOptions = Readonly<{ runtime?: 'coroutine'; entry?: never; limits?: never; sandbox?: never; }> | Readonly<{ runtime: 'thread'; entry: URL | string; limits?: Readonly<{ heapBytes?: number; }>; sandbox?: never; }> | Readonly<{ runtime: 'process'; entry: URL | string; limits?: never; sandbox?: ITraySandbox; }>;"
+            "export type ITrayRuntimeOptions = Readonly<{ runtime?: 'coroutine'; entry?: never; limits?: never; sandbox?: never; }> | Readonly<{ runtime: 'thread'; entry: IUrlLike; limits?: Readonly<{ heapBytes?: number; }>; sandbox?: never; }> | Readonly<{ runtime: 'process'; entry: IUrlLike; limits?: never; sandbox?: ITraySandbox; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4001,7 +4064,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayRuntimeOptions:export type ITrayRuntimeOptions = Readonly<{ runtime?: 'coroutine'; entry?: never; limits?: never; sandbox?: never; }> | Readonly<{ runtime: 'thread'; entry: URL | string; limits?: Readonly<{ heapBytes?: number; }>; sandbox?: never; }> | Readonly<{ runtime: 'process'; entry: URL | string; limits?: never; sandbox?: ITraySandbox; }>;",
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITrayRuntimeOptions:export type ITrayRuntimeOptions = Readonly<{ runtime?: 'coroutine'; entry?: never; limits?: never; sandbox?: never; }> | Readonly<{ runtime: 'thread'; entry: IUrlLike; limits?: Readonly<{ heapBytes?: number; }>; sandbox?: never; }> | Readonly<{ runtime: 'process'; entry: IUrlLike; limits?: never; sandbox?: ITraySandbox; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4010,7 +4073,7 @@
         {
           "name": "ITraySandbox",
           "kind": "type",
-          "signature": "export type ITraySandbox = Readonly<{ name: string; wrap(command: IProcessLaunchCommand): IProcessLaunchCommand; }>;",
+          "signature": "export type ITraySandbox = Readonly<{ name: string; wrap(command: ITrayLaunchCommand): ITrayLaunchCommand; }>;",
           "declarationLine": 66,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "External process command transformation; Tray ships no sandbox implementation.",
@@ -4025,7 +4088,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITraySandbox = Readonly<{ name: string; wrap(command: IProcessLaunchCommand): IProcessLaunchCommand; }>;"
+            "export type ITraySandbox = Readonly<{ name: string; wrap(command: ITrayLaunchCommand): ITrayLaunchCommand; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4064,7 +4127,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/hosts/typing.d.ts:ITraySandbox:export type ITraySandbox = Readonly<{ name: string; wrap(command: IProcessLaunchCommand): IProcessLaunchCommand; }>;",
+          "identity": "packages/tray/dist/hosts/typing.d.ts:ITraySandbox:export type ITraySandbox = Readonly<{ name: string; wrap(command: ITrayLaunchCommand): ITrayLaunchCommand; }>;",
           "guidance": [
             {
               "id": "host-定义与构造选项",
@@ -4141,7 +4204,7 @@
           "name": "ITraySpawnOptions",
           "kind": "type",
           "signature": "export type ITraySpawnOptions<H extends IAnyTrayHost> = Readonly<{ id: string; } & (undefined extends IHostConfig<H> ? { config?: unknown; } : { config: unknown; })>;",
-          "declarationLine": 168,
+          "declarationLine": 182,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Spawn grammar requires input only when the validator output excludes undefined.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITraySpawnOptions.",
@@ -4269,7 +4332,7 @@
           "name": "ITraySupervisorPolicy",
           "kind": "type",
           "signature": "export type ITraySupervisorPolicy = Readonly<{ restart?: Readonly<{ mode?: 'never' | 'on-failure' | 'always'; maxRestarts?: number; windowMs?: number; initialDelayMs?: number; }>; startupTimeoutMs?: number; }>;",
-          "declarationLine": 90,
+          "declarationLine": 104,
           "source": "packages/tray/dist/hosts/typing.d.ts",
           "purpose": "Tray projects the canonical supervision names into each rpc runtime adapter.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITraySupervisorPolicy.",
@@ -7488,7 +7551,7 @@
           "name": "ILoadedArtifact",
           "kind": "type",
           "signature": "export type ILoadedArtifact<TArtifact> = Readonly<{ readonly value: TArtifact; readonly release: IReleaseDescriptor; }>;",
-          "declarationLine": 6,
+          "declarationLine": 7,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "Artifact plus its explicit lifecycle release contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoadedArtifact.",
@@ -7552,7 +7615,7 @@
           "name": "ILoader",
           "kind": "type",
           "signature": "export type ILoader<TSource, TArtifact> = Readonly<{ readonly load: (source: TSource, context: ILoaderContext) => ILoadedArtifact<TArtifact> | PromiseLike<ILoadedArtifact<TArtifact>>; }>;",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "One-shot source-to-artifact loader contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoader.",
@@ -7616,7 +7679,7 @@
           "name": "ILoaderContext",
           "kind": "type",
           "signature": "export type ILoaderContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; readonly report: (error: unknown) => void; }>;",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "Runtime-neutral input context for one loader admission.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoaderContext.",
@@ -7680,7 +7743,7 @@
           "name": "ILoadIntoHostOptions",
           "kind": "type",
           "signature": "export type ILoadIntoHostOptions<TSource, TArtifact, THost extends PluginHost<any, any, any>, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly host: ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>; readonly source: TSource; readonly loader: ILoader<TSource, TArtifact>; readonly adapter: IAdapter<TArtifact, THost, TPlugin>; readonly mutation: 'use' | 'replace'; readonly signal?: IAbortSignal; readonly timeoutMs: number | false; readonly report?: (error: unknown) => void; }>;",
-          "declarationLine": 21,
+          "declarationLine": 22,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "Atomic Loader to Adapter to managed Host transaction options.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoadIntoHostOptions.",
@@ -7744,7 +7807,7 @@
           "name": "ILoadIntoHostResult",
           "kind": "type",
           "signature": "export type ILoadIntoHostResult = ITrayPluginMutationResult<unknown, unknown, unknown>;",
-          "declarationLine": 32,
+          "declarationLine": 33,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "Result shape returned by the managed mutation after custody transfer.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoadIntoHostResult.",

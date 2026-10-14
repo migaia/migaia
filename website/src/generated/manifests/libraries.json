@@ -4102,7 +4102,7 @@
                   "rows": [
                     [
                       "`@migaia/lifecycle/abort`",
-                      "`createAbortController`、`observeAbortSubscription`、`IAbortSignal`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`"
+                      "`createAbortController`、`observeAbortSubscription`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`（结构化 signal 类型 `IAbortSignal` 由 `@migaia/utils` 提供）"
                     ],
                     ["`@migaia/lifecycle/scheduler`", "scheduler、snapshot与时间校验"],
                     ["`@migaia/lifecycle/quiescence`", "quiescence/lease/pending trackers"],
@@ -13651,7 +13651,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/lifecycle`、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。"
+                  "text": "`@migaia/rpc-core` 与 `@migaia/rpc-contract` 是 peer 依赖，三者版本必须完全一致（当前 `0.0.7`）。运行时依赖 `@migaia/supervision`（进程监督与预算）、`@migaia/plugin-host`、`@migaia/utils`，会随包安装。"
                 },
                 {
                   "type": "paragraph",
@@ -15434,7 +15434,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\nimport type { IThreadSpec } from '@migaia/supervision/threads'\nimport type { IAbortSignal } from '@migaia/lifecycle'\nimport type { IScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方提供真实入口与生命周期；返回后负责关闭 channel、terminate 并等待 exited。 */\nexport async function openWorkerChannel(\n  threadSpec: IThreadSpec,\n  signal: IAbortSignal,\n  scheduler: IScheduler\n) {\n  const launcher = createNodeThreadLauncher()\n  const handle = await launcher.launch(threadSpec, { signal })\n  try {\n    const channel = await handle.open(signal, { scheduler })\n    return { handle, channel }\n  } catch (primary) {\n    handle.terminate()\n    await handle.exited\n    throw primary\n  }\n}"
+                  "code": "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\nimport type { IThreadSpec } from '@migaia/supervision/threads'\nimport type { IAbortSignal } from '@migaia/utils'\nimport type { IScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方提供真实入口与生命周期；返回后负责关闭 channel、terminate 并等待 exited。 */\nexport async function openWorkerChannel(\n  threadSpec: IThreadSpec,\n  signal: IAbortSignal,\n  scheduler: IScheduler\n) {\n  const launcher = createNodeThreadLauncher()\n  const handle = await launcher.launch(threadSpec, { signal })\n  try {\n    const channel = await handle.open(signal, { scheduler })\n    return { handle, channel }\n  } catch (primary) {\n    handle.terminate()\n    await handle.exited\n    throw primary\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -15672,7 +15672,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`encode`/`decode` 的 `options?`：`type?: string`（默认 `primaryType`）、`signal?: ISerializeAbortSignal`、`context?: string`（默认 `'anonymous'`，出错时拼进消息定位是哪个调用点）。"
+                  "text": "`encode`/`decode` 的 `options?`：`type?: string`（默认 `primaryType`）、`signal?: IAbortSignal`、`context?: string`（默认 `'anonymous'`，出错时拼进消息定位是哪个调用点）。"
                 },
                 {
                   "type": "paragraph",
@@ -15955,7 +15955,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ISerializeAbortSignal,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';"
+                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  isChunkShape,\n  assertSerializeType,\n  SERIALIZE_TYPE_PATTERN,\n  SERIALIZE_SOURCE,\n  SerializeCodecError,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  bytesToBase64,\n  base64ToBytes,\n  streamBase64Chunks,\n  encodeStream,\n  decodeStream,\n  collectStream,\n  sliceByFrameBudget,\n  jsonPlugin,\n  jsonParser,\n  SerializeChunkKind,\n  SerializeOutput,\n  SerializePhase,\n  SerializeCleanupPolicy,\n  SerializeCleanupKind,\n  SerializePluginType,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeCleanupError,\n  type ISerializeTimeoutDiagnostic,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type ITextEncoder,\n  type ITextDecoder,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions,\n  type IJsonPluginOptions,\n  type ISerializeChunkKind,\n  type ISerializeOutputFormat,\n  type ISerializeCleanupPolicy,\n  type ISerializeCleanupKind,\n  type ISerializePluginType\n} from '@migaia/serialize';"
                 },
                 {
                   "type": "paragraph",
@@ -16024,7 +16024,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `ISerializeAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?"
+                  "text": "运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `IAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?"
                 },
                 {
                   "type": "paragraph",
@@ -16114,7 +16114,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ISerializeContext = {\n  readonly signal: ISerializeAbortSignal;\n  readonly context: string;\n};"
+                  "code": "type ISerializeContext = {\n  readonly signal: IAbortSignal;\n  readonly context: string;\n};"
                 },
                 {
                   "type": "paragraph",
@@ -16263,7 +16263,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ISerializeRegistry = {\n  readonly primaryType: string;\n  readonly types: readonly string[];\n  has(type: string): boolean;\n  encode(\n    value: unknown,\n    options?: {\n      readonly type?: string;\n      readonly signal?: ISerializeAbortSignal;\n      readonly context?: string;\n    }\n  ): Promise<ISerializeChunk>;\n  decode(\n    chunk: ISerializeChunk,\n    options?: {\n      readonly type?: string;\n      readonly signal?: ISerializeAbortSignal;\n      readonly context?: string;\n    }\n  ): Promise<unknown>;\n  close(): void;\n  dispose(options?: { readonly deadlineAt?: number }): Promise<void>;\n};"
+                  "code": "type ISerializeRegistry = {\n  readonly primaryType: string;\n  readonly types: readonly string[];\n  has(type: string): boolean;\n  encode(\n    value: unknown,\n    options?: {\n      readonly type?: string;\n      readonly signal?: IAbortSignal;\n      readonly context?: string;\n    }\n  ): Promise<ISerializeChunk>;\n  decode(\n    chunk: ISerializeChunk,\n    options?: {\n      readonly type?: string;\n      readonly signal?: IAbortSignal;\n      readonly context?: string;\n    }\n  ): Promise<unknown>;\n  close(): void;\n  dispose(options?: { readonly deadlineAt?: number }): Promise<void>;\n};"
                 },
                 {
                   "type": "table",
@@ -16322,7 +16322,7 @@
                   "type": "list",
                   "items": [
                     "`type?: string` —— 省略时用 `primaryType`；传了但 registry 里没有注册这个 `type` 会抛 `SerializeCodecError`／`CODEC_NOT_FOUND`（\"no serialize plugin registered for type: ...\"），`context` 字段固定为 `'registry'`（与调用方传入的 `context` 无关）",
-                    "`signal?: ISerializeAbortSignal` —— 与 registry 内部因 `close()`/`dispose()` 触发的关闭信号复合（first-observed-wins）：任一方先 abort，操作立即以 `SerializeCodecError`／`ABORTED` 结束，不等 parser 真正返回",
+                    "`signal?: IAbortSignal` —— 与 registry 内部因 `close()`/`dispose()` 触发的关闭信号复合（first-observed-wins）：任一方先 abort，操作立即以 `SerializeCodecError`／`ABORTED` 结束，不等 parser 真正返回",
                     "`context?: string` —— 省略时为 `'anonymous'`；出错时拼进消息，定位是哪个调用点"
                   ]
                 },
@@ -16749,7 +16749,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IFrameBudgetOptions = {\n  readonly targetMs?: number; // 默认 8\n  readonly minItems?: number; // 默认 64\n  readonly maxItems?: number; // 默认 250_000\n  readonly initialItems?: number; // 默认 2_048\n  readonly yieldTo?: () => Promise<void>;\n  readonly signal?: ISerializeAbortSignal;\n  readonly scheduler: IScheduler; // 必填\n};\n\nfunction sliceByFrameBudget<T>(\n  items: readonly T[],\n  options: IFrameBudgetOptions\n): AsyncGenerator<readonly T[], void, undefined>;"
+                  "code": "type IFrameBudgetOptions = {\n  readonly targetMs?: number; // 默认 8\n  readonly minItems?: number; // 默认 64\n  readonly maxItems?: number; // 默认 250_000\n  readonly initialItems?: number; // 默认 2_048\n  readonly yieldTo?: () => Promise<void>;\n  readonly signal?: IAbortSignal;\n  readonly scheduler: IScheduler; // 必填\n};\n\nfunction sliceByFrameBudget<T>(\n  items: readonly T[],\n  options: IFrameBudgetOptions\n): AsyncGenerator<readonly T[], void, undefined>;"
                 },
                 {
                   "type": "paragraph",
@@ -16828,7 +16828,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function decodeStream(\n  registry: ISerializeRegistry,\n  chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,\n  options?: {\n    readonly type?: string;\n    readonly context?: string;\n    readonly signal?: ISerializeAbortSignal;\n  }\n): AsyncGenerator<unknown, void, undefined>;"
+                  "code": "function decodeStream(\n  registry: ISerializeRegistry,\n  chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,\n  options?: {\n    readonly type?: string;\n    readonly context?: string;\n    readonly signal?: IAbortSignal;\n  }\n): AsyncGenerator<unknown, void, undefined>;"
                 },
                 {
                   "type": "paragraph",
@@ -16994,7 +16994,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
+                  "code": "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type IAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
                 },
                 {
                   "type": "paragraph",
@@ -17037,7 +17037,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
+                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type IAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
                 },
                 {
                   "type": "paragraph",
@@ -17316,7 +17316,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "依赖 `@migaia/lifecycle`（仅用其 `IAbortSignal` 类型，用于协作式取消）。"
+                  "text": "依赖 `@migaia/utils`（其中 `IAbortSignal` 类型用于协作式取消）。"
                 }
               ]
             },
@@ -32301,7 +32301,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`request<Input, Output>(payload: Input, options?: { signal?: IRpcAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回",
+                    "`request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回",
                     "`disposed`(只读 getter)—— 是否已 `close()`/`dispose()`",
                     "`close(): void` —— 同步标记不可用(幂等)，此后 `request()` 立即拒绝，但不释放底层 endpoint",
                     "`dispose(): Promise<void>` —— 唯一异步释放入口：先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`；失败会 reject，重复调用复用同一个 Promise"
@@ -32334,7 +32334,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error",
+                    "`compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>`（必填）—— 真正干活的函数；`compute` 抛出的异常会被 RPC 端点框架捕获转成失败响应，不会逃逸成 Worker 的 unhandled error",
                     "`postMessage: (message: unknown) => void`（必填）—— Worker 侧发消息回主线程的函数，通常传 `(message) => self.postMessage(message)`",
                     "`options.timeoutMs?: number` —— Worker 侧对每次请求处理设的超时，默认不设"
                   ]
@@ -32788,7 +32788,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createWorkerHandler<Input, Output>(\n  compute: (payload: Input, context: { signal: IRpcAbortSignal }) => Output | Promise<Output>,\n  postMessage: (message: unknown) => void,\n  options?: { readonly timeoutMs?: number }\n): ManagedRpcHandler;"
+                  "code": "function createWorkerHandler<Input, Output>(\n  compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,\n  postMessage: (message: unknown) => void,\n  options?: { readonly timeoutMs?: number }\n): ManagedRpcHandler;"
                 },
                 {
                   "type": "list",

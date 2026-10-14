@@ -1580,7 +1580,7 @@
                 "rows": [
                   [
                     "`@migaia/lifecycle/abort`",
-                    "`createAbortController`、`observeAbortSubscription`、`IAbortSignal`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`"
+                    "`createAbortController`、`observeAbortSubscription`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`（结构化 signal 类型 `IAbortSignal` 由 `@migaia/utils` 提供）"
                   ],
                   ["`@migaia/lifecycle/scheduler`", "scheduler、snapshot与时间校验"],
                   ["`@migaia/lifecycle/quiescence`", "quiescence/lease/pending trackers"],
@@ -6790,16 +6790,6 @@
           "ownerFragment": "lifecycle-abort--IAbortController"
         },
         {
-          "identity": "packages/lifecycle/dist/abort.d.ts:IAbortSignal:export type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: 'abort', listener: () => void): void; };",
-          "name": "IAbortSignal",
-          "signature": "export type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: 'abort', listener: () => void): void; };",
-          "source": "packages/lifecycle/dist/abort.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./abort",
-          "ownerModule": "abort",
-          "ownerFragment": "lifecycle-abort--IAbortSignal"
-        },
-        {
           "identity": "packages/lifecycle/dist/dispose-transaction.d.ts:IDisposeItem:export type IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor; };",
           "name": "IDisposeItem",
           "signature": "export type IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor; };",
@@ -7041,7 +7031,7 @@
           "name": "createAbortController",
           "kind": "function",
           "signature": "export declare function createAbortController(): IAbortController;",
-          "declarationLine": 17,
+          "declarationLine": 9,
           "source": "packages/lifecycle/dist/abort.d.ts",
           "purpose": "Creates one actual host-native AbortController instance in the current realm.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAbortController.",
@@ -7149,7 +7139,7 @@
           "name": "IAbortController",
           "kind": "type",
           "signature": "export type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };",
-          "declarationLine": 12,
+          "declarationLine": 4,
           "source": "packages/lifecycle/dist/abort.d.ts",
           "purpose": "Structural controller returned by the public factory.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortController.",
@@ -7210,75 +7200,6 @@
           "usageScore": 32,
           "configuration": [],
           "fragment": "lifecycle-abort--IAbortController"
-        },
-        {
-          "name": "IAbortSignal",
-          "kind": "type",
-          "signature": "export type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: 'abort', listener: () => void): void; };",
-          "declarationLine": 3,
-          "source": "packages/lifecycle/dist/abort.d.ts",
-          "purpose": "Structural abort signal consumed by lifecycle owners without importing DOM or Node types.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortSignal.",
-          "advanced": "No additional advanced behavior is declared for IAbortSignal.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IAbortSignal."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAbortSignal.",
-          "examples": [
-            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
-            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}",
-            "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }",
-            "import {\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
-            "function createAbortController(): IAbortController\n// type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(...); removeEventListener(...) };\n// type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void };"
-          ],
-          "members": [],
-          "exportPath": "./abort",
-          "overloadSignatures": [
-            "export type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: 'abort', listener: () => void): void; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IAbortSignal when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IAbortSignal does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Structural abort signal consumed by lifecycle owners without importing DOM or Node types."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IAbortSignal from @migaia/lifecycle/abort, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IAbortSignal when its type contract and declared inputs match the result you need. Choose a different public symbol when IAbortSignal does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAbortSignal."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IAbortSignal."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/abort.d.ts:IAbortSignal:export type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean; }): void; removeEventListener(type: 'abort', listener: () => void): void; };",
-          "guidance": [],
-          "usageScore": 80,
-          "configuration": [],
-          "fragment": "lifecycle-abort--IAbortSignal"
         },
         {
           "name": "IObservedAbortFailureSink",

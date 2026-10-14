@@ -2422,16 +2422,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/lifecycle/abort/IAbortSignal",
-      "to": "/en/guides/lifecycle",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/lifecycle",
-      "to": "/en/docs/lifecycle/abort/IAbortSignal",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/lifecycle/abort/IObservedAbortFailureSink",
       "to": "/en/guides/lifecycle",
       "type": "domain-peer"
@@ -9112,16 +9102,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/en/docs/rpc-core/IRpcAbortSignal",
-      "to": "/en/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/rpc-core",
-      "to": "/en/docs/rpc-core/IRpcAbortSignal",
-      "type": "domain-peer"
-    },
-    {
       "from": "/en/docs/rpc-core/IRpcAuthenticationCapability",
       "to": "/en/guides/rpc-core",
       "type": "domain-peer"
@@ -10319,6 +10299,16 @@
     {
       "from": "/en/guides/rpc-core",
       "to": "/en/docs/rpc-core/adapters/web-worker/IWebWorkerLikePort",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/rpc-core/adapters/web-worker/IWebWorkerPortEvent",
+      "to": "/en/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/rpc-core",
+      "to": "/en/docs/rpc-core/adapters/web-worker/IWebWorkerPortEvent",
       "type": "domain-peer"
     },
     {
@@ -15309,16 +15299,6 @@
     {
       "from": "/en/guides/serialize",
       "to": "/en/docs/serialize/core/isChunkShape",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/docs/serialize/core/ISerializeAbortSignal",
-      "to": "/en/guides/serialize",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/en/guides/serialize",
-      "to": "/en/docs/serialize/core/ISerializeAbortSignal",
       "type": "domain-peer"
     },
     {
@@ -22362,6 +22342,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/en/docs/tray/ITrayLaunchCommand",
+      "to": "/en/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/tray",
+      "to": "/en/docs/tray/ITrayLaunchCommand",
+      "type": "domain-peer"
+    },
+    {
       "from": "/en/docs/tray/ITrayMethodPath",
       "to": "/en/guides/tray",
       "type": "domain-peer"
@@ -23119,6 +23109,26 @@
     {
       "from": "/en/guides/utils",
       "to": "/en/docs/utils/IFieldCollector",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/utils/isUrlObject",
+      "to": "/en/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/utils",
+      "to": "/en/docs/utils/isUrlObject",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/utils/readUrlHref",
+      "to": "/en/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/utils",
+      "to": "/en/docs/utils/readUrlHref",
       "type": "domain-peer"
     },
     {
@@ -24699,6 +24709,16 @@
     {
       "from": "/en/guides/utils",
       "to": "/en/docs/utils/typing/IDiscriminatedByPath",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/docs/utils/typing/IUrlLike",
+      "to": "/en/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/en/guides/utils",
+      "to": "/en/docs/utils/typing/IUrlLike",
       "type": "domain-peer"
     },
     {
@@ -29319,16 +29339,6 @@
     {
       "from": "/zh/guides/lifecycle",
       "to": "/zh/docs/lifecycle/abort/IAbortController",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/lifecycle/abort/IAbortSignal",
-      "to": "/zh/guides/lifecycle",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/lifecycle",
-      "to": "/zh/docs/lifecycle/abort/IAbortSignal",
       "type": "domain-peer"
     },
     {
@@ -36012,16 +36022,6 @@
       "type": "domain-peer"
     },
     {
-      "from": "/zh/docs/rpc-core/IRpcAbortSignal",
-      "to": "/zh/guides/rpc-core",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/rpc-core",
-      "to": "/zh/docs/rpc-core/IRpcAbortSignal",
-      "type": "domain-peer"
-    },
-    {
       "from": "/zh/docs/rpc-core/IRpcAuthenticationCapability",
       "to": "/zh/guides/rpc-core",
       "type": "domain-peer"
@@ -37219,6 +37219,16 @@
     {
       "from": "/zh/guides/rpc-core",
       "to": "/zh/docs/rpc-core/adapters/web-worker/IWebWorkerLikePort",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/rpc-core/adapters/web-worker/IWebWorkerPortEvent",
+      "to": "/zh/guides/rpc-core",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/rpc-core",
+      "to": "/zh/docs/rpc-core/adapters/web-worker/IWebWorkerPortEvent",
       "type": "domain-peer"
     },
     {
@@ -42209,16 +42219,6 @@
     {
       "from": "/zh/guides/serialize",
       "to": "/zh/docs/serialize/core/isChunkShape",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/docs/serialize/core/ISerializeAbortSignal",
-      "to": "/zh/guides/serialize",
-      "type": "domain-peer"
-    },
-    {
-      "from": "/zh/guides/serialize",
-      "to": "/zh/docs/serialize/core/ISerializeAbortSignal",
       "type": "domain-peer"
     },
     {
@@ -49262,6 +49262,16 @@
       "type": "domain-peer"
     },
     {
+      "from": "/zh/docs/tray/ITrayLaunchCommand",
+      "to": "/zh/guides/tray",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/tray",
+      "to": "/zh/docs/tray/ITrayLaunchCommand",
+      "type": "domain-peer"
+    },
+    {
       "from": "/zh/docs/tray/ITrayMethodPath",
       "to": "/zh/guides/tray",
       "type": "domain-peer"
@@ -50019,6 +50029,26 @@
     {
       "from": "/zh/guides/utils",
       "to": "/zh/docs/utils/IFieldCollector",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/utils/isUrlObject",
+      "to": "/zh/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/utils",
+      "to": "/zh/docs/utils/isUrlObject",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/utils/readUrlHref",
+      "to": "/zh/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/utils",
+      "to": "/zh/docs/utils/readUrlHref",
       "type": "domain-peer"
     },
     {
@@ -51599,6 +51629,16 @@
     {
       "from": "/zh/guides/utils",
       "to": "/zh/docs/utils/typing/IDiscriminatedByPath",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/docs/utils/typing/IUrlLike",
+      "to": "/zh/guides/utils",
+      "type": "domain-peer"
+    },
+    {
+      "from": "/zh/guides/utils",
+      "to": "/zh/docs/utils/typing/IUrlLike",
       "type": "domain-peer"
     },
     {
@@ -64412,16 +64452,6 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/en/docs/lifecycle#IAbortSignal",
-      "to": "/en/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "to": "/en/docs/lifecycle#IAbortSignal",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/en/docs/lifecycle#IDisposeItem",
       "to": "/en/docs/lifecycle/disposal#lifecycle-disposal--IDisposeItem",
       "type": "symbol-alias"
@@ -66022,16 +66052,6 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/zh/docs/lifecycle#IAbortSignal",
-      "to": "/zh/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "to": "/zh/docs/lifecycle#IAbortSignal",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/zh/docs/lifecycle#IDisposeItem",
       "to": "/zh/docs/lifecycle/disposal#lifecycle-disposal--IDisposeItem",
       "type": "symbol-alias"
@@ -66333,36 +66353,6 @@
     },
     {
       "from": "/en/docs/lifecycle/abort",
-      "to": "/en/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "to": "/en/docs/lifecycle/abort",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "to": "/en/guides/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "to": "/en/architecture/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/lifecycle",
-      "to": "/en/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/abort",
       "to": "/en/docs/lifecycle/abort#lifecycle-abort--IObservedAbortFailureSink",
       "type": "api-symbol"
     },
@@ -66529,36 +66519,6 @@
     {
       "from": "/zh/architecture/lifecycle",
       "to": "/zh/docs/lifecycle/abort#lifecycle-abort--IAbortController",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/abort",
-      "to": "/zh/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "to": "/zh/docs/lifecycle/abort",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "to": "/zh/guides/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
-      "to": "/zh/architecture/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/lifecycle",
-      "to": "/zh/docs/lifecycle/abort#lifecycle-abort--IAbortSignal",
       "type": "architecture-symbol"
     },
     {
@@ -109123,36 +109083,6 @@
     },
     {
       "from": "/en/docs/rpc-core",
-      "to": "/en/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "to": "/en/docs/rpc-core",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "to": "/en/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/rpc-core/getting-started",
-      "to": "/en/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "to": "/en/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/rpc-core",
-      "to": "/en/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-core",
       "to": "/en/docs/rpc-core#rpc-core-index--IRpcAuthenticationCapability",
       "type": "api-symbol"
     },
@@ -112789,36 +112719,6 @@
     {
       "from": "/zh/architecture/rpc-core",
       "to": "/zh/docs/rpc-core#rpc-core-index--IRpcAbortCapability",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core",
-      "to": "/zh/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "to": "/zh/docs/rpc-core",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "to": "/zh/guides/rpc-core/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/rpc-core/getting-started",
-      "to": "/zh/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
-      "to": "/zh/architecture/rpc-core",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/rpc-core",
-      "to": "/zh/docs/rpc-core#rpc-core-index--IRpcAbortSignal",
       "type": "architecture-symbol"
     },
     {
@@ -117093,6 +116993,36 @@
     },
     {
       "from": "/en/docs/rpc-core/adapters/web-worker",
+      "to": "/en/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "to": "/en/docs/rpc-core/adapters/web-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "to": "/en/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/rpc-core/getting-started",
+      "to": "/en/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "to": "/en/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/rpc-core",
+      "to": "/en/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/adapters/web-worker",
       "to": "/en/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerTransportOptions",
       "type": "api-symbol"
     },
@@ -117199,6 +117129,36 @@
     {
       "from": "/zh/architecture/rpc-core",
       "to": "/zh/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerLikePort",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/adapters/web-worker",
+      "to": "/zh/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "to": "/zh/docs/rpc-core/adapters/web-worker",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "to": "/zh/guides/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
+      "to": "/zh/architecture/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/rpc-core",
+      "to": "/zh/docs/rpc-core/adapters/web-worker#rpc-core-adapters/web-worker--IWebWorkerPortEvent",
       "type": "architecture-symbol"
     },
     {
@@ -143482,16 +143442,6 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/en/docs/serialize#ISerializeAbortSignal",
-      "to": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/en/docs/serialize#ISerializeAbortSignal",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/en/docs/serialize#ISerializeChunk",
       "to": "/en/docs/serialize/core#serialize-core--ISerializeChunk",
       "type": "symbol-alias"
@@ -144429,16 +144379,6 @@
     {
       "from": "/zh/docs/serialize/core#serialize-core--isChunkShape",
       "to": "/zh/docs/serialize#isChunkShape",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/serialize#ISerializeAbortSignal",
-      "to": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/zh/docs/serialize#ISerializeAbortSignal",
       "type": "alias-symbol"
     },
     {
@@ -146803,36 +146743,6 @@
     },
     {
       "from": "/en/docs/serialize/core",
-      "to": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/en/docs/serialize/core",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/en/guides/serialize/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/guides/serialize/getting-started",
-      "to": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/en/architecture/serialize",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/architecture/serialize",
-      "to": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/serialize/core",
       "to": "/en/docs/serialize/core#serialize-core--ISerializeChunk",
       "type": "api-symbol"
     },
@@ -147839,36 +147749,6 @@
     {
       "from": "/zh/architecture/serialize",
       "to": "/zh/docs/serialize/core#serialize-core--isChunkShape",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/serialize/core",
-      "to": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/zh/docs/serialize/core",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/zh/guides/serialize/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/guides/serialize/getting-started",
-      "to": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/zh/architecture/serialize",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/architecture/serialize",
-      "to": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
       "type": "architecture-symbol"
     },
     {
@@ -148890,16 +148770,6 @@
       "from": "/en/architecture/serialize",
       "to": "/en/docs/serialize/registry#serialize-registry--ISerializeTimeoutDiagnostic",
       "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/serialize/registry#ISerializeAbortSignal",
-      "to": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/en/docs/serialize/registry#ISerializeAbortSignal",
-      "type": "alias-symbol"
     },
     {
       "from": "/en/docs/serialize/registry#ISerializeChunk",
@@ -149180,16 +149050,6 @@
       "from": "/zh/architecture/serialize",
       "to": "/zh/docs/serialize/registry#serialize-registry--ISerializeTimeoutDiagnostic",
       "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/serialize/registry#ISerializeAbortSignal",
-      "to": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/serialize/core#serialize-core--ISerializeAbortSignal",
-      "to": "/zh/docs/serialize/registry#ISerializeAbortSignal",
-      "type": "alias-symbol"
     },
     {
       "from": "/zh/docs/serialize/registry#ISerializeChunk",
@@ -187843,6 +187703,36 @@
     },
     {
       "from": "/en/docs/tray",
+      "to": "/en/docs/tray#tray-index--ITrayLaunchCommand",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray#tray-index--ITrayLaunchCommand",
+      "to": "/en/docs/tray",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray#tray-index--ITrayLaunchCommand",
+      "to": "/en/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/tray/getting-started",
+      "to": "/en/docs/tray#tray-index--ITrayLaunchCommand",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray#tray-index--ITrayLaunchCommand",
+      "to": "/en/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/tray",
+      "to": "/en/docs/tray#tray-index--ITrayLaunchCommand",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray",
       "to": "/en/docs/tray#tray-index--ITrayMethodPath",
       "type": "api-symbol"
     },
@@ -189299,6 +189189,36 @@
     {
       "from": "/zh/architecture/tray",
       "to": "/zh/docs/tray#tray-index--ITrayKey",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray",
+      "to": "/zh/docs/tray#tray-index--ITrayLaunchCommand",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray#tray-index--ITrayLaunchCommand",
+      "to": "/zh/docs/tray",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray#tray-index--ITrayLaunchCommand",
+      "to": "/zh/guides/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/tray/getting-started",
+      "to": "/zh/docs/tray#tray-index--ITrayLaunchCommand",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray#tray-index--ITrayLaunchCommand",
+      "to": "/zh/architecture/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/tray",
+      "to": "/zh/docs/tray#tray-index--ITrayLaunchCommand",
       "type": "architecture-symbol"
     },
     {
@@ -192809,6 +192729,66 @@
     {
       "from": "/en/architecture/utils",
       "to": "/en/docs/utils#utils-index--IFieldCollector",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils#utils-index--isUrlObject",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--isUrlObject",
+      "to": "/en/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--isUrlObject",
+      "to": "/en/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/utils/getting-started",
+      "to": "/en/docs/utils#utils-index--isUrlObject",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--isUrlObject",
+      "to": "/en/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/utils",
+      "to": "/en/docs/utils#utils-index--isUrlObject",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils#utils-index--readUrlHref",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--readUrlHref",
+      "to": "/en/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--readUrlHref",
+      "to": "/en/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/utils/getting-started",
+      "to": "/en/docs/utils#utils-index--readUrlHref",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils#utils-index--readUrlHref",
+      "to": "/en/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/utils",
+      "to": "/en/docs/utils#utils-index--readUrlHref",
       "type": "architecture-symbol"
     },
     {
@@ -193892,6 +193872,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/utils#IUrlLike",
+      "to": "/en/docs/utils/typing#utils-typing--IUrlLike",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/utils/typing#utils-typing--IUrlLike",
+      "to": "/en/docs/utils#IUrlLike",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/utils#IUtilsReporter",
       "to": "/en/docs/utils/promise#utils-promise--IUtilsReporter",
       "type": "symbol-alias"
@@ -194459,6 +194449,66 @@
     {
       "from": "/zh/architecture/utils",
       "to": "/zh/docs/utils#utils-index--IFieldCollector",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils#utils-index--isUrlObject",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--isUrlObject",
+      "to": "/zh/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--isUrlObject",
+      "to": "/zh/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/utils/getting-started",
+      "to": "/zh/docs/utils#utils-index--isUrlObject",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--isUrlObject",
+      "to": "/zh/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/utils",
+      "to": "/zh/docs/utils#utils-index--isUrlObject",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils#utils-index--readUrlHref",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--readUrlHref",
+      "to": "/zh/docs/utils",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--readUrlHref",
+      "to": "/zh/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/utils/getting-started",
+      "to": "/zh/docs/utils#utils-index--readUrlHref",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#utils-index--readUrlHref",
+      "to": "/zh/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/utils",
+      "to": "/zh/docs/utils#utils-index--readUrlHref",
       "type": "architecture-symbol"
     },
     {
@@ -195539,6 +195589,16 @@
     {
       "from": "/zh/docs/utils/promise#utils-promise--ITimeoutOperation",
       "to": "/zh/docs/utils#ITimeoutOperation",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/utils#IUrlLike",
+      "to": "/zh/docs/utils/typing#utils-typing--IUrlLike",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/utils/typing#utils-typing--IUrlLike",
+      "to": "/zh/docs/utils#IUrlLike",
       "type": "alias-symbol"
     },
     {
@@ -205612,6 +205672,36 @@
       "type": "architecture-symbol"
     },
     {
+      "from": "/en/docs/utils/typing",
+      "to": "/en/docs/utils/typing#utils-typing--IUrlLike",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils/typing#utils-typing--IUrlLike",
+      "to": "/en/docs/utils/typing",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils/typing#utils-typing--IUrlLike",
+      "to": "/en/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/guides/utils/getting-started",
+      "to": "/en/docs/utils/typing#utils-typing--IUrlLike",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils/typing#utils-typing--IUrlLike",
+      "to": "/en/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/architecture/utils",
+      "to": "/en/docs/utils/typing#utils-typing--IUrlLike",
+      "type": "architecture-symbol"
+    },
+    {
       "from": "/en/docs/utils/typing#IAbortSignal",
       "to": "/en/docs/utils/promise#utils-promise--IAbortSignal",
       "type": "symbol-alias"
@@ -205789,6 +205879,36 @@
     {
       "from": "/zh/architecture/utils",
       "to": "/zh/docs/utils/typing#utils-typing--IDiscriminatedByPath",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/typing",
+      "to": "/zh/docs/utils/typing#utils-typing--IUrlLike",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/typing#utils-typing--IUrlLike",
+      "to": "/zh/docs/utils/typing",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils/typing#utils-typing--IUrlLike",
+      "to": "/zh/guides/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/guides/utils/getting-started",
+      "to": "/zh/docs/utils/typing#utils-typing--IUrlLike",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/typing#utils-typing--IUrlLike",
+      "to": "/zh/architecture/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/architecture/utils",
+      "to": "/zh/docs/utils/typing#utils-typing--IUrlLike",
       "type": "architecture-symbol"
     },
     {

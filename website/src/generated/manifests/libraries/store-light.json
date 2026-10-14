@@ -4745,7 +4745,7 @@
           "name": "IStoreResourceLoadContext",
           "kind": "type",
           "signature": "export type IStoreResourceLoadContext = { signal: IAbortSignal; generation: number; token: IGenerationToken; };",
-          "declarationLine": 2,
+          "declarationLine": 3,
           "source": "packages/store-light/dist/store-resource-request.d.ts",
           "purpose": "IStoreResourceLoadContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceLoadContext.",

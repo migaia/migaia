@@ -1319,12 +1319,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/en/docs/lifecycle/abort/IAbortSignal",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/en/docs/lifecycle/abort/IObservedAbortFailureSink",
       "locale": "en",
       "domain": "docs",
@@ -5291,12 +5285,6 @@
       "library": "rpc-core"
     },
     {
-      "path": "/en/docs/rpc-core/IRpcAbortSignal",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/en/docs/rpc-core/IRpcAuthenticationCapability",
       "locale": "en",
       "domain": "docs",
@@ -5958,6 +5946,12 @@
     },
     {
       "path": "/en/docs/rpc-core/adapters/web-worker/IWebWorkerLikePort",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/en/docs/rpc-core/adapters/web-worker/IWebWorkerPortEvent",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-core"
@@ -9024,12 +9018,6 @@
     },
     {
       "path": "/en/docs/serialize/core/IFrameBudgetOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/en/docs/serialize/core/ISerializeAbortSignal",
       "locale": "en",
       "domain": "docs",
       "library": "serialize"
@@ -13301,6 +13289,12 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/ITrayLaunchCommand",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/ITrayMethodPath",
       "locale": "en",
       "domain": "docs",
@@ -14201,6 +14195,12 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/isUrlObject",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/number",
       "locale": "en",
       "domain": "docs",
@@ -14633,6 +14633,12 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/readUrlHref",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/scheduler",
       "locale": "en",
       "domain": "docs",
@@ -14730,6 +14736,12 @@
     },
     {
       "path": "/en/docs/utils/typing/IDiscriminatedByPath",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/typing/IUrlLike",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -17490,12 +17502,6 @@
     },
     {
       "path": "/zh/docs/lifecycle/abort/IAbortController",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/abort/IAbortSignal",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"
@@ -21575,12 +21581,6 @@
       "library": "rpc-core"
     },
     {
-      "path": "/zh/docs/rpc-core/IRpcAbortSignal",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-core"
-    },
-    {
       "path": "/zh/docs/rpc-core/IRpcAuthenticationCapability",
       "locale": "zh",
       "domain": "docs",
@@ -22242,6 +22242,12 @@
     },
     {
       "path": "/zh/docs/rpc-core/adapters/web-worker/IWebWorkerLikePort",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/zh/docs/rpc-core/adapters/web-worker/IWebWorkerPortEvent",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
@@ -25338,12 +25344,6 @@
     },
     {
       "path": "/zh/docs/serialize/core/IFrameBudgetOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "serialize"
-    },
-    {
-      "path": "/zh/docs/serialize/core/ISerializeAbortSignal",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"
@@ -29657,6 +29657,12 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/ITrayLaunchCommand",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/ITrayMethodPath",
       "locale": "zh",
       "domain": "docs",
@@ -30569,6 +30575,12 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/isUrlObject",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/number",
       "locale": "zh",
       "domain": "docs",
@@ -31007,6 +31019,12 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/readUrlHref",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/scheduler",
       "locale": "zh",
       "domain": "docs",
@@ -31104,6 +31122,12 @@
     },
     {
       "path": "/zh/docs/utils/typing/IDiscriminatedByPath",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/typing/IUrlLike",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"

@@ -2681,6 +2681,158 @@
           "usageScore": 30,
           "configuration": [],
           "fragment": "utils-index--IFieldCollector"
+        },
+        {
+          "name": "isUrlObject",
+          "kind": "function",
+          "signature": "export declare function isUrlObject(value: unknown): value is Readonly<{ href: string; }>;",
+          "declarationLine": 18,
+          "source": "packages/utils/dist/url.d.ts",
+          "purpose": "True for the object form of `IUrlLike`: a non-null object whose `href` is a string. Used to tell a URL object apart from option objects in source unions; it does not check that `href` parses.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUrlObject.",
+          "advanced": "No additional advanced behavior is declared for isUrlObject.",
+          "parameters": ["value: unknown"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "value is Readonly<{ href: string; }>",
+          "errors": ["No documented errors are declared for isUrlObject."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isUrlObject.",
+          "examples": [],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function isUrlObject(value: unknown): value is Readonly<{ href: string; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["value is Readonly<{ href: string; }>"],
+          "whenToUse": "Use isUrlObject when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when isUrlObject does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "True for the object form of `IUrlLike`: a non-null object whose `href` is a string. Used to tell a URL object apart from option objects in source unions; it does not check that `href` parses."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import isUrlObject from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use isUrlObject when its function contract and declared inputs match the result you need. Choose a different public symbol when isUrlObject does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUrlObject."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for isUrlObject."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/url.d.ts:isUrlObject:export declare function isUrlObject(value: unknown): value is Readonly<{ href: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-index--isUrlObject"
+        },
+        {
+          "name": "readUrlHref",
+          "kind": "function",
+          "signature": "export declare function readUrlHref(value: IUrlLike): string;",
+          "declarationLine": 13,
+          "source": "packages/utils/dist/url.d.ts",
+          "purpose": "Returns the text form of a URL-like value: the string itself, or the object's `href`. It performs no parsing or validation; callers that need a valid URL keep their own checks.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readUrlHref.",
+          "advanced": "No additional advanced behavior is declared for readUrlHref.",
+          "parameters": ["value: IUrlLike"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "IUrlLike",
+              "optional": false
+            }
+          ],
+          "returns": "string",
+          "errors": ["No documented errors are declared for readUrlHref."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readUrlHref.",
+          "examples": [],
+          "members": [],
+          "exportPath": ".",
+          "overloadSignatures": ["export declare function readUrlHref(value: IUrlLike): string;"],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "IUrlLike",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["string"],
+          "whenToUse": "Use readUrlHref when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when readUrlHref does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Returns the text form of a URL-like value: the string itself, or the object's `href`. It performs no parsing or validation; callers that need a valid URL keep their own checks."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import readUrlHref from @migaia/utils, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use readUrlHref when its function contract and declared inputs match the result you need. Choose a different public symbol when readUrlHref does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for readUrlHref."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for readUrlHref."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/url.d.ts:readUrlHref:export declare function readUrlHref(value: IUrlLike): string;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-index--readUrlHref"
         }
       ],
       "aliases": [
@@ -3763,6 +3915,16 @@
           "ownerExportPath": "./promise",
           "ownerModule": "promise",
           "ownerFragment": "utils-promise--ITimeoutOperation"
+        },
+        {
+          "identity": "packages/utils/dist/url.d.ts:IUrlLike:export type IUrlLike = string | Readonly<{ href: string; }>;",
+          "name": "IUrlLike",
+          "signature": "export type IUrlLike = string | Readonly<{ href: string; }>;",
+          "source": "packages/utils/dist/url.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./typing",
+          "ownerModule": "typing",
+          "ownerFragment": "utils-typing--IUrlLike"
         },
         {
           "identity": "packages/utils/dist/promise.d.ts:IUtilsReporter:export type IUtilsReporter = (error: unknown, context: { readonly operation: 'abort-timeout-signal' | 'withTimeout' | 'raceWithAbort' | 'retry' | 'sleep' | 'limiter'; readonly phase: 'late-rejection' | 'cleanup' | 'reporter'; readonly attempt?: number; }) => void;",
@@ -24517,7 +24679,7 @@
           "name": "IDiscriminatedByField",
           "kind": "type",
           "signature": "export type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKey>> = { [K in T[F]]: Extract<T, Record<F, K>>; };",
-          "declarationLine": 6,
+          "declarationLine": 7,
           "source": "packages/utils/dist/typing.d.ts",
           "purpose": "Groups a discriminated union by one top-level property-key field.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDiscriminatedByField.",
@@ -24586,7 +24748,7 @@
           "name": "IDiscriminatedByPath",
           "kind": "type",
           "signature": "export type IDiscriminatedByPath<T, P extends IObjectPathInput<T>> = { [K in Extract<IObjectPathValue<T, P>, PropertyKey>]: IExtractDiscriminatedByPath<T, P, K>; };",
-          "declarationLine": 12,
+          "declarationLine": 13,
           "source": "packages/utils/dist/typing.d.ts",
           "purpose": "Groups a discriminated union by a typed string or tuple object path.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDiscriminatedByPath.",
@@ -24650,6 +24812,68 @@
           "usageScore": 36,
           "configuration": [],
           "fragment": "utils-typing--IDiscriminatedByPath"
+        },
+        {
+          "name": "IUrlLike",
+          "kind": "type",
+          "signature": "export type IUrlLike = string | Readonly<{ href: string; }>;",
+          "declarationLine": 6,
+          "source": "packages/utils/dist/url.d.ts",
+          "purpose": "A URL given either as text or as any object with an `href`, such as a WHATWG `URL`. It lets runtime-neutral module accept `new URL(...)` without depending on DOM or Node type declarations; consumers read the text form through `readUrlHref`.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUrlLike.",
+          "advanced": "No additional advanced behavior is declared for IUrlLike.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IUrlLike."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IUrlLike.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IUrlLike",
+          "exportPath": "./typing",
+          "overloadSignatures": ["export type IUrlLike = string | Readonly<{ href: string; }>;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IUrlLike when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IUrlLike does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A URL given either as text or as any object with an `href`, such as a WHATWG `URL`. It lets runtime-neutral module accept `new URL(...)` without depending on DOM or Node type declarations; consumers read the text form through `readUrlHref`."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IUrlLike from @migaia/utils/typing, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IUrlLike when its type contract and declared inputs match the result you need. Choose a different public symbol when IUrlLike does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUrlLike."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IUrlLike."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/url.d.ts:IUrlLike:export type IUrlLike = string | Readonly<{ href: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "utils-typing--IUrlLike"
         }
       ],
       "aliases": [
