@@ -1,3 +1,4 @@
+import { readUrlHref, type IUrlLike } from '@migaia/utils'
 import { createAdapterConfigurationError, createAdapterConfigurationTypeError } from './data.js'
 import {
   AdapterEntryErrorText,
@@ -10,8 +11,8 @@ import {
 
 /** Native owners supply entry snapshots; this pure resolver never reads runtime globals. */
 export type IAdapterEntryOptions = Readonly<{
-  mainEntry?: string | URL
-  base?: string | URL
+  mainEntry?: IUrlLike
+  base?: IUrlLike
   execArgv?: readonly string[]
   electron?: boolean
   singleBinary?: boolean
@@ -41,10 +42,7 @@ export function retainAdapterRuntimeFlags(flags: readonly string[]): readonly st
  * bytes; relative strings use the explicit base or main entry directory. Self spawning rejects
  * interpreter and test harness contexts before acquiring any native resource.
  */
-export function resolveAdapterEntry(
-  entry: true | string | URL,
-  options: IAdapterEntryOptions
-): string {
+export function resolveAdapterEntry(entry: true | IUrlLike, options: IAdapterEntryOptions): string {
   if (entry === true) {
     if (
       options.mainEntry === undefined ||
@@ -60,7 +58,9 @@ export function resolveAdapterEntry(
       throw createAdapterConfigurationError(AdapterEntryErrorText.selfUnavailable)
     return resolveAdapterEntry(options.mainEntry, options)
   }
-  if (entry instanceof URL) return entry.href
+  /** Any object with a string `href` (such as a WHATWG URL) is an exact URL. */
+  if (typeof entry === 'object' && entry !== null && typeof entry.href === 'string')
+    return entry.href
   if (typeof entry !== 'string' || !entry)
     throw createAdapterConfigurationError(AdapterEntryErrorText.invalid)
   /** A relative string is meaningful only with native-owner supplied entry data. */
@@ -68,7 +68,10 @@ export function resolveAdapterEntry(
   if (!ADAPTER_ENTRY_SCHEME.test(entry) && base === undefined)
     throw createAdapterConfigurationError(AdapterEntryErrorText.relativeUnavailable)
   try {
-    return new URL(entry, ADAPTER_ENTRY_SCHEME.test(entry) ? undefined : base).href
+    return new URL(
+      entry,
+      ADAPTER_ENTRY_SCHEME.test(entry) || base === undefined ? undefined : readUrlHref(base)
+    ).href
   } catch (cause) {
     throw createAdapterConfigurationTypeError(AdapterEntryErrorText.invalid, cause)
   }

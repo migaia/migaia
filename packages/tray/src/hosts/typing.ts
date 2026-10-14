@@ -6,7 +6,7 @@ import type {
   IPluginFeatureName,
   IPluginFeatureOutput
 } from '@migaia/plugin-host'
-import type { IProcessLaunchCommand } from '@migaia/rpc-process'
+import type { IAbortSignal, IUrlLike } from '@migaia/utils'
 import type { IRuntimeConnectionDetail } from '@migaia/rpc-core/remote'
 import type {
   TrayInstanceEvent as TrayInstanceEventValues,
@@ -16,7 +16,7 @@ import type {
 import type { ITrayRoutingPolicy } from './routing-policy.js'
 
 /** Caller cancellation and deadline occupy only the third public call position. */
-export type ITrayCallOptions = Readonly<{ signal?: AbortSignal; timeoutMs?: number }>
+export type ITrayCallOptions = Readonly<{ signal?: IAbortSignal; timeoutMs?: number }>
 /** Accepted host runtime families; transport and supervision remain rpc-owned. */
 export type ITrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime]
 /** Current registry state published through discovery. */
@@ -119,18 +119,29 @@ export type ITrayInstanceEventRecord = ITrayInstance &
 /** External process command transformation; Tray ships no sandbox implementation. */
 export type ITraySandbox = Readonly<{
   name: string
-  wrap(command: IProcessLaunchCommand): IProcessLaunchCommand
+  wrap(command: ITrayLaunchCommand): ITrayLaunchCommand
+}>
+/**
+ * The launch command a sandbox may rewrite. Structurally identical to rpc-process
+ * `IProcessLaunchCommand`; declared here so Tray's public types do not pull in rpc-process
+ * declarations and their Node types.
+ */
+export type ITrayLaunchCommand = Readonly<{
+  command: string
+  args: readonly string[]
+  cwd?: string
+  env: Readonly<{ inherit: readonly string[]; set: Readonly<Record<string, string>> }>
 }>
 /** Runtime-specific options reject launch fields outside their owning family. */
 export type ITrayRuntimeOptions =
   | Readonly<{ runtime?: 'coroutine'; entry?: never; limits?: never; sandbox?: never }>
   | Readonly<{
       runtime: 'thread'
-      entry: URL | string
+      entry: IUrlLike
       limits?: Readonly<{ heapBytes?: number }>
       sandbox?: never
     }>
-  | Readonly<{ runtime: 'process'; entry: URL | string; limits?: never; sandbox?: ITraySandbox }>
+  | Readonly<{ runtime: 'process'; entry: IUrlLike; limits?: never; sandbox?: ITraySandbox }>
 /** Tray projects the canonical supervision names into each rpc runtime adapter. */
 export type ITraySupervisorPolicy = Readonly<{
   restart?: Readonly<{
@@ -288,7 +299,7 @@ export type ITray<
   replace(id: string, options?: Readonly<{ config?: unknown }>): Promise<ITrayInstance>
   on(event: TrayInstanceEvent, listener: (event: ITrayInstanceEventRecord) => void): () => void
   watch(
-    options?: Readonly<{ signal?: AbortSignal }>
+    options?: Readonly<{ signal?: IAbortSignal }>
   ): AsyncIterableIterator<ITrayInstanceEventRecord>
   dispose(options?: Readonly<{ graceMs?: number }>): Promise<void>
   [Symbol.asyncDispose](): Promise<void>

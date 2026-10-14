@@ -1,3 +1,4 @@
+import { isUrlObject, type IUrlLike } from '@migaia/utils'
 import {
   resolveAdapterEntry,
   retainAdapterRuntimeFlags
@@ -19,7 +20,7 @@ export function isShortThreadSpawn(spawn: IRuntimeThreadPeerOptions['spawn']): b
   return (
     spawn === true ||
     typeof spawn === 'string' ||
-    spawn instanceof URL ||
+    isUrlObject(spawn) ||
     (spawn !== null && typeof spawn === 'object' && 'entry' in spawn)
   )
 }
@@ -35,16 +36,16 @@ export async function expandThreadSpawn(
 ): Promise<IRuntimeThreadSpawn> {
   /** Caller-selected fields override defaults only for this one short source. */
   const source: IRuntimeThreadShortSpawn =
-    typeof options.spawn === 'object' && !(options.spawn instanceof URL)
+    typeof options.spawn === 'object' && !isUrlObject(options.spawn)
       ? (options.spawn as IRuntimeThreadShortSpawn)
-      : { entry: options.spawn as true | string | URL }
+      : { entry: options.spawn as true | IUrlLike }
   /** Bun's Node compatibility globals must never select Node's launcher ahead of Bun's adapter. */
   const bun = Reflect.get(globalThis, 'Bun')
   /** Deno mainModule is already an exact absolute module URL. */
   const deno = Reflect.get(globalThis, 'Deno') as { mainModule?: string } | undefined
   /** Browser callers must pass an exact URL; no main-module or stack-trace inference exists there. */
   const node = typeof process !== 'undefined' && process.versions?.node !== undefined
-  if (!bun && !deno && !node && !(source.entry instanceof URL))
+  if (!bun && !deno && !node && !isUrlObject(source.entry))
     invalidThreadConfig('spawn', ThreadErrorText.browserEntryRequired)
   /** Native runtime snapshots feed one Core-owned entry policy rather than duplicate checks. */
   let mainEntry: URL | undefined
