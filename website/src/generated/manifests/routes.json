@@ -1037,12 +1037,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/en/docs/event-subscriber/subscriber/IEventAbortSignal",
-      "locale": "en",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/en/docs/event-subscriber/subscriber/IEventChannelLike",
       "locale": "en",
       "domain": "docs",
@@ -2190,12 +2184,6 @@
     },
     {
       "path": "/en/docs/middleware-pipeline/IMiddlewarePipeline",
-      "locale": "en",
-      "domain": "docs",
-      "library": "middleware-pipeline"
-    },
-    {
-      "path": "/en/docs/middleware-pipeline/IMiddlewarePipelineAbortSignal",
       "locale": "en",
       "domain": "docs",
       "library": "middleware-pipeline"
@@ -17225,12 +17213,6 @@
       "library": "event-subscriber"
     },
     {
-      "path": "/zh/docs/event-subscriber/subscriber/IEventAbortSignal",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "event-subscriber"
-    },
-    {
       "path": "/zh/docs/event-subscriber/subscriber/IEventChannelLike",
       "locale": "zh",
       "domain": "docs",
@@ -18414,12 +18396,6 @@
     },
     {
       "path": "/zh/docs/middleware-pipeline/IMiddlewarePipeline",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "middleware-pipeline"
-    },
-    {
-      "path": "/zh/docs/middleware-pipeline/IMiddlewarePipelineAbortSignal",
       "locale": "zh",
       "domain": "docs",
       "library": "middleware-pipeline"
