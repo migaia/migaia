@@ -602,7 +602,7 @@ test('Logger custom plugin guide covers extension, Host use, async completion, a
     "await logger.shutdown('manual')"
   ])
     assert.ok(source.includes(contract), `custom Logger plugin guide misses ${contract}`)
-  assert.match(source, /shared \+ getShared/)
+  assert.match(source, /defineFeature/)
   assert.match(source, /usePipeline \/ useAsyncPipeline/)
 })
 

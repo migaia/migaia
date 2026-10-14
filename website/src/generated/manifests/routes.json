@@ -2067,6 +2067,12 @@
       "library": "logger"
     },
     {
+      "path": "/en/docs/logger/troubleshooting",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
       "path": "/en/docs/middleware-pipeline",
       "locale": "en",
       "domain": "docs",
@@ -3537,6 +3543,12 @@
       "library": "reactive"
     },
     {
+      "path": "/en/docs/reactive/troubleshooting",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/en/docs/resource",
       "locale": "en",
       "domain": "docs",
@@ -3646,6 +3658,12 @@
     },
     {
       "path": "/en/docs/resource/suspense-and-ssr",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/troubleshooting",
       "locale": "en",
       "domain": "docs",
       "library": "resource"
@@ -17841,6 +17859,12 @@
       "library": "logger"
     },
     {
+      "path": "/zh/docs/logger/troubleshooting",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
       "path": "/zh/docs/middleware-pipeline",
       "locale": "zh",
       "domain": "docs",
@@ -19311,6 +19335,12 @@
       "library": "reactive"
     },
     {
+      "path": "/zh/docs/reactive/troubleshooting",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/zh/docs/resource",
       "locale": "zh",
       "domain": "docs",
@@ -19420,6 +19450,12 @@
     },
     {
       "path": "/zh/docs/resource/suspense-and-ssr",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "resource"

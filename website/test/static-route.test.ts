@@ -2651,52 +2651,40 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Handle cancellation, errors, and Storage terminal state',
       'Use AbortController when the user no longer needs a result'
     ],
-    ['/zh/docs/logger', 'Logger 学习路径', '按你要解决的问题进入'],
-    ['/en/docs/logger', 'Logger learning paths', 'Enter through the problem you need to solve'],
-    ['/zh/docs/logger/getting-started', '五分钟建立可关闭的结构化 Logger', '构造、输出并观察失败'],
-    [
-      '/en/docs/logger/getting-started',
-      'Build a shutdown-safe structured Logger in five minutes',
-      'Construct, emit, and observe failures'
-    ],
-    [
-      '/zh/docs/logger/entries-hooks-and-sinks',
-      '组织 entry、hook 与 sink',
-      '需要字段语义时使用 dispatchRaw'
-    ],
+    ['/zh/docs/logger', 'Logger：按需组合能力的日志库', '内置插件'],
+    ['/en/docs/logger', 'Logger: a logging library you assemble from plugins', 'Built-in plugins'],
+    ['/zh/docs/logger/getting-started', '快速开始：第一个 Logger', '常用方法'],
+    ['/en/docs/logger/getting-started', 'Quick start: your first Logger', 'Common methods'],
+    ['/zh/docs/logger/entries-hooks-and-sinks', 'Entry、Hook 与 Sink', '输出端出错时'],
     [
       '/en/docs/logger/entries-hooks-and-sinks',
-      'Organize entries, hooks, and sinks',
-      'Use dispatchRaw when fields carry meaning'
+      'Entries, hooks, and sinks',
+      'When an output fails'
     ],
-    ['/zh/docs/logger/plugins-and-batching', '组合内置插件与有界批处理', '按 provider'],
-    [
-      '/en/docs/logger/plugins-and-batching',
-      'Compose built-in plugins and bounded batching',
-      'Order plugins from provider to consumer'
-    ],
-    ['/zh/docs/logger/pipelines', '为 Logger 选择 pipeline 模式', '不要把四种控制流混用'],
+    ['/zh/docs/logger/plugins-and-batching', '内置插件与批量上报', '其他插件'],
+    ['/en/docs/logger/plugins-and-batching', 'Built-in plugins and batching', 'Other plugins'],
+    ['/zh/docs/logger/custom-plugin', '编写自定义插件', '编写插件时注意'],
+    ['/en/docs/logger/custom-plugin', 'Write a custom plugin', 'Rules for plugins'],
+    ['/zh/docs/logger/pipelines', '处理步骤：在输出之前修改或拦截日志', '选择模式'],
     [
       '/en/docs/logger/pipelines',
-      'Choose a Logger pipeline mode',
-      'Do not mix the four control flows'
+      'Pipelines: modify or drop entries before output',
+      'Choose a mode'
     ],
-    ['/zh/docs/logger/flush-and-shutdown', '正确 flush 并进入终态', '按所有权边界选择操作'],
+    ['/zh/docs/logger/flush-and-shutdown', 'Flush 与关闭：退出前确认日志都写完', '例子'],
     [
       '/en/docs/logger/flush-and-shutdown',
-      'Flush correctly and enter terminal state',
-      'Choose an operation from the ownership boundary'
+      'Flush and shutdown: confirm logs are written before exit',
+      'Example'
     ],
-    [
-      '/zh/docs/logger/runtime-and-forwarding',
-      '跨运行时适配并组合多个 Logger',
-      '只在平台边界替换 runtime manager'
-    ],
+    ['/zh/docs/logger/runtime-and-forwarding', '转发与运行环境', '替换底层能力'],
     [
       '/en/docs/logger/runtime-and-forwarding',
-      'Adapt runtimes and compose multiple Loggers',
-      'Replace the runtime manager only at a platform boundary'
+      'Forwarding and runtime',
+      'Replace low-level capabilities'
     ],
+    ['/zh/docs/logger/troubleshooting', '排错与常见问题', '常见错误代码'],
+    ['/en/docs/logger/troubleshooting', 'Troubleshooting and FAQ', 'Common error codes'],
     ['/zh/docs/plugin-host', 'Plugin Host：让你的库可以被插件扩展', 'API 一览'],
     [
       '/en/docs/plugin-host',
@@ -2825,68 +2813,40 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Cancel a run and handle errors',
       'Two errors at once'
     ],
-    ['/zh/docs/resource', 'Resource 学习路径', '把可见状态与传输状态分开'],
-    ['/en/docs/resource', 'Resource learning paths', 'Separate visible state from transport state'],
+    ['/zh/docs/resource', 'Resource：会随输入自动刷新、可取消的异步数据', 'API 一览'],
     [
-      '/zh/docs/resource/getting-started',
-      '五分钟建立响应式异步 Resource',
-      '建立依赖追踪与 latest-wins 请求'
+      '/en/docs/resource',
+      'Resource: async data that refreshes with its inputs and can be cancelled',
+      'API at a glance'
     ],
-    [
-      '/en/docs/resource/getting-started',
-      'Build a reactive asynchronous Resource in five minutes',
-      'Connect dependency tracking to latest-wins requests'
-    ],
-    [
-      '/zh/docs/resource/caching-and-refresh',
-      '设计 Resource 缓存新鲜度与后台刷新',
-      '分别选择时间、展示和保活策略'
-    ],
-    [
-      '/en/docs/resource/caching-and-refresh',
-      'Design Resource cache freshness and background refresh',
-      'Choose time, presentation, and retention separately'
-    ],
-    [
-      '/zh/docs/resource/suspense-and-ssr',
-      '把 Resource 接入 Suspense 与 SSR 快照',
-      '三种结果进入正确边界'
-    ],
+    ['/zh/docs/resource/getting-started', '快速开始：加载一个用户', '构造选项'],
+    ['/en/docs/resource/getting-started', 'Quick start: load a user', 'Constructor options'],
+    ['/zh/docs/resource/caching-and-refresh', '缓存与刷新', '什么时候会重新请求'],
+    ['/en/docs/resource/caching-and-refresh', 'Caching and refresh', 'When a new request starts'],
+    ['/zh/docs/resource/suspense-and-ssr', 'Suspense 与服务端渲染', '服务端渲染：把数据带到浏览器'],
     [
       '/en/docs/resource/suspense-and-ssr',
-      'Integrate Resource with Suspense and SSR snapshots',
-      'outcome to the right boundary'
+      'Suspense and server rendering',
+      'Server rendering: carry data to the browser'
     ],
+    ['/zh/docs/resource/cancellation-and-retry', '取消与重试', '失败后自动重试'],
+    ['/en/docs/resource/cancellation-and-retry', 'Cancellation and retry', 'Retry after failure'],
+    ['/zh/docs/resource/troubleshooting', '排错与常见问题', '错误代码'],
+    ['/en/docs/resource/troubleshooting', 'Troubleshooting and FAQ', 'Error codes'],
+    ['/zh/docs/reactive', 'Reactive：值变了，依赖它的计算和副作用自动更新', 'API 一览'],
     [
-      '/zh/docs/resource/cancellation-and-retry',
-      '控制 Resource 取消、重试与退避',
-      '让重试策略受错误和次数约束'
+      '/en/docs/reactive',
+      'Reactive: when a value changes, dependent computations and effects update',
+      'API at a glance'
     ],
-    [
-      '/en/docs/resource/cancellation-and-retry',
-      'Control Resource cancellation, retries, and backoff',
-      'Bound retry by both error and attempt count'
-    ],
-    ['/zh/docs/reactive', 'Reactive 学习路径', '先理解三个角色'],
-    ['/zh/docs/reactive/getting-started', '五分钟建立响应式状态', '建立第一张图'],
-    ['/zh/docs/reactive/reactive', '组合 Signal、Computed 与 Effect', '区分 value 与 peek'],
-    ['/zh/docs/reactive/runtime', '隔离 Runtime 与宿主能力', '每个隔离域创建一个 Runtime'],
-    ['/en/docs/reactive', 'Reactive learning paths', 'Start with three roles'],
-    [
-      '/en/docs/reactive/getting-started',
-      'Build reactive state in five minutes',
-      'Build the first graph'
-    ],
-    [
-      '/en/docs/reactive/reactive',
-      'Compose Signal, Computed, and Effect',
-      'Distinguish value from peek'
-    ],
-    [
-      '/en/docs/reactive/runtime',
-      'Isolate Runtime and host capabilities',
-      'Create one Runtime per isolation domain'
-    ],
+    ['/zh/docs/reactive/getting-started', '快速开始：第一张依赖图', '释放'],
+    ['/en/docs/reactive/getting-started', 'Quick start: your first dependency graph', 'Disposal'],
+    ['/zh/docs/reactive/reactive', 'Signal、Computed、Effect', '读取但不建立依赖'],
+    ['/en/docs/reactive/reactive', 'Signal, Computed, Effect', 'Read without a dependency'],
+    ['/zh/docs/reactive/runtime', 'Runtime 与调度', '每个场景使用自己的 Runtime'],
+    ['/en/docs/reactive/runtime', 'Runtime and scheduling', 'Give each context its own Runtime'],
+    ['/zh/docs/reactive/troubleshooting', '排错与常见问题', '错误代码'],
+    ['/en/docs/reactive/troubleshooting', 'Troubleshooting and FAQ', 'Error codes'],
     ['/zh/docs/event-subscriber', 'Event Subscriber：通知所有关心这件事的模块', 'API 一览'],
     [
       '/zh/docs/event-subscriber/getting-started',
@@ -3029,7 +2989,8 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'getting-started',
     'caching-and-refresh',
     'suspense-and-ssr',
-    'cancellation-and-retry'
+    'cancellation-and-retry',
+    'troubleshooting'
   ]
     .map((topic) =>
       readFileSync(join(buildRoot, artifactPath(`/en/docs/resource/${topic}`)), 'utf8')
@@ -3044,9 +3005,9 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(resourceText, /dehydrate|hydrate/)
   assert.match(resourceText, /retryDelay/)
   assert.match(guideSource, /const id = userId\.value/)
-  assert.match(guideSource, /fetch\(`\/api\/users\/\$\{id\}`.*\{ signal \}/)
-  assert.match(guideSource, /const payload = JSON\.stringify\(snapshot\)/)
-  assert.match(guideSource, /initialSnapshot,\\n  ttl: 30_000/)
+  assert.match(guideSource, /signal as AbortSignal/)
+  assert.match(guideSource, /JSON\.stringify\(onServer\.dehydrate\(\)\)/)
+  assert.match(guideSource, /initialSnapshot: JSON\.parse\(json\)/)
 
   const serializeTopics = [
     'getting-started',
@@ -3143,24 +3104,23 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'custom-plugin',
     'pipelines',
     'flush-and-shutdown',
-    'runtime-and-forwarding'
+    'runtime-and-forwarding',
+    'troubleshooting'
   ]
     .map((topic) => readFileSync(join(buildRoot, artifactPath(`/en/docs/logger/${topic}`)), 'utf8'))
     .join('\n')
   const loggerText = renderedText(loggerTopics)
   assert.match(loggerText, /onFailure/)
-  assert.match(loggerText, /systemScheduler/)
-  assert.match(loggerText, /core\.ctx\.options/)
   assert.match(loggerText, /dispatchRaw/)
-  assert.match(loggerText, /batch must precede http/)
+  assert.match(loggerText, /batch must come before http/)
   assert.match(loggerText, /BATCH_OVERFLOW/)
-  assert.match(loggerText, /PIPELINE_NEXT_DUPLICATE/)
-  assert.match(loggerText, /shutdown-safe|terminal state/)
+  assert.match(loggerText, /PIPELINE_MODE_MISMATCH/)
+  assert.match(loggerText, /a closed Logger cannot be reopened/)
   assert.match(loggerText, /setLoggerRuntimeManager/)
-  assert.match(guideSource, /plugins: \[level\(\{ level: 'info' \}\), color\(\)\]/)
+  assert.match(guideSource, /level\(\{ level: 'info' \}\)/)
   assert.match(guideSource, /log\.usePipeline\(\(entry, next\)/)
-  assert.match(guideSource, /const restore = setLoggerRuntimeManager/)
-  assert.match(guideSource, /requestLog\.extends\(appLog, auditLog\)/)
+  assert.match(guideSource, /setLoggerRuntimeManager\(\{/)
+  assert.match(guideSource, /api\.extends\(audit\)/)
 
   const storageWebStart = readFileSync(
     join(buildRoot, artifactPath('/en/docs/storage-web/getting-started')),
@@ -3290,7 +3250,7 @@ test('SITE-T-REACTIVE-START flushes the queued rerun before disposing the Effect
 
     assert.ok(flush >= 0, `/${locale}/docs/reactive/getting-started misses runtime.flush()`)
     assert.ok(stop > flush, `/${locale}/docs/reactive/getting-started disposes before flush`)
-    assert.ok(page.includes('total: 36'))
+    assert.ok(page.includes(locale === 'zh' ? '总价: 30' : 'total: 30'))
   }
 })
 

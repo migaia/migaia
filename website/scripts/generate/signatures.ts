@@ -340,7 +340,7 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'security-capacity-and-recovery'
   ],
   capability: ['graph', 'graph-dynamic', 'graph-topology'],
-  reactive: ['reactive', 'runtime'],
+  reactive: ['reactive', 'runtime', 'troubleshooting'],
   lifecycle: ['scope', 'disposal', 'abort', 'quiescence', 'scheduler', 'generation', 'errors'],
   'event-subscriber': [
     'subscriptions',
@@ -350,7 +350,12 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'troubleshooting'
   ],
   'middleware-pipeline': ['sync-and-async', 'generators', 'cancellation-and-errors'],
-  resource: ['caching-and-refresh', 'suspense-and-ssr', 'cancellation-and-retry'],
+  resource: [
+    'caching-and-refresh',
+    'suspense-and-ssr',
+    'cancellation-and-retry',
+    'troubleshooting'
+  ],
   serialize: [
     'chunk-shapes-and-wire-conversion',
     'registry-and-plugins',
@@ -377,7 +382,8 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'custom-plugin',
     'pipelines',
     'flush-and-shutdown',
-    'runtime-and-forwarding'
+    'runtime-and-forwarding',
+    'troubleshooting'
   ],
   'rpc-core': [
     'endpoint-composition',
