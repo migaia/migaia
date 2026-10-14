@@ -17,6 +17,10 @@ export const WebsiteCopy = {
     searchPlaceholder: 'Search the library',
     searchEmpty: 'Type to search the documentation.',
     searchUnknown: 'No matching result yet. Try a library or API name.',
+    homeEyebrow: 'Migaia TypeScript libraries',
+    homeTitle: 'Manage state, async tasks, and isolated hosts.',
+    homeDescription:
+      'Choose composable libraries for reactive state, browser persistence, cancellable Worker tasks, cross-runtime calls, and supervised plugin or agent processes.',
     capabilityMap: 'Capability map',
     shortestPath: 'Choose the shortest useful path.',
     foundation: 'Foundation',
@@ -27,6 +31,36 @@ export const WebsiteCopy = {
     stateStorageText: 'Compose state, persistence, and boundaries.',
     integration: 'Integration',
     integrationText: 'Understand transport and platform edges.',
+    scenarios: 'Build with migaia',
+    scenarioTitle: 'What do you need your application to do?',
+    /** Home scenarios connect concrete application goals to existing library pages. */
+    homeScenarios: [
+      {
+        title: 'Run cancellable heavy computation in a Worker',
+        body: 'Keep the UI responsive and cancel stale work through Resources and cooperative RPC tasks.',
+        libraries: ['store-worker', 'resource', 'rpc-threads']
+      },
+      {
+        title: 'Manage isolated plugin or agent processes',
+        body: 'Start and discover host instances, share execution budgets, monitor health, and restart failures.',
+        libraries: ['tray', 'supervision']
+      },
+      {
+        title: 'Call across browser windows and iframes',
+        body: 'Expose methods over browser channels with explicit origin and connection boundaries.',
+        libraries: ['rpc-browser']
+      },
+      {
+        title: 'Persist browser state',
+        body: 'Choose a browser storage backend, then save, restore, and migrate application state.',
+        libraries: ['storage-web', 'store-persist']
+      },
+      {
+        title: 'Isolate state for each SSR request',
+        body: 'Give each request its own Runtime and hydrate server snapshots in the browser.',
+        libraries: ['store-ssr']
+      }
+    ],
     startFive: 'Start in 5 minutes',
     smallResult: 'Make one small result.',
     quickstartBody:
@@ -40,9 +74,12 @@ export const WebsiteCopy = {
     capabilityPluginHost: 'Capability + Plugin Host',
     capabilityPluginHostText:
       'Enable optional features by policy, then install, consume, replace, and release their implementations.',
-    webRpcSerialize: 'WebRPC + Serialize',
+    traySupervision: 'Tray + Supervision',
+    traySupervisionText:
+      'Manage plugin or agent instances with execution budgets, health checks, and failure restarts.',
+    webRpcSerialize: 'RPC Peer + Serialize',
     webRpcSerializeText:
-      'Define typed remote calls, choose a codec, and connect the contract to a browser or worker transport.',
+      'Make typed remote calls through RPC Peer and encode and decode application data with Serialize.',
     libraryIndex: 'Library index',
     responsibility: 'Responsibility and boundary',
     responsibilityBody:
@@ -102,6 +139,10 @@ export const WebsiteCopy = {
     searchPlaceholder: '搜索文档',
     searchEmpty: '输入内容以搜索文档。',
     searchUnknown: '没有匹配结果，请尝试类库名或 API 名。',
+    homeEyebrow: 'Migaia TypeScript 类库',
+    homeTitle: '管理状态、异步任务与隔离宿主。',
+    homeDescription:
+      '按需组合响应式状态、浏览器持久化、可取消的 Worker 任务、跨运行时调用，以及插件或 agent 进程的监督治理。',
     capabilityMap: '能力地图',
     shortestPath: '选择最短且有效的路径。',
     foundation: '基础能力',
@@ -112,6 +153,36 @@ export const WebsiteCopy = {
     stateStorageText: '组合状态、持久化与边界。',
     integration: '集成',
     integrationText: '理解传输层与平台边界。',
+    scenarios: '用 migaia 解决实际问题',
+    scenarioTitle: '你的应用现在需要做什么？',
+    /** Home scenarios connect concrete application goals to existing library pages. */
+    homeScenarios: [
+      {
+        title: '在 Worker 中运行可取消的重计算',
+        body: '保持界面响应，通过 Resource 和协作响应取消的 RPC 任务终止过期工作。',
+        libraries: ['store-worker', 'resource', 'rpc-threads']
+      },
+      {
+        title: '管理一组隔离的插件或 agent 进程',
+        body: '启动和发现宿主实例，共享执行预算，检查健康并在故障后重启。',
+        libraries: ['tray', 'supervision']
+      },
+      {
+        title: '浏览器跨窗口与 iframe 调用',
+        body: '通过浏览器通道暴露方法，明确来源校验和连接边界。',
+        libraries: ['rpc-browser']
+      },
+      {
+        title: '持久化浏览器状态',
+        body: '选择浏览器存储后端，再保存、恢复并迁移应用状态。',
+        libraries: ['storage-web', 'store-persist']
+      },
+      {
+        title: '请求级 SSR 状态',
+        body: '让每个请求持有独立 Runtime，并把服务端快照复水到浏览器。',
+        libraries: ['store-ssr']
+      }
+    ],
     startFive: '五分钟上手',
     smallResult: '先完成一个小而明确的结果。',
     quickstartBody: '从依赖最少的类库开始，阅读模块入口并验证返回值，再逐步加入集成能力。',
@@ -122,8 +193,10 @@ export const WebsiteCopy = {
     reactiveResourceText: '跟踪变化的输入，取消过期请求，并统一暴露加载、成功与失败状态。',
     capabilityPluginHost: 'Capability + Plugin Host',
     capabilityPluginHostText: '按策略启用可选能力，再安装、消费、替换并释放对应实现。',
-    webRpcSerialize: 'WebRPC + Serialize',
-    webRpcSerializeText: '定义类型安全的远程调用，选择编解码器，并接入浏览器或 Worker 传输。',
+    traySupervision: 'Tray + Supervision',
+    traySupervisionText: '统一管理插件或 agent 实例，控制执行预算、健康检查与故障重启。',
+    webRpcSerialize: 'RPC Peer + Serialize',
+    webRpcSerializeText: '通过 RPC Peer 定义类型安全的远程调用，用 Serialize 编解码应用数据。',
     libraryIndex: '类库索引',
     responsibility: '职责与边界',
     responsibilityBody:
