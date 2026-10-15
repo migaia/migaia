@@ -40,9 +40,7 @@ pnpm add @migaia/store-light
 ```ts
 import {
   createStore,
-  createStoreSync,
   createAsyncStore,
-  createLegacyStore,
   storeReady
 } from '@migaia/store-light';
 ```
@@ -75,12 +73,6 @@ store.count; // 1
 - `warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `console.warn` 提示"只有首个 await 之前的写入被自动 batch"
 - `mutationPolicy?: IMutationPolicy` —— 默认无；接入 MobX 风格的严格写入守卫（见 [USEGUIDE §7](./USEGUIDE.md#7-写入守卫imutationguard--imutationpolicy)）
 
-**`createStoreSync`｜3 秒上手** —— `createStore` 的显式命名别名，行为完全一致：
-
-```ts
-const store = createStoreSync({ count: 0 });
-```
-
 **`createAsyncStore`｜10 秒上手** —— 定义里含异步 `FieldBuilder` 时使用，返回的 Promise resolve 时全部字段已就绪：
 
 ```ts
@@ -91,15 +83,6 @@ const store = await createAsyncStore({
 ```
 
 参数与 `createStore` 相同（`shape`、`options?: ICreateStoreOptions`），区别只在于接受异步 `FieldBuilder` 且返回 `Promise<IReactiveStore<S>>`。
-
-**`createLegacyStore`｜5 秒上手** —— 历史兼容入口：不做同步字段限制，异步字段未就绪时需自行等待：
-
-```ts
-const store = createLegacyStore(shapeWithAsyncField);
-await storeReady(store); // 或检查 store.$async
-```
-
-参数与 `createStore` 相同；新代码优先用 `createStore`/`createAsyncStore`。
 
 **`storeReady`｜3 秒上手** —— 取任意 Store 的就绪 Promise：
 

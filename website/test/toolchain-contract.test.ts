@@ -1298,9 +1298,7 @@ test('SITE-T-STORE-LIGHT-API-COVERAGE separates Store creation, brands, and Reso
   const creationOptions = ['shape', 'runtime', 'debugName', 'warnAsyncActions', 'mutationPolicy']
   const targets = [
     ['createStore', creationOptions],
-    ['createStoreSync', creationOptions],
     ['createAsyncStore', creationOptions],
-    ['createLegacyStore', creationOptions],
     ['storeReady', ['store']],
     ['raw', ['value']],
     ['isRaw', ['value']],

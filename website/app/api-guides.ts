@@ -19284,40 +19284,6 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: storeLightCreationOptions.zh
     }
   },
-  'store-light:index:createStoreSync': {
-    en: {
-      purpose:
-        'Explicit naming alias for createStore. It has the same synchronous-field admission, Store facade, ownership, errors, and disposal contract; it does not create a second implementation path.',
-      quickStart: `import { createStoreSync } from '@migaia/store-light'\n\nconst settings = createStoreSync({ theme: 'system' })\ntry {\n  settings.theme = 'dark'\n  console.log(settings.theme)\n} finally {\n  await settings.$dispose()\n}`,
-      scenarios: [
-        'An API surface benefits from spelling the synchronous creation mode.',
-        'Code is paired visually with createAsyncStore.',
-        'The shape contains only ordinary fields and synchronous FieldBuilders.'
-      ],
-      avoidWhen: [
-        'Different behavior from createStore is expected.',
-        'An asynchronous FieldBuilder exists.',
-        'The alias would be wrapped again as a compatibility facade.'
-      ],
-      options: storeLightCreationOptions.en
-    },
-    zh: {
-      purpose:
-        'createStore 的显式命名 alias；同步 field admission、Store facade、ownership、error 与 disposal 契约完全相同，不存在第二条实现路径。',
-      quickStart: `import { createStoreSync } from '@migaia/store-light'\n\nconst settings = createStoreSync({ theme: 'system' })\ntry {\n  settings.theme = 'dark'\n  console.log(settings.theme)\n} finally {\n  await settings.$dispose()\n}`,
-      scenarios: [
-        'API surface 需要显式写出同步创建模式。',
-        '代码需要与 createAsyncStore 形成视觉配对。',
-        'shape 只包含普通 field 与同步 FieldBuilder。'
-      ],
-      avoidWhen: [
-        '期望与 createStore 不同的行为。',
-        '存在 async FieldBuilder。',
-        '准备把 alias 再包装成 compatibility facade。'
-      ],
-      options: storeLightCreationOptions.zh
-    }
-  },
   'store-light:index:createAsyncStore': {
     en: {
       purpose:
@@ -19352,54 +19318,20 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: storeLightCreationOptions.zh
     }
   },
-  'store-light:index:createLegacyStore': {
-    en: {
-      purpose:
-        'Migration-only facade that may return before legacy or asynchronous FieldBuilders are ready. New code should select createStore or createAsyncStore so readiness is explicit at construction.',
-      quickStart: `import { createLegacyStore, storeReady } from '@migaia/store-light'\n\nconst oldShape = { theme: 'system' }\nconst useReadyStore = (store: { theme: string }) => console.log(store.theme)\nconst legacy = createLegacyStore(oldShape)\ntry {\n  if (legacy.$async) await storeReady(legacy)\n  useReadyStore(legacy)\n} finally {\n  await legacy.$dispose()\n}`,
-      scenarios: [
-        'Existing code relies on synchronous object identity before async fields settle.',
-        'A bounded migration cannot switch every consumer to await construction at once.',
-        'storeReady is already the established readiness bridge.'
-      ],
-      avoidWhen: [
-        'Writing new code.',
-        'A consumer might access asynchronous fields before storeReady resolves.',
-        'The compatibility path has no documented removal condition.'
-      ],
-      options: storeLightCreationOptions.en
-    },
-    zh: {
-      purpose:
-        '仅用于迁移的 facade，可能在 legacy/async FieldBuilder ready 前返回。新代码应选择 createStore 或 createAsyncStore，在构造边界显式处理 readiness。',
-      quickStart: `import { createLegacyStore, storeReady } from '@migaia/store-light'\n\nconst oldShape = { theme: 'system' }\nconst useReadyStore = (store: { theme: string }) => console.log(store.theme)\nconst legacy = createLegacyStore(oldShape)\ntry {\n  if (legacy.$async) await storeReady(legacy)\n  useReadyStore(legacy)\n} finally {\n  await legacy.$dispose()\n}`,
-      scenarios: [
-        '既有代码依赖 async field settle 前就得到同步 object identity。',
-        '有界迁移无法一次把全部 consumer 改为 await construction。',
-        'storeReady 已是既有 readiness bridge。'
-      ],
-      avoidWhen: [
-        '编写新代码。',
-        'consumer 可能在 storeReady resolve 前访问 async field。',
-        'compatibility path 没有明确 removal condition。'
-      ],
-      options: storeLightCreationOptions.zh
-    }
-  },
   'store-light:index:storeReady': {
     en: {
       purpose:
-        'Returns the initialization Promise registered for a Store created by Store Light. It exists for React integration and legacy migration, not as the preferred construction model.',
-      quickStart: `import { createLegacyStore, storeReady } from '@migaia/store-light'\n\nconst shape = { theme: 'system' }\nconst store = createLegacyStore(shape)\nif (store.$async) await storeReady(store)\nconsole.log('store ready')`,
+        'Returns the initialization Promise registered for a Store created by Store Light. It exists for Store adapter integration, not as the preferred construction model.',
+      quickStart: `import { createStore, storeReady } from '@migaia/store-light'\n\nconst shape = { theme: 'system' }\nconst store = createStore(shape)\nawait storeReady(store)\nconsole.log('store ready')`,
       scenarios: [
-        'A legacy Store was returned before async fields settled.',
+        'An integration accepts an existing Store identity.',
         'An adapter must suspend on the exact Store initialization generation.',
-        'Migration tests need the internal readiness bridge.'
+        'Repeated reads must return the same readiness Promise.'
       ],
       avoidWhen: [
         'createAsyncStore can make readiness explicit.',
         'The object was not created by Store Light.',
-        'The Store is synchronous; there is no async initialization Promise to await.'
+        'A resource fetch Promise is needed instead of field initialization.'
       ],
       options: [
         {
@@ -19408,24 +19340,24 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: 'required',
           optional: false,
           type: 'object',
-          whenToUse: 'Pass the exact Store returned by a legacy creation path.',
+          whenToUse: 'Pass the exact Store returned by createStore or createAsyncStore.',
           example: 'await storeReady(store)'
         }
       ]
     },
     zh: {
       purpose:
-        '返回 Store Light 为某个 Store 登记的 initialization Promise。它服务于 React adapter 与 legacy migration，不是推荐的构造模型。',
-      quickStart: `import { createLegacyStore, storeReady } from '@migaia/store-light'\n\nconst shape = { theme: 'system' }\nconst store = createLegacyStore(shape)\nif (store.$async) await storeReady(store)\nconsole.log('store ready')`,
+        '返回 Store Light 为某个 Store 登记的 initialization Promise。它服务于 React adapter，不是推荐的构造模型。',
+      quickStart: `import { createStore, storeReady } from '@migaia/store-light'\n\nconst shape = { theme: 'system' }\nconst store = createStore(shape)\nawait storeReady(store)\nconsole.log('store ready')`,
       scenarios: [
-        'legacy Store 在 async field settle 前已返回。',
+        '集成接收已有 Store identity。',
         'adapter 必须 suspend 在准确 Store initialization generation 上。',
-        '迁移测试需要内部 readiness bridge。'
+        '重复读取必须返回同一个 readiness Promise。'
       ],
       avoidWhen: [
         '可以用 createAsyncStore 显式处理 readiness。',
         '对象不是由 Store Light 创建。',
-        'Store 为同步定义，没有 async initialization Promise。'
+        '需要等待资源 fetch 而非字段初始化。'
       ],
       options: [
         {
@@ -19434,7 +19366,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           defaultValue: '必填',
           optional: false,
           type: 'object',
-          whenToUse: '传入 legacy creation path 返回的准确 Store。',
+          whenToUse: '传入 createStore 或 createAsyncStore 返回的准确 Store。',
           example: 'await storeReady(store)'
         }
       ]

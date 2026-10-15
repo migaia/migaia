@@ -25,9 +25,7 @@
 ```ts
 import {
   createStore,
-  createStoreSync,
   createAsyncStore,
-  createLegacyStore,
   storeReady,
   raw,
   isRaw,
@@ -65,12 +63,10 @@ import {
 | API                                  | 签名                                | 参数类型                                                      | 同步/异步 | 行为                                                                                                                                                                                         |
 | ------------------------------------ | ----------------------------------- | ------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `createStore(shape, options?)`       | `(S) => IReactiveStore<S>`          | `shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions` | 同步      | 同步创建；**shape 中任意字段是非 `mode: 'sync'` 的 `FieldBuilder`（`mode: 'async'` 或历史无 mode 的 Builder）会在读取属性描述符阶段直接抛错**，不会执行任何 I/O，提示改用 `createAsyncStore` |
-| `createStoreSync(shape, options?)`   | 同上                                | 同上                                                          | 同步      | `createStore` 的显式命名别名，行为完全一致，不是独立的生命周期语义                                                                                                                           |
 | `createAsyncStore(shape, options?)`  | `(S) => Promise<IReactiveStore<S>>` | `shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions` | 异步      | 允许异步 `FieldBuilder`；返回的 Promise 在全部异步字段初始化完成（或抛错）后才 resolve/reject，resolve 后每个字段都已就绪                                                                    |
-| `createLegacyStore(shape, options?)` | `(S) => IReactiveStore<S>`          | `shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions` | 同步      | 历史兼容门面：不做同步字段限制，即使 shape 里有异步字段也立即同步返回 Store——此时异步字段还没就绪，调用方需要自行用 `storeReady(store)` 等待，或检查 `store.$async`                          |
 | `storeReady(store)`                  | `(store: object) => Promise<void>`  | `store: object`                                               | 异步      | 返回该 Store 的就绪 Promise；只对通过上述任一入口创建的 Store 有效，传入非 Store 对象会抛 `[store] store has no asynchronous initialization`                                                 |
 
-新代码建议只用 `createStore`（纯同步定义）和 `createAsyncStore`（含异步字段的定义）这两个入口；`createLegacyStore` 是为迁移期保留的兼容层。
+创建入口只有 `createStore`（纯同步定义）和 `createAsyncStore`（含异步字段的定义）。
 
 **初始化失败的清理语义**：无论走哪个入口，构造过程中任何一步抛错（字段类型非法、Builder 的 `create()` 拒绝所有权等），已经创建的内部节点都会被回收（`scope.dispose()`），不会遗留半初始化的资源。异步字段初始化失败（`readyList` 中的 Promise reject）同样会把整个 Store 标记为 `disposed` 并回收资源，即使有的字段在此之前已经初始化成功。
 
@@ -154,7 +150,7 @@ export type IAsyncFieldBuilder<F extends IDisposable> = {
 
 **所有权规则**：`IFieldContext` 刻意不传 `scope`——所有权登记是 Store 的职责，不是 Builder 的职责。Builder 只管"造出字段"，Store 在拿到字段后统一 `claimOwnership` + `scope.own`；这样第三方 Builder 实现"创建了资源却忘了登记"时，`$dispose()` 也不会漏释放，因为登记这一步根本不由 Builder 完成。
 
-**同步 vs 异步字段**：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `LegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve，或用 `createLegacyStore()` + `storeReady()`。
+**同步 vs 异步字段**：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `LegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve。
 
 一个最小的自定义同步字段实现（改编自 `@migaia/store-wasm` 的 `number()`）：
 
@@ -388,7 +384,7 @@ cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。
 | `[store] createStore() only accepts synchronous fields; "${key}" is a FieldBuilder. Use createAsyncStore().`                                                                                                                       | `createStore()`（非 `createAsyncStore`）的 shape 里含非 `mode: 'sync'` 的 `FieldBuilder`                                               |
 | `[store] field is not settable: ${key}`                                                                                                                                                                                            | `$set()` 传入的 key 不对应任何 signal（computed/wasm/方法字段，或压根不存在的 key）                                                    |
 | `[store] unknown hydration field: ${key}`                                                                                                                                                                                          | `$hydrate(partial, { unknown: 'strict' })` 遇到未知 key                                                                                |
-| `[store] store has no asynchronous initialization`                                                                                                                                                                                 | 对非 Store 对象（或未经 `createStore`/`createAsyncStore`/`createLegacyStore` 创建的对象）调用 `storeReady()`                           |
+| `[store] store has no asynchronous initialization`                                                                                                                                                                                 | 对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`                           |
 | `[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime` | `$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）          |
 | `[store] resource is disposed`                                                                                                                                                                                                     | 对已 `disposed`/`closing` 的 `StoreResource` 调用 `preload`/`retry`/`retain*`/`captureVersion`/`commitCapture` 等操作                  |
 | `[store] unknown resource version`                                                                                                                                                                                                 | `retainVersion(version)`/`captureVersion(id)`/`commitCapture(capture)` 传入的版本号既不是当前版本，也不在 retired/stale/closing 列表里 |
@@ -470,7 +466,7 @@ Computed 只有 getter、没有 setter，属性描述符层面就不可写；ESM
 检查是不是走了 `$batch`/`$set`/`$hydrate` 或方法（Action）内部——这几条路径会先 `runInAction()` 再执行，动作深度 > 0 时 `assertMutationAllowed` 自然放行。只有"在这些路径之外直接赋值"才会被拦截。
 
 **Q：`createStore()` 报 "only accepts synchronous fields"，但我看代码是同步的。**
-检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `LegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()`/`createLegacyStore()` 接受。
+检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `LegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()` 接受。
 
 **Q：`StoreResource.read()` 一直抛同一个 Promise，界面卡在 loading。**
 确认调用方确实在 Suspense 边界内 `await`/处理了这个抛出的 Promise；`read()` 抛 Promise 是设计如此（React Suspense 协议），不是错误——真正的问题通常是外层没有 `<Suspense>` 或没有等待 Promise settle 就再次同步渲染。
