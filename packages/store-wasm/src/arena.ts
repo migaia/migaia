@@ -116,33 +116,13 @@ export function disposeWasmField(
   disposeAllWasm([...sources.map((source) => () => source.dispose()), () => block.dispose()])
 }
 
-/** Re-throws construction primary while retaining rollback failure for non-Error primaries too. */
+/**
+ * Re-throws the construction primary with the rollback failure appended to its non-enumerable
+ * `errors`. Primitive, frozen or hostile primaries fall back to a coded aggregate whose first entry
+ * is the primary, so both failures stay reachable.
+ */
 export function throwWasmConstructionFailure(primary: unknown, cleanup: unknown): never {
-  if (primary instanceof Error) {
-    try {
-      /** Preserve an earlier cause while making the rollback failure reachable from the primary. */
-      const cause = primary.cause
-      Object.defineProperty(primary, 'cause', {
-        configurable: true,
-        enumerable: false,
-        value:
-          cause === undefined
-            ? cleanup
-            : createStoreWasmAggregateError(
-                StoreWasmErrorCode.cleanupFailed,
-                [cause, cleanup],
-                StoreWasmErrorText.cleanupFailed
-              ),
-        writable: true
-      })
-      throw primary
-    } catch (attachmentError) {
-      if (attachmentError === primary) throw primary
-      // Frozen or hostile Error objects fall through to the aggregate path.
-    }
-  }
-  const attached = attachSecondaryErrors(primary, [cleanup])
-  if (attached === primary) throw primary
+  if (attachSecondaryErrors(primary, [cleanup]) === primary) throw primary
   throw createStoreWasmAggregateError(
     StoreWasmErrorCode.cleanupFailed,
     [primary, cleanup],

@@ -35,33 +35,13 @@ import { StoreLightErrorText } from './error-text.js'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
-/** Re-throws construction primary while retaining cleanup failure for non-Error primaries. */
+/**
+ * Re-throws the construction primary with the cleanup failure appended to its non-enumerable
+ * `errors`. Primitive, frozen or hostile primaries fall back to a coded aggregate whose first entry
+ * is the primary, so both failures stay reachable.
+ */
 function throwConstructionFailure(primary: unknown, cleanup: unknown): never {
-  if (primary instanceof Error) {
-    try {
-      /** Preserve any earlier causal failure while making the latest cleanup failure reachable. */
-      const cause = primary.cause
-      Object.defineProperty(primary, 'cause', {
-        configurable: true,
-        enumerable: false,
-        value:
-          cause === undefined
-            ? cleanup
-            : createStoreLightAggregateError(
-                StoreLightErrorCode.initAndCleanupFailed,
-                [cause, cleanup],
-                StoreLightErrorText.cleanupFailed
-              ),
-        writable: true
-      })
-      throw primary
-    } catch (attachmentError) {
-      if (attachmentError === primary) throw primary
-      // Frozen or hostile Error objects fall through to the aggregate path.
-    }
-  }
-  const attached = attachSecondaryErrors(primary, [cleanup])
-  if (attached === primary) throw primary
+  if (attachSecondaryErrors(primary, [cleanup]) === primary) throw primary
   throw createStoreLightAggregateError(
     StoreLightErrorCode.initAndCleanupFailed,
     [primary, cleanup],
