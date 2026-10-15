@@ -87,9 +87,10 @@ function applyTheme(choice: IThemeChoice, date = new Date()) {
 /**
  * Strips a trailing slash from the address before hydration. Static hosts redirect `/zh/docs/x` to
  * the directory URL `/zh/docs/x/`; React Router then requests `/zh/docs/x/_.data`, which is never
- * prerendered, so a later Back to that entry rendered the not-found page.
+ * prerendered, so a later Back to that entry rendered the not-found page. The site root (Vite base,
+ * `/` or `/migaia/`) keeps its slash because React Router's basename includes it.
  */
-const TRAILING_SLASH_BOOT_SCRIPT = `(()=>{const p=location.pathname;if(p.length>1&&p.endsWith('/'))history.replaceState(history.state,'',p.replace(/\\/+$/,'')+location.search+location.hash)})()`
+const TRAILING_SLASH_BOOT_SCRIPT = `(()=>{const p=location.pathname;if(p!==${JSON.stringify(import.meta.env.BASE_URL)}&&p.endsWith('/'))history.replaceState(history.state,'',p.replace(/\\/+$/,'')+location.search+location.hash)})()`
 
 /** Supplies the shared static document shell and its keyboard-first orientation controls. */
 export function Layout({ children }: { children: React.ReactNode }) {

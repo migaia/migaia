@@ -49,18 +49,12 @@ type IDocsRouteProps = {
 }
 
 /** Loads only the library selected by this route; domain indexes need no API payload. */
-export async function loader({
-  params,
-  request
-}: {
-  readonly params: IDocsRouteProps['params']
-  readonly request: Request
-}) {
+export async function loader({ params }: { readonly params: IDocsRouteProps['params'] }) {
   const parts = (params['*'] ?? '').split('/').filter(Boolean)
   const librarySlug = parts[0]
   if (!librarySlug) return null
-  const pathname = new URL(request.url).pathname
-  const locale = pathname.split('/')[1]
+  /** Route params stay basename-relative, so a sub-path deployment cannot shift the locale segment. */
+  const locale = params.lang
   const domain = pageKind(parts)
   const topic = parts.slice(1).join('/') || 'index'
   /** Guide registry stays loader-only so the client route does not ship every tutorial body. */
