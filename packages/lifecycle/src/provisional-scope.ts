@@ -87,7 +87,7 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
     if (state !== ProvisionalScopeState.pending) {
       throw createLifecycleError(
         LifecycleErrorCode.provisionalSettled,
-        '[lifecycle] provisional scope has already committed or rolled back'
+        LifecycleErrorText.provisionalSettled
       )
     }
   }
@@ -274,7 +274,7 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
       ) {
         throw createLifecycleError(
           LifecycleErrorCode.provisionalParentClosed,
-          '[lifecycle] commitTo() target is already closing or terminal',
+          LifecycleErrorText.provisionalParentClosed,
           { cause: error, errors: cleanupErrors }
         )
       }

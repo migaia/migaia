@@ -4,7 +4,7 @@ import {
   createLifecycleError
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
+import { LifecycleErrorText, LifecycleErrorTextFactory } from './error-text.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { defaultLifecycleScheduler, resolveSchedulerOption } from './scheduler.js'
 
@@ -120,7 +120,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
     ) {
       throw createLifecycleError(
         LifecycleErrorCode.invalidOption,
-        '[lifecycle] scheduler.schedule must return an object with a cancel() function'
+        LifecycleErrorText.schedulerTaskInvalid
       )
     }
   }
@@ -204,7 +204,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       }
       record.timeoutError = createLifecycleError(
         LifecycleErrorCode.queueAdmissionTimeout,
-        `[lifecycle] mutation waited in the queue for more than ${timeoutMs}ms`,
+        LifecycleErrorTextFactory.mutationAdmissionTimeout(timeoutMs),
         { detail: { owner: record.owner, waitedMs } }
       )
       if (record.admissionTimer !== undefined && !record.timeoutSettled) {
@@ -289,7 +289,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       return Promise.reject(
         createLifecycleError(
           LifecycleErrorCode.queueSelfDependency,
-          `[lifecycle] mutation with owner "${owner}" was enqueued while a mutation with the same owner is running`,
+          LifecycleErrorTextFactory.mutationSelfDependency(owner),
           { detail: { owner } }
         )
       )

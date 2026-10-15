@@ -163,10 +163,10 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
 
   const assertOpen = (): void => {
     if (terminal.lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, '[lifecycle] scope is terminal')
+      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
     }
     if (terminal.lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')
+      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
     }
   }
 
@@ -174,7 +174,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
     if (currentlyReleasing) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeReentrantOwn,
-        '[lifecycle] cannot call own() from within this scope’s own dispose()'
+        LifecycleErrorText.scopeReentrantOwn
       )
     }
     assertOpen()
