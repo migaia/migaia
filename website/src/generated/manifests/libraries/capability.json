@@ -142,7 +142,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "它只管理静态 required provider-consumer DAG：首次 `ready()` 冻结注册表，检测 unknown provider/重复 edge/cycle，按稳定拓扑顺序启动；启动失败会回滚已启动节点，`dispose()` 按逆拓扑释放。节点的 `start()` 可以通过 `context.get(provider)` 读取 direct ready provider，并用 `context.own(resource, descriptor)` 登记 auxiliary resource；primary `value + release` 只由 Graph 所有一次。"
+                "text": "它只管理静态 required provider-consumer DAG：首次 `ready()` 冻结注册表，检测 unknown provider/重复 edge/cycle，按 level/ordinal 调用启动，同层并行等待，整层成功才启动下一层；本层全部 settle 后以规范顺序第一个失败为 primary，并保留其余失败于 errors 链，回滚本层及此前已启动节点，`dispose()` 按逆拓扑释放。节点的 `start()` 可以通过 `context.get(provider)` 读取 direct ready provider，并用 `context.own(resource, descriptor)` 登记 auxiliary resource；primary `value + release` 只由 Graph 所有一次。"
               },
               {
                 "type": "paragraph",
@@ -691,7 +691,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`ready()` 会先校验 unknown provider、duplicate edge、self-loop/cycle，再按注册 ordinal 做稳定拓扑启动。`context.get(provider)` 只能读取当前 node 已声明且已 ready 的 direct provider；它不创建 lease。`context.own()` 进入 node provisional scope，启动失败、abort、stale 或 dispose 时回滚。"
+                "text": "`ready()` 会先校验 unknown provider、duplicate edge、self-loop/cycle，再按 level 分层、同层 ordinal 顺序调用 start，并行等待该层全部 settle；只有整层成功才进入下一层。同层失败以先注册节点为 primary，其余失败保留在 errors 链。若需要完成顺序，必须声明依赖边。`context.get(provider)` 只能读取当前 node 已声明且已 ready 的 direct provider；它不创建 lease。`context.own()` 进入 node provisional scope，启动失败、abort、stale 或 dispose 时回滚。"
               },
               {
                 "type": "paragraph",
