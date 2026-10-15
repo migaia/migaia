@@ -111,6 +111,10 @@
               {
                 "type": "paragraph",
                 "text": "生成的 `src/` 由 wasm-pack 完整覆盖。发布或验证前应执行一次确定性重复构建，并通过真实 WASM host 和 packed consumer 导入/实例化测试。"
+              },
+              {
+                "type": "paragraph",
+                "text": "转码的往返保真限于 JSON 数据模型及可表示数值；任意 MessagePack 的 bin/ext、非 JSON map key 和超出 JSON 数值范围的整数不保证可逆，可能被改写或拒绝。JSON 对象直接走 map 序列化，不依赖 struct-map 配置。"
               }
             ]
           }
@@ -227,6 +231,10 @@
               {
                 "type": "paragraph",
                 "text": "`build` 必须从 `rust/` 运行 wasm-pack，并完整生成 `src/wasm_provider.js`、`.d.ts` 和 `.wasm`；生成目录禁止手工修改。验证还应执行真实非零 WASM host runner、两次确定性构建的字节比较，以及 packed 安装、导入和实例化。`@migaia/store-wasm` 另外执行其 `fmt → lint → typecheck → typecheck:test → test` 门禁和真实 WASM consumer 检查。"
+              },
+              {
+                "type": "paragraph",
+                "text": "转码的往返保真限于 JSON 数据模型及可表示数值；任意 MessagePack 的 bin/ext、非 JSON map key 和超出 JSON 数值范围的整数不保证可逆，可能被改写或拒绝。JSON 对象直接走 map 序列化，不依赖 struct-map 配置。"
               }
             ]
           }
@@ -584,7 +592,7 @@
           "name": "InitInput",
           "kind": "type",
           "signature": "export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;",
-          "declarationLine": 77,
+          "declarationLine": 79,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "InitInput is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for InitInput.",
@@ -647,7 +655,7 @@
           "name": "InitOutput",
           "kind": "interface",
           "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_conversionresult_free: (a: number, b: number) => void; readonly alloc_bytes: (a: number) => number; readonly byte_len_of: (a: number) => number; readonly conversionresult_error: (a: number) => [number, number]; readonly conversionresult_id: (a: number) => number; readonly conversionresult_len: (a: number) => number; readonly dealloc_bytes: (a: number) => number; readonly json_to_msgpack: (a: number, b: number) => number; readonly msgpack_to_json: (a: number, b: number) => number; readonly ptr_of: (a: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __wbindgen_start: () => void; }",
-          "declarationLine": 79,
+          "declarationLine": 81,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "InitOutput is part of this module's public interface contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for InitOutput.",
@@ -710,7 +718,7 @@
           "name": "initSync",
           "kind": "function",
           "signature": "export function initSync(module: { module: SyncInitInput } | SyncInitInput): InitOutput;",
-          "declarationLine": 106,
+          "declarationLine": 108,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Instantiates the given `module`, which can either be bytes or a precompiled `WebAssembly.Module`. @param {{ module: SyncInitInput }} module - Passing `SyncInitInput` directly is deprecated. @returns {InitOutput}",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for initSync.",
@@ -789,7 +797,7 @@
           "name": "json_to_msgpack",
           "kind": "function",
           "signature": "export function json_to_msgpack(id: number, len: number): ConversionResult;",
-          "declarationLine": 62,
+          "declarationLine": 64,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "json_to_msgpack is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for json_to_msgpack.",
@@ -881,7 +889,7 @@
           "name": "msgpack_to_json",
           "kind": "function",
           "signature": "export function msgpack_to_json(id: number, len: number): ConversionResult;",
-          "declarationLine": 67,
+          "declarationLine": 69,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "MessagePack bytes in, JSON bytes out. Returns operation-bound output metadata.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for msgpack_to_json.",
@@ -970,7 +978,7 @@
           "name": "ptr_of",
           "kind": "function",
           "signature": "export function ptr_of(id: number): number;",
-          "declarationLine": 75,
+          "declarationLine": 77,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "Byte pointer into wasm linear memory for `id`. Guaranteed 8-byte aligned. Returns `0` for an unknown/dead id instead of trapping, so a stale handle is recoverable on the JS side rather than aborting the module.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ptr_of.",
@@ -1049,7 +1057,7 @@
           "name": "SyncInitInput",
           "kind": "type",
           "signature": "export type SyncInitInput = BufferSource | WebAssembly.Module;",
-          "declarationLine": 96,
+          "declarationLine": 98,
           "source": "packages/wasm/src/wasm_provider.d.ts",
           "purpose": "SyncInitInput is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for SyncInitInput.",
