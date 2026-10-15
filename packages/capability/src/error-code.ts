@@ -77,7 +77,7 @@ export const CapabilityErrorCode = {
 
   /**
    * Reserved for diagnostics or events when the gate denies activation. No current throw site uses
-   * it. `enable()` and `enableResult()` return `{ status: 'gated' }` for a denied activation
+   * it. `enable()` returns `{ status: 'gated' }` for a denied activation
    * without throwing. Reserving this code for an `onError` or event channel does not change that
    * behavior.
    *

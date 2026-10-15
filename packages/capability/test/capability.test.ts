@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createCapabilityHost, CapabilityErrorCode, type ICapabilityHandle } from '../src/index'
+import {
+  createCapabilityHost,
+  CapabilityErrorCode,
+  type ICapabilityEnableResult,
+  type ICapabilityHandle
+} from '../src/index'
 
 /**
  * 能力闸门的验收。
@@ -290,7 +295,7 @@ describe('能力闸门', () => {
         }
       })
     })
-    expect(await host.enableResult('worker')).toEqual({
+    expect(await host.enable('worker')).toEqual({
       status: 'enabled'
     })
     await host.dispose()
@@ -380,12 +385,12 @@ describe('能力闸门', () => {
     host.register({ name: 'persist', activate })
 
     const results = await Promise.all([
-      host.enableLegacyBoolean('persist'),
-      host.enableLegacyBoolean('persist'),
-      host.enableLegacyBoolean('persist')
+      host.enable('persist'),
+      host.enable('persist'),
+      host.enable('persist')
     ])
 
-    expect(results).toEqual([true, true, true])
+    expect(results).toEqual([{ status: 'enabled' }, { status: 'enabled' }, { status: 'enabled' }])
     expect(activate).toHaveBeenCalledTimes(1)
     expect(host.state('persist')).toBe('on')
     await host.dispose()
@@ -396,7 +401,7 @@ describe('能力闸门', () => {
     const host = enabledHost({ tenant: 'acme' }, 'persist')
     host.register({ name: 'persist', activate })
 
-    await host.enableLegacyBoolean('persist')
+    await host.enable('persist')
 
     expect(activate).toHaveBeenCalledWith({ tenant: 'acme' })
     await host.dispose()
@@ -421,7 +426,7 @@ describe('能力闸门', () => {
     definition.name = 'worker'
     definition.activate = activateReplacement
 
-    await expect(host.enableLegacyBoolean('persist')).resolves.toBe(true)
+    await expect(host.enable('persist')).resolves.toEqual({ status: 'enabled' })
     expect(activateOriginal).toHaveBeenCalledOnce()
     expect(observedThisNames).toEqual(['persist'])
     expect(activateReplacement).not.toHaveBeenCalled()
@@ -458,14 +463,14 @@ describe('能力闸门', () => {
       activate: async () => handles.shift() as ICapabilityHandle
     })
 
-    await host.enableLegacyBoolean('persist')
-    expect(host.disableNow('persist')).toBe(true)
+    await host.enable('persist')
+    await expect(host.disable('persist')).resolves.toBe(true)
     expect(first.dispose).toHaveBeenCalledTimes(1)
     // 关闭一个已关闭的能力不是错误，但也不该再释放一次
-    expect(host.disableNow('persist')).toBe(false)
+    await expect(host.disable('persist')).resolves.toBe(false)
     expect(first.dispose).toHaveBeenCalledTimes(1)
 
-    await host.enableLegacyBoolean('persist')
+    await host.enable('persist')
     expect(host.handle('persist')).toBe(second)
     await host.dispose()
     expect(second.dispose).toHaveBeenCalledTimes(1)
@@ -484,7 +489,10 @@ describe('能力闸门', () => {
       }
     })
 
-    await expect(host.enableLegacyBoolean('worker')).resolves.toBe(false)
+    await expect(host.enable('worker')).resolves.toMatchObject({
+      status: 'failed',
+      error: expect.any(Error)
+    })
     // 「半开」是最坏的结果：调用方以为能用，实际没有 handle
     expect(host.state('worker')).toBe('failed')
     expect(host.handle('worker')).toBeUndefined()
@@ -500,7 +508,7 @@ describe('能力闸门', () => {
     const host = createCapabilityHost(undefined)
     host.register({ name: 'devtools', activate })
 
-    await expect(host.enableLegacyBoolean('devtools')).resolves.toBe(false)
+    await expect(host.enable('devtools')).resolves.toEqual({ status: 'gated' })
     expect(activate).not.toHaveBeenCalled()
     expect(host.state('devtools')).toBe('gated')
     await host.dispose()
@@ -530,7 +538,7 @@ describe('能力闸门', () => {
     // Map 保存 flag：危险键名只是普通字符串，不会落到 Object.prototype。
     host.setFlag('__proto__', true)
     expect(host.state('__proto__')).toBe('off')
-    await expect(host.enableLegacyBoolean('__proto__')).resolves.toBe(true)
+    await expect(host.enable('__proto__')).resolves.toEqual({ status: 'enabled' })
     await host.dispose()
   })
 
@@ -538,7 +546,7 @@ describe('能力闸门', () => {
     const handle = handleOf()
     const host = enabledHost(undefined, 'persist')
     host.register({ name: 'persist', activate: async () => handle })
-    await host.enableLegacyBoolean('persist')
+    await host.enable('persist')
     const unreadable = new Proxy({} as Record<string, boolean>, {
       ownKeys() {
         throw new Error('flag service payload is unreadable')
@@ -553,7 +561,7 @@ describe('能力闸门', () => {
     )
     expect(host.state('persist')).toBe('gated')
     expect(handle.dispose).toHaveBeenCalledTimes(1)
-    await expect(host.enableLegacyBoolean('persist')).resolves.toBe(false)
+    await expect(host.enable('persist')).resolves.toEqual({ status: 'gated' })
     await host.dispose()
   })
 
@@ -567,15 +575,15 @@ describe('能力闸门', () => {
     const host = enabledHost(undefined, 'persist')
     host.register({ name: 'persist', activate })
 
-    await host.enableLegacyBoolean('persist')
+    await host.enable('persist')
     host.setFlag('persist', false)
     expect(first.dispose).toHaveBeenCalledTimes(1)
     expect(host.state('persist')).toBe('gated')
-    await expect(host.enableLegacyBoolean('persist')).resolves.toBe(false)
+    await expect(host.enable('persist')).resolves.toEqual({ status: 'gated' })
 
     host.setFlag('persist', true)
     expect(host.state('persist')).toBe('off')
-    await expect(host.enableLegacyBoolean('persist')).resolves.toBe(true)
+    await expect(host.enable('persist')).resolves.toEqual({ status: 'enabled' })
     expect(host.handle('persist')).toBe(second)
     await host.dispose()
   })
@@ -586,7 +594,7 @@ describe('能力闸门', () => {
     const host = enabledHost(undefined, 'persist', 'worker')
     host.register({ name: 'persist', activate: async () => persist })
     host.register({ name: 'worker', activate: async () => worker })
-    await Promise.all([host.enableLegacyBoolean('persist'), host.enableLegacyBoolean('worker')])
+    await Promise.all([host.enable('persist'), host.enable('worker')])
 
     host.setFlags({ worker: true })
 
@@ -617,8 +625,8 @@ describe('能力闸门', () => {
         }
       })
     })
-    await host.enableLegacyBoolean('foundation')
-    await host.enableLegacyBoolean('dependent')
+    await host.enable('foundation')
+    await host.enable('dependent')
 
     host.setFlags({})
 
@@ -652,8 +660,8 @@ describe('能力闸门', () => {
         }
       })
     })
-    await host.enableLegacyBoolean('foundation')
-    await host.enableLegacyBoolean('dependent')
+    await host.enable('foundation')
+    await host.enable('dependent')
 
     expect(() => host.setFlags({})).not.toThrow()
 
@@ -669,7 +677,10 @@ describe('能力闸门', () => {
 
   it('rejects disposer reentry without letting it rewrite the outer flag snapshot', async () => {
     let host!: ReturnType<typeof createCapabilityHost<undefined>>
-    let enableDuringDispose: Promise<boolean> | undefined
+    /** Structured activation rejection retained until the outer transition finishes. */
+    let enableDuringDispose: Promise<ICapabilityEnableResult> | undefined
+    /** Awaitable disable rejects reentry instead of throwing synchronously. */
+    let disableDuringDispose: Promise<boolean> | undefined
     const reentryErrors: unknown[] = []
     host = enabledHost(undefined, 'persist')
     host.register({
@@ -678,8 +689,7 @@ describe('能力闸门', () => {
         dispose() {
           for (const mutation of [
             () => host.setFlag('persist', true),
-            () => host.setFlags({ persist: true }),
-            () => host.disableNow('persist')
+            () => host.setFlags({ persist: true })
           ]) {
             try {
               mutation()
@@ -687,15 +697,16 @@ describe('能力闸门', () => {
               reentryErrors.push(error)
             }
           }
-          enableDuringDispose = host.enableLegacyBoolean('persist')
+          disableDuringDispose = host.disable('persist')
+          enableDuringDispose = host.enable('persist')
         }
       })
     })
-    await host.enableLegacyBoolean('persist')
+    await host.enable('persist')
 
     host.setFlags({})
 
-    expect(reentryErrors).toHaveLength(3)
+    expect(reentryErrors).toHaveLength(2)
     for (const error of reentryErrors) {
       expect(error).toEqual(
         expect.objectContaining({
@@ -703,10 +714,11 @@ describe('能力闸门', () => {
         })
       )
     }
+    await expect(disableDuringDispose).rejects.toThrow('lifecycle transition')
     await expect(enableDuringDispose).rejects.toThrow('lifecycle transition')
     expect(host.state('persist')).toBe('gated')
     expect(host.handle('persist')).toBeUndefined()
-    await expect(host.enableLegacyBoolean('persist')).resolves.toBe(false)
+    await expect(host.enable('persist')).resolves.toEqual({ status: 'gated' })
     await host.dispose()
   })
 
@@ -723,7 +735,7 @@ describe('能力闸门', () => {
     })
     host.register({ name: 'worker', activate: () => gate.promise })
 
-    const enabling = host.enableLegacyBoolean('worker')
+    const enabling = host.enable('worker')
     host.setFlag('worker', false)
     gate.resolve({
       dispose() {
@@ -731,7 +743,7 @@ describe('能力闸门', () => {
       }
     })
 
-    await expect(enabling).resolves.toBe(false)
+    await expect(enabling).resolves.toEqual({ status: 'gated' })
     expect(host.state('worker')).toBe('gated')
     expect(host.error('worker')).toBe(disposeError)
     expect(onError).toHaveBeenCalledWith('worker', disposeError)
@@ -757,7 +769,7 @@ describe('能力闸门', () => {
       })
     })
 
-    await expect(host.enableLegacyBoolean('worker')).resolves.toBe(true)
+    await expect(host.enable('worker')).resolves.toEqual({ status: 'enabled' })
     host.setFlag('worker', false)
     await Promise.resolve()
     await Promise.resolve()
@@ -789,11 +801,11 @@ describe('能力闸门', () => {
       onError
     })
     host.register({ name: 'worker', activate })
-    await host.enableLegacyBoolean('worker')
+    await host.enable('worker')
 
     host.setFlag('worker', false)
     host.setFlag('worker', true)
-    await expect(host.enableLegacyBoolean('worker')).resolves.toBe(true)
+    await expect(host.enable('worker')).resolves.toEqual({ status: 'enabled' })
     cleanup.resolve(undefined)
     await reported.promise
 
@@ -820,17 +832,19 @@ describe('能力闸门', () => {
     })
     host.register({ name: 'worker', activate })
 
-    const staleEnable = host.enableLegacyBoolean('worker')
-    host.disableNow('worker')
-    await expect(host.enableLegacyBoolean('worker')).resolves.toBe(true)
+    const staleEnable = host.enable('worker')
+    /** Trigger synchronous revocation now; await physical cleanup after releasing the old task. */
+    const disabling = host.disable('worker')
+    await expect(host.enable('worker')).resolves.toEqual({ status: 'enabled' })
     staleActivation.resolve({
       dispose: async () => {
         await cleanup.promise
         throw cleanupError
       }
     })
-    await expect(staleEnable).resolves.toBe(false)
+    await expect(staleEnable).resolves.toEqual({ status: 'cancelled' })
     cleanup.resolve(undefined)
+    await disabling
     await vi.waitFor(() => {
       expect(onError).toHaveBeenCalledWith('worker', cleanupError)
     })
@@ -860,7 +874,7 @@ describe('能力闸门', () => {
       })
     })
 
-    await host.enableLegacyBoolean('worker')
+    await host.enable('worker')
     host.setFlag('worker', false)
     await Promise.resolve()
 
@@ -882,7 +896,10 @@ describe('能力闸门', () => {
       activate: async () => null as unknown as ICapabilityHandle
     })
 
-    await expect(host.enableLegacyBoolean('malformed')).resolves.toBe(false)
+    await expect(host.enable('malformed')).resolves.toMatchObject({
+      status: 'failed',
+      error: expect.any(Error)
+    })
     expect(host.state('malformed')).toBe('failed')
     expect(String(host.error('malformed'))).toContain('invalid handle')
     expect(onError).toHaveBeenCalledTimes(1)
@@ -897,12 +914,14 @@ describe('能力闸门', () => {
     const host = enabledHost(undefined, 'persist')
     host.register({ name: 'persist', activate: () => gate.promise })
 
-    const enabling = host.enableLegacyBoolean('persist')
+    const enabling = host.enable('persist')
     expect(host.state('persist')).toBe('activating')
-    host.disableNow('persist')
+    /** Disable starts revocation immediately and settles after the pending handle is cleaned up. */
+    const disabling = host.disable('persist')
     gate.resolve(handle)
 
-    await expect(enabling).resolves.toBe(false)
+    await expect(enabling).resolves.toEqual({ status: 'cancelled' })
+    await disabling
     expect(host.state('persist')).toBe('off')
     expect(host.handle('persist')).toBeUndefined()
     // 作废不等于泄漏：刚建出来的东西要就地释放
@@ -916,12 +935,12 @@ describe('能力闸门', () => {
     const host = enabledHost(undefined, 'persist')
     host.register({ name: 'persist', activate: () => gate.promise })
 
-    const enabling = host.enableLegacyBoolean('persist')
+    const enabling = host.enable('persist')
     const disposing = host.dispose()
     gate.resolve(handle)
 
     await disposing
-    await expect(enabling).resolves.toBe(false)
+    await expect(enabling).resolves.toEqual({ status: 'cancelled' })
     expect(handle.dispose).toHaveBeenCalledTimes(1)
   })
 
@@ -959,9 +978,9 @@ describe('能力闸门', () => {
       })
     }
 
-    await host.enableLegacyBoolean('worker')
-    await host.enableLegacyBoolean('persist')
-    await host.enableLegacyBoolean('devtools')
+    await host.enable('worker')
+    await host.enable('persist')
+    await host.enable('devtools')
     await host.dispose()
 
     expect(order).toEqual(['devtools', 'persist', 'worker'])
@@ -976,11 +995,11 @@ describe('能力闸门', () => {
       'already registered'
     )
     expect(() => host.state('nope')).toThrow('not registered')
-    await expect(host.enableLegacyBoolean('nope')).rejects.toThrow('not registered')
+    await expect(host.enable('nope')).rejects.toThrow('not registered')
 
     await host.dispose()
     // enable 是 async：释放后的调用以 rejection 形态报错，不是同步抛
-    await expect(host.enableLegacyBoolean('persist')).rejects.toThrow('disposed')
+    await expect(host.enable('persist')).rejects.toThrow('disposed')
   })
 
   it('supports a lazily imported capability, which is the whole point', async () => {
@@ -996,7 +1015,7 @@ describe('能力闸门', () => {
     })
 
     expect(load).not.toHaveBeenCalled()
-    await host.enableLegacyBoolean('persist')
+    await host.enable('persist')
     expect(load).toHaveBeenCalledTimes(1)
     await host.dispose()
   })

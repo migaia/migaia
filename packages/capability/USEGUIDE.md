@@ -142,7 +142,7 @@ type ICapabilityEnableStatusValue =
 
 同样经 `export *` 导出的 `ICapabilityEnableStatusValue` 是 `ICapabilityEnableResult['status']` 取值的联合类型，与 `CapabilityEnableStatus` 常量表的取值一一对应。
 
-`CapabilityEnableStatus` 是 `enable()`/`enableResult()` 返回值 `status` 字段的取值表，对应完整联合类型：
+`CapabilityEnableStatus` 是 `enable()` 返回值 `status` 字段的取值表，对应完整联合类型：
 
 ```ts
 type ICapabilityEnableResult =
@@ -227,11 +227,8 @@ type ICapabilityHost<Context> = {
   setFlag(name: string, enabled: boolean): void
   setFlags(flags: Readonly<Record<string, boolean>>): void
   enable(name: string): Promise<ICapabilityEnableResult>
-  enableResult(name: string): Promise<ICapabilityEnableResult>
   disable(name: string): Promise<boolean>
   dispose(): Promise<void>
-  enableLegacyBoolean(name: string): Promise<boolean>
-  disableNow(name: string): boolean
   readonly disposed: boolean
 }
 ```
@@ -264,9 +261,9 @@ type ICapabilityHost<Context> = {
 
 原子替换整份开关快照，细节见[宿主创建与开关快照](#宿主创建与开关快照)。`disposed` 抛 `HOST_DISPOSED`；重入窗口内调用抛 `HOST_TRANSITIONING`；`flags` 本身读取失败会先 fail-closed 到空快照再重新抛出原始错误（包装为 `INVALID_OPTION`）。
 
-#### `enable(name)` / `enableResult(name)`
+#### `enable(name)`
 
-幂等启用：并发调用共享同一次 `activate()`（内部靠同一个 `pending` Promise 实现）。开关为假时直接返回 `{ status: 'gated' }`，不会"偷偷打开"，也不会调用 `activate()`。`enableResult` 是 `enable` 的别名，语义完全一致（`enableResult(name) { return this.enable(name); }`）。未注册抛 `NOT_REGISTERED`（同步抛出会被转换成 rejected Promise）；`disposed` 时返回值为 rejected Promise，错误信息为 `'capability host is disposed'`；重入窗口内调用同样返回携带 `HOST_TRANSITIONING` 的 rejected Promise（`enable` 是 async 语义，不会同步抛错）。
+幂等启用：并发调用共享同一次 `activate()`（内部靠同一个 `pending` Promise 实现）。开关为假时直接返回 `{ status: 'gated' }`，不会"偷偷打开"，也不会调用 `activate()`。未注册抛 `NOT_REGISTERED`（同步抛出会被转换成 rejected Promise）；`disposed` 时返回值为 rejected Promise，错误信息为 `'capability host is disposed'`；重入窗口内调用同样返回携带 `HOST_TRANSITIONING` 的 rejected Promise（`enable` 是 async 语义，不会同步抛错）。
 
 #### `disable(name)`
 
@@ -276,17 +273,9 @@ type ICapabilityHost<Context> = {
 
 唯一异步释放入口：首次调用按真实激活顺序反向（LIFO）关闭全部能力并等待全部释放工作结束；完成前的重复调用（包括 disposer 内部的重入调用）立即以 `HOST_TRANSITIONING` 拒绝，完成后才恢复为返回同一个 canonical Promise（幂等）。这是显式的 breaking behavior：旧行为会让进行中的重复调用共享首个 Promise；新行为要求外部并发调用方保留并等待首个 Promise，避免 disposer-origin 调用把自己卡在自等待循环里。
 
-#### `enableLegacyBoolean(name)`
-
-同步/布尔风格兼容适配器，语义与 `enable()` 完全共享同一份内部实现和同一个 `pending` Promise——并发对同一名字调用 `enable()` 和 `enableLegacyBoolean()`，实际只会跑一次 `activate()`。只返回布尔值，用于接入尚未迁移到结构化结果的旧调用点。
-
-#### `disableNow(name)`
-
-同步版本：立即触发关闭和释放，但**不等待**异步 `dispose()` 完成即返回。确定要等清理完成用 `disable()`。`disposed` 抛 `HOST_DISPOSED`；重入窗口内调用抛 `HOST_TRANSITIONING`；未注册抛 `NOT_REGISTERED`。
-
 #### `disposed`（只读属性）
 
-host 是否已经整体关闭；`true` 之后所有变更类方法（`register`/`setFlag`/`setFlags`/`enable`/`enableResult`/`disable`/`enableLegacyBoolean`/`disableNow`）都会抛错或拒绝，只读诊断方法（`names`/`state`/`handle`/`error`）仍然可用。
+host 是否已经整体关闭；`true` 之后所有变更类方法（`register`/`setFlag`/`setFlags`/`enable`/`disable`）都会抛错或拒绝，只读诊断方法（`names`/`state`/`handle`/`error`）仍然可用。
 
 ---
 
@@ -299,7 +288,7 @@ host 是否已经整体关闭；`true` 之后所有变更类方法（`register`/
 异步 `activate()` 完成时，`generationController.adopt(token, handle, releaseFn)` 会比较"发起时的 generation"和"当前 generation"：
 
 - 一致 → 正常提交，`state` 变为 `on`，handle 生效，进入 `activationOrder`。
-- 不一致（说明激活过程中开关被关掉了，或 host 已被 `dispose()`）→ **不采纳这个结果**，`adopt()` 立即调用释放回调把刚创建出的 handle 就地释放；对外表现为 `enable()`/`enableLegacyBoolean()` 返回 `false`/`{ status: 'cancelled' }`。
+- 不一致（说明激活过程中开关被关掉了，或 host 已被 `dispose()`）→ **不采纳这个结果**，`adopt()` 立即调用释放回调把刚创建出的 handle 就地释放；对外表现为 `enable()` 返回 `{ status: 'cancelled' }`。
 
 这就是"关闭一个能力"和裸的动态 `import()` 之间的本质区别：没有这层保护，一个正在加载的 chunk 完成后会直接把开关"偷偷"打开，用户看到的是"明明关了，过几百毫秒又自己回来了"。
 
@@ -364,7 +353,7 @@ type ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof Capability
 | `invalidName`（`INVALID_NAME`）             | `register()` 传入的 `name` 不是非空字符串                                                                                                                                         | `TypeError`                                |
 | `invalidActivate`（`INVALID_ACTIVATE`）     | `register()` 传入的 `activate` 不是函数                                                                                                                                           | `TypeError`                                |
 | `invalidHandle`（`INVALID_HANDLE`）         | `activate()` 的返回值缺少可调用的 `dispose`                                                                                                                                       | `TypeError`                                |
-| `gated`（`GATED`）                          | 当前没有抛出点——`enable()`/`enableResult()` 用 `{ status: 'gated' }` 结构化返回表达拒绝，从不抛错；保留给未来诊断/事件通道                                                        | —                                          |
+| `gated`（`GATED`）                          | 当前没有抛出点——`enable()` 用 `{ status: 'gated' }` 结构化返回表达拒绝，从不抛错；保留给未来诊断/事件通道                                                        | —                                          |
 | `invalidOption`（`INVALID_OPTION`）         | `flags`/`definition`/`options` 快照时宿主对象（如 hostile Proxy）的 `ownKeys`/`getOwnPropertyDescriptor`/getter 抛错，或 `options` 本身不是对象/函数，或 `onError` 提供但不是函数 | `TypeError` 或 `Error`（视具体校验点而定） |
 
 `INVALID_OPTION` 场景下，fail-closed 之后才抛出，原始 Proxy 异常经 `cause` 保持 `===` 可达；调用方应修复传入的 `flags`/`definition` 对象，不要对同一份 hostile 输入重试。
@@ -383,8 +372,8 @@ type ICapabilityErrorCode = (typeof CapabilityErrorCode)[keyof typeof Capability
 
 ## 重入与并发保护
 
-- **变更类方法之间互斥**：`register`/`setFlag`/`setFlags`/`disableNow`（以及 `disable`/`dispose` 触发的同步阶段）内部通过一个"事务深度"计数器（`transitionDepth`）互相保护——在这些方法内部（例如一个能力自己的 `dispose()` 回调）再去调用任何一个变更方法，会立即抛出携带 `code: 'HOST_TRANSITIONING'` 的错误。这防止了"回退过程中被自己的清理逻辑打乱开关快照"这类难以复现的 bug。
-- `enable()`/`enableResult()`/`enableLegacyBoolean()` 在重入时不会同步抛错（它们是 async 语义），而是返回一个带 `HOST_TRANSITIONING` 的被拒绝 Promise。
+- **变更类方法之间互斥**：`register`/`setFlag`/`setFlags`（以及 `disable`/`dispose` 触发的同步阶段）内部通过一个"事务深度"计数器（`transitionDepth`）互相保护——在这些方法内部（例如一个能力自己的 `dispose()` 回调）再去调用任何一个变更方法，会立即抛出携带 `code: 'HOST_TRANSITIONING'` 的错误。这防止了"回退过程中被自己的清理逻辑打乱开关快照"这类难以复现的 bug。
+- `enable()`/`disable()` 在重入时不会同步抛错，而是返回一个带 `HOST_TRANSITIONING` 的被拒绝 Promise。
 - disposer 在同步释放阶段调用同一 host 的 `dispose()` 时，立即同步抛出带 `HOST_TRANSITIONING` 的错误；调用延迟到当前栈之后（首次 `dispose()` completion 尚未 settle）时，也立即返回带 `HOST_TRANSITIONING` 的 rejected Promise。这是显式的行为约定：旧实现让所有进行中的调用复用首个 Promise；当前实现禁止任何进行中的重复调用加入该 Promise，避免 disposer 自等待死锁。
 - 外部并发调用方必须保留并等待首次 `dispose()` 返回的 Promise；首次 Promise 完成（`disposeCompleted === true`）后，重复 `dispose()` 才返回同一个已完成的 canonical Promise。不要用第二次调用来"加入"正在进行的释放。
 - `dispose()`/`disable()` 内部用"循环直到稳定"的方式等待清理完成，具体机制见[释放顺序与依赖](#释放顺序与依赖)一节末段。
@@ -436,9 +425,6 @@ await capabilities.dispose() // LIFO 释放全部已启用能力，之后 host �
 **关掉一个能力之后，过了一会儿它又自动变成 `on` 了。**
 正常情况下不应该发生——这正是 [Generation 机制](#generation-races)要防止的竞态。如果观察到这个现象，检查是否绕过了 host 直接持有并调用了 `activate()` 的返回值，或者在能力的 `dispose()` 里手动调用了 `enable()`（这类重入会被[重入与并发保护](#重入与并发保护)描述的机制直接拒绝，确认没有捕获这个拒绝并静默重试）。
 
-**`disableNow()` 之后资源好像还没释放干净。**
-`disableNow()` 是同步兼容接口，只是**触发**了释放，不等待异步清理完成。如果 handle 的 `dispose()` 是异步的，需要用 `disable()`/`dispose()` 的 Promise 版本并 `await`。
-
 **`setFlags({})` 之后所有能力都被关掉了，但只想改一个。**
 `setFlags()` 是整份快照的原子替换，不是"打补丁"。只想改一个开关用 `setFlag(name, enabled)`；确实要批量替换，记得把所有仍需保留的能力都显式列进新快照。
 
@@ -483,3 +469,5 @@ incomplete observation，但不能在 fence 之前启动物理 disposer。`metri
 FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，二者不可相互替代。
 
 Graph ownership admission: ctx.own(resource, descriptor) requires a callable force immediately. Invalid descriptors throw GRAPH_INVALID_OPTION with the original lifecycle TypeError reachable through cause; they do not wait until disposal or report a closed graph. Dynamic graph report callbacks are final observers: synchronous throws and returned Promise rejections are contained without changing the mutation result.
+
+CapabilityHost 使用 `enable(name)` 返回结构化激活结果，使用 `disable(name)` 等待资源释放。`enableResult`、`enableLegacyBoolean`、`disableNow` 已移除；需要布尔值时比较 `(await host.enable(name)).status === CapabilityEnableStatus.enabled`。保留并等待 `disable()` 返回的 Promise，以确认物理清理已完成。

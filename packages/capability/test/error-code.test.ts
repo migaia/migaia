@@ -73,10 +73,10 @@ describe('M-T38 (§3.7.3): capability 码表触发点', () => {
     expect(host.state('a')).toBe('failed')
   })
 
-  it('GATED: 开关为 false 时 enableResult 返回 {status:"gated"} 且不抛错', async () => {
+  it('GATED: 开关为 false 时 enable 返回 {status:"gated"} 且不抛错', async () => {
     const host = createCapabilityHost<unknown>({}, { flags: { a: false } })
     host.register({ name: 'a', activate: () => handleOf() })
-    await expect(host.enableResult('a')).resolves.toEqual({ status: 'gated' })
+    await expect(host.enable('a')).resolves.toEqual({ status: 'gated' })
   })
 })
 
