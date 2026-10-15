@@ -1,3 +1,4 @@
+import { trimTimestampWindow } from './timestamp-window.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   LifecycleState,
@@ -166,10 +167,7 @@ export function createSupervisor<
     cooldownTimer = undefined
   }
   /** Removes expired failures before deciding the next delay or exhaustion. */
-  const trimFailures = (): void => {
-    const now = scheduler.now()
-    while (failures.length && now - failures[0]! >= windowMs) failures.shift()
-  }
+  const trimFailures = (): void => trimTimestampWindow(failures, scheduler.now(), windowMs)
   /** Both failure sites derive delay from the same already-trimmed failure window. */
   const restartDelay = (): number =>
     Math.min(maxDelayMs, initialDelayMs * factor ** (failures.length - 1))

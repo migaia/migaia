@@ -154,3 +154,36 @@ describe('A2 unit budget', () => {
     expect(parent.pending).toBe(0)
   })
 })
+
+describe('SV-P2 rolling timestamp prefix', () => {
+  it('expires only the old grant while preserving the later grant at each exact boundary', () => {
+    /** Two distinct grant times distinguish a rolling window from clearing all history. */
+    const scheduler = createManualScheduler()
+    /** Public budget admission is the verification seam for the shared trim operation. */
+    const budget = createUnitBudget({
+      kind: 'memory',
+      maxUnits: 2,
+      launchRate: { max: 2, windowMs: 1000 },
+      scheduler
+    })
+    /** Releases each live lease while the rate window continues to own its timestamp. */
+    const take = (): void => {
+      const outcome = budget.tryAcquire()
+      expect(outcome.kind).toBe('granted')
+      if (outcome.kind === 'granted') outcome.lease.release()
+    }
+    take()
+    scheduler.advance(500)
+    take()
+    expect(budget.tryAcquire()).toEqual({ kind: 'rejected', reason: BudgetRejection.rateLimited })
+    scheduler.advance(500)
+    take()
+    expect(budget.tryAcquire()).toEqual({ kind: 'rejected', reason: BudgetRejection.rateLimited })
+    scheduler.advance(499)
+    expect(budget.tryAcquire()).toEqual({ kind: 'rejected', reason: BudgetRejection.rateLimited })
+    scheduler.advance(1)
+    take()
+    expect(budget.inUse).toBe(0)
+    budget.close()
+  })
+})
