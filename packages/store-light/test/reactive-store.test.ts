@@ -1,3 +1,4 @@
+import { StoreLightErrorCode } from '../src/error-code.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
@@ -877,5 +878,71 @@ describe('debugName / $runtime / $async on plain stores', () => {
     const store = createStore({ count: 1 }, { runtime })
     expect(store.$async).toBe(false)
     store.$dispose()
+  })
+})
+
+describe('ST-B3 hydration option capture', () => {
+  it('reads changing getters once and preserves the unknown callback receiver', async () => {
+    /** Local runtime keeps this store independent of the ambient graph. */
+    const runtime = createRuntime()
+    /** Known writes commit only after option admission and unknown-field reporting. */
+    const store = createStore({ known: 0 }, { runtime })
+    /** Counts actual getter effects, not descriptor enumeration. */
+    let policyReads = 0
+    /** One captured callback serves both unknown fields. */
+    let callbackReads = 0
+    /** The method receiver remains the caller's original option object. */
+    const seen: string[] = []
+    /** A second policy read would switch the transaction to strict and expose the old defect. */
+    const options = {
+      marker: 'original',
+      get unknown() {
+        policyReads++
+        return policyReads === 1 ? ('report' as const) : ('strict' as const)
+      },
+      get onUnknown() {
+        callbackReads++
+        return function (this: { marker: string }, key: string): void {
+          seen.push(`${this.marker}:${key}`)
+        }
+      }
+    }
+    try {
+      store.$hydrate({ ghost: 1, another: 2, known: 3 }, options)
+      expect(store.known).toBe(3)
+      expect(seen).toEqual(['original:ghost', 'original:another'])
+      expect(policyReads).toBe(1)
+      expect(callbackReads).toBe(1)
+    } finally {
+      await store.$dispose()
+    }
+  })
+
+  it('retains an option getter failure as cause before any field is mutated', async () => {
+    /** The store exposes whether option admission happened before mutation. */
+    const store = createStore({ known: 0 }, { runtime: createRuntime() })
+    /** Caller provenance must remain reachable from the package error. */
+    const cause = new Error('hydrate option getter')
+    try {
+      expect(() =>
+        store.$hydrate(
+          { known: 3 },
+          {
+            get unknown(): never {
+              throw cause
+            }
+          }
+        )
+      ).toThrow(
+        expect.objectContaining({
+          source: '@migaia/store-light',
+          code: StoreLightErrorCode.invalidOption,
+          cause
+        })
+      )
+      expect(store.known).toBe(0)
+    } finally {
+      await store.$dispose()
+    }
   })
 })

@@ -716,6 +716,20 @@ function createStoreCore<S extends Record<string, unknown>>(
           { cause: descriptorSnapshot.error }
         )
       }
+      /** Capture each public option once, preserving inherited accessors and their receiver. */
+      let unknownPolicy: IHydrateOptions['unknown']
+      /** Every unknown field uses the same callback observed at admission. */
+      let onUnknown: IHydrateOptions['onUnknown']
+      try {
+        unknownPolicy = options.unknown
+        onUnknown = options.onUnknown
+      } catch (error) {
+        throw createStoreLightError(
+          StoreLightErrorCode.invalidOption,
+          StoreLightErrorText.optionsObject,
+          { cause: error }
+        )
+      }
       let entries: Array<[string, unknown]>
       try {
         entries = Object.entries(partial)
@@ -727,14 +741,14 @@ function createStoreCore<S extends Record<string, unknown>>(
         )
       }
       let firstUnknown: string | undefined
-      if (options.unknown === 'strict' || options.unknown === 'report') {
+      if (unknownPolicy === 'strict' || unknownPolicy === 'report') {
         for (const [key] of entries) {
           if (signals.has(key)) continue
-          if (options.unknown === 'strict') {
+          if (unknownPolicy === 'strict') {
             firstUnknown = key
             break
           }
-          options.onUnknown?.(key)
+          if (onUnknown) Reflect.apply(onUnknown, options, [key])
         }
       }
       if (firstUnknown !== undefined) {
