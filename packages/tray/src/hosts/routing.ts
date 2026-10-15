@@ -45,12 +45,14 @@ export function createRoutingRegistry(
       const policy = policies.get(name)
       if (!policy) throw createTrayError(TrayErrorCode.routingUnknown)
       /** Map insertion order is the admission's spawn order. */
-      const candidates = [...registry.records.values()].filter(
-        (record) =>
+      const candidates: ITrayRecord[] = []
+      for (const record of registry.records.values())
+        if (
           record.definition.name === host &&
           record.state === TrayInstanceState.ready &&
           !record.removed
-      )
+        )
+          candidates.push(record)
       if (!candidates.length) throw createTrayError(TrayErrorCode.hostUnavailable)
       /** Sequence state belongs to this registry and one host name. */
       let hostSequences = sequences.get(host)
