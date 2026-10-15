@@ -21,6 +21,7 @@ import {
 import {
   CapabilityGraphNodeState,
   CapabilityGraphState,
+  GraphBlockedReason,
   type ICapabilityGraphNodeState,
   type ICapabilityGraphState
 } from './state-constants.js'
@@ -31,6 +32,7 @@ export { CAPABILITY_GRAPH_SOURCE, type ICapabilityGraphError } from './errors.js
 export {
   CapabilityGraphNodeState,
   CapabilityGraphState,
+  GraphBlockedReason,
   type ICapabilityGraphNodeState,
   type ICapabilityGraphState
 } from './state-constants.js'
@@ -88,7 +90,7 @@ export type IGraphNodeDiagnostic = {
   readonly value: unknown
   readonly error: unknown
   /** Cause for a blocked node when dependency availability is responsible. */
-  readonly reason?: 'missing' | 'suspended' | 'removed' | 'failed'
+  readonly reason?: GraphBlockedReason
   /** Optional composition binding retained by the dynamic owner. */
   readonly binding?: unknown
   /** Monotonic lifecycle generation for this node. */

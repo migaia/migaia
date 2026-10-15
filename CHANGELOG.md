@@ -41,6 +41,11 @@
 
 ### Behavior
 
+- Capability publishes `GraphReadinessState` at its root, `GraphBlockedReason`
+  at `/graph`, and `GraphBindingReleaseReason` at `/graph/dynamic` as canonical
+  constants for existing string domains. Host error text has one private owner;
+  existing messages, codes and state values are preserved.
+
 - Static capability graphs invoke independent starts in each topology level
   before awaiting that level. Previously each node completed serially. A failed
   level fully settles before rollback; its first failure in topology order stays

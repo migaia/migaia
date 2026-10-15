@@ -477,3 +477,14 @@ CapabilityHost 使用 `enable(name)` 返回结构化激活结果，使用 `disab
 Dynamic register/replace capture id, kind, start and dependency facts once when the mutation leaves the queue. The stored definition and its edges are immutable snapshots; changing the original caller object after admission no longer changes graph identity, diagnostics or dependencies. Call replace explicitly to change a node. Captured start methods keep the original definition receiver and return value. Getter failures reject with GRAPH_INVALID_NODE while retaining the original native error or cause.
 
 Pure topology and incremental indexes share one private structural/edge admission owner. Static topology keeps its dense ordinal contract and constructs its index from the admitted snapshots without repeating edge validation. The trusted construction helper is not a package export.
+
+
+### Canonical Graph values
+
+readiness 的 `ready/blocked/failed` 使用根入口 `GraphReadinessState`；节点阻塞原因使用
+`@migaia/capability/graph` 的 `GraphBlockedReason`；binding 释放原因使用
+`@migaia/capability/graph/dynamic` 的 `GraphBindingReleaseReason`。现有 `IGraphReadinessState`、
+`IGraphBindingReleaseReason` 与 diagnostic `reason` 的取值不变。动态 remove/suspend 的
+`IGraphDependencyMutationPolicy` 复用 `@migaia/capability/graph/dependency` 的 `DependencyPolicy.reject/cascade`，
+不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建，
+既有错误文案、native TypeError 和 code 保持原契约。
