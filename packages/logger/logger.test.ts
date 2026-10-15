@@ -1109,7 +1109,7 @@ describe('logger plugin host integration', () => {
     expect(batches).toEqual([['immediate']])
   })
 
-  it('bounds batch concurrency and rejects a full lossless window synchronously', async () => {
+  it('bounds batch concurrency and drops the incoming batch when the window is in flight', async () => {
     let release!: () => void
     let active = 0
     const peak: number[] = []
@@ -1129,13 +1129,23 @@ describe('logger plugin host integration', () => {
         }
       )
 
+    const failures: unknown[] = []
+    logger.onFailure((failure) => {
+      failures.push(failure.error)
+    })
+
     batcher.push('first')
-    expect(() => batcher.push('second')).toThrowError(
-      expect.objectContaining({ code: 'BATCH_OVERFLOW' })
-    )
+    // The only pending slot is in flight, so the incoming batch is the oldest undelivered data.
+    expect(() => batcher.push('second')).not.toThrow()
     release()
     await batcher.flush()
     expect(Math.max(...peak)).toBe(1)
+    // The overflow report crosses the logger defer boundary before reaching onFailure.
+    await vi.waitFor(() =>
+      expect(failures).toEqual([
+        expect.objectContaining({ code: 'BATCH_OVERFLOW', detail: { dropped: 1 } })
+      ])
+    )
   })
 
   it('removes named extends edges idempotently and disconnects them on shutdown', async () => {
