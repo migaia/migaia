@@ -3691,7 +3691,7 @@
         {
           "name": "CapabilityGraphErrorCode",
           "kind": "const",
-          "signature": "export declare const CapabilityGraphErrorCode: {\n  /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: 'GRAPH_DISPOSED';\n  /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: 'GRAPH_FROZEN';\n  /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: 'GRAPH_INVALID_NODE';\n  /** A second node uses an already registered ID. */ readonly duplicateNode: 'GRAPH_DUPLICATE_NODE';\n  /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: 'GRAPH_UNKNOWN_PROVIDER';\n  /** A consumer repeats the same provider edge. */ readonly duplicateEdge: 'GRAPH_DUPLICATE_EDGE';\n  /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: 'GRAPH_DEPENDENCY_CYCLE';\n  /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: 'GRAPH_PROVIDER_UNAVAILABLE';\n  /** A node start failed and the graph entered failed state. */ readonly startFailed: 'GRAPH_START_FAILED';\n  /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: 'GRAPH_DISPOSE_FAILED';\n  /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: 'GRAPH_ADMISSION_CLOSED';\n  /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: 'GRAPH_UNKNOWN_NODE';\n  /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: 'GRAPH_REENTRANT_OPERATION';\n  /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: 'GRAPH_INVALID_OPTION';\n  /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS';\n  /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT';\n  /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: 'GRAPH_NODE_NOT_SUSPENDED';\n};",
+          "signature": "export declare const CapabilityGraphErrorCode: {\n  /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: 'GRAPH_DISPOSED';\n  /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: 'GRAPH_FROZEN';\n  /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: 'GRAPH_INVALID_NODE';\n  /** A second node uses an already registered ID. */ readonly duplicateNode: 'GRAPH_DUPLICATE_NODE';\n  /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: 'GRAPH_UNKNOWN_PROVIDER';\n  /** A consumer repeats the same provider edge. */ readonly duplicateEdge: 'GRAPH_DUPLICATE_EDGE';\n  /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: 'GRAPH_DEPENDENCY_CYCLE';\n  /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: 'GRAPH_PROVIDER_UNAVAILABLE';\n  /** A node start failed and the graph entered failed state. */ readonly startFailed: 'GRAPH_START_FAILED';\n  /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: 'GRAPH_DISPOSE_FAILED';\n  /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: 'GRAPH_ADMISSION_CLOSED';\n  /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: 'GRAPH_UNKNOWN_NODE';\n  /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: 'GRAPH_REENTRANT_OPERATION';\n  /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: 'GRAPH_INVALID_OPTION';\n  /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS';\n  /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT';\n  /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: 'GRAPH_NODE_NOT_SUSPENDED';\n};",
           "declarationLine": 4,
           "source": "packages/capability/dist/graph/error-code.d.ts",
           "purpose": "Stable error codes owned by `@migaia/capability/graph`.",
@@ -3709,7 +3709,7 @@
           "aliasOf": "CapabilityGraphErrorCode",
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };"
+            "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3748,7 +3748,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/error-code.d.ts:CapabilityGraphErrorCode:export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
+          "identity": "packages/capability/dist/graph/error-code.d.ts:CapabilityGraphErrorCode:export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -3886,7 +3886,7 @@
           "name": "createCapabilityGraph",
           "kind": "function",
           "signature": "export declare function createCapabilityGraph(\n  options?: ICapabilityGraphOptions,\n): ICapabilityGraph;",
-          "declarationLine": 78,
+          "declarationLine": 84,
           "source": "packages/capability/dist/graph/index.d.ts",
           "purpose": "Creates a runtime-neutral static capability dependency graph.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createCapabilityGraph.",
@@ -3903,6 +3903,7 @@
           "errors": ["No documented errors are declared for createCapabilityGraph."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createCapabilityGraph.",
           "examples": [
+            "import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst serviceId = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph()\ngraph.register({\n  id: serviceId, kind: 'service', dependencies: [],\n  start: () => ({ value: { read: () => 42 }, release: () => undefined })\n})\ntry {\n  await graph.ready()\n  console.log(graph.readValue<{ read(): number }>(serviceId)?.read()) // 42\n} finally {\n  await graph.dispose()\n}",
             "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
           ],
           "members": [],
@@ -3964,7 +3965,7 @@
           ],
           "identity": "packages/capability/dist/graph/index.d.ts:createCapabilityGraph:export declare function createCapabilityGraph(options?: ICapabilityGraphOptions): ICapabilityGraph;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 38,
           "configuration": [
             {
               "name": "onError",
@@ -4045,7 +4046,7 @@
         {
           "name": "ICapabilityGraph",
           "kind": "type",
-          "signature": "export type ICapabilityGraph = {\n  register<T>(node: IGraphNodeDefinition<T>): void;\n  ready(): Promise<void>;\n  nodeState(id: IGraphNodeId): IGraphNodeDiagnostic;\n  readonly nodes: readonly IGraphNodeId[];\n  readonly state: ICapabilityGraphState;\n  readonly error: unknown | undefined;\n  dispose(): Promise<void>;\n  get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T;\n};",
+          "signature": "export type ICapabilityGraph = {\n  register<T>(node: IGraphNodeDefinition<T>): void;\n  ready(): Promise<void>;\n  nodeState(id: IGraphNodeId): IGraphNodeDiagnostic;\n  /** * Read the same value projection as nodeState without allocating a diagnostic. Existing nodes * return undefined until the whole graph is ready and after disposal; undefined is valid data. An * unknown id retains GRAPH_UNKNOWN_NODE. Payload identity and mutability stay caller-owned. */ readValue<\n    T = unknown,\n  >(\n    id: IGraphNodeId,\n  ): T | undefined;\n  readonly nodes: readonly IGraphNodeId[];\n  readonly state: ICapabilityGraphState;\n  readonly error: unknown | undefined;\n  dispose(): Promise<void>;\n  get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T;\n};",
           "declarationLine": 63,
           "source": "packages/capability/dist/graph/index.d.ts",
           "purpose": "Public Graph contract.",
@@ -4060,7 +4061,7 @@
           "members": [],
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };"
+            "export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; /** * Read the same value projection as nodeState without allocating a diagnostic. Existing nodes * return undefined until the whole graph is ready and after disposal; undefined is valid data. An * unknown id retains GRAPH_UNKNOWN_NODE. Payload identity and mutability stay caller-owned. */ readValue<T = unknown>(id: IGraphNodeId): T | undefined; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4099,9 +4100,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/index.d.ts:ICapabilityGraph:export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };",
+          "identity": "packages/capability/dist/graph/index.d.ts:ICapabilityGraph:export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; /** * Read the same value projection as nodeState without allocating a diagnostic. Existing nodes * return undefined until the whole graph is ready and after disposal; undefined is valid data. An * unknown id retains GRAPH_UNKNOWN_NODE. Payload identity and mutability stay caller-owned. */ readValue<T = unknown>(id: IGraphNodeId): T | undefined; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "capability-graph--ICapabilityGraph"
         },
@@ -4301,7 +4302,7 @@
           "name": "ICapabilityGraphOptions",
           "kind": "type",
           "signature": "export type ICapabilityGraphOptions = { readonly onError?: (error: unknown) => void };",
-          "declarationLine": 74,
+          "declarationLine": 80,
           "source": "packages/capability/dist/graph/index.d.ts",
           "purpose": "Factory options are snapshotted before any lifecycle object is constructed.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICapabilityGraphOptions.",
@@ -4634,6 +4635,7 @@
           "examples": [
             "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'",
             "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}",
+            "import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst serviceId = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph()\ngraph.register({\n  id: serviceId, kind: 'service', dependencies: [],\n  start: () => ({ value: { read: () => 42 }, release: () => undefined })\n})\ntry {\n  await graph.ready()\n  console.log(graph.readValue<{ read(): number }>(serviceId)?.read()) // 42\n} finally {\n  await graph.dispose()\n}",
             "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph'",
             "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
           ],
@@ -4681,7 +4683,7 @@
           "declaredConfiguration": [],
           "identity": "packages/capability/dist/graph/index.d.ts:IGraphNodeId:export type IGraphNodeId = string & { readonly __graphNodeId: unique symbol; };",
           "guidance": [],
-          "usageScore": 30,
+          "usageScore": 44,
           "configuration": [],
           "fragment": "capability-graph--IGraphNodeId"
         },
@@ -189868,6 +189870,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 USEGUIDE.md。"
                 }
               ]
@@ -190313,7 +190319,7 @@
           "name": "ITrayEntryContext",
           "kind": "type",
           "signature": "export type ITrayEntryContext = {\n  readonly signal: IAbortSignal;\n  get<T>(key: ITrayKey): T;\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T;\n};",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryContext.",
@@ -190379,8 +190385,8 @@
         {
           "name": "ITrayEntryDefinition",
           "kind": "type",
-          "signature": "export type ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey;\n  readonly kind: ITrayEntryKind;\n  readonly requires?: readonly ITrayKey[];\n  readonly readiness?: IGraphReadinessSnapshot;\n  readonly start: (\n    context: ITrayEntryContext,\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>;\n};",
-          "declarationLine": 16,
+          "signature": "export type ITrayEntryDefinition<T> = {\n  readonly key: ITrayKey;\n  readonly kind: ITrayEntryKind;\n  readonly requires?: readonly ITrayKey[];\n  /** * Initial fact is captured at admission. Only a blocked ready() may reacquire this property; * supply a getter for fresh provider snapshots. Failed results remain cached permanently. */ readonly readiness?: IGraphReadinessSnapshot;\n  readonly start: (\n    context: ITrayEntryContext,\n  ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>;\n};",
+          "declarationLine": 17,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryDefinition is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryDefinition.",
@@ -190400,7 +190406,7 @@
           "aliasOf": "ITrayEntryDefinition",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };"
+            "export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; /** * Initial fact is captured at admission. Only a blocked ready() may reacquire this property; * supply a getter for fresh provider snapshots. Failed results remain cached permanently. */ readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -190439,7 +190445,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryDefinition:export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };",
+          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryDefinition:export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; /** * Initial fact is captured at admission. Only a blocked ready() may reacquire this property; * supply a getter for fresh provider snapshots. Failed results remain cached permanently. */ readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };",
           "guidance": [],
           "usageScore": 44,
           "configuration": [],
@@ -190449,7 +190455,7 @@
           "name": "ITrayEntryInstance",
           "kind": "type",
           "signature": "export type ITrayEntryInstance<T> = {\n  readonly value: T;\n  readonly release: (context: IGraphReleaseContext) => void | PromiseLike<void>;\n};",
-          "declarationLine": 7,
+          "declarationLine": 8,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryInstance is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryInstance.",
@@ -190515,8 +190521,8 @@
         {
           "name": "ITrayEntryKind",
           "kind": "type",
-          "signature": "export type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service';",
-          "declarationLine": 6,
+          "signature": "export type ITrayEntryKind = TrayEntryKind;",
+          "declarationLine": 7,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryKind is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryKind.",
@@ -190533,9 +190539,7 @@
           "members": [],
           "aliasOf": "ITrayEntryKind",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service';"
-          ],
+          "overloadSignatures": ["export type ITrayEntryKind = TrayEntryKind;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use ITrayEntryKind when its type contract and declared inputs match the result you need.",
@@ -190573,7 +190577,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryKind:export type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service';",
+          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryKind:export type ITrayEntryKind = TrayEntryKind;",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -190712,7 +190716,7 @@
           "name": "ITrayGraph",
           "kind": "type",
           "signature": "export type ITrayGraph = {\n  readonly keys: readonly ITrayKey[];\n  readonly state: ITrayState;\n  readonly error: unknown | undefined;\n  ready(): Promise<void>;\n  get<T>(key: ITrayKey): T;\n  entryState(key: ITrayKey): IGraphNodeState;\n  dispose(): Promise<void>;\n};",
-          "declarationLine": 24,
+          "declarationLine": 29,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayGraph is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayGraph.",
@@ -190785,6 +190789,10 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
                 },
                 {
                   "type": "paragraph",
@@ -191255,7 +191263,7 @@
           "name": "ITrayKey",
           "kind": "type",
           "signature": "export type ITrayKey = string & { readonly __trayKey: unique symbol };",
-          "declarationLine": 3,
+          "declarationLine": 4,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayKey is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayKey.",
@@ -191330,6 +191338,10 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
                 },
                 {
                   "type": "paragraph",
@@ -192394,8 +192406,8 @@
         {
           "name": "ITrayState",
           "kind": "type",
-          "signature": "export type ITrayState = 'open' | ICapabilityGraphState;",
-          "declarationLine": 23,
+          "signature": "export type ITrayState = ICapabilityGraphState;",
+          "declarationLine": 28,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayState is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayState.",
@@ -192412,7 +192424,7 @@
           "members": [],
           "aliasOf": "ITrayState",
           "exportPath": ".",
-          "overloadSignatures": ["export type ITrayState = 'open' | ICapabilityGraphState;"],
+          "overloadSignatures": ["export type ITrayState = ICapabilityGraphState;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use ITrayState when its type contract and declared inputs match the result you need.",
@@ -192450,7 +192462,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/contract.d.ts:ITrayState:export type ITrayState = 'open' | ICapabilityGraphState;",
+          "identity": "packages/tray/dist/contract.d.ts:ITrayState:export type ITrayState = ICapabilityGraphState;",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -193230,6 +193242,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 USEGUIDE.md。"
                 }
               ]
@@ -193424,6 +193440,10 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
                 },
                 {
                   "type": "paragraph",
@@ -194103,13 +194123,13 @@
             },
             {
               "name": "shutdown",
-              "type": "Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>",
+              "type": "Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>",
               "optional": false,
               "description": "Selects bounded shutdown or a strict drain that waits for physical completion."
             },
             {
               "name": "shutdown.mode",
-              "type": "'bounded' | 'strict-drain'",
+              "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes."
             },
@@ -194158,7 +194178,7 @@
             },
             {
               "name": "shutdown",
-              "type": "Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>",
+              "type": "Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>",
               "optional": false,
               "description": "Selects bounded shutdown or a strict drain that waits for physical completion.",
               "descriptionEn": "Selects bounded shutdown or a strict drain that waits for physical completion.",
@@ -194166,7 +194186,7 @@
             },
             {
               "name": "shutdown.mode",
-              "type": "'bounded' | 'strict-drain'",
+              "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes.",
               "descriptionEn": "Uses a bounded wait or waits strictly until every physical plugin release completes.",
@@ -194187,7 +194207,7 @@
           "name": "ICanResolveReadyDefinitions",
           "kind": "type",
           "signature": "export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]> =\n  number extends TDefinitions['length']\n    ? false\n    : string extends ITrayDefinitionNames<TDefinitions>\n      ? false\n      : IReadyInferenceExceeded<TDefinitions> extends true\n        ? false\n        : IHasWidenedProviders<TDefinitions> extends true\n          ? false\n          : true;",
-          "declarationLine": 56,
+          "declarationLine": 57,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Whether the public resolver may safely retain an exact finite readiness tuple.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICanResolveReadyDefinitions.",
@@ -194250,8 +194270,8 @@
         {
           "name": "ICreateHostOptions",
           "kind": "type",
-          "signature": "export type ICreateHostOptions<\n  THost extends PluginHost<any, any, any>,\n  TPlugins extends readonly ITrayPluginConstraint<THost>[],\n> = Readonly<{\n  /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost;\n  /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins;\n  /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number;\n  /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number;\n  /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{\n    /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode:\n      | 'bounded'\n      | 'strict-drain';\n  }>;\n  /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (\n    error: unknown,\n  ) => void;\n}>;",
-          "declarationLine": 172,
+          "signature": "export type ICreateHostOptions<\n  THost extends PluginHost<any, any, any>,\n  TPlugins extends readonly ITrayPluginConstraint<THost>[],\n> = Readonly<{\n  /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost;\n  /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins;\n  /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number;\n  /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number;\n  /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{\n    /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode;\n  }>;\n  /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (\n    error: unknown,\n  ) => void;\n}>;",
+          "declarationLine": 173,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Host creation options.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICreateHostOptions.",
@@ -194268,7 +194288,7 @@
           "aliasOf": "ICreateHostOptions",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;"
+            "export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -194307,7 +194327,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:ICreateHostOptions:export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
+          "identity": "packages/tray/dist/host/typing.d.ts:ICreateHostOptions:export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
           "guidance": [],
           "usageScore": 10,
           "configuration": [],
@@ -194317,7 +194337,7 @@
           "name": "IHostBaselinePlugins",
           "kind": "type",
           "signature": "export type IHostBaselinePlugins<THost extends PluginHost<any, any, any>> =\n  IPluginHostInstalledPlugins<THost> extends readonly IPluginConstraint<any>[]\n    ? IPluginHostInstalledPlugins<THost>\n    : readonly [];",
-          "declarationLine": 6,
+          "declarationLine": 7,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Constructor-installed plugins remain part of every exact and dynamic Tray view.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IHostBaselinePlugins.",
@@ -194381,7 +194401,7 @@
           "name": "IPluginWithSynchronousShared",
           "kind": "type",
           "signature": "export type IPluginWithSynchronousShared<TPlugin> = TPlugin & {\n  readonly shared?: (core: unknown) => Record<PropertyKey, unknown>;\n};",
-          "declarationLine": 68,
+          "declarationLine": 69,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Awaitable values accepted at lifecycle boundaries.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginWithSynchronousShared.",
@@ -194445,7 +194465,7 @@
           "name": "IResolveReadyTrayPlugins",
           "kind": "type",
           "signature": "export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> =\n  number extends TDefinitions['length']\n    ? readonly []\n    : string extends ITrayDefinitionNames<TDefinitions>\n      ? readonly []\n      : IReadyInferenceExceeded<TDefinitions> extends true\n        ? readonly []\n        : IAllDefinitionsIndependent<TDefinitions> extends true\n          ? TDefinitions\n          : IHasWidenedProviders<TDefinitions> extends true\n            ? readonly []\n            : IResolveReadyWithFuel<TDefinitions>;",
-          "declarationLine": 66,
+          "declarationLine": 67,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Exact readiness is selected only for finite, literal, at-most-128 definition tuples.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResolveReadyTrayPlugins.",
@@ -194509,7 +194529,7 @@
           "name": "ITrayHost",
           "kind": "type",
           "signature": "export type ITrayHost<\n  THost extends PluginHost<any, any, any>,\n  TDefinitions extends readonly ITrayPluginConstraint<THost>[],\n  TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<\n    IResolveReadyTrayPlugins<TDefinitions>,\n    readonly ITrayPluginConstraint<THost>[]\n  >,\n> = Readonly<{\n  readonly plugins: readonly string[];\n  readonly readyPlugins: readonly string[];\n  readonly state: ITrayHostState;\n  readonly isActive: boolean;\n  readonly error: unknown | undefined;\n  readonly extensions: Readonly<\n    IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>\n  >;\n  readonly config: IPluginHostConfigFor<\n    readonly [...IHostBaselinePlugins<THost>, ...TReady]\n  >;\n  pluginState(name: string): string;\n  on<TKey extends keyof ITrayHostEventMap>(\n    type: TKey,\n    listener: (\n      event: IEventContext<ITrayHostEventMap[TKey]>,\n    ) => void | PromiseLike<void>,\n  ): IUnsubscribe;\n  use<TPlugin extends ITrayPluginConstraint<THost>>(\n    plugin: TPlugin,\n  ): Promise<\n    ITrayPluginMutationResult<\n      ITrayHost<THost, TDefinitions, TReady>,\n      ITrayResolvedHost<THost, readonly [...TDefinitions, TPlugin]>,\n      ITrayHostDynamic<THost>\n    >\n  >;\n  unUse<const TName extends string>(\n    name: TName,\n  ): Promise<\n    TName extends ITrayDefinitionNames<TDefinitions>\n      ? ITrayPluginRemovalResult<\n          ITrayHost<THost, TDefinitions, TReady>,\n          IRemoveTrayDefinition<\n            TDefinitions,\n            TName\n          > extends readonly ITrayPluginConstraint<THost>[]\n            ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>>\n            : ITrayHostDynamic<THost>\n        >\n      : ITrayPluginRemovalResult<\n          ITrayHost<THost, TDefinitions, TReady>,\n          ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>\n        >\n  >;\n  replace<TPlugin extends ITrayPluginConstraint<THost>>(\n    plugin: TPlugin,\n  ): Promise<\n    ITrayPluginMutationResult<\n      ITrayHost<THost, TDefinitions, TReady>,\n      ITrayMutationView<THost, TDefinitions, TReady, TPlugin>,\n      ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>\n    >\n  >;\n  dispose(): Promise<ITrayHostDisposalResult>;\n  [asyncDisposeKey](): Promise<void>;\n}>;",
-          "declarationLine": 151,
+          "declarationLine": 152,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Public managed Host surface.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHost.",
@@ -194649,7 +194669,7 @@
           "name": "ITrayHostCreationError",
           "kind": "type",
           "signature": "export type ITrayHostCreationError = Error &\n  Readonly<{ readonly detail: ITrayHostCreationFailureDetail }>;",
-          "declarationLine": 200,
+          "declarationLine": 201,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostCreationError is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostCreationError.",
@@ -194713,7 +194733,7 @@
           "name": "ITrayHostCreationFailureDetail",
           "kind": "type",
           "signature": "export type ITrayHostCreationFailureDetail = ICleanupResult &\n  Readonly<{\n    readonly phase: 'factory' | 'admission' | 'graph' | 'setup' | 'commit';\n    readonly cleanupComplete: boolean;\n  }>;",
-          "declarationLine": 196,
+          "declarationLine": 197,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostCreationFailureDetail is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostCreationFailureDetail.",
@@ -194777,7 +194797,7 @@
           "name": "ITrayHostDisposalResult",
           "kind": "type",
           "signature": "export type ITrayHostDisposalResult = ICleanupResult &\n  Readonly<{\n    readonly state: 'terminal';\n    readonly termination: 'managed' | 'external-host';\n    readonly cleanupComplete: boolean;\n    readonly error?: Error;\n  }>;",
-          "declarationLine": 190,
+          "declarationLine": 191,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostDisposalResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDisposalResult.",
@@ -194841,7 +194861,7 @@
           "name": "ITrayHostDynamic",
           "kind": "type",
           "signature": "export type ITrayHostDynamic<\n  THost extends PluginHost<any, any, any>,\n  TManagedBaseline extends object = object,\n> = Omit<\n  ITrayHost<\n    THost,\n    readonly ITrayPluginConstraint<THost>[],\n    readonly ITrayPluginConstraint<THost>[]\n  >,\n  'extensions'\n> &\n  Readonly<{\n    readonly extensions: Readonly<\n      IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>\n    >;\n  }>;",
-          "declarationLine": 168,
+          "declarationLine": 169,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Conservative dynamic view returned after widened or committed-failure mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDynamic.",
@@ -194905,7 +194925,7 @@
           "name": "ITrayHostEventMap",
           "kind": "type",
           "signature": "export type ITrayHostEventMap = {\n  readonly use: Readonly<Record<string, unknown>>;\n  readonly unUse: Readonly<Record<string, unknown>>;\n  readonly replace: Readonly<Record<string, unknown>>;\n  /** Settled lifecycle aliases describe the logical operation without exposing Graph authority. */ readonly registered: Readonly<\n    Record<string, unknown>\n  >;\n  readonly removed: Readonly<Record<string, unknown>>;\n  readonly replaced: Readonly<Record<string, unknown>>;\n  readonly mutationFailed: Readonly<{\n    readonly operation: 'use' | 'unUse' | 'replace';\n    readonly name: string;\n    readonly error: Error;\n  }>;\n  readonly disposing: Readonly<{ readonly state: 'closing' }>;\n  readonly disposed: Readonly<{\n    readonly state: 'terminal';\n    readonly cleanupComplete: boolean;\n  }>;\n};",
-          "declarationLine": 80,
+          "declarationLine": 81,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Event payloads published after settled managed mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostEventMap.",
@@ -194969,7 +194989,7 @@
           "name": "ITrayHostState",
           "kind": "type",
           "signature": "export type ITrayHostState = (typeof TrayHostState)[keyof typeof TrayHostState];",
-          "declarationLine": 78,
+          "declarationLine": 79,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostState is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostState.",
@@ -195033,7 +195053,7 @@
           "name": "ITrayPluginConstraint",
           "kind": "type",
           "signature": "export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> =\n  IPluginConstraint<THost>;",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Plugin descriptor accepted by the managed Tray Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginConstraint.",
@@ -195097,7 +195117,7 @@
           "name": "ITrayPluginMutationObservation",
           "kind": "type",
           "signature": "export type ITrayPluginMutationObservation<TView> = ICleanupResult &\n  Readonly<{\n    readonly operation: 'use' | 'replace';\n    readonly name: string;\n    readonly affected: readonly string[];\n    readonly topologyChanged: boolean;\n    readonly view: TView;\n    readonly cleanupComplete: boolean;\n  }>;",
-          "declarationLine": 105,
+          "declarationLine": 106,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginMutationObservation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginMutationObservation.",
@@ -195161,7 +195181,7 @@
           "name": "ITrayPluginMutationResult",
           "kind": "type",
           "signature": "export type ITrayPluginMutationResult<\n  TPreviousView,\n  TSuccessView,\n  TCommittedFailureView,\n> =\n  | (ITrayPluginMutationObservation<TSuccessView> &\n      Readonly<{ readonly ok: true; readonly committed: true }>)\n  | (ITrayPluginMutationObservation<TPreviousView> &\n      Readonly<{\n        readonly ok: false;\n        readonly committed: false;\n        readonly error: Error;\n      }>)\n  | (ITrayPluginMutationObservation<TCommittedFailureView> &\n      Readonly<{\n        readonly ok: false;\n        readonly committed: true;\n        readonly error: Error;\n      }>);",
-          "declarationLine": 113,
+          "declarationLine": 114,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginMutationResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginMutationResult.",
@@ -195225,7 +195245,7 @@
           "name": "ITrayPluginPhysicalCleanupResult",
           "kind": "type",
           "signature": "export type ITrayPluginPhysicalCleanupResult = ICleanupResult;",
-          "declarationLine": 104,
+          "declarationLine": 105,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Cleanup observation returned by managed mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginPhysicalCleanupResult.",
@@ -195287,7 +195307,7 @@
           "name": "ITrayPluginRemovalObservation",
           "kind": "type",
           "signature": "export type ITrayPluginRemovalObservation<TView> = ICleanupResult &\n  Readonly<{\n    readonly name: string;\n    readonly affected: readonly string[];\n    readonly view: TView;\n    readonly cleanupComplete: boolean;\n  }>;",
-          "declarationLine": 125,
+          "declarationLine": 126,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginRemovalObservation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginRemovalObservation.",
@@ -195351,7 +195371,7 @@
           "name": "ITrayPluginRemovalResult",
           "kind": "type",
           "signature": "export type ITrayPluginRemovalResult<TPreviousView, TCommittedView> =\n  | (ITrayPluginRemovalObservation<TPreviousView> &\n      Readonly<{\n        readonly ok: true;\n        readonly committed: false;\n        readonly removed: false;\n      }>)\n  | (ITrayPluginRemovalObservation<TCommittedView> &\n      Readonly<{ readonly ok: true; readonly committed: true; readonly removed: true }>)\n  | (ITrayPluginRemovalObservation<TPreviousView> &\n      Readonly<{\n        readonly ok: false;\n        readonly committed: false;\n        readonly removed: false;\n        readonly error: Error;\n      }>)\n  | (ITrayPluginRemovalObservation<TCommittedView> &\n      Readonly<{\n        readonly ok: false;\n        readonly committed: true;\n        readonly removed: true;\n        readonly error: Error;\n      }>);",
-          "declarationLine": 131,
+          "declarationLine": 132,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginRemovalResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginRemovalResult.",
@@ -195415,7 +195435,7 @@
           "name": "ITrayResolvedHost",
           "kind": "type",
           "signature": "export type ITrayResolvedHost<\n  THost extends PluginHost<any, any, any>,\n  TDefinitions extends readonly ITrayPluginConstraint<THost>[],\n> =\n  ICanResolveReadyDefinitions<TDefinitions> extends true\n    ? ITrayHost<THost, TDefinitions>\n    : ITrayHostDynamic<THost>;",
-          "declarationLine": 189,
+          "declarationLine": 190,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayResolvedHost is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayResolvedHost.",
@@ -195481,7 +195501,7 @@
           "name": "IUnsubscribe",
           "kind": "type",
           "signature": "export type IUnsubscribe = () => void;",
-          "declarationLine": 102,
+          "declarationLine": 103,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Minimal unsubscribe contract shared with event-subscriber without a runtime dependency.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUnsubscribe.",
@@ -195543,7 +195563,7 @@
           "name": "TrayHostState",
           "kind": "const",
           "signature": "export declare const TrayHostState: {\n  readonly active: 'active';\n  readonly closing: 'closing';\n  readonly terminal: 'terminal';\n  readonly failed: 'failed';\n};",
-          "declarationLine": 72,
+          "declarationLine": 73,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Public lifecycle states for a managed Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for TrayHostState.",
@@ -196320,7 +196340,7 @@
           "declaredConfiguration": [
             {
               "name": "mode",
-              "type": "'bounded' | 'strict-drain'",
+              "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes."
             },
@@ -196337,7 +196357,7 @@
           "configuration": [
             {
               "name": "mode",
-              "type": "'bounded' | 'strict-drain'",
+              "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes.",
               "descriptionEn": "Uses a bounded wait or waits strictly until every physical plugin release completes.",
@@ -196358,7 +196378,7 @@
           "name": "IRuntime",
           "kind": "type",
           "signature": "export type IRuntime<\n  TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[],\n> = Readonly<{\n  readonly state: 'active' | 'closing' | 'terminal';\n  readonly activeRuns: number;\n  run<TName extends string, TResult>(\n    name: TName,\n    options: IRuntimeRunOptions,\n    execute: (\n      context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>>,\n    ) => TResult | PromiseLike<TResult>,\n  ): Promise<TResult>;\n  dispose(): Promise<IRuntimeDisposalResult>;\n  readonly [Symbol.asyncDispose]: () => Promise<void>;\n}>;",
-          "declarationLine": 46,
+          "declarationLine": 47,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Public Runtime lifecycle and exact-generation execution surface.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntime.",
@@ -196424,7 +196444,7 @@
           "name": "IRuntimeDisposalResult",
           "kind": "type",
           "signature": "export type IRuntimeDisposalResult = Readonly<{\n  readonly state: 'terminal';\n  readonly cleanupComplete: boolean;\n}>;",
-          "declarationLine": 41,
+          "declarationLine": 42,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Physical runtime disposal observation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeDisposalResult.",
@@ -196488,7 +196508,7 @@
           "name": "IRuntimeExtensionsFor",
           "kind": "type",
           "signature": "export type IRuntimeExtensionsFor<\n  TReady extends readonly IPluginConstraint<any>[],\n  TName extends string,\n> = string extends TName\n  ? Readonly<Record<PropertyKey, unknown>>\n  : [Extract<TReady[number], { readonly name: TName }>] extends [never]\n    ? Readonly<Record<PropertyKey, unknown>>\n    : IExtractPluginExt<Extract<TReady[number], { readonly name: TName }>>;",
-          "declarationLine": 4,
+          "declarationLine": 5,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Resolves exact extension types for literal ready plugin names and stays unknown when widened.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeExtensionsFor.",
@@ -196552,7 +196572,7 @@
           "name": "IRuntimeRunContext",
           "kind": "type",
           "signature": "export type IRuntimeRunContext<TExtensions = Readonly<Record<PropertyKey, unknown>>> =\n  Readonly<{\n    readonly runId: number;\n    readonly plugin: string;\n    readonly extensions: TExtensions;\n    readonly signal: IAbortSignal;\n    readonly deadlineAt: number | undefined;\n    readonly self: IRuntimeSelfMutation;\n  }>;",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Context exposed to one callback with an exact plugin-generation extension snapshot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeRunContext.",
@@ -196616,7 +196636,7 @@
           "name": "IRuntimeRunOptions",
           "kind": "type",
           "signature": "export type IRuntimeRunOptions = Readonly<{\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs: number | false;\n}>;",
-          "declarationLine": 31,
+          "declarationLine": 32,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Caller cancellation and callback admission deadline.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeRunOptions.",
@@ -196680,7 +196700,7 @@
           "name": "IRuntimeSelfMutation",
           "kind": "type",
           "signature": "export type IRuntimeSelfMutation = Readonly<{\n  /** Schedules removal of the callback's exact plugin generation after settlement. */ readonly unUse: () => IRuntimeSelfMutationTicket;\n  /** Schedules replacement of the callback's exact plugin generation after settlement. */ readonly replace: (\n    plugin: IPluginConstraint<any>,\n  ) => IRuntimeSelfMutationTicket;\n}>;",
-          "declarationLine": 24,
+          "declarationLine": 25,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Runtime-neutral self-mutation capability bound to the current callback generation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeSelfMutation.",
@@ -196744,7 +196764,7 @@
           "name": "IRuntimeSelfMutationTicket",
           "kind": "type",
           "signature": "export type IRuntimeSelfMutationTicket<TResult = unknown> = Readonly<{\n  /** Resolves only after callback settlement and canonical Host mutation completion. */ readonly completion: Promise<TResult>;\n}>;",
-          "declarationLine": 19,
+          "declarationLine": 20,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Deferred exact-generation mutation result exposed by a Runtime callback.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeSelfMutationTicket.",
@@ -196807,8 +196827,8 @@
         {
           "name": "IRuntimeShutdownOptions",
           "kind": "type",
-          "signature": "export type IRuntimeShutdownOptions = Readonly<{\n  readonly mode: 'bounded' | 'strict-drain';\n  readonly quiescenceMs?: number;\n}>;",
-          "declarationLine": 36,
+          "signature": "export type IRuntimeShutdownOptions = Readonly<{\n  readonly mode: TrayShutdownMode;\n  readonly quiescenceMs?: number;\n}>;",
+          "declarationLine": 37,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Runtime shutdown policy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeShutdownOptions.",
@@ -196823,7 +196843,7 @@
           "aliasOf": "IRuntimeShutdownOptions",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IRuntimeShutdownOptions = Readonly<{ readonly mode: 'bounded' | 'strict-drain'; readonly quiescenceMs?: number; }>;"
+            "export type IRuntimeShutdownOptions = Readonly<{ readonly mode: TrayShutdownMode; readonly quiescenceMs?: number; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -196862,7 +196882,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntimeShutdownOptions:export type IRuntimeShutdownOptions = Readonly<{ readonly mode: 'bounded' | 'strict-drain'; readonly quiescenceMs?: number; }>;",
+          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntimeShutdownOptions:export type IRuntimeShutdownOptions = Readonly<{ readonly mode: TrayShutdownMode; readonly quiescenceMs?: number; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
