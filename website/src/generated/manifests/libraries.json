@@ -595,6 +595,24 @@
                   "text": "CapabilityHost 使用 `enable(name)` 返回结构化激活结果，使用 `disable(name)` 等待资源释放。`enableResult`、`enableLegacyBoolean`、`disableNow` 已移除；需要布尔值时比较 `(await host.enable(name)).status === CapabilityEnableStatus.enabled`。保留并等待 `disable()` 返回的 Promise，以确认物理清理已完成。"
                 }
               ]
+            },
+            {
+              "id": "graph-node-snapshots",
+              "heading": "Graph node snapshots",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Dynamic register/replace capture id, kind, start and dependency facts once when the mutation leaves the queue. The stored definition and its edges are immutable snapshots; changing the original caller object after admission no longer changes graph identity, diagnostics or dependencies. Call replace explicitly to change a node. Captured start methods keep the original definition receiver and return value."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Getter failures reject with GRAPH_INVALID_NODE while retaining the original native error or cause."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Pure topology and incremental indexes share one private structural/edge admission owner. Static topology keeps its dense ordinal contract and constructs its index from the admitted snapshots without repeating edge validation. The trusted construction helper is not a module export."
+                }
+              ]
             }
           ]
         },
@@ -1254,6 +1272,24 @@
                 {
                   "type": "paragraph",
                   "text": "CapabilityHost 使用 `enable(name)` 返回结构化激活结果，使用 `disable(name)` 等待资源释放。`enableResult`、`enableLegacyBoolean`、`disableNow` 已移除；需要布尔值时比较 `(await host.enable(name)).status === CapabilityEnableStatus.enabled`。保留并等待 `disable()` 返回的 Promise，以确认物理清理已完成。"
+                }
+              ]
+            },
+            {
+              "id": "graph-node-snapshots",
+              "heading": "Graph node snapshots",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Dynamic register/replace capture id, kind, start and dependency facts once when the mutation leaves the queue. The stored definition and its edges are immutable snapshots; changing the original caller object after admission no longer changes graph identity, diagnostics or dependencies. Call replace explicitly to change a node. Captured start methods keep the original definition receiver and return value."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Getter failures reject with GRAPH_INVALID_NODE while retaining the original native error or cause."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Pure topology and incremental indexes share one private structural/edge admission owner. Static topology keeps its dense ordinal contract and constructs its index from the admitted snapshots without repeating edge validation. The trusted construction helper is not a module export."
                 }
               ]
             }
