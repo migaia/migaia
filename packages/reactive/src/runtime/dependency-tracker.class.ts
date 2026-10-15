@@ -78,6 +78,15 @@ export class DependencyTracker {
    * VersionClock and has no numeric exhaustion.
    */
   #topologyTokens = new WeakMap<IObservable, object>()
+  /**
+   * Topology snapshot of each suspended observer: dependency to its topology token at suspension.
+   *
+   * A suspended observer holds no reverse edges, so `disconnectObservable` cannot notify it. The
+   * snapshot lets `revalidate` reject a dependency that was invalidated or disposed meanwhile. Weak
+   * keys keep only forward references, which `depVersions` already holds; any non-fast-path commit
+   * or `clearDependencies` deletes the entry.
+   */
+  #suspendedTopology = new WeakMap<IObserver, Map<IObservable, object | undefined>>()
   #runtime: IRuntime
 
   constructor(runtime: IRuntime) {
@@ -121,9 +130,67 @@ export class DependencyTracker {
 
   /** Disconnects all dependency edges for an observer during disposal. */
   clearDependencies(observer: IObserver): void {
+    this.#suspendedTopology.delete(observer)
     for (const dep of observer.deps) this.#unsubscribe(dep, observer)
     mutableNodeDeps(observer, observer.deps).clear()
     mutableNodeVersions(observer, observer.depVersions).clear()
+  }
+
+  /**
+   * Suspends an idle observer: removes every reverse edge but keeps `depVersions` as a snapshot.
+   *
+   * The observer then holds no subscription, so it cannot leak through its dependencies. A later
+   * `revalidate` decides from the snapshot whether the cached result is still current. An observer
+   * without dependency edges (never attached or already suspended) is left unchanged.
+   */
+  suspendDependencies(observer: IObserver): void {
+    if (observer.deps.size === 0) return
+    /** Topology tokens at suspension, compared by `revalidate`. */
+    const topology = new Map<IObservable, object | undefined>()
+    for (const dep of observer.deps) topology.set(dep, this.#topologyTokens.get(dep))
+    this.#suspendedTopology.set(observer, topology)
+    for (const dep of topology.keys()) this.#unsubscribe(dep, observer)
+    mutableNodeDeps(observer, observer.deps).clear()
+  }
+
+  /** Whether `suspendDependencies` detached this observer and no later commit has reattached it. */
+  isSuspended(observer: IObserver): boolean {
+    return this.#suspendedTopology.has(observer)
+  }
+
+  /**
+   * Returns whether every recorded dependency still has its recorded version, so the observer's
+   * cached result is current. Dependencies are pulled in recorded order and the check stops at the
+   * first change, like `hasStaleDependencies`. `isStale()` also counts as a change, so a source
+   * with an unsynchronized remote write still forces the observer's own read.
+   *
+   * For a suspended observer, a dependency invalidated or disposed since suspension is a change.
+   * When the snapshot is still current, the observer is subscribed to its recorded dependencies
+   * again.
+   *
+   * A dependency `pull()` failure returns `false`: the caller re-evaluates the observer, and that
+   * evaluation reads the dependency again and owns its failure (rethrows it or handles it).
+   */
+  revalidate(observer: IObserver): boolean {
+    const topology = this.#suspendedTopology.get(observer)
+    try {
+      for (const [dep, recordedVersion] of observer.depVersions) {
+        if (
+          topology !== undefined &&
+          (this.#terminalObservables.has(dep) ||
+            this.#topologyTokens.get(dep) !== topology.get(dep))
+        ) {
+          return false
+        }
+        dep.pull?.()
+        if (dep.isStale?.() || dep.version !== recordedVersion) return false
+      }
+    } catch {
+      // A dependency evaluation failure is reproduced by the caller's re-evaluation, not lost.
+      return false
+    }
+    if (topology !== undefined) this.#commit(observer, new Set(observer.depVersions.keys()))
+    return true
   }
 
   /**
@@ -277,7 +344,9 @@ export class DependencyTracker {
   }
 
   #commit(observer: IObserver, nextDeps: Set<IObservable>): void {
-    if (observer.deps.size === nextDeps.size) {
+    // A suspended observer has no `deps` but keeps its `depVersions` snapshot; the size check
+    // sends it through the full path, which subscribes again and replaces the snapshot.
+    if (observer.deps.size === nextDeps.size && observer.depVersions.size === nextDeps.size) {
       let sameTopology = true
       for (const dep of nextDeps) {
         if (!observer.deps.has(dep)) {
@@ -291,6 +360,7 @@ export class DependencyTracker {
         return
       }
     }
+    this.#suspendedTopology.delete(observer)
     /** Stable pre-commit dependency snapshot; lifecycle callbacks may mutate the live view. */
     const prevDeps = new Set(observer.deps)
     /** Reverse edges added by this commit; terminal rollback removes only these edges. */
