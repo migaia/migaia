@@ -34,6 +34,205 @@ const deferred = <T>() => {
 }
 
 describe('capability graph core', () => {
+  it('CPL-T1 starts a whole level before awaiting it and preserves reverse release', async () => {
+    /** Independent startup gates expose concurrency without a wall-clock assertion. */
+    const first = deferred<ReturnType<typeof instance<string>>>()
+    /** The later registration settles first to separate invocation order from completion order. */
+    const second = deferred<ReturnType<typeof instance<string>>>()
+    /** Invocation and physical release order remain separate observable contracts. */
+    const started: string[] = []
+    /** Root ownership must release by topology rather than by completion order. */
+    const released: string[] = []
+    /** Real Graph ownership coordinates both the level barrier and dependent provider reads. */
+    const graph = createCapabilityGraph()
+    for (const [name, gate] of [
+      ['first', first],
+      ['second', second]
+    ] as const)
+      graph.register({
+        id: id(name),
+        kind: 'test',
+        dependencies: [],
+        start: () => {
+          started.push(name)
+          return gate.promise
+        }
+      })
+    graph.register({
+      id: id('consumer'),
+      kind: 'test',
+      dependencies: [{ provider: id('first'), required: true }],
+      start: (context) => {
+        started.push('consumer')
+        expect(context.get(id('first'))).toBe('first')
+        return instance('consumer', () => {
+          released.push('consumer')
+        })
+      }
+    })
+    /** Keep the exact initial readiness promise while selectively completing the starts. */
+    const ready = graph.ready()
+    try {
+      expect([...started]).toEqual(['first', 'second'])
+      second.resolve(
+        instance('second', () => {
+          released.push('second')
+        })
+      )
+      await Promise.resolve()
+      expect([...started]).toEqual(['first', 'second'])
+      first.resolve(
+        instance('first', () => {
+          released.push('first')
+        })
+      )
+      await ready
+      expect([...started]).toEqual(['first', 'second', 'consumer'])
+      await graph.dispose()
+      expect(released).toEqual(['consumer', 'second', 'first'])
+    } finally {
+      first.resolve(instance('first'))
+      second.resolve(instance('second'))
+      await ready.catch(() => undefined)
+      await graph.dispose()
+    }
+  })
+
+  it('CPL-T2 settles a failed level and preserves ordinal primary plus secondary failures', async () => {
+    /** Two independently failing starts deliberately reject in reverse registration order. */
+    const first = deferred<ReturnType<typeof instance<number>>>()
+    /** A separate rejection lets the later node fail before the canonical primary. */
+    const second = deferred<ReturnType<typeof instance<number>>>()
+    /** Canonical primary identity must survive attachment of its sibling failure. */
+    const firstFailure = new Error('first start')
+    /** This failure must remain reachable even though it occurs before the primary. */
+    const secondFailure = new Error('second start')
+    /** The successful sibling must be rolled back despite settling before either failure. */
+    const release = vi.fn()
+    /** No later-level start may run after any member of this level fails. */
+    const consumer = vi.fn(() => instance(4))
+    /** Invocation evidence ensures both deferred starts are actually in flight. */
+    const started: string[] = []
+    /** The same public lifecycle owns successful peers and startup rollback. */
+    const graph = createCapabilityGraph()
+    for (const [name, gate] of [
+      ['first', first],
+      ['second', second]
+    ] as const)
+      graph.register({
+        id: id(name),
+        kind: 'test',
+        dependencies: [],
+        start: () => {
+          started.push(name)
+          return gate.promise
+        }
+      })
+    graph.register({
+      id: id('success'),
+      kind: 'test',
+      dependencies: [],
+      start: () => instance(3, release)
+    })
+    graph.register({
+      id: id('consumer'),
+      kind: 'test',
+      dependencies: [{ provider: id('success'), required: true }],
+      start: consumer
+    })
+    /** Observe the ready rejection immediately so the fixture introduces no unhandled rejection. */
+    let settled = false
+    /** Observe the final primary without creating an unhandled readiness rejection. */
+    const ready = graph.ready().then(
+      () => {
+        settled = true
+        return undefined
+      },
+      (error: unknown) => {
+        settled = true
+        return error
+      }
+    )
+    try {
+      expect([...started]).toEqual(['first', 'second'])
+      second.reject(secondFailure)
+      await Promise.resolve()
+      expect(settled).toBe(false)
+      expect(release).not.toHaveBeenCalled()
+      first.reject(firstFailure)
+      const failure = await ready
+      expect(failure).toBe(firstFailure)
+      expect(failure).toMatchObject({
+        code: CapabilityGraphErrorCode.startFailed,
+        errors: [secondFailure]
+      })
+      expect(graph.error).toBe(failure)
+      expect(graph.nodeState(id('first')).error).toBe(firstFailure)
+      expect(graph.nodeState(id('second')).error).toBe(secondFailure)
+      expect(release).toHaveBeenCalledTimes(1)
+      expect(consumer).not.toHaveBeenCalled()
+      expect(graph.nodeState(id('consumer')).state).toBe(CapabilityGraphNodeState.blocked)
+    } finally {
+      first.resolve(instance(1))
+      second.resolve(instance(2))
+      await ready
+      await graph.dispose()
+    }
+  })
+
+  it('CPL-T3 disposes while two same-level starts are pending and releases both late results', async () => {
+    /** Starts and releases have separate gates so disposal never waits for uncooperative work. */
+    const starts = [
+      deferred<ReturnType<typeof instance<number>>>(),
+      deferred<ReturnType<typeof instance<number>>>()
+    ]
+    /** Physical-release completion provides a bounded observable for each late result. */
+    const releases = [deferred<void>(), deferred<void>()]
+    /** Both starts must be invoked before disposal begins. */
+    const invoked: number[] = []
+    /** Every late physical release must occur once, in resolution order. */
+    const released: number[] = []
+    /** Public disposal must remain independent of unresolved startup work. */
+    const graph = createCapabilityGraph()
+    for (const [position, start] of starts.entries())
+      graph.register({
+        id: id(String(position)),
+        kind: 'test',
+        dependencies: [],
+        start: () => {
+          invoked.push(position)
+          return start.promise
+        }
+      })
+    /** Disposal rejects readiness immediately while the original starts remain pending. */
+    const ready = graph.ready().catch((error: unknown) => error)
+    try {
+      expect([...invoked]).toEqual([0, 1])
+      /** Repeated disposal must preserve its existing completion identity. */
+      const disposal = graph.dispose()
+      expect(graph.dispose()).toBe(disposal)
+      await disposal
+      expect(await ready).toMatchObject({ code: CapabilityGraphErrorCode.admissionClosed })
+      for (const position of [1, 0]) {
+        starts[position]!.resolve(
+          instance(position, () => {
+            released.push(position)
+            releases[position]!.resolve()
+          })
+        )
+        await releases[position]!.promise
+      }
+      expect(released).toEqual([1, 0])
+      expect(graph.state).toBe(CapabilityGraphState.terminal)
+      expect(graph.nodeState(id('0')).value).toBeUndefined()
+      expect(graph.nodeState(id('1')).value).toBeUndefined()
+    } finally {
+      for (const start of starts) start.resolve(instance(0))
+      await ready
+      await graph.dispose()
+    }
+  })
+
   it('CAP-P3 preserves strict-equality treatment of a NaN auxiliary value', async () => {
     /** Owning a primitive is supported; NaN was never equal to itself in the old collision scan. */
     const released = vi.fn()

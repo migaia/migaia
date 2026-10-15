@@ -74,7 +74,7 @@ type IGraphNodeDefinition<T> = {
 }
 ```
 
-`ready()` 会先校验 unknown provider、duplicate edge、self-loop/cycle，再按注册 ordinal 做稳定拓扑启动。`context.get(provider)` 只能读取当前 node 已声明且已 ready 的 direct provider；它不创建 lease。`context.own()` 进入 node provisional scope，启动失败、abort、stale 或 dispose 时回滚。
+`ready()` 会先校验 unknown provider、duplicate edge、self-loop/cycle，再按 level 分层、同层 ordinal 顺序调用 start，并行等待该层全部 settle；只有整层成功才进入下一层。同层失败以先注册节点为 primary，其余失败保留在 errors 链。若需要完成顺序，必须声明依赖边。`context.get(provider)` 只能读取当前 node 已声明且已 ready 的 direct provider；它不创建 lease。`context.own()` 进入 node provisional scope，启动失败、abort、stale 或 dispose 时回滚。
 
 使用 `@migaia/capability/graph/topology` 时，公开节点的 `ordinal` 必须唯一并连续覆盖 `[0, nodeCount)`；拓扑构建只接受该注册域，非法或重复 ordinal 会按 `onInvalid` 的 `invalid-node` 或 `duplicate-ordinal` 语义报告。
 
