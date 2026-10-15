@@ -305,7 +305,10 @@ export async function normalizeProcessSources(
   forwarded: IProcessShortSourceOptions = {}
 ): Promise<IRuntimeProcessFullPeerOptions> {
   /** Default reporting remains observable; full sources retain their original report functions. */
-  const report = options.report ?? defaultRpcReporter
+  const configuredReport = options.report
+  /** Explicit reporters receive every notice; omitted defaults are coalesced per native process. */
+  const reportEachTerminationNotice = configuredReport !== undefined
+  const report = configuredReport ?? defaultRpcReporter
   /** Source-only Plugin values are configuration, not private Host provenance. */
   const settings = { ...options, ...forwarded, report }
   /** Resolved options are passed only through the held preparation, never prepared a second time. */
@@ -444,7 +447,7 @@ export async function normalizeProcessSources(
                 short.onNotice(error)
                 return
               }
-              if (report !== defaultRpcReporter || !terminationNoticeReported) {
+              if (reportEachTerminationNotice || !terminationNoticeReported) {
                 terminationNoticeReported = true
                 report(error)
               }

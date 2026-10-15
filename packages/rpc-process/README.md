@@ -210,3 +210,6 @@ Process carrier 观察尚未实现：`createProcessTransport(...).transport.obse
 | [`@migaia/supervision`](../supervision/README.md)       | launcher、预算、重启策略                               |
 
 完整用法、选项说明、错误码表与高级用法见 [USEGUIDE](./USEGUIDE.md)。
+
+
+Explicit reporting policy: omitting `report` keeps the short-source default termination notice once per native process. Supplying any `report` function receives every notice, including `defaultRpcReporter` itself; wrapping the same function does not change this policy. `onNotice` receives each expected termination notice instead of the reporter when supplied. Other failures are always reported. No policy depends on function identity.
