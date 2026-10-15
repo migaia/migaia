@@ -1,7 +1,12 @@
 import type { IDisposer, IRuntime } from '@migaia/reactive'
 import { persistUnit } from '../core/persist-unit.js'
 import type { ICodec } from '@migaia/storage-contract'
-import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js'
+import type {
+  IPersistHandle,
+  IPersistStorage,
+  IPersistUnit,
+  IPersistUnitOptions
+} from '../core/types.js'
 import { snapshotPersistOptions } from '../core/options.js'
 
 /**
@@ -23,14 +28,16 @@ export type IPersistableStore = {
   ): void
 }
 
-export type IPersistOptions = {
+export type IPersistOptions = Pick<
+  IPersistUnitOptions<Record<string, unknown>>,
+  'debounceMs' | 'maxWaitMs' | 'scheduler'
+> & {
   key: string
   storage: IPersistStorage
   codec?: ICodec
   version?: number
   migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>
   partialize?: (state: Record<string, unknown>) => Record<string, unknown>
-  debounceMs?: number
 }
 
 function toPersistUnit(store: IPersistableStore): IPersistUnit<Record<string, unknown>> {
@@ -51,6 +58,8 @@ export function persist(store: IPersistableStore, options: IPersistOptions): IPe
     version: snapshot.version,
     migrate: snapshot.migrate,
     partialize: snapshot.partialize,
-    debounceMs: snapshot.debounceMs
+    debounceMs: snapshot.debounceMs,
+    maxWaitMs: snapshot.maxWaitMs,
+    scheduler: snapshot.scheduler
   })
 }

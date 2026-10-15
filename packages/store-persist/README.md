@@ -73,6 +73,8 @@ handle.dispose(); // 停止订阅、清计时器、abort 在途 I/O
 - `migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>` —— `version` 与存档不一致时的转换函数，不提供则版本不一致直接 hydrate 失败
 - `partialize?: (state: Record<string, unknown>) => Record<string, unknown>` —— 默认恒等函数，写入前裁剪
 - `debounceMs?: number` —— 默认 `0`（不防抖），必须是 `[0, 2147483647]` 内的有限数
+- `maxWaitMs?: number` —— 可选，同一范围；从成功水合后的首次变更起限制防抖窗口，持续变更也在上限到达时请求入队；省略保持仅等待安静间隔，`0` 表示下一次 0ms 调度入队
+- `scheduler?: IScheduler` —— 可选，默认 system scheduler；注入的单调时钟和可取消任务统一拥有防抖计时，接口来自 `@migaia/utils/scheduler`
 
 注意：`restore()` 内部走 `store.$hydrate()`（宽松写回、未知字段跳过），因此 `persist()` 不需要单独的 `merge` 选项——即使只 `partialize` 出一部分字段，hydrate 也只覆盖这些字段，不影响其余字段。
 
@@ -101,7 +103,7 @@ cart.set('sku-123', 2); // 默认 debounceMs: 0，下一次写队列排空即写
 
 `IPersistCollectionOptions<TState>` 全部字段（与 `IPersistOptions` 同名字段语义一致，额外多一个 `merge`）：
 
-- `key: string`（必填）、`storage: IPersistStorage`（必填）、`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）
+- `key: string`（必填）、`storage: IPersistStorage`（必填）、`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）
 - `migrate?: (persisted: TState, fromVersion: number) => TState`
 - `partialize?: (state: TState) => Partial<TState>` —— 默认恒等函数
 - `merge?: (persisted: Partial<TState>, current: TState) => TState` —— 默认对 plain object 做启动快照三向合并，数组/Map/Set 等非 plain 形状整体替换；一旦自定义 `partialize` 只存部分字段，且状态本身是数组/Map/Set，**必须**提供匹配的 `merge`，否则默认合并会丢数据
@@ -140,7 +142,7 @@ const { value, dispose } = persistKeyed(atomStore, session('u1'), 'u1', {
 
 - `namespace: string`（必填）—— storage key 前缀，`clearFamily()` 靠它过滤
 - `storage: IPersistStorage`（必填）
-- `codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）
+- `codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）
 - `partialize?: (value: T) => Partial<T>` —— 默认恒等函数
 - `merge?: (persisted: Partial<T>, current: T) => T` —— 语义同 `persistCollection` 的 `merge`
 
@@ -255,3 +257,5 @@ window.addEventListener('beforeunload', () => {
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test && pnpm run build
 ```
+
+`maxWaitMs` 限制防抖后请求写入的时间，不限制串行队列或存储适配器的实际完成时间。`flush()`、`clear()`、`dispose()` 都取消当前防抖窗口；卸载前尚未触发的最新快照仍会发起最终写入，最终失败保留在 `writeError`，即使状态已是 disposed。

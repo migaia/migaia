@@ -1,3 +1,4 @@
+import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IReactiveComputed, IDisposer, IRuntime } from '@migaia/reactive'
 import type { ICodec, IKeyValueStore, IRecordStore } from '@migaia/storage-contract'
 import { PersistState } from '../state-constants.js'
@@ -79,7 +80,12 @@ export type IPersistUnitOptions<TState> = {
   migrate?: (persisted: TState, fromVersion: number) => TState
   partialize?: (state: TState) => Partial<TState>
   merge?: (persisted: Partial<TState>, current: TState) => TState
+  /** Quiet interval before enqueueing a write; zero writes without debounce. */
   debounceMs?: number
+  /** Maximum debounce-window duration after hydration; does not bound storage or queue latency. */
+  maxWaitMs?: number
+  /** Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler. */
+  scheduler?: IScheduler
 }
 
 /**

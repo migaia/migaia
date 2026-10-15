@@ -1,7 +1,12 @@
 import type { IRuntime } from '@migaia/reactive'
 import { persistUnit } from '../core/persist-unit.js'
 import type { ICodec } from '@migaia/storage-contract'
-import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js'
+import type {
+  IPersistHandle,
+  IPersistStorage,
+  IPersistUnit,
+  IPersistUnitOptions
+} from '../core/types.js'
 import { snapshotPersistOptions } from '../core/options.js'
 
 /**
@@ -16,7 +21,10 @@ export type IPersistableCollection<TState> = {
   replace(state: TState): void
 }
 
-export type IPersistCollectionOptions<TState> = {
+export type IPersistCollectionOptions<TState> = Pick<
+  IPersistUnitOptions<TState>,
+  'debounceMs' | 'maxWaitMs' | 'scheduler'
+> & {
   key: string
   storage: IPersistStorage
   codec?: ICodec
@@ -24,7 +32,6 @@ export type IPersistCollectionOptions<TState> = {
   migrate?: (persisted: TState, fromVersion: number) => TState
   partialize?: (state: TState) => Partial<TState>
   merge?: (persisted: Partial<TState>, current: TState) => TState
-  debounceMs?: number
 }
 
 function toPersistUnit<TState>(collection: IPersistableCollection<TState>): IPersistUnit<TState> {
@@ -66,6 +73,8 @@ export function persistCollection<TState>(
     migrate: snapshot.migrate,
     partialize: snapshot.partialize,
     merge: snapshot.merge,
-    debounceMs: snapshot.debounceMs
+    debounceMs: snapshot.debounceMs,
+    maxWaitMs: snapshot.maxWaitMs,
+    scheduler: snapshot.scheduler
   })
 }

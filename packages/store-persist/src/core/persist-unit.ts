@@ -1,3 +1,5 @@
+import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
+import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IDisposer } from '@migaia/reactive'
 import { readEnvelope, removeEnvelope, writeEnvelope } from '../storage/codec.js'
@@ -114,6 +116,8 @@ export function persistUnit<TState>(
     partialize: IPersistUnitOptions<TState>['partialize']
     merge: IPersistUnitOptions<TState>['merge']
     debounceMs: IPersistUnitOptions<TState>['debounceMs']
+    maxWaitMs: IPersistUnitOptions<TState>['maxWaitMs']
+    scheduler: IPersistUnitOptions<TState>['scheduler']
   }
   try {
     extracted = {
@@ -125,7 +129,9 @@ export function persistUnit<TState>(
       migrate: options.migrate,
       partialize: options.partialize,
       merge: options.merge,
-      debounceMs: options.debounceMs
+      debounceMs: options.debounceMs,
+      maxWaitMs: options.maxWaitMs,
+      scheduler: options.scheduler
     }
   } catch (error) {
     throw createStorePersistTypeError(
@@ -161,7 +167,8 @@ export function persistUnit<TState>(
         return { ...(current as object), ...(persisted as object) } as TState
       return persisted as TState
     },
-    debounceMs = 0
+    debounceMs = 0,
+    maxWaitMs
   } = extracted
 
   assertPersistString(key, 'key')
@@ -234,6 +241,18 @@ export function persistUnit<TState>(
     )
   }
 
+  if (
+    maxWaitMs !== undefined &&
+    (!Number.isFinite(maxWaitMs) || maxWaitMs < 0 || maxWaitMs > MAX_TIMER_DELAY_MS)
+  ) {
+    throw createStorePersistTypeError(
+      StorePersistErrorCode.invalidOption,
+      StorePersistErrorText.maxWait(key)
+    )
+  }
+  /** Own the debounce clock and timer through the same admitted scheduler snapshot. */
+  const scheduler = resolveSchedulerOption(extracted) ?? resolveScheduler(systemScheduler)
+
   const hydrationStatus = runtime.signal<IHydrationStatus>(PersistState.loading)
   const hydrationError = runtime.signal<unknown>(undefined)
   const writeStatus = runtime.signal<IWriteStatus>(PersistState.idle)
@@ -263,7 +282,10 @@ export function persistUnit<TState>(
   const hydrated = runtime.computed(() => hydrationStatus.value === PersistState.success)
 
   let stopSubscription: IDisposer | undefined
-  let timer: ReturnType<typeof setTimeout> | undefined
+  /** At most one timer owns the current quiet/max-wait window. */
+  let timer: IScheduledTask | undefined
+  /** First-change deadline remains stable while later changes extend the quiet interval. */
+  let writeDeadline: number | undefined
   let disposed = false
   let generationEpoch = 0
   const activeOperations = new Set<AbortController>()
@@ -352,13 +374,20 @@ export function persistUnit<TState>(
     return operation
   }
 
+  /** Cancels a whole debounce window; final disposal uses the result to retain its last snapshot. */
+  function clearWriteTimer(): boolean {
+    /** Clear ownership before cancellation so another operation cannot cancel this handle twice. */
+    const scheduled = timer
+    timer = undefined
+    writeDeadline = undefined
+    scheduled?.cancel()
+    return scheduled !== undefined
+  }
+
+  /** Coalesces changes until quiet time or the first change's optional maximum deadline. */
   function scheduleWrite(): void {
     if (disposed) return
-    if (hydrating || hydrationFailed) {
-      dirtyDuringHydrate = true
-      return
-    }
-    if (!hydrationSettled) {
+    if (hydrating || hydrationFailed || !hydrationSettled) {
       dirtyDuringHydrate = true
       return
     }
@@ -366,11 +395,20 @@ export function persistUnit<TState>(
       void enqueueWrite().catch(() => undefined)
       return
     }
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = undefined
-      void enqueueWrite().catch(() => undefined)
-    }, debounceMs)
+    /** One clock read determines both the next quiet interval and the unchanged maximum window. */
+    const now = scheduler.now()
+    /** Retain the original deadline while cancelling the old quiet timer. */
+    const deadline = writeDeadline ?? (maxWaitMs === undefined ? undefined : now + maxWaitMs)
+    clearWriteTimer()
+    writeDeadline = deadline
+    timer = scheduler.schedule(
+      () => {
+        timer = undefined
+        writeDeadline = undefined
+        void enqueueWrite().catch(() => undefined)
+      },
+      deadline === undefined ? debounceMs : Math.min(debounceMs, Math.max(0, deadline - now))
+    )
   }
 
   /**
@@ -491,10 +529,7 @@ export function persistUnit<TState>(
     async flush() {
       assertActive()
       const pendingWrite = writeDrain
-      if (timer) {
-        clearTimeout(timer)
-        timer = undefined
-      }
+      clearWriteTimer()
       await settled
       if (hydrationFailed) throw hydrationError.value
       // Capture the write already observed by this flush before checking the
@@ -507,10 +542,7 @@ export function persistUnit<TState>(
     },
     async clear() {
       assertActive()
-      if (timer) {
-        clearTimeout(timer)
-        timer = undefined
-      }
+      clearWriteTimer()
       await settled
       if (hydrationFailed) throw hydrationError.value
       assertActive()
@@ -535,9 +567,7 @@ export function persistUnit<TState>(
       activeOperations.clear()
       writeStatus.value = PersistState.disposed
       lifecycleStatus.value = PersistState.disposed
-      if (timer) {
-        clearTimeout(timer)
-        timer = undefined
+      if (clearWriteTimer()) {
         // A pending debounced write still owes storage the latest state.
         startFinalWrite()
       }

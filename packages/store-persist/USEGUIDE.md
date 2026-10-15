@@ -85,6 +85,8 @@ type IPersistOptions = {
   migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;
   partialize?: (state: Record<string, unknown>) => Record<string, unknown>;
   debounceMs?: number;
+  maxWaitMs?: number;
+  scheduler?: import('@migaia/utils/scheduler').IScheduler;
 };
 ```
 
@@ -137,6 +139,8 @@ type IPersistCollectionOptions<TState> = {
   partialize?: (state: TState) => Partial<TState>;
   merge?: (persisted: Partial<TState>, current: TState) => TState;
   debounceMs?: number;
+  maxWaitMs?: number;
+  scheduler?: import('@migaia/utils/scheduler').IScheduler;
 };
 ```
 
@@ -183,6 +187,8 @@ type IPersistKeyedOptions<T> = {
   codec?: ICodec;
   version?: number;
   debounceMs?: number;
+  maxWaitMs?: number;
+  scheduler?: import('@migaia/utils/scheduler').IScheduler;
   partialize?: (value: T) => Partial<T>;
   merge?: (persisted: Partial<T>, current: T) => T;
 };
@@ -474,3 +480,5 @@ function createStorePersistAggregateError(
 ## 构建、测试与排查
 
 仓库根目录：`pnpm --filter @migaia/store-persist fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。hydrate 失败检查 `handle.ready`/`hydrationError`；写入失败检查 `writeError`，并确认 codec output 与后端能力匹配。
+
+防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。

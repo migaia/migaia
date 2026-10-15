@@ -46,7 +46,8 @@
   "dependencies": {
     "@migaia/reactive": "workspace:^",
     "@migaia/storage-contract": "workspace:^",
-    "@migaia/utils": "workspace:^"
+    "@migaia/utils": "workspace:^",
+    "@migaia/lifecycle": "workspace:^"
   },
   "devDependencies": {
     "@migaia/storage-web": "workspace:^",
