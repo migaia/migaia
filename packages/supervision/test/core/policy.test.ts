@@ -108,3 +108,79 @@ describe('A4 restart policy', () => {
     await supervisor.stop()
   })
 })
+
+describe('SV-B3/B4 public policy admission', () => {
+  it.each([
+    ['restart.mode', { restart: { mode: 'typo' } }, TypeError],
+    ['terminalPolicy.mode', { terminalPolicy: { mode: 'typo' } }, TypeError],
+    ['isolation', { isolation: 'typo' }, TypeError],
+    ['health.intervalMs', { health: { intervalMs: 0, check: async () => undefined } }, RangeError]
+  ] as const)('rejects %s before a unit or timer is created', (_field, invalid, Constructor) => {
+    /** Observable adapters must not be touched during invalid policy admission. */
+    const launcher = createMemoryLauncher()
+    /** The same manual scheduler controls budget and supervisor resources. */
+    const scheduler = createManualScheduler()
+    expect(() =>
+      createSupervisor({
+        id: 'invalid-policy',
+        report: () => undefined,
+        spec: 'a',
+        launcher,
+        profile: createMemoryProfile(),
+        budget: createUnitBudget({ kind: 'memory', maxUnits: 1, scheduler }),
+        scheduler,
+        ...invalid
+      } as never)
+    ).toThrow(
+      expect.objectContaining({
+        name: Constructor.name,
+        code: SupervisionErrorCode.invalidOption,
+        detail: { field: _field }
+      })
+    )
+    expect(launcher.launched).toHaveLength(0)
+    expect(scheduler.pendingCount).toBe(0)
+  })
+
+  it('keeps a zero one-shot startup budget legal and rejects invalid replacement before retiring', async () => {
+    /** Invalid replacement must not terminate the already serving unit. */
+    const launcher = createMemoryLauncher()
+    /** No clock advance occurs while testing the serving-unit boundary. */
+    const scheduler = createManualScheduler()
+    /** The first supervisor proves zero startup deadline remains an explicit valid policy. */
+    const zero = createSupervisor({
+      id: 'zero',
+      report: () => undefined,
+      spec: 'a',
+      launcher,
+      profile: createMemoryProfile({ autoExitOnTerminate: true }),
+      startupTimeoutMs: 0,
+      budget: createUnitBudget({ kind: 'memory', maxUnits: 1, scheduler }),
+      scheduler
+    })
+    expect(zero.state).toBe('idle')
+    await zero.dispose()
+    /** A serving supervisor exposes generation and termination through existing public fixtures. */
+    const supervisor = createSupervisor({
+      id: 'serving',
+      report: () => undefined,
+      spec: 'a',
+      launcher,
+      profile: createMemoryProfile({ autoExitOnTerminate: true }),
+      budget: createUnitBudget({ kind: 'memory', maxUnits: 2, scheduler }),
+      scheduler
+    })
+    await supervisor.start()
+    expect(() => supervisor.replace({ strategy: 'typo' as never })).toThrow(
+      expect.objectContaining({
+        name: 'TypeError',
+        code: SupervisionErrorCode.invalidOption,
+        detail: { field: 'replace.strategy' }
+      })
+    )
+    expect(supervisor.state).toBe('ready')
+    expect(launcher.launched).toHaveLength(1)
+    expect(launcher.launched[0]!.termination).toEqual([])
+    await supervisor.dispose()
+  })
+})

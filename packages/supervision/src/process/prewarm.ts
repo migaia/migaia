@@ -4,6 +4,7 @@ import {
   createLifecycleScope,
   type ILifecycleScope
 } from '@migaia/lifecycle'
+import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, systemWallClock, type IScheduledTask } from '@migaia/utils/scheduler'
 import { admitCapabilities } from '../admission.js'
 import { SupervisionErrorCode } from '../error-code.js'
@@ -60,7 +61,7 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
     options.isolation ?? 'required',
     'process'
   )
-  const scheduler = options.scheduler ?? systemScheduler
+  const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
   const wallClock = options.wallClock ?? systemWallClock
   const idle = new Set<IIdle<THandle>>()
   const starting = new Set<IIdle<THandle>>()

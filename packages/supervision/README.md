@@ -25,3 +25,5 @@ health, replacement, and bounded release policy. The launcher declares `heap-lim
 requires a health check. A thread is not a fault-isolation or CPU-limit boundary. Choose the
 process profile when either guarantee is required. See [USEGUIDE.md](./USEGUIDE.md) for the
 thread launcher contract and example.
+
+Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit. The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor.
