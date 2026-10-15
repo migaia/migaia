@@ -23393,6 +23393,10 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm run typecheck:e2e && pnpm run test:e2e"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "未发布的实例式 family 源码已移除。按 key 管理状态使用公开的 `familyDef`/`derivedFamilyDef` 和 `createAtomStore` 组合；`StoreKeyedErrorCode.familyDisposed`、`.evictionFailed` 及对应 union 值随无触发路径删除，调用方应移除这两种无效检查。"
                 }
               ]
             }
@@ -23439,7 +23443,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "额外发布的子路径是 `@migaia/store-keyed/reactive/atom`（独立协议类型），以及两个窄导出别名 `@migaia/store-keyed/atom/store`、`@migaia/store-keyed/atom/definition`。`reactive/family.ts`（`createFamily`/`computedFamily`）是未发布的内部源码，没有出现在 `module.json` 的 `exports` 或主入口 `index.ts` 里，不能作为应用依赖——它只在包自己的测试里被直接 import。"
+                  "text": "额外发布的子路径是 `@migaia/store-keyed/reactive/atom`（独立协议类型），以及两个窄导出别名 `@migaia/store-keyed/atom/store`、`@migaia/store-keyed/atom/definition`。未发布的 `createFamily`/`computedFamily` 内部实现已删除；family 由 definition 与 AtomStore 组合管理。"
                 }
               ]
             },
@@ -24392,7 +24396,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：为什么 `reactive/family.ts` 里的 `createFamily`/`computedFamily` 用不了？ 它们是包内部测试专用的未发布源码，没有出现在 `module.json` 的 `exports` 字段或主入口 `index.ts` 里，任何 `import . from '@migaia/store-keyed/reactive/family'` 都会在构建产物里找不到该子路径。如果需要\"实例式 family\"的能力，应基于 `familyDef`/`derivedFamilyDef`（definition 级）加 `createAtomStore` 组合出来，或直接依赖 `@migaia/reactive` 自建。"
+                  "text": "Q：如何创建按 key 分组的状态？ 使用 `familyDef`/`derivedFamilyDef` 与 `createAtomStore` 的公开组合。未发布的实例式 family 源码及其测试已删除；仅属于该实现的 `FAMILY_DISPOSED`/`EVICTION_FAILED` 错误码成员也已移除。"
                 }
               ]
             },
