@@ -6491,6 +6491,10 @@
                 {
                   "type": "paragraph",
                   "text": "`activation: 'lazy'` 的插件在 `use()` 时只登记不安装；`await host.activate(name)` 先按依赖顺序激活它必需的惰性 provider 再安装自身，并发调用共享同一个 Promise。非惰性插件安装时会先激活它必需的已登记惰性 provider；依赖校验失败时不激活任何插件。同步的 `useSync()` 无法等待激活，遇到未激活的必需 provider 抛 `PLUGIN_NOT_ACTIVATED`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "同步生命周期 hook（含 setup、install、feature/expose、update、beforeRelease、dispose、启停通知及依赖换绑）内调用 `activate()` 会在共享请求查找之前同步抛 `LIFECYCLE_MUTATION`；hook 等待期间，外部同名调用继续获得同一个 Promise。运行时没有异步上下文：hook 在 `await` 后再调用 `activate()` 激活同一注册，也会获得该共享 Promise。如果 hook 等待它，就形成自等待；有限 `execution.mutationTimeoutMs` 到期后以 `MUTATION_EXECUTION_TIMEOUT` 失败并回滚。`mutationTimeoutMs: false` 关闭执行超时，该自等待可能一直挂起；请在 hook 外发起激活。"
                 }
               ]
             },
@@ -7770,6 +7774,10 @@
                 {
                   "type": "paragraph",
                   "text": "`activation: 'lazy'` 的插件在 `use()` 时只做准入与依赖校验并登记名称，句柄访问抛 `PLUGIN_NOT_ACTIVATED`。`await host.activate(name)` 先按依赖顺序激活它必需的惰性 provider，再安装自身；对同一插件的并发调用共享同一个 Promise，失败后插件保持未激活，可重试；已禁用的插件不能激活（`PLUGIN_DISABLED`）。非惰性插件安装时先激活它必需的已登记惰性 provider；同批中只被惰性成员依赖的惰性成员保持未激活；依赖校验失败时不会激活任何插件。`useSync()` 无法等待激活，遇到未激活的必需 provider 抛 `PLUGIN_NOT_ACTIVATED`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "同步生命周期 hook（含 setup、install、feature/expose、update、beforeRelease、dispose、启停通知及依赖换绑）内调用 `activate()` 会在共享请求查找之前同步抛 `LIFECYCLE_MUTATION`；hook 等待期间，外部同名调用继续获得同一个 Promise。运行时没有异步上下文：hook 在 `await` 后再调用 `activate()` 激活同一注册，也会获得该共享 Promise。如果 hook 等待它，就形成自等待；有限 `execution.mutationTimeoutMs` 到期后以 `MUTATION_EXECUTION_TIMEOUT` 失败并回滚。`mutationTimeoutMs: false` 关闭执行超时，该自等待可能一直挂起；请在 hook 外发起激活。"
                 }
               ]
             },
@@ -8046,7 +8054,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`await host.use(plugin)` 卡住不返回。 检查 `install()` 等待的 Promise 是否能够完成。`execution.mutationTimeoutMs` 限制本次 hook 的等待时间。插件 lifecycle hook 调用当前 Host 的 mutation 会被 `LIFECYCLE_MUTATION` 拒绝。排队等待另由 `queueAdmissionTimeoutMs` 控制。"
+                  "text": "Q：`await host.use(plugin)` 卡住不返回。 检查 `install()` 等待的 Promise 是否能够完成。`execution.mutationTimeoutMs` 限制本次 hook 的等待时间。插件 lifecycle hook 调用当前 Host 的 mutation 会被 `LIFECYCLE_MUTATION` 拒绝；`activate()` 的异步同名共享边界见“热替换与惰性激活”，自等待在关闭执行超时时可能持续挂起。排队等待另由 `queueAdmissionTimeoutMs` 控制。"
                 },
                 {
                   "type": "paragraph",
