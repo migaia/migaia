@@ -13844,7 +13844,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "完整来源示例的 `report` 会收到 `@migaia/supervision` / `CAPABILITY_UNSUPPORTED`（`capability: 'termination'`）。这是预期提示：Node launcher 不能保证终止孙进程。短来源的默认 `console.error` 每进程只报告一次；短对象可用 `onNotice` 显式接收每次提示，其他错误始终正常报告。"
+                  "text": "完整来源示例的 `report` 会收到 `@migaia/supervision` / `CAPABILITY_UNSUPPORTED`（`capability: 'termination'`）。这是预期提示：Node launcher 不能保证终止孙进程。短来源省略 `report` 时，每个 native process 至多报告一次终止能力提示。显式提供的所有 reporter（包括直接传 `defaultRpcReporter`）逐次接收，与包装同一函数的行为一致；短对象的 `onNotice` 可接管这些提示。其他错误始终正常报告，策略不再依赖函数身份。"
                 }
               ]
             },
@@ -14104,7 +14104,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值；`wrap` 可包装计算出的启动命令。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。省略 `report` 使用 `console.error`；默认终止能力提示每进程只报一次，`onNotice` 接收原提示对象。完整来源不改变现有行为。"
+                  "text": "短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值；`wrap` 可包装计算出的启动命令。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。未配置 `report` 时复用默认控制台出口，并按进程合并预期终止能力通知；配置 `report` 后对每次启动都调用该函数，直接传默认函数与转发包装函数一视同仁。若设置短对象 `onNotice`，该 callback 收到原始通知并替代本项 reporter 调用。完整来源保持原有报告语义。"
                 }
               ]
             },
