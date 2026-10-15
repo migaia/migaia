@@ -1,4 +1,8 @@
-import { getDefaultRuntime, currentRuntimeVersion } from '../src/entry/extension.js'
+import {
+  getDefaultRuntime,
+  currentRuntimeVersion,
+  deferRuntimeCleanup
+} from '../src/entry/extension.js'
 import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -116,5 +120,37 @@ describe('ST-C6 pure default provider', () => {
     const signal = runtime.signal(1)
     expect(signal.runtime).toBe(runtime)
     signal.dispose()
+  })
+})
+
+describe('ST-C5 adapter cleanup capability', () => {
+  it('uses the bound Runtime idle channel and reports cleanup failure there', () => {
+    const pending: Array<() => void> = []
+    const reported: unknown[] = []
+    const runtime = createRuntime({
+      scheduleIdle: (task) => {
+        pending.push(task)
+      },
+      onError: (error) => {
+        reported.push(error)
+      }
+    })
+    const trace: number[] = []
+    deferRuntimeCleanup(runtime, () => {
+      trace.push(1)
+    })
+    expect(trace).toEqual([])
+    pending.shift()!()
+    expect(trace).toEqual([1])
+    const failure = new Error('cleanup failed')
+    deferRuntimeCleanup(runtime, () => {
+      throw failure
+    })
+    pending.shift()!()
+    expect(reported).toEqual([failure])
+    expect(() => deferRuntimeCleanup(runtime, null as never)).toThrow(
+      expect.objectContaining({ code: ReactiveErrorCode.invalidOption })
+    )
+    expect(pending).toHaveLength(0)
   })
 })

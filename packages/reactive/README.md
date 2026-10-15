@@ -34,32 +34,32 @@
 pnpm add @migaia/reactive
 ```
 
-| 入口 | 内容与边界 |
-| --- | --- |
-| `@migaia/reactive` | Runtime 工厂、`IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect`、诊断常量与错误码。 |
-| `@migaia/reactive/extension` | 所有权、受控 source、observer binding、图协议类型与只读版本查询。 |
+| 入口                         | 内容与边界                                                                                |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `@migaia/reactive`           | Runtime 工厂、`IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect`、诊断常量与错误码。 |
+| `@migaia/reactive/extension` | 所有权、受控 source、observer binding、图协议类型与只读版本查询。                         |
 
 ## 5. 五分钟上手
 
 ```ts
-import { createRuntime } from '@migaia/reactive';
+import { createRuntime } from '@migaia/reactive'
 
-const runtime = createRuntime();
+const runtime = createRuntime()
 
-const count = runtime.signal(1);
-const doubled = runtime.computed(() => count.value * 2);
+const count = runtime.signal(1)
+const doubled = runtime.computed(() => count.value * 2)
 
-const seen: number[] = [];
+const seen: number[] = []
 const effect = runtime.effect(() => {
-  seen.push(doubled.value);
-}); // 创建时立即同步跑一次：seen = [2]
+  seen.push(doubled.value)
+}) // 创建时立即同步跑一次：seen = [2]
 
-count.value = 3;
-runtime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]
+count.value = 3
+runtime.flush() // 手动冲刷待处理的副作用：seen = [2, 6]
 
-effect.dispose();
-doubled.dispose();
-count.dispose();
+effect.dispose()
+doubled.dispose()
+count.dispose()
 ```
 
 这段代码建立的是一张由当前 `runtime` 独占的依赖图。`runtime.effect()` 创建时会立即执行一次；执行过程中读取 `doubled.value`，使 `Effect → Computed → Signal` 三层依赖自动登记，所以 `seen` 首先得到 `2`。这不是手工订阅，之后也不需要再次告诉 `Effect` 它依赖了谁。
@@ -99,7 +99,6 @@ count.dispose();
 
 更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 **[USEGUIDE.md](./USEGUIDE.md)**。
 
-
 跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。
 
 `@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export.
@@ -108,7 +107,29 @@ count.dispose();
 import { getDefaultRuntime } from '@migaia/reactive/extension'
 const runtime = getDefaultRuntime()
 const node = runtime.signal(1)
-runtime.batch(() => { node.value = 2 })
+runtime.batch(() => {
+  node.value = 2
+})
 console.log(node.value)
 node.dispose()
+```
+
+`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources.
+
+```ts
+import { createRuntime } from '@migaia/reactive'
+import { deferRuntimeCleanup } from '@migaia/reactive/extension'
+const idle: Array<() => void> = []
+const runtime = createRuntime({
+  scheduleIdle: (task) => {
+    idle.push(task)
+  }
+})
+let released = false
+deferRuntimeCleanup(runtime, () => {
+  released = true
+})
+console.log(released) // false
+idle.shift()?.()
+console.log(released) // true
 ```

@@ -33,3 +33,5 @@ export type { IObservable, IObserver } from '../runtime/types.js'
 /** Pure adapter imports can defer the default and report through the canonical phase domain. */
 export { getDefaultRuntime } from '../runtime/default-runtime-provider.js'
 export { ReactiveErrorPhase } from '../runtime/trace-constants.js'
+
+export { deferRuntimeCleanup } from '../runtime/deferred-cleanup.js'
