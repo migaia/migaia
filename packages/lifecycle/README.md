@@ -696,3 +696,7 @@ console.log(await waiting) // false；没有遗留 timer
 `boundedWait(task, deadlineAt, { scheduler, reportCleanup? })` 仍负责绝对截止时间与任务竞争，不会取消 task。
 它的默认清理失败行为不变；可选 `reportCleanup` 允许 logger flush 把 timer 清理失败作为诊断，保留任务或 deadline winner。
 批处理 debounce、health 周期调度与预算授予定时器不等同于一次性相对延时，不强行转换其 owner 语义。
+
+### Scope 入口边界
+
+`@migaia/lifecycle/scope` 是异步 `createLifecycleScope` 的窄入口；同步与 provisional scope 从 root 导入 `createSyncLifecycleScope` / `createProvisionalScope`。包不提供第二套 scope 实现。generation/quiescence 子路径直接映射各自 canonical owner，未构建的同名 barrel 已删除。

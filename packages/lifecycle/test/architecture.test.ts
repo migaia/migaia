@@ -22,10 +22,7 @@ const readSrcFiles = (): Map<string, string> => {
       !name.endsWith('.ts') ||
       name.endsWith('.d.ts') ||
       name === 'observed-subscription.ts' ||
-      name === 'disposal.ts' ||
-      name === 'scope.ts' ||
-      name === 'generation.ts' ||
-      name === 'quiescence.ts'
+      name === 'disposal.ts'
     )
       continue
     files.set(name, readFileSync(join(srcRoot, name), 'utf8'))
@@ -188,10 +185,7 @@ describe('L-T20 cross-module: a downstream adapter uses only public primitives',
         name === 'error-boundary.ts' ||
         name === 'default-scheduler.ts' ||
         name === 'sync-dispose-transaction.ts' ||
-        name === 'disposal.ts' ||
-        name === 'scope.ts' ||
-        name === 'generation.ts' ||
-        name === 'quiescence.ts'
+        name === 'disposal.ts'
       )
         continue
       const moduleSpecifier = `./${name.replace(/\.ts$/, '')}`
