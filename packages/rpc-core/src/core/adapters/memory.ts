@@ -1,3 +1,5 @@
+import { deferTask, systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import type { IRpcCarrierProbe } from '../probe/types.js'
 import { carrierSizeBytes } from './probe-content.js'
 import { createRpcTransportError, RpcCoreErrorCode, tagRpcError } from '../errors.js'
@@ -20,6 +22,12 @@ import {
 /** Closure-owned observation state keeps both physical sides visible to queued delivery. */
 type IMemoryObservation = { probe: IRpcCarrierProbe | undefined; generation: number }
 
+/** Delivery jobs belong to this pair; endpoint deadline clocks remain separately configured. */
+export type IMemoryTransportOptions = Readonly<{
+  /** Defaults to native microtask delivery; injected clocks control only this pair's queued jobs. */
+  scheduler?: IScheduler
+}>
+
 export type IMemoryTransport = IRpcTransport & {
   /**
    * Tears down the whole pair — closing either side closes both; after this, `send()` on either
@@ -35,7 +43,16 @@ export type IMemoryTransport = IRpcTransport & {
  * real async transport: code that assumes "the other side hasn't seen this yet" immediately after
  * `send()` returns stays correct.
  */
-export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemoryTransport] {
+export function createMemoryTransportPair(
+  options: IMemoryTransportOptions = {}
+): readonly [IMemoryTransport, IMemoryTransport] {
+  if (options === null || typeof options !== 'object' || Array.isArray(options))
+    throw tagRpcError(
+      new TypeError(RpcAdapterErrorText.memoryOptions),
+      RpcCoreErrorCode.invalidConfig
+    )
+  /** Capture the chosen delivery capability before either side acquires subscriptions. */
+  const scheduler = resolveSchedulerOption(options, systemScheduler)
   const listenersA = createMessageListenerHub<{ data: unknown }>()
   const listenersB = createMessageListenerHub<{ data: unknown }>()
   /** Each physical side owns one independently replaceable observation generation. */
@@ -96,7 +113,7 @@ export function createMemoryTransportPair(): readonly [IMemoryTransport, IMemory
           )
         }
       }
-      queueMicrotask(() => {
+      deferTask(scheduler, () => {
         // Closed between send() and delivery — the other side is gone,
         // there is nobody left to deliver to.
         if (closed) return

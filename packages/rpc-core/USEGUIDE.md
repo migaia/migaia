@@ -988,3 +988,22 @@ probe.setStages(['message', 'carrier'])
 console.log(readProbeStages(probe)) // 66
 release()
 ```
+
+### Controlling asynchronous memory delivery
+
+```ts
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { createManualScheduler } from '@migaia/utils/scheduler'
+
+const clock = createManualScheduler()
+const [sender, receiver] = createMemoryTransportPair({ scheduler: clock })
+const messages: unknown[] = []
+const stop = receiver.subscribe(({ data }) => { messages.push(data) })
+sender.send('payload')
+clock.advance(0)
+console.log(messages) // ['payload']
+stop()
+await sender.close()
+```
+
+This is a deterministic in-process adapter example. The factory returns both transport ends, not one endpoint transport. Its optional scheduler is captured before subscriptions are acquired. Zero-argument construction keeps the original delivery-before-later-Promise order. Remote bindings and provider governors defer through their own already captured scheduler; custom clocks own those control jobs as well as timers. An old two-method clock receives deferred jobs through schedule(callback,0); drive it while awaiting manually controlled setup/readiness. Deferred notifications keep their existing post-close checks and callback error reporting.

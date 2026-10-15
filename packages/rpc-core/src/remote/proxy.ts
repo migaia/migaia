@@ -1,3 +1,4 @@
+import { deferTask } from '@migaia/utils/scheduler'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcAbortError, createRpcError, isRpcRemoteError } from '../core/errors.js'
 import { createRuntimeBindingCalls } from './internal/runtime-call.js'
@@ -290,7 +291,7 @@ class RemoteRegistration<TUnit, TSpec> {
         if (this.#releaseReason !== undefined || this.#departed.has(generation)) {
           /** Capture before release clears historical reasons. */
           const reason = this.#releaseReason ?? this.#departed.get(generation)
-          queueMicrotask(() => {
+          deferTask(this.#options.binding.scheduler, () => {
             try {
               listener(reason)
             } catch (error) {

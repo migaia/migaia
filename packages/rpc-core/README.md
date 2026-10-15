@@ -230,3 +230,7 @@ Runtime Peer 支持 `await using`，其 `Symbol.asyncDispose` 就是原来的 `c
 | [`@migaia/plugin-host`](../plugin-host/README.md)               | `createRuntimePlugin` 安装的宿主     |
 
 完整用法见 [USEGUIDE](./USEGUIDE.md)。
+
+### Deferred scheduling ownership
+
+Memory transport delivery and deferred remote/governor control work use the existing scheduler contract. Default scheduling retains native microtasks. `createMemoryTransportPair({ scheduler })` controls only pair delivery; endpoint deadline clocks remain a separate constructor choice. Injected manual clocks must advance zero-time work for deferred reconciliation, departure notifications and policy close. Ordinary deadline `schedule(0)` behavior is unchanged.
