@@ -5,14 +5,27 @@ export type IRetainedConsumer = 'core' | 'client' | 'provider' | 'full' | 'custo
 const reviewed = (...modules: readonly string[]): readonly string[] =>
   Object.freeze([...modules].sort())
 
+/** Reviewed closure owners retained by all five measured consumers; no platform layer is added. */
+const reviewClosureModules = reviewed(
+  'dist/core/internal/probe-emitter.js',
+  'workspace:packages/capability/dist/graph/topology-admission.js',
+  'workspace:packages/lifecycle/dist/abortable-delay.js',
+  'workspace:packages/lifecycle/dist/error-boundary.js',
+  'workspace:packages/lifecycle/dist/owned-entries.js',
+  'workspace:packages/lifecycle/dist/sync-dispose-transaction.js',
+  'workspace:packages/plugin-host/dist/dependency-reader.js'
+)
+
 /**
  * Reviewed retained module sets as of main 9cd4497a (counts 137/195/202/207/206). The A12 check
  * allows a small number of unreviewed additions per consumer, so ordinary merges do not require a
- * re-pin; refresh this list when a consumer approaches that allowance.
+ * re-pin; refresh this list when a consumer approaches that allowance. The review-closure owners
+ * above were inspected and measured on 2026-10-15; byte caps and the allowance are unchanged.
  */
 export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, readonly string[]>> =
   Object.freeze({
     core: reviewed(
+      ...reviewClosureModules,
       '\u0000rolldown/runtime.js',
       'dist/core/composed.js',
       'dist/core/endpoint-kernel.js',
@@ -152,6 +165,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/string.js'
     ),
     client: reviewed(
+      ...reviewClosureModules,
       '\u0000rolldown/runtime.js',
       '\u0000vite/preload-helper.js',
       'dist/core/client.js',
@@ -349,6 +363,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/string.js'
     ),
     provider: reviewed(
+      ...reviewClosureModules,
       '\u0000rolldown/runtime.js',
       '\u0000vite/preload-helper.js',
       'dist/core/composed.js',
@@ -553,6 +568,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/string.js'
     ),
     full: reviewed(
+      ...reviewClosureModules,
       '\u0000rolldown/runtime.js',
       '\u0000vite/preload-helper.js',
       'dist/core/composed.js',
@@ -762,6 +778,7 @@ export const reviewedRetainedInventory: Readonly<Record<IRetainedConsumer, reado
       'workspace:packages/utils/dist/string.js'
     ),
     custom: reviewed(
+      ...reviewClosureModules,
       '\u0000rolldown/runtime.js',
       '\u0000vite/preload-helper.js',
       'dist/core/composed.js',
