@@ -52,7 +52,12 @@ export const EventSubscriberErrorCode = {
    */
   subscriptionHandleProjectionFailed: 'SUBSCRIPTION_HANDLE_PROJECTION_FAILED',
   /** A captured invocation was called after completion or more than once. */
-  invocationClosed: 'INVOCATION_CLOSED'
+  invocationClosed: 'INVOCATION_CLOSED',
+  /**
+   * Closing a subscription chain ran every disposer and more than one failed. The AggregateError
+   * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged.
+   */
+  subscriptionDisposeFailed: 'SUBSCRIPTION_DISPOSE_FAILED'
 } as const
 
 export type IEventSubscriberErrorCode =
