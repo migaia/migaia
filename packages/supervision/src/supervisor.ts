@@ -204,6 +204,32 @@ export function createSupervisor<
         ...(slot.exitObservedAt === undefined ? {} : { observedAt: slot.exitObservedAt })
       })
   }
+  /**
+   * Turns a failed attempt's provisional `terminal` outcome into the supervisor's stable answer.
+   * When the failure policy armed a backoff, the supervisor is not terminal, so the caller waits
+   * for the backoff attempt's settled outcome instead. Must run outside the command queue, because
+   * the backoff attempt is enqueued on that same queue.
+   */
+  const settleLaunchOutcome = (
+    outcome: IReadyOutcome<THandle>
+  ): IReadyOutcome<THandle> | Promise<IReadyOutcome<THandle>> =>
+    outcome.state === 'terminal' && state === SupervisorState.backoff ? whenReady() : outcome
+  /**
+   * Enqueues one promoting launch and publishes it as `pendingStart` until it settles. Every
+   * promote site (start, backoff, cooldown) uses this, so a settled launch never lingers as a stale
+   * ready outcome for later `start()` calls.
+   */
+  const enqueuePromoteLaunch = (cause: ILaunchCause): Promise<IReadyOutcome<THandle>> => {
+    /** The launch published by this call; cleared only if no newer launch replaced it. */
+    const launch: Promise<IReadyOutcome<THandle>> = commands
+      .enqueue(async () => (await launchAttempt(cause, spec, true)).outcome)
+      .then(settleLaunchOutcome)
+      .finally(() => {
+        if (pendingStart === launch) pendingStart = undefined
+      })
+    pendingStart = launch
+    return launch
+  }
   /** Terminates after the allowed failure window and optionally arms one cooldown. */
   const enterTerminal = (lastError: unknown, lastRejection?: BudgetRejection): void => {
     if (terminal.lifecycle !== 'open') return
@@ -233,9 +259,7 @@ export function createSupervisor<
         cooldownTimer = undefined
         if (terminal.lifecycle !== 'open' || state !== SupervisorState.terminal) return
         failures.length = 0
-        pendingStart = commands.enqueue(() =>
-          launchAttempt(LaunchCause.cooldown, spec, true).then((result) => result.outcome)
-        )
+        void enqueuePromoteLaunch(LaunchCause.cooldown)
       }, options.terminalPolicy.afterMs)
       cooldownTimer.unref?.()
     }
@@ -247,9 +271,7 @@ export function createSupervisor<
     backoffTimer = scheduler.schedule(() => {
       backoffTimer = undefined
       if (terminal.lifecycle !== 'open' || state !== SupervisorState.backoff) return
-      pendingStart = commands.enqueue(() =>
-        launchAttempt(LaunchCause.backoff, spec, true).then((result) => result.outcome)
-      )
+      void enqueuePromoteLaunch(LaunchCause.backoff)
     }, delayMs)
   }
   /** Applies the restart policy to a failed active or attempted unit. */
@@ -733,13 +755,15 @@ export function createSupervisor<
     attempts.supersede()
     clearTimers()
     failures.length = 0
-    return commands.enqueue(async () => {
-      if (active) {
-        await retire(active, 'stop')
-        active = undefined
-      }
-      return (await launchAttempt(LaunchCause.restart, spec, true)).outcome
-    })
+    return commands
+      .enqueue(async () => {
+        if (active) {
+          await retire(active, 'stop')
+          active = undefined
+        }
+        return (await launchAttempt(LaunchCause.restart, spec, true)).outcome
+      })
+      .then(settleLaunchOutcome)
   }
   /** Replaces by stopping first or by switching after a candidate reaches ready. */
   const replace = (
@@ -907,12 +931,7 @@ export function createSupervisor<
         degradationReported = true
         for (const diagnostic of admission.diagnostics) options.report(diagnostic)
       }
-      pendingStart = commands
-        .enqueue(async () => (await launchAttempt(LaunchCause.start, spec, true)).outcome)
-        .finally(() => {
-          pendingStart = undefined
-        })
-      return pendingStart
+      return enqueuePromoteLaunch(LaunchCause.start)
     },
     whenReady,
     stop,
