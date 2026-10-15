@@ -149,8 +149,8 @@
                   "事务性所有权：`createProvisionalScope`",
                   "变更队列：`createMutationQueue`",
                   "调度器、中止与有界等待：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`",
-                  "错误基础设施：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`",
-                  "状态常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`",
+                  "错误基础设施：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`",
+                  "状态常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                   "按需导入与 tree-shaking",
                   "高阶组合示例",
                   "构建门禁"
@@ -550,7 +550,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/lifecycle/errors'"
+                "code": "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/utils/function'"
               },
               {
                 "type": "paragraph",
@@ -569,7 +569,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
               },
               {
                 "type": "paragraph",
@@ -644,6 +644,10 @@
               {
                 "type": "paragraph",
                 "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+              },
+              {
+                "type": "paragraph",
+                "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
               },
               {
                 "type": "paragraph",
@@ -731,7 +735,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
+                "code": "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
               },
               {
                 "type": "paragraph",
@@ -751,7 +755,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`ThenableProbeKind`｜3 秒上手 —— `probeThenable`/内部归化逻辑的判别结果：`{ notThenable: 'not-thenable', thenable: 'thenable', failed: 'failed', promise: 'promise' }`。"
+                "text": "`ThenableProbeKind` 由 `@migaia/utils/function` 提供，取值为 `notThenable`、`thenable`、`failed`；lifecycle 不再提供平行常量或 `promise` 变体。"
               },
               {
                 "type": "paragraph",
@@ -857,8 +861,8 @@
                   "事务性所有权模块：`createProvisionalScope`",
                   "变更队列模块：`createMutationQueue`",
                   "调度器、中止与有界等待模块：`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`",
-                  "错误基础设施模块：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`createLifecycleTypeError`、`createLifecycleFailure`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`",
-                  "状态常量模块：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`",
+                  "错误基础设施模块：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`createLifecycleTypeError`、`createLifecycleFailure`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`",
+                  "状态常量模块：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                   "按需导入与 tree-shaking",
                   "错误码：`LifecycleErrorCode`（20 个码）逐条语义",
                   "诊断消息：`LifecycleErrorText`",
@@ -1617,7 +1621,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
               }
             ]
           },
@@ -1752,9 +1756,13 @@
             ]
           },
           {
-            "id": "probethenable",
-            "heading": "probeThenable",
+            "id": "probethenable-utils",
+            "heading": "probeThenable（utils）",
             "blocks": [
+              {
+                "type": "paragraph",
+                "text": "从 `@migaia/utils/function` 导入；下述工具属于 utils，不是 lifecycle 的公开导出。"
+              },
               {
                 "type": "code",
                 "language": "ts",
@@ -1830,7 +1838,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
+                "code": "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
               },
               {
                 "type": "paragraph",
@@ -1854,11 +1862,6 @@
                     "`LifecycleErrorPolicy`",
                     "`{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }`",
                     "释放错误策略；`firstError` 只为兼容 `web-rpc` discovery-registry 的迁移语义存在，不是通用默认值"
-                  ],
-                  [
-                    "`ThenableProbeKind`",
-                    "`{ notThenable: 'not-thenable', thenable: 'thenable', failed: 'failed', promise: 'promise' }`",
-                    "`probeThenable`/内部归化逻辑的判别结果"
                   ],
                   [
                     "`DisposeTransactionKind`",
@@ -2123,9 +2126,9 @@
               {
                 "type": "list",
                 "items": [
-                  "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
-                  "常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。",
-                  "类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IThenableProbeKind`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IThenableProbe`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。"
+                  "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
+                  "常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。",
+                  "类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。"
                 ]
               },
               {
@@ -2873,7 +2876,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -2948,6 +2951,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -3145,7 +3152,7 @@
           "name": "DisposeTransactionKind",
           "kind": "const",
           "signature": "export declare const DisposeTransactionKind: { readonly order: \"order\"; readonly plan: \"plan\"; };",
-          "declarationLine": 29,
+          "declarationLine": 22,
           "source": "packages/lifecycle/dist/state-constants.d.ts",
           "purpose": "Disposal transaction planning modes.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for DisposeTransactionKind.",
@@ -3156,7 +3163,7 @@
           "errors": ["No documented errors are declared for DisposeTransactionKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for DisposeTransactionKind.",
           "examples": [
-            "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
+            "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
           "members": [],
           "aliasOf": "DisposeTransactionKind",
@@ -3376,7 +3383,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -3451,6 +3458,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -3672,7 +3683,7 @@
           "name": "IDisposeTransactionKind",
           "kind": "type",
           "signature": "export type IDisposeTransactionKind = (typeof DisposeTransactionKind)[keyof typeof DisposeTransactionKind];",
-          "declarationLine": 43,
+          "declarationLine": 35,
           "source": "packages/lifecycle/dist/state-constants.d.ts",
           "purpose": "IDisposeTransactionKind is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDisposeTransactionKind.",
@@ -4088,7 +4099,7 @@
           "name": "ILifecycleErrorPolicy",
           "kind": "type",
           "signature": "export type ILifecycleErrorPolicy = (typeof LifecycleErrorPolicy)[keyof typeof LifecycleErrorPolicy];",
-          "declarationLine": 41,
+          "declarationLine": 34,
           "source": "packages/lifecycle/dist/state-constants.d.ts",
           "purpose": "ILifecycleErrorPolicy is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleErrorPolicy.",
@@ -4389,7 +4400,7 @@
           "name": "ILifecycleStateValue",
           "kind": "type",
           "signature": "export type ILifecycleStateValue = (typeof LifecycleState)[keyof typeof LifecycleState];",
-          "declarationLine": 39,
+          "declarationLine": 32,
           "source": "packages/lifecycle/dist/state-constants.d.ts",
           "purpose": "ILifecycleStateValue is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleStateValue.",
@@ -4655,7 +4666,7 @@
           "name": "ILifecycleUnitStateValue",
           "kind": "type",
           "signature": "export type ILifecycleUnitStateValue = (typeof LifecycleUnitState)[keyof typeof LifecycleUnitState];",
-          "declarationLine": 40,
+          "declarationLine": 33,
           "source": "packages/lifecycle/dist/state-constants.d.ts",
           "purpose": "ILifecycleUnitStateValue is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleUnitStateValue.",
@@ -5577,70 +5588,6 @@
           "fragment": "lifecycle-index--ITerminalController"
         },
         {
-          "name": "IThenableProbeKind",
-          "kind": "type",
-          "signature": "export type IThenableProbeKind = (typeof ThenableProbeKind)[keyof typeof ThenableProbeKind];",
-          "declarationLine": 42,
-          "source": "packages/lifecycle/dist/state-constants.d.ts",
-          "purpose": "IThenableProbeKind is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThenableProbeKind.",
-          "advanced": "No additional advanced behavior is declared for IThenableProbeKind.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IThenableProbeKind."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThenableProbeKind.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "IThenableProbeKind",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IThenableProbeKind = (typeof ThenableProbeKind)[keyof typeof ThenableProbeKind];"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IThenableProbeKind when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IThenableProbeKind does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "IThenableProbeKind is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IThenableProbeKind from @migaia/lifecycle, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IThenableProbeKind when its type contract and declared inputs match the result you need. Choose a different public symbol when IThenableProbeKind does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThenableProbeKind."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IThenableProbeKind."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/state-constants.d.ts:IThenableProbeKind:export type IThenableProbeKind = (typeof ThenableProbeKind)[keyof typeof ThenableProbeKind];",
-          "guidance": [],
-          "usageScore": 4,
-          "configuration": [],
-          "fragment": "lifecycle-index--IThenableProbeKind"
-        },
-        {
           "name": "IUnitState",
           "kind": "type",
           "signature": "export type IUnitState = (typeof LifecycleUnitState)[keyof typeof LifecycleUnitState];",
@@ -5726,7 +5673,7 @@
             "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)",
             "import { LifecycleErrorCode, type ILifecycleErrorCode } from '@migaia/lifecycle'",
             "if (error.code === LifecycleErrorCode.scopeClosed) {\n  /* ... */\n}",
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'",
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
           "members": [],
@@ -5979,7 +5926,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -6054,6 +6001,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -6154,7 +6105,7 @@
           "errors": ["No documented errors are declared for LifecycleErrorPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LifecycleErrorPolicy.",
           "examples": [
-            "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
+            "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
           "members": [],
           "aliasOf": "LifecycleErrorPolicy",
@@ -6222,7 +6173,7 @@
           "examples": [
             "import { LifecycleErrorText, type ILifecycleErrorText } from '@migaia/lifecycle'",
             "error.message === LifecycleErrorText.disposeTransactionFailed",
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
           ],
           "members": [],
           "aliasOf": "LifecycleErrorText",
@@ -6276,7 +6227,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -6351,6 +6302,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -6451,7 +6406,7 @@
           "errors": ["No documented errors are declared for LifecycleState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LifecycleState.",
           "examples": [
-            "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
+            "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
           "members": [],
           "aliasOf": "LifecycleState",
@@ -6517,7 +6472,7 @@
           "errors": ["No documented errors are declared for LifecycleUnitState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LifecycleUnitState.",
           "examples": [
-            "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
+            "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
           ],
           "members": [],
           "aliasOf": "LifecycleUnitState",
@@ -6567,72 +6522,6 @@
           "usageScore": 34,
           "configuration": [],
           "fragment": "lifecycle-index--LifecycleUnitState"
-        },
-        {
-          "name": "ThenableProbeKind",
-          "kind": "const",
-          "signature": "export declare const ThenableProbeKind: { readonly notThenable: \"not-thenable\"; readonly thenable: \"thenable\"; readonly failed: \"failed\"; readonly promise: \"promise\"; };",
-          "declarationLine": 22,
-          "source": "packages/lifecycle/dist/state-constants.d.ts",
-          "purpose": "Internal thenable probe outcomes; getter failures remain distinct from plain values.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ThenableProbeKind.",
-          "advanced": "No additional advanced behavior is declared for ThenableProbeKind.",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for ThenableProbeKind."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ThenableProbeKind.",
-          "examples": [
-            "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
-          ],
-          "members": [],
-          "aliasOf": "ThenableProbeKind",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const ThenableProbeKind: { readonly notThenable: \"not-thenable\"; readonly thenable: \"thenable\"; readonly failed: \"failed\"; readonly promise: \"promise\"; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use ThenableProbeKind when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ThenableProbeKind does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Internal thenable probe outcomes; getter failures remain distinct from plain values."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import ThenableProbeKind from @migaia/lifecycle, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use ThenableProbeKind when its const contract and declared inputs match the result you need. Choose a different public symbol when ThenableProbeKind does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ThenableProbeKind."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ThenableProbeKind."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/state-constants.d.ts:ThenableProbeKind:export declare const ThenableProbeKind: { readonly notThenable: \"not-thenable\"; readonly thenable: \"thenable\"; readonly failed: \"failed\"; readonly promise: \"promise\"; };",
-          "guidance": [],
-          "usageScore": 34,
-          "configuration": [],
-          "fragment": "lifecycle-index--ThenableProbeKind"
         }
       ],
       "aliases": [
@@ -7223,7 +7112,7 @@
           "errors": ["No documented errors are declared for IObservedAbortFailureSink."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IObservedAbortFailureSink.",
           "examples": [
-            "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/lifecycle/errors'"
+            "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/utils/function'"
           ],
           "members": [],
           "aliasOf": "IObservedAbortFailureSink",
@@ -7289,7 +7178,7 @@
           "errors": ["No documented errors are declared for IObservedAbortSubscription."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IObservedAbortSubscription.",
           "examples": [
-            "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/lifecycle/errors'"
+            "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/utils/function'"
           ],
           "members": [],
           "aliasOf": "IObservedAbortSubscription",
@@ -7661,7 +7550,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -7736,6 +7625,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -8551,7 +8444,7 @@
           "signature": "export declare function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void;",
           "declarationLine": 9,
           "source": "packages/lifecycle/dist/report-boundary.d.ts",
-          "purpose": "Ported from `@migaia/capability`'s `containAsyncRejection`. `() => void` in TypeScript still accepts an `async` function. This guards a diagnostic/release callback's return value for a thenable and observes its rejection, so a callback that turns out to be `async` behind our backs doesn't surface as an unhandled rejection one microtask later (L-T17, L-T26, L-T35).",
+          "purpose": "Delegates callback-result inspection to the canonical utils thenable boundary. `() => void` in TypeScript still accepts an `async` function. This guards a diagnostic/release callback's return value for a thenable and observes its rejection, so a callback that turns out to be `async` behind our backs doesn't surface as an unhandled rejection one microtask later (L-T17, L-T26, L-T35).",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for containAsyncRejection.",
           "advanced": "No additional advanced behavior is declared for containAsyncRejection.",
           "parameters": ["value: unknown", "onRejected: (error: unknown) => void"],
@@ -8598,7 +8491,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Ported from `@migaia/capability`'s `containAsyncRejection`. `() => void` in TypeScript still accepts an `async` function. This guards a diagnostic/release callback's return value for a thenable and observes its rejection, so a callback that turns out to be `async` behind our backs doesn't surface as an unhandled rejection one microtask later (L-T17, L-T26, L-T35)."
+              "content": "Delegates callback-result inspection to the canonical utils thenable boundary. `() => void` in TypeScript still accepts an `async` function. This guards a diagnostic/release callback's return value for a thenable and observes its rejection, so a callback that turns out to be `async` behind our backs doesn't surface as an unhandled rejection one microtask later (L-T17, L-T26, L-T35)."
             },
             {
               "id": "getting-started",
@@ -8636,7 +8529,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -8671,7 +8564,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -8746,6 +8639,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -8835,7 +8732,7 @@
           "name": "createErrorCollector",
           "kind": "function",
           "signature": "export declare function createErrorCollector(policy: IErrorPolicy, report: ((error: unknown) => void) | undefined): IErrorCollector;",
-          "declarationLine": 72,
+          "declarationLine": 69,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "createErrorCollector is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createErrorCollector.",
@@ -8923,7 +8820,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -8958,7 +8855,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -9033,6 +8930,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -9122,7 +9023,7 @@
           "name": "createLifecycleError",
           "kind": "function",
           "signature": "export declare function createLifecycleError(code: string, message: string, options?: { readonly cause?: unknown; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; readonly errors?: readonly unknown[]; }): ILifecycleError;",
-          "declarationLine": 29,
+          "declarationLine": 26,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Builds a `(source, code)`-tagged error without ever touching `stack` — the engine populates it at construction and this function never reassigns it, so the original throw site is always visible.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLifecycleError.",
@@ -9224,7 +9125,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -9259,7 +9160,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -9334,6 +9235,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -9423,7 +9328,7 @@
           "name": "createLifecycleFailure",
           "kind": "function",
           "signature": "export declare function createLifecycleFailure(code: string, message: string, error: unknown): ILifecycleError;",
-          "declarationLine": 46,
+          "declarationLine": 43,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Converts an arbitrary cleanup/listener throw into a lifecycle-boundary failure. Extensible `Error` objects are tagged in place so callers retain identity and native type; primitive throws (or objects that reject tagging) are wrapped with the original reachable through `cause`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLifecycleFailure.",
@@ -9540,7 +9445,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -9615,6 +9520,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -9704,7 +9613,7 @@
           "name": "createLifecycleRangeError",
           "kind": "function",
           "signature": "export declare function createLifecycleRangeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): RangeError;",
-          "declarationLine": 51,
+          "declarationLine": 48,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Creates a native `RangeError` for input validation and attaches the supplied code. Preserves the native type required by `docs/contracts/error-codes.md` §2.2.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLifecycleRangeError.",
@@ -9806,7 +9715,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -9841,7 +9750,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -9916,6 +9825,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -10005,7 +9918,7 @@
           "name": "createLifecycleTypeError",
           "kind": "function",
           "signature": "export declare function createLifecycleTypeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): TypeError;",
-          "declarationLine": 56,
+          "declarationLine": 53,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Creates a lifecycle-tagged native TypeError without replacing its runtime type.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLifecycleTypeError.",
@@ -10126,7 +10039,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -10201,6 +10114,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -10290,7 +10207,7 @@
           "name": "IErrorCollector",
           "kind": "type",
           "signature": "export type IErrorCollector = { readonly policy: IErrorPolicy; /** Records one item's failure. For `report`, this is also where the reporter is invoked. */ add(source: string, error: unknown): void; /** * Finalizes collection. `collect`/`report`/`firstError`-with-no-error return the collected list * (empty for `report`, since those were already handed to the reporter per `add`); `throw` and * `firstError`-with-an-error throw instead of returning. */ finalize(message: string): readonly ICollectedError[]; };",
-          "declarationLine": 61,
+          "declarationLine": 58,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Collects errors under one of the four policies (D-4) and produces the correct finalize behavior.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IErrorCollector.",
@@ -10301,7 +10218,7 @@
           "errors": ["No documented errors are declared for IErrorCollector."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IErrorCollector.",
           "examples": [
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}"
           ],
           "members": [],
@@ -10355,7 +10272,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -10392,7 +10309,7 @@
           "name": "ILifecycleError",
           "kind": "type",
           "signature": "export type ILifecycleError = Error & { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; readonly cause?: unknown; /** * Stores a frozen, non-enumerable list of secondary failures such as cleanup errors, appended in * occurrence order. Keeps them separate from `cause` so the primary error retains its identity. */ readonly errors?: readonly unknown[]; };",
-          "declarationLine": 13,
+          "declarationLine": 10,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "The structural error contract every module in the workspace follows (`docs/contracts/error-codes.md` §2). Attached as properties on a real `Error`, never used to replace it — callers that branch on `instanceof DOMException`/`RangeError`/etc. keep working.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleError.",
@@ -10404,7 +10321,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleError.",
           "examples": [
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}",
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
             "function createLifecycleError(\n  code: string,\n  message: string,\n  options?: {\n    readonly cause?: unknown\n    readonly phase?: string\n    readonly detail?: Readonly<Record<string, unknown>>\n    readonly errors?: readonly unknown[]\n  }\n): ILifecycleError // Error & { source, code, phase?, detail?, cause?, errors? }",
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nfunction createLifecycleTypeError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }\n): TypeError\n\nfunction createLifecycleFailure(code: string, message: string, error: unknown): ILifecycleError"
           ],
@@ -10459,7 +10376,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -10641,7 +10558,7 @@
           "name": "LIFECYCLE_SOURCE",
           "kind": "const",
           "signature": "export declare const LIFECYCLE_SOURCE = \"@migaia/lifecycle\";",
-          "declarationLine": 7,
+          "declarationLine": 4,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "`source` value stamped onto every error this module throws.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for LIFECYCLE_SOURCE.",
@@ -10652,9 +10569,9 @@
           "errors": ["No documented errors are declared for LIFECYCLE_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LIFECYCLE_SOURCE.",
           "examples": [
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
             "const LIFECYCLE_SOURCE: '@migaia/lifecycle'",
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'",
             "LIFECYCLE_SOURCE // '@migaia/lifecycle'"
           ],
           "members": [],
@@ -10706,7 +10623,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -10732,7 +10649,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -10807,6 +10724,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -10896,7 +10817,7 @@
           "name": "tagLifecycleError",
           "kind": "function",
           "signature": "export declare function tagLifecycleError<E extends Error>(error: E, code: string): E;",
-          "declarationLine": 40,
+          "declarationLine": 37,
           "source": "packages/lifecycle/dist/errors.d.ts",
           "purpose": "Stamps `(source, code)` onto an error object we did not construct ourselves (e.g. a built-in `AggregateError`) without touching `stack`, `message`, or `errors`. Used where the error's _type_ matters to callers (`AggregateError`) so `createLifecycleError`'s plain `Error` cannot be used.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for tagLifecycleError.",
@@ -10984,7 +10905,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -11019,7 +10940,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -11094,6 +11015,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",

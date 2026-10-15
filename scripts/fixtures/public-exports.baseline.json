@@ -79,8 +79,6 @@
         "LifecycleErrorText",
         "LifecycleState",
         "LifecycleUnitState",
-        "ThenableProbeKind",
-        "assimilateCapturedThen",
         "boundedWait",
         "containAsyncRejection",
         "createAbortController",
@@ -102,7 +100,6 @@
         "createSyncStartedDisposalLedger",
         "createTerminalController",
         "executeReleaseDescriptor",
-        "probeThenable",
         "snapshotScheduler",
         "tagLifecycleError",
         "validateSchedulerDelay",
@@ -140,14 +137,12 @@
       ],
       "./errors": [
         "LIFECYCLE_SOURCE",
-        "assimilateCapturedThen",
         "containAsyncRejection",
         "createErrorCollector",
         "createLifecycleError",
         "createLifecycleFailure",
         "createLifecycleRangeError",
         "createLifecycleTypeError",
-        "probeThenable",
         "tagLifecycleError"
       ]
     },
