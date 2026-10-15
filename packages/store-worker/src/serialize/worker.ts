@@ -1,3 +1,4 @@
+import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IWorkerMessageEvent } from '../worker-message-event.js'
 import {
   SerializeCodecError,
@@ -76,7 +77,10 @@ type IWorkerAckState = {
 
 /** Creates the stable cancellation failure used while a worker stream is unwinding. */
 function workerStreamCancelledError(): DOMException {
-  return new DOMException('serialize stream cancelled', 'AbortError')
+  return attachErrorIdentity(
+    new DOMException(StoreWorkerErrorText.streamCancelled, StoreWorkerErrorText.abortName),
+    { source: STORE_WORKER_SOURCE, code: StoreWorkerErrorCode.requestAborted }
+  )
 }
 
 /** Waits for consumer credit without allowing an unbounded worker-side chunk queue. */

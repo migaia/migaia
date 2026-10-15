@@ -1,5 +1,9 @@
 /** Stable public diagnostics owned by `@migaia/store-worker`. */
 export const StoreWorkerErrorText = {
+  /** Stable stream-unwind message consumed by the worker credit/cancellation boundary. */
+  streamCancelled: 'serialize stream cancelled',
+  /** Native cancellation classification must remain AbortError across the worker error chain. */
+  abortName: 'AbortError',
   optionsObject: '[store] worker options must be an object',
   workerComputedAdapter: '[store] workerComputed adapter must be a WorkerAdapter',
   workerComputedCallback: (name: string): string =>
