@@ -1,21 +1,15 @@
-import { probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { assertErrorPolicyReporter } from './error-boundary.js'
-import type {
-  ICollectedError,
-  IErrorPolicy,
-  IReleaseContext,
-  IReleaseDescriptor,
-  ILifecycleState
-} from './types.js'
+import type { ICollectedError, IErrorPolicy, IReleaseDescriptor, ILifecycleState } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
-import { createLifecycleError, createErrorCollector } from './errors.js'
+import { createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createOwnedEntryList } from './owned-entries.js'
 import { createTerminalController } from './terminal-controller.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
-import { LifecycleState } from './state-constants.js'
-import { admitDescriptor } from './dispose-transaction.js'
+import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
+import { admitDescriptor, admitItems } from './dispose-transaction.js'
+import { executeSyncDisposeTransaction } from './sync-dispose-transaction.js'
 
 const disposeKey = (Symbol as typeof Symbol & { dispose?: symbol }).dispose
 
@@ -39,56 +33,6 @@ export type ISyncLifecycleScope = {
   close(): void
   /** Always synchronous — this is the whole reason this type exists (D-6). */
   dispose(): readonly ICollectedError[]
-}
-
-type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
-
-function runSyncCallback(
-  callback: (context: IReleaseContext) => void | PromiseLike<void>,
-  context: IReleaseContext
-): ICallbackOutcome {
-  let result: void | PromiseLike<void>
-  try {
-    result = callback(context)
-  } catch (error) {
-    return { ok: false, error }
-  }
-  // 单次探测：hostile `.then` getter 的异常也必须作为本项失败进入 error policy，绝不逃逸出释放循环。
-  const probe = probeThenable(result)
-  if (probe.kind === ThenableProbeKind.failed) return { ok: false, error: probe.error }
-  if (probe.kind === 'thenable') {
-    return {
-      ok: false,
-      error: createLifecycleError(
-        LifecycleErrorCode.scopeSyncViolation,
-        LifecycleErrorText.syncCallbackReturnedThenable
-      )
-    }
-  }
-  return { ok: true }
-}
-
-/**
- * Same degrade order as the async path (custom skips the rest; graceful throwing still runs force),
- * minus any timeout race — there is nothing to await.
- */
-function executeSyncDescriptor(
-  descriptor: ISyncReleaseDescriptor,
-  context: IReleaseContext
-): readonly unknown[] {
-  if (descriptor.custom) {
-    const outcome = runSyncCallback(descriptor.custom, context)
-    return outcome.ok ? [] : [outcome.error]
-  }
-  const errors: unknown[] = []
-  if (descriptor.graceful) {
-    const gracefulOutcome = runSyncCallback(descriptor.graceful, context)
-    if (gracefulOutcome.ok) return []
-    errors.push(gracefulOutcome.error)
-  }
-  const forceOutcome = runSyncCallback(descriptor.force, context)
-  if (!forceOutcome.ok) errors.push(forceOutcome.error)
-  return errors
 }
 
 /**
@@ -174,48 +118,17 @@ export function createSyncLifecycleScope(
     close()
     disposed = true
     const released = entries.drain().reverse()
-    const collector = createErrorCollector(errorPolicy, options.report)
-    const admissionErrors: Array<{ readonly source: string; readonly error: unknown }> = []
-    const admitted = released.flatMap((entry) => {
-      try {
-        // Snapshot every descriptor field before any callback or ordering work begins. A hostile
-        // accessor therefore cannot discard the remaining release plan halfway through dispose().
-        const descriptor = entry.descriptor
-        return [
-          {
-            ...entry,
-            descriptor: {
-              syncSafe: descriptor.syncSafe,
-              order: descriptor.order,
-              custom: descriptor.custom,
-              graceful: descriptor.graceful,
-              gracefulTimeoutMs: descriptor.gracefulTimeoutMs,
-              force: descriptor.force
-            } as ISyncReleaseDescriptor
-          }
-        ]
-      } catch (error) {
-        admissionErrors.push({ source: entry.source, error })
-        return []
-      }
-    })
-    // Explicit release orders are used by synchronous owners that need a source-before-query
-    // barrier. Legacy callers with omitted orders retain the documented LIFO behavior.
-    const snapshot = admitted.some((entry) => entry.descriptor.order !== undefined)
-      ? [...admitted].sort(
-          (left, right) => (right.descriptor.order ?? 0) - (left.descriptor.order ?? 0)
-        )
-      : admitted
+    /** Canonical admission snapshots every item before the first callback and preserves LIFO ties. */
+    const admission = admitItems(released, { kind: DisposeTransactionKind.order }, true)
     currentlyReleasing = true
     const controller = createController()
     controller.abort(
       createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
     )
     try {
-      for (const admissionError of admissionErrors)
-        collector.add(admissionError.source, admissionError.error)
-      for (const entry of snapshot) {
-        const context: IReleaseContext = {
+      return executeSyncDisposeTransaction(
+        admission,
+        () => ({
           signal: controller.signal,
           deadlineAt: undefined,
           report: (error) => {
@@ -226,15 +139,14 @@ export function createSyncLifecycleScope(
               // Last error boundary for the reporter's own synchronous failures.
             }
           }
-        }
-        const errors = executeSyncDescriptor(entry.descriptor, context)
-        for (const error of errors) collector.add(entry.source, error)
-      }
+        }),
+        errorPolicy,
+        options.report
+      )
     } finally {
       currentlyReleasing = false
       terminal.forceTerminal()
     }
-    return collector.finalize(LifecycleErrorText.syncScopeDisposalFailed)
   }
 
   const scope: ISyncLifecycleScope = {

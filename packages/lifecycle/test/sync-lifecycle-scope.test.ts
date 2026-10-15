@@ -62,6 +62,39 @@ describe('L-T4 SyncLifecycleScope: rejects async descriptors and async-owner ins
   })
 })
 
+describe('LC-C2 shared release admission', () => {
+  it.each(['order', 'force'] as const)(
+    're-admits a changed %s before any release runs',
+    (field) => {
+      /** Collecting keeps a rejected item observable while the remaining resource still releases. */
+      const scope = createSyncLifecycleScope({ errorPolicy: 'collect' })
+      /** This valid resource proves admission failure cannot discard the remaining plan. */
+      const kept = vi.fn()
+      /** This callback must never run after its descriptor changes to an invalid shape. */
+      const rejected = vi.fn()
+      /** Switches getter output only after own() has accepted the original descriptor. */
+      let mutated = false
+      scope.own('kept', { syncSafe: true, force: kept })
+      scope.own('changed', {
+        syncSafe: true,
+        get order() {
+          return mutated && field === 'order' ? NaN : 0
+        },
+        get force() {
+          return mutated && field === 'force' ? (undefined as never) : rejected
+        }
+      })
+      mutated = true
+      /** The shared admission policy returns the coded failure synchronously. */
+      const errors = scope.dispose()
+      expect(errors).toHaveLength(1)
+      expect(errors[0].error).toMatchObject({ code: LifecycleErrorCode.invalidOption })
+      expect(kept).toHaveBeenCalledTimes(1)
+      expect(rejected).not.toHaveBeenCalled()
+    }
+  )
+})
+
 describe('SyncLifecycleScope: dispose() is fully synchronous and returns (not a Promise)', () => {
   it('dispose() return value is a plain array, not a thenable', () => {
     const scope = createSyncLifecycleScope()

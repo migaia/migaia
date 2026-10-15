@@ -175,8 +175,8 @@ describe('L-T20 cross-module: a downstream adapter uses only public primitives',
   })
 
   it('the public surface (index.ts) is sufficient — no test in this suite has ever imported from a sibling src/*.ts other than for direct unit coverage of that module', () => {
-    // A weaker, always-true structural marker: confirms `index.ts` re-exports at least one symbol
-    // from every other module file, so nothing in src/ is unreachable from the public surface.
+    // Public modules remain accessible from the root. Canonical implementation modules stay
+    // private and are reached through their owning public primitives.
     const indexSource = readFileSync(join(srcRoot, 'index.ts'), 'utf8')
     const files = readSrcFiles()
     for (const name of files.keys()) {
@@ -187,6 +187,7 @@ describe('L-T20 cross-module: a downstream adapter uses only public primitives',
         name === 'report-boundary.ts' ||
         name === 'error-boundary.ts' ||
         name === 'default-scheduler.ts' ||
+        name === 'sync-dispose-transaction.ts' ||
         name === 'disposal.ts' ||
         name === 'scope.ts' ||
         name === 'generation.ts' ||

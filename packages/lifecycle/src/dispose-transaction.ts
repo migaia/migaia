@@ -329,7 +329,7 @@ type IDescriptorAdmission =
   | { readonly ok: true; readonly descriptor: IReleaseDescriptor }
   | { readonly ok: false; readonly error: unknown }
 
-type IAdmissionBatch = {
+export type IAdmissionBatch = {
   readonly admitted: readonly IAdmittedDisposeItem[]
   readonly rejected: readonly ICollectedError[]
 }
@@ -448,15 +448,18 @@ export const admitDescriptor = (
 /**
  * Admits descriptors independently before any release callback runs. Rejected items are excluded
  * from execution but retained as policy inputs; valid order-mode items are then stably sorted from
- * their already-snapshotted numeric keys, so no hostile accessor can abort the batch.
+ * their already-snapshotted numeric keys, so no hostile accessor can abort the batch. Sync scopes
+ * additionally retain their existing syncSafe getter read; registration already validates its
+ * value.
  */
-const admitItems = (
+export const admitItems = (
   items: readonly IDisposeItem[],
-  mode: IDisposeTransactionMode
+  mode: IDisposeTransactionMode,
+  snapshotSyncMarker = false
 ): IAdmissionBatch => {
   const admitted: IAdmittedDisposeItem[] = []
   const rejected: ICollectedError[] = []
-  const includeOrder = mode.kind === 'order'
+  const includeOrder = mode.kind === DisposeTransactionKind.order
   const itemCount = items.length
   for (let index = 0; index < itemCount; index++) {
     const item = items[index]
@@ -467,7 +470,10 @@ const admitItems = (
     let source = 'transaction'
     try {
       source = item.source
-      const admission = admitDescriptor(item.descriptor, includeOrder)
+      /** Read the item descriptor once, including the sync scope's established marker read. */
+      const descriptor = item.descriptor
+      if (snapshotSyncMarker) void descriptor.syncSafe
+      const admission = admitDescriptor(descriptor, includeOrder)
       if (!admission.ok) {
         rejected.push({ source, error: admission.error })
         continue
@@ -477,7 +483,7 @@ const admitItems = (
       rejected.push({ source, error })
     }
   }
-  if (mode.kind === 'plan') return { admitted, rejected }
+  if (mode.kind === DisposeTransactionKind.plan) return { admitted, rejected }
   // Stable sort: ties (equal order) keep the caller-supplied relative sequence.
   admitted.sort((a, b) => (b.descriptor.order ?? 0) - (a.descriptor.order ?? 0))
   return { admitted, rejected }
