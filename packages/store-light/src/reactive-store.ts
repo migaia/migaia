@@ -49,21 +49,12 @@ function throwConstructionFailure(primary: unknown, cleanup: unknown): never {
   )
 }
 
-/** Reports synchronous-construction cleanup failures without creating a late rejection. */
+/**
+ * Reports synchronous-construction cleanup failures without creating a late rejection.
+ * `Runtime.reportError` already contains reporter failures, so no host fallback is needed.
+ */
 function reportSynchronousCleanupFailure(runtime: IRuntime, error: unknown): void {
-  try {
-    runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
-    return
-  } catch (reporterError) {
-    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError
-    try {
-      if (host) host(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // A failing host sink cannot be allowed to turn cleanup observation into
-      // an unhandled rejection; the original cleanup error remains the input.
-    }
-  }
+  runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
 }
 
 /** Rejects JavaScript-boundary API values before internal reactive machinery sees them. */
