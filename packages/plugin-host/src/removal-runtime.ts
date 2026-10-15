@@ -11,6 +11,8 @@ import { markRegistrationRevoked } from './composition.js'
 import type { IPluginBeforeReleaseContext, IPluginDisposalContext } from './typing.js'
 
 type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+  /** Host-owned synchronous hook boundary, independent of the asynchronous cleanup wait. */
+  readonly invokeHook: <T>(invoke: () => T) => T
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   /** Removes an exact committed registration and its dependency node atomically. */
   readonly removeRegistration: (registration: IRegistration<TDomainCore, TValue>) => void
@@ -62,7 +64,10 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     this.#port.setBeforeReleaseRegistration(registration)
     return this.#port.cleanupRuntime
       .disposeGroup(
-        [() => invokeCaptured(hook, registration.plugin.owner, [context])],
+        [
+          () =>
+            this.#port.invokeHook(() => invokeCaptured(hook, registration.plugin.owner, [context]))
+        ],
         ERROR_TEXT.BEFORE_RELEASE_PHASE
       )
       .finally(() => {
@@ -225,13 +230,17 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
   ): (() => void | PromiseLike<void>) | undefined {
     if (registration.plugin.dispose)
       return () =>
-        invokeCaptured(registration.plugin.dispose!, registration.plugin.owner, [
-          Object.freeze({
-            signal: registration.lifecycleController?.signal ?? this.#port.executionSignal,
-            deadlineAt: undefined
-          } satisfies IPluginDisposalContext)
-        ])
-    return registration.plugin.disposer
+        this.#port.invokeHook(() =>
+          invokeCaptured(registration.plugin.dispose!, registration.plugin.owner, [
+            Object.freeze({
+              signal: registration.lifecycleController?.signal ?? this.#port.executionSignal,
+              deadlineAt: undefined
+            } satisfies IPluginDisposalContext)
+          ])
+        )
+    /** The already captured symbol disposer is invoked through the same synchronous boundary. */
+    const disposer = registration.plugin.disposer
+    return disposer ? () => this.#port.invokeHook(disposer) : undefined
   }
 
   /** Removes extension capabilities still owned by the exact registration. */

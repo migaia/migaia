@@ -26,6 +26,8 @@ import {
 } from './dependency-runtime.js'
 
 type IPluginHostEnablementRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+  /** Marks synchronous notification reentry without extending the marker over its Promise. */
+  readonly invokeHook: <T>(invoke: () => T) => T
   readonly state: PluginHostState<TDomainCore, TValue>
   readonly diagnostic: IPluginHostDiagnostic
 }>
@@ -160,7 +162,10 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
       signal: registration.lifecycleController!.signal
     }) satisfies IPluginRegistrationContext
     try {
-      containAsyncRejection(invokeCaptured(callback, registration.plugin.owner, [context]), report)
+      containAsyncRejection(
+        this.#port.invokeHook(() => invokeCaptured(callback, registration.plugin.owner, [context])),
+        report
+      )
     } catch (error) {
       report(error)
     }

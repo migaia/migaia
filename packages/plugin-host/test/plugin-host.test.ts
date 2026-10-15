@@ -1085,6 +1085,7 @@ describe('PluginHost', () => {
       featurePending: { drain: () => new Promise<void>(() => undefined) }
     }
     const runtime = new PluginHostRemovalRuntime({
+      invokeHook: (invoke) => invoke(),
       host: {},
       registrations: new Map([[registration.name, registration]]),
       removeRegistration: () => undefined,
@@ -1219,6 +1220,7 @@ describe('PluginHost', () => {
     const registrations = new Map([[registration.name, registration]])
     const extensionOwners = new Map([['owned', registration]])
     const runtime = new PluginHostRemovalRuntime({
+      invokeHook: (invoke) => invoke(),
       host,
       registrations,
       removeRegistration: (current) => {
