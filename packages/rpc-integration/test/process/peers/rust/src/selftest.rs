@@ -1191,7 +1191,11 @@ fn check_runtime_baseline(counts: &mut Counts) {
 /// Restored vectors call the actual initiator and physical owners; v1 describe/catalog stays retired.
 fn check_entry_vectors(root: &Path, counts: &mut Counts) {
     use crate::json::{number, object, string};
-    if let Some(schema) = load(root, "../../../rpc-contract/schema/remote-contract.schema.json", counts) {
+    if let Some(schema) = load(
+        root,
+        "../../../rpc-contract/schema/remote-contract.schema.json",
+        counts,
+    ) {
         if let Some(vector) = load(root, "remote-host-control.json", counts) {
             check_host(&vector, field(&schema, "$defs"), counts);
         }
@@ -1310,7 +1314,7 @@ pub fn run(root: &Path) -> io::Result<()> {
     }
     let mut encoded = Vec::new();
     let normal = write_frame(&mut encoded, &crate::json::string("echo")).is_ok()
-        && read_frame(&mut &encoded[..])
+        && read_frame(&mut &encoded[..], MAX_FRAME)
             .ok()
             .flatten()
             .is_some_and(|payload| payload == b"\"echo\"");
@@ -1321,7 +1325,7 @@ pub fn run(root: &Path) -> io::Result<()> {
         normal,
     );
     for (label, size) in [("zero", 0u32), ("oversize", 16_777_217u32)] {
-        let result = read_frame(&mut &size.to_be_bytes()[..]);
+        let result = read_frame(&mut &size.to_be_bytes()[..], MAX_FRAME);
         counts.case(
             "stream-framing",
             "local",
@@ -1396,7 +1400,7 @@ fn check_frames(vectors: &Value, counts: &mut Counts) {
         let mut actual = Vec::new();
         let mut code = "";
         loop {
-            match read_frame(&mut reader) {
+            match read_frame(&mut reader, MAX_FRAME) {
                 Ok(Some(frame)) => actual.push(frame),
                 Ok(None) => break,
                 Err(_error) => {
