@@ -6,6 +6,8 @@ import type { IPluginHostCore, IPluginHostDiagnostic } from './typing.js'
 
 /** Host authority needed by setup; the registration remains owned by its install transaction. */
 export type IPluginSetupPort = Readonly<{
+  /** Marks only the synchronous setup invocation, leaving async continuations unmarked. */
+  readonly invokeHook: <T>(invoke: () => T) => T
   readonly createCore: (registration: IRegistration<any, any>) => IPluginHostCore<any>
   readonly executionSignal: IAbortSignal
   readonly scheduler: IScheduler

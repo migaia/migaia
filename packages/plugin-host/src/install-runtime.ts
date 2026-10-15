@@ -49,6 +49,8 @@ export type IInstallBatchContext<TDomainCore extends object, TValue> = {
 }
 
 type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+  /** Host-owned synchronous invocation boundary; preserves the hook's exact returned value. */
+  readonly invokeHook: <T>(invoke: () => T) => T
   readonly scheduler: IScheduler
   readonly executionSignal: IAbortSignal
   readonly setSetupPending: (registration: IRegistration<TDomainCore, TValue> | undefined) => void
@@ -197,7 +199,9 @@ async function runPluginSetup(
   let attemptSubscription: ReturnType<typeof observeAbortSubscription> | undefined
   try {
     const pending = Promise.resolve(
-      invokeCaptured(registration.plugin.setup!, registration.plugin.owner, [context])
+      port.invokeHook(() =>
+        invokeCaptured(registration.plugin.setup!, registration.plugin.owner, [context])
+      )
     )
     /** Identifies a rejection produced by setup itself before the deadline or disposal won. */
     let ownRejection: { readonly error: unknown } | undefined
@@ -511,12 +515,15 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     registration: IRegistration<TDomainCore, TValue>,
     batch: IInstallBatchContext<TDomainCore, TValue>
   ): unknown {
-    return this.#invokeInstall(registration, this.#initializeFeatureCore(registration, batch))
+    return this.#port.invokeHook(() =>
+      this.#invokeInstall(registration, this.#initializeFeatureCore(registration, batch))
+    )
   }
 
   /** Binds setup to the same batch, generation, scheduler, and diagnostic authority as install. */
   #setupPort(batch: IInstallBatchContext<TDomainCore, TValue>): IPluginSetupPort {
     return {
+      invokeHook: this.#port.invokeHook,
       createCore: (registration) => this.#port.createCore(registration, batch),
       executionSignal: this.#port.executionSignal,
       scheduler: this.#port.scheduler,
@@ -533,7 +540,9 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     batch: IInstallBatchContext<TDomainCore, TValue>,
     installedValue: unknown
   ): void {
-    const extensions = this.#mergeDescriptorExpose(registration, installedValue)
+    const extensions = this.#port.invokeHook(() =>
+      this.#mergeDescriptorExpose(registration, installedValue)
+    )
     mountPluginExtensions(
       registration,
       extensions,

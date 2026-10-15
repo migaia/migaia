@@ -183,7 +183,9 @@ export const PluginHostErrorCode = {
   /**
    * Thrown when a plugin lifecycle callback (`setup`, `install`, `dispose`, `update`, or
    * `beforeRelease`) reenters a host mutation API, or an external `config.update()` runs during
-   * setup or `beforeRelease`.
+   * setup or `beforeRelease`. A synchronous `activate()` reentry rejects before sharing an existing
+   * activation. After an await, same-name activation callers share that Promise regardless of
+   * origin; callers must avoid awaiting their own activation.
    *
    * Reentrancy makes installation rollback boundaries ambiguous. Move later mutations outside
    * lifecycle callbacks.

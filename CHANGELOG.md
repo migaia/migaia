@@ -41,6 +41,13 @@
 
 ### Behavior
 
+- Plugin-host rejects synchronous hook calls to `activate()` before returning a shared
+  activation Promise. Outside callers still share that Promise while a hook is pending.
+  After an `await`, hook origin cannot be distinguished: activating the same registration
+  returns the shared Promise. Awaiting it from that hook fails with
+  `MUTATION_EXECUTION_TIMEOUT` when the finite execution budget expires; with
+  `mutationTimeoutMs: false`, this self-wait can remain pending.
+
 - Failed lazy plugin activation withdraws stages, shared receipts and extensions,
   releases provisional and committed resources, and keeps the same cold handle
   retryable with a fresh scope and batch-bound core. Cleanup failures remain

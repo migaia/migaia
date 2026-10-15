@@ -9,6 +9,8 @@ import type { IPluginHostDiagnostic } from './typing.js'
 
 /** Narrow Host authority used by one replacement transaction; every call runs inside the queue. */
 type IPluginHostReplaceRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+  /** Marks only the original synchronous rebind call, leaving async waiting to its owner. */
+  readonly invokeHook: <T>(invoke: () => T) => T
   /** Committed registrations by name, read after each publication. */
   readonly registrations: ReadonlyMap<string, IRegistration<TDomainCore, TValue>>
   /** Host-owned topology and registration status used by capability replacement plans. */
@@ -104,7 +106,9 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
       if (!dependent) continue
       const hook = dependent.plugin.onDependencyReplaced!
       try {
-        await hook(name, replacement.featureOutputs ?? Object.freeze({}))
+        await this.#port.invokeHook(() =>
+          hook(name, replacement.featureOutputs ?? Object.freeze({}))
+        )
       } catch (error) {
         hookErrors.push(error)
         failedRebinds.push(dependentName)

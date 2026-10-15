@@ -202,6 +202,17 @@ export class PluginHost<
    */
   #state = new PluginHostState<TDomainCore, TValue>()
   #hookRegistration: IRegistration<TDomainCore, TValue> | undefined
+  /** Synchronous hook stack only; asynchronous continuations have no portable origin identity. */
+  #hookInvocationDepth = 0
+  /** Marks the original invocation without wrapping its return value or adding an await turn. */
+  #invokeHook = <T>(invoke: () => T): T => {
+    this.#hookInvocationDepth += 1
+    try {
+      return invoke()
+    } finally {
+      this.#hookInvocationDepth -= 1
+    }
+  }
   /** Registration currently awaiting setup; blocks synchronous config mutation admission. */
   #setupPending: IRegistration<TDomainCore, TValue> | undefined
   /** Exact registration inside a bounded pre-release hook; config updates reject before enqueue. */
@@ -254,6 +265,7 @@ export class PluginHost<
       bindTerminalSink(this.#pipelineDiagnostic, onDiagnosticFailure)
     }
     this.#enablementRuntime = new PluginHostEnablementRuntime({
+      invokeHook: this.#invokeHook,
       state: this.#state,
       diagnostic: this.#diagnostic
     })
@@ -357,6 +369,7 @@ export class PluginHost<
       }
     })
     this.#installRuntime = new PluginHostInstallRuntime({
+      invokeHook: this.#invokeHook,
       scheduler: this.#scheduler,
       executionSignal: this.#executionController.signal,
       state: this.#state,
@@ -389,6 +402,7 @@ export class PluginHost<
       decorateError: (error) => attachPluginHostIdentity(error, this)
     })
     this.#removalRuntime = new PluginHostRemovalRuntime({
+      invokeHook: this.#invokeHook,
       registrations: this.#state.registrations,
       removeRegistration: (registration) => this.#state.closeRegistration(registration),
       clearRegistrationPublication: (registration) =>
@@ -414,6 +428,7 @@ export class PluginHost<
       }
     })
     this.#replaceRuntime = new PluginHostReplaceRuntime({
+      invokeHook: this.#invokeHook,
       registrations: this.#state.registrations,
       state: this.#state,
       installBatch: (entries, publish, prepareBatch) =>
@@ -437,6 +452,7 @@ export class PluginHost<
       decorateError: (error) => attachPluginHostIdentity(error, this)
     })
     this.#resumeRuntime = new PluginHostResumeRuntime({
+      invokeHook: this.#invokeHook,
       state: this.#state,
       drainLeases: (registration) => this.#drainRegistrationLeases(registration),
       runBeforeRelease: (registration) => this.#removalRuntime.runBeforeRelease(registration),
@@ -599,6 +615,7 @@ export class PluginHost<
       }
     })
     this.#configRuntime = new PluginHostConfigRuntime({
+      invokeHook: this.#invokeHook,
       registrations: this.#state.registrations,
       assertActive: () => this.#assertActive(),
       isSetupPending: () => this.#setupPending !== undefined,
@@ -757,7 +774,7 @@ export class PluginHost<
   }
 
   #assertMutationAllowed(): void {
-    if (this.#hookRegistration)
+    if (this.#hookRegistration || this.#hookInvocationDepth > 0)
       throw attachPluginHostIdentity(
         new PluginHostError(PluginHostErrorCode.lifecycleMutation, ERROR_TEXT.LIFECYCLE_MUTATION),
         this
@@ -933,6 +950,9 @@ export class PluginHost<
   /** Explicitly activates one lazy plugin; concurrent callers receive one Promise identity. */
   activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>> {
     this.#assertActive()
+    // Direct hook nesting must reject before coalescing. After an await, callers share the
+    // request regardless of origin; a finite operation deadline bounds any resulting self-wait.
+    if (this.#hookInvocationDepth > 0) this.#assertMutationAllowed()
     const current = this.#activationRequests.get(name)
     if (current) return current
     this.#assertMutationAllowed()

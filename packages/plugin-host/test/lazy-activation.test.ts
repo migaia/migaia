@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import {
   defineFeature,
   definePlugin,
@@ -9,6 +10,95 @@ import {
 } from '../src/index.js'
 
 describe('lazy activation', () => {
+  it.each(['setup', 'install'] as const)(
+    'PHA-T1 rejects synchronous %s activation reentry before sharing the pending request',
+    async (phase) => {
+      /** Reentry targets the same public registration and pending activation. */
+      const host = new PluginHost<Record<string, never>>({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
+      /** A synchronous hook must not receive the Promise that depends on its own completion. */
+      const reenter = () => {
+        expect(() => host.activate('reentrant')).toThrow(
+          expect.objectContaining({ code: PluginHostErrorCode.lifecycleMutation })
+        )
+        return {}
+      }
+      /** Definition overloads preserve whether setup is present in the supported public API. */
+      const plugin =
+        phase === 'setup'
+          ? definePlugin({
+              name: 'reentrant',
+              activation: 'lazy',
+              setup: reenter,
+              install: () => ({})
+            })
+          : definePlugin({ name: 'reentrant', activation: 'lazy', install: reenter })
+      await host.use(plugin)
+      await host.activate('reentrant')
+      await host.dispose()
+    }
+  )
+
+  it.each([false, 20] as const)(
+    'PHA-T2 shares asynchronous activation callers with mutationTimeoutMs=%s',
+    async (timeout) => {
+      /** The operation deadline advances only when the test explicitly advances its clock. */
+      const scheduler = createManualScheduler()
+      const host = new PluginHost<Record<string, never>>({
+        scheduler,
+        execution: { mutationTimeoutMs: timeout, pipelineDrainTimeoutMs: false }
+      })
+      /** Resolves once the hook has entered, so the outside request runs during its await. */
+      let entered!: () => void
+      const started = new Promise<void>((resolve) => {
+        entered = resolve
+      })
+      /** Allows the asynchronous hook continuation to read the shared request. */
+      let proceed!: () => void
+      const gate = new Promise<void>((resolve) => {
+        proceed = resolve
+      })
+      /** Signals that the continuation has captured its exact public Promise identity. */
+      let observed!: () => void
+      const captured = new Promise<void>((resolve) => {
+        observed = resolve
+      })
+      /** An await continuation has no portable hook-origin identity. */
+      let inside: ReturnType<typeof host.activate> | undefined
+      await host.use(
+        definePlugin({
+          name: 'asynchronous',
+          activation: 'lazy',
+          install: async () => {
+            entered()
+            await gate
+            inside = host.activate('asynchronous')
+            observed()
+            if (timeout !== false) await inside
+            return {}
+          }
+        })
+      )
+      const first = host.activate('asynchronous')
+      await started
+      expect(host.activate('asynchronous')).toBe(first)
+      proceed()
+      await captured
+      expect(inside).toBe(first)
+      if (timeout === false) await first
+      else {
+        /** Observe rejection before the deterministic deadline breaks the self-dependency. */
+        const rejected = expect(first).rejects.toMatchObject({
+          code: PluginHostErrorCode.mutationExecutionTimeout
+        })
+        scheduler.advance(timeout)
+        await rejected
+      }
+      await host.dispose()
+    }
+  )
+
   it('PHL-T1 PH-B2 releases committed resources after shared publication fails on a non-extensible Host', async () => {
     /** Non-extensible Host instances already support public handle publication. */
     const host = new PluginHost<Record<string, never>>({

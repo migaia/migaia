@@ -11,6 +11,8 @@ import type {
 } from './typing.js'
 
 type IPluginHostConfigRuntimePort<TDomainCore extends object, TValue> = Readonly<{
+  /** Host-owned synchronous hook boundary, without changing the update result identity. */
+  readonly invokeHook: <T>(invoke: () => T) => T
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly assertActive: () => void
   readonly isSetupPending: () => boolean
@@ -100,10 +102,11 @@ export class PluginHostConfigRuntime<
         if (registration.plugin.update) {
           this.#port.beginOperation(registration)
           this.#port.setHookRegistration(registration)
-          const updateResult = invokeCaptured(
-            registration.plugin.update,
-            registration.plugin.owner,
-            [next as never, this.#port.createCore(registration)]
+          const updateResult = this.#port.invokeHook(() =>
+            invokeCaptured(registration.plugin.update!, registration.plugin.owner, [
+              next as never,
+              this.#port.createCore(registration)
+            ])
           )
           await this.#port.awaitOperation(updateResult, registration)
           this.#port.assertOperationCurrent(registration)

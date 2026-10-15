@@ -103,6 +103,8 @@ await host.dispose()
 
 `activation: 'lazy'` 的插件在 `use()` 时只登记不安装；`await host.activate(name)` 先按依赖顺序激活它必需的惰性 provider 再安装自身，并发调用共享同一个 Promise。非惰性插件安装时会先激活它必需的已登记惰性 provider；依赖校验失败时不激活任何插件。同步的 `useSync()` 无法等待激活，遇到未激活的必需 provider 抛 `PLUGIN_NOT_ACTIVATED`。
 
+同步生命周期 hook（含 setup、install、feature/expose、update、beforeRelease、dispose、启停通知及依赖换绑）内调用 `activate()` 会在共享请求查找之前同步抛 `LIFECYCLE_MUTATION`；hook 等待期间，外部同名调用继续获得同一个 Promise。运行时没有异步上下文：hook 在 `await` 后再调用 `activate()` 激活同一注册，也会获得该共享 Promise。如果 hook 等待它，就形成自等待；有限 `execution.mutationTimeoutMs` 到期后以 `MUTATION_EXECUTION_TIMEOUT` 失败并回滚。`mutationTimeoutMs: false` 关闭执行超时，该自等待可能一直挂起；请在 hook 外发起激活。
+
 ---
 
 <a id="host-构造与生命周期-api"></a>
