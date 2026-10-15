@@ -2079,6 +2079,16 @@ const storeLightCreationOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
 const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuide[]>> = {
   en: [
     {
+      name: 'factory',
+      description:
+        'Loader function or object-form config. The load context carries an abort signal, generation, and identity token.',
+      defaultValue: 'required',
+      optional: false,
+      type: 'IStoreResourceFactory<T> | IStoreResourceConfig<T>',
+      whenToUse: 'Create a Suspense-readable async value with explicit ownership.',
+      example: 'createStoreResource(({ signal }) => fetchUser(signal))'
+    },
+    {
       name: 'runtime',
       description: 'Owns deferred cleanup and diagnostics.',
       defaultValue: 'defaultRuntime',
@@ -2093,16 +2103,6 @@ const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
       type: 'IScheduler',
       whenToUse: 'Control timer scheduling, cancellation and optional unref in the host.',
       example: '{ scheduler }'
-    },
-    {
-      name: 'factory',
-      description:
-        'Loader function or object-form config. The load context carries an abort signal, generation, and identity token.',
-      defaultValue: 'required',
-      optional: false,
-      type: 'IStoreResourceFactory<T> | IStoreResourceConfig<T>',
-      whenToUse: 'Create a Suspense-readable async value with explicit ownership.',
-      example: 'createStoreResource(({ signal }) => fetchUser(signal))'
     },
     {
       name: 'keepAliveMs',
@@ -2143,6 +2143,16 @@ const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
   ],
   zh: [
     {
+      name: 'factory',
+      description:
+        'loader function 或 object-form config；load context 提供 abort signal、generation 与 identity token。',
+      defaultValue: '必填',
+      optional: false,
+      type: 'IStoreResourceFactory<T> | IStoreResourceConfig<T>',
+      whenToUse: '创建带显式 ownership 的 Suspense-readable async value。',
+      example: 'createStoreResource(({ signal }) => fetchUser(signal))'
+    },
+    {
       name: 'runtime',
       description: '拥有延迟清理和诊断出口。',
       defaultValue: 'defaultRuntime',
@@ -2157,16 +2167,6 @@ const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
       type: 'IScheduler',
       whenToUse: '控制宿主的 timer 调度、取消与可选 unref。',
       example: '{ scheduler }'
-    },
-    {
-      name: 'factory',
-      description:
-        'loader function 或 object-form config；load context 提供 abort signal、generation 与 identity token。',
-      defaultValue: '必填',
-      optional: false,
-      type: 'IStoreResourceFactory<T> | IStoreResourceConfig<T>',
-      whenToUse: '创建带显式 ownership 的 Suspense-readable async value。',
-      example: 'createStoreResource(({ signal }) => fetchUser(signal))'
     },
     {
       name: 'keepAliveMs',
