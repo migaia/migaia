@@ -1,3 +1,4 @@
+import type { TrayShutdownMode } from '../state-constants.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IExtractPluginExt, IPluginConstraint } from '@migaia/plugin-host'
 
@@ -43,7 +44,7 @@ export type IRuntimeRunOptions = Readonly<{
 
 /** Runtime shutdown policy. */
 export type IRuntimeShutdownOptions = Readonly<{
-  readonly mode: 'bounded' | 'strict-drain'
+  readonly mode: TrayShutdownMode
   readonly quiescenceMs?: number
 }>
 

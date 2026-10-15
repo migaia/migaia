@@ -56,10 +56,10 @@
     "@migaia/rpc-core": "workspace:^",
     "@migaia/rpc-process": "workspace:^",
     "@migaia/rpc-threads": "workspace:^",
+    "@migaia/supervision": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
-    "@migaia/supervision": "workspace:^",
     "typescript": "~6.0.2",
     "vitest": "4.1.10"
   }

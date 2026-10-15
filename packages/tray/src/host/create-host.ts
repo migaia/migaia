@@ -1,10 +1,11 @@
+import { TrayShutdownMode } from '../state-constants.js'
 import { mergeCleanupResults } from '@migaia/lifecycle'
 import {
   createDynamicCapabilityGraph,
   type IDynamicCapabilityGraph,
   type IDynamicGraphNodeDefinition
 } from '@migaia/capability/graph/dynamic'
-import type { IGraphNodeId } from '@migaia/capability/graph'
+import { CapabilityGraphNodeState, type IGraphNodeId } from '@migaia/capability/graph'
 import { createEventHub } from '@migaia/event-subscriber'
 import type { IEventContext } from '@migaia/event-subscriber'
 import {
@@ -204,7 +205,7 @@ export async function createHost<
           { beforeCleanup: fence }
         )
         const bounded =
-          captured.shutdown.mode === 'strict-drain'
+          captured.shutdown.mode === TrayShutdownMode['strict-drain']
             ? { complete: true as const, value: await removalPromise }
             : await settleWithin(removalPromise, captured.quiescenceMs)
         if (!bounded.complete) {
@@ -221,7 +222,7 @@ export async function createHost<
         cleanup.errors.push(...removal.cleanupErrors)
         cleanup.complete = cleanup.complete && removal.cleanupComplete
         if (removal.physicalCompletion) {
-          if (captured.shutdown.mode === 'strict-drain') {
+          if (captured.shutdown.mode === TrayShutdownMode['strict-drain']) {
             const physicalResult = await removal.physicalCompletion
             cleanup.errors.push(...physicalResult.cleanupErrors)
             cleanup.complete = cleanup.complete && physicalResult.cleanupErrors.length === 0
@@ -397,7 +398,8 @@ function snapshotOptions<
     !Number.isFinite(quiescenceMs) ||
     quiescenceMs < 0 ||
     !shutdown ||
-    (shutdown.mode !== 'bounded' && shutdown.mode !== 'strict-drain')
+    (shutdown.mode !== TrayShutdownMode.bounded &&
+      shutdown.mode !== TrayShutdownMode['strict-drain'])
   )
     throw createTrayError(TrayErrorCode.invalidEntry)
   return Object.freeze({
@@ -525,7 +527,9 @@ function createManagedHost(
     get readyPlugins() {
       assertReadable()
       return Object.freeze(
-        [...graph.nodes].filter((id) => graph.nodeState(id).state === 'ready').map(String)
+        [...graph.nodes]
+          .filter((id) => graph.nodeState(id).state === CapabilityGraphNodeState.ready)
+          .map(String)
       )
     },
     get state() {
@@ -560,7 +564,7 @@ function createManagedHost(
       try {
         return graph.nodeState(name as IGraphId).state
       } catch {
-        return 'blocked'
+        return CapabilityGraphNodeState.blocked
       }
     },
     on<TKey extends keyof ITrayHostEventMap>(
