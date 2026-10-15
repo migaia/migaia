@@ -303,7 +303,8 @@ describe('record construction rollback matrix', () => {
     }
 
     expect(thrown).toBe(primary)
-    expect((thrown as Error).cause).toBe(cleanup)
+    // Cleanup failures are appended to the primary's non-enumerable `errors`, never its `cause`.
+    expect((thrown as { errors?: readonly unknown[] }).errors).toContain(cleanup)
     expect(allocations.size).toBe(0)
   })
 
