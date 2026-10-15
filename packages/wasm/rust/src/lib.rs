@@ -1,4 +1,5 @@
 use std::{
+    alloc::{self, Layout},
     cell::RefCell,
     collections::HashMap,
     io::{self, Cursor, Write},
@@ -65,25 +66,54 @@ thread_local! {
     static ARENA: RefCell<Arena> = RefCell::new(Arena::new());
 }
 
+/// Allocates a zeroed block of `words` u64 words without aborting on OOM.
+///
+/// Mirrors `vec![0u64; words]` (including its zeroed-allocation fast path) but
+/// returns `None` instead of calling `handle_alloc_error`. On wasm32 that
+/// handler traps while the caller holds the `ARENA` borrow; the `RefCell` flag
+/// is never reset, so every later export traps too and the module is lost.
+fn try_zeroed_block(words: usize) -> Option<Block> {
+    if words == 0 {
+        return Some(Block::new());
+    }
+    let layout = Layout::array::<u64>(words).ok()?;
+    // SAFETY: `layout` has a non-zero size because `words > 0`.
+    let data = unsafe { alloc::alloc_zeroed(layout) }.cast::<u64>();
+    if data.is_null() {
+        return None;
+    }
+    // SAFETY: `data` comes from the global allocator with the exact layout of
+    // a `Vec<u64>` of capacity `words`, and every word is initialised to zero.
+    Some(unsafe { Vec::from_raw_parts(data, words, words) })
+}
+
+/// Inserts a zeroed `words`-sized block under a fresh id.
+///
+/// Every allocation on this path is fallible, so exhaustion of linear memory
+/// or of the id space returns `None` and leaves the arena usable.
+fn insert_zeroed_block(arena: &mut Arena, words: usize) -> Option<u32> {
+    let block = try_zeroed_block(words)?;
+    arena.map.try_reserve(1).ok()?;
+    let id = arena.fresh_id();
+    if id == NULL_ID {
+        return None;
+    }
+    arena.map.insert(id, block);
+    Some(id)
+}
+
 /// Allocate an 8-byte-aligned, zeroed buffer of at least `byte_len` bytes.
 ///
-/// Returns a stable allocation id, or `0` (`NULL_ID`) if the id space is
-/// exhausted. The buffer never moves for the lifetime of the id, so a pointer
-/// from [`ptr_of`] stays valid until [`dealloc_bytes`] — suitable for exposing
-/// as a contiguous numeric typed array on the JS side.
+/// Returns a stable allocation id, or `0` (`NULL_ID`) if the id space or
+/// linear memory is exhausted. The buffer never moves for the lifetime of the
+/// id, so a pointer from [`ptr_of`] stays valid until [`dealloc_bytes`] —
+/// suitable for exposing as a contiguous numeric typed array on the JS side.
 #[wasm_bindgen]
 pub fn alloc_bytes(byte_len: u32) -> u32 {
     // round up to whole u64 words so the whole requested range is backed
     let words = (byte_len as usize).div_ceil(8);
 
-    ARENA.with(|arena| {
-        let mut arena = arena.borrow_mut();
-        let id = arena.fresh_id();
-        if id != NULL_ID {
-            arena.map.insert(id, vec![0u64; words]);
-        }
-        id
-    })
+    ARENA.with(|arena| insert_zeroed_block(&mut arena.borrow_mut(), words).unwrap_or(NULL_ID))
 }
 
 /// Byte pointer into wasm linear memory for `id`. Guaranteed 8-byte aligned.
@@ -208,7 +238,16 @@ impl Write for ArenaWriter<'_> {
             let doubled = capacity.max(8).checked_mul(2).ok_or_else(|| {
                 io::Error::new(io::ErrorKind::WriteZero, "conversion output is too large")
             })?;
-            block.resize(doubled.max(required).div_ceil(8), 0);
+            let words = doubled.max(required).div_ceil(8);
+            // Fallible growth: an aborting `resize` would trap inside the arena
+            // borrow, so OOM fails this conversion through `io::Error` instead.
+            block.try_reserve_exact(words - block.len()).map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::OutOfMemory,
+                    "conversion output allocation failed",
+                )
+            })?;
+            block.resize(words, 0);
         }
         let destination = unsafe {
             std::slice::from_raw_parts_mut(block.as_mut_ptr() as *mut u8, block.len() * 8)
@@ -234,13 +273,7 @@ impl Write for ArenaWriter<'_> {
 
 /// Allocates an output block while the caller already owns the arena borrow.
 fn allocate_output(arena: &mut Arena, byte_len: usize) -> Option<u32> {
-    let words = byte_len.div_ceil(8);
-    let id = arena.fresh_id();
-    if id == NULL_ID {
-        return None;
-    }
-    arena.map.insert(id, vec![0u64; words]);
-    Some(id)
+    insert_zeroed_block(arena, byte_len.div_ceil(8))
 }
 
 /// Returns the input pointer and requested byte length without cloning input.
