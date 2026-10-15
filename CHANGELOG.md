@@ -15,6 +15,10 @@
 
 ### Behavior
 
+- Synchronous lifecycle disposal uses the same descriptor admission and ordering
+  as asynchronous disposal. A descriptor changed to an invalid force or order
+  after registration reports `INVALID_OPTION` while other valid resources still
+  release, rather than leaking a raw TypeError or sorting with NaN.
 - Calling lifecycle scope `own()` from outside a synchronous disposer callback
   while teardown is pending reports `SCOPE_CLOSED`. Previously it incorrectly
   reported `SCOPE_REENTRANT_OWN`; actual synchronous disposer reentry retains that
