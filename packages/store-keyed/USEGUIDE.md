@@ -35,7 +35,7 @@ errors.ts / error-code.ts / error-text.ts —— 包边界错误的构造器、�
 reactive/atom.ts       —— "实例式" atom 协议类型，只有类型和跨 Runtime 校验，无实现
 ```
 
-主入口 `@migaia/store-keyed` 一次性导出前六个文件（`atom/definition.ts`、`atom/kind-constants.ts` 的 `AtomKind`/`IAtomKind`、`atom/store.ts`、`atom/def-optics.ts`、`atom/optics-path.ts`、`family/definition.ts`、`errors.ts`）的全部公开成员——包括 `readOpticPath`/`writeOpticPath`/`KeyedSplitCache` 这类底层工具函数，它们随主入口一起发布，不是内部私有实现。额外发布的子路径是 `@migaia/store-keyed/reactive/atom`（独立协议类型），以及两个窄导出别名 `@migaia/store-keyed/atom/store`、`@migaia/store-keyed/atom/definition`。**`reactive/family.ts`（`createFamily`/`computedFamily`）是未发布的内部源码，没有出现在 `package.json` 的 `exports` 或主入口 `index.ts` 里，不能作为应用依赖**——它只在包自己的测试里被直接 import。
+主入口 `@migaia/store-keyed` 一次性导出前六个文件（`atom/definition.ts`、`atom/kind-constants.ts` 的 `AtomKind`/`IAtomKind`、`atom/store.ts`、`atom/def-optics.ts`、`atom/optics-path.ts`、`family/definition.ts`、`errors.ts`）的全部公开成员——包括 `readOpticPath`/`writeOpticPath`/`KeyedSplitCache` 这类底层工具函数，它们随主入口一起发布，不是内部私有实现。额外发布的子路径是 `@migaia/store-keyed/reactive/atom`（独立协议类型），以及两个窄导出别名 `@migaia/store-keyed/atom/store`、`@migaia/store-keyed/atom/definition`。未发布的 `createFamily`/`computedFamily` 内部实现已删除；family 由 definition 与 AtomStore 组合管理。
 
 ---
 
@@ -645,8 +645,8 @@ store.dispose(); // 释放这个作用域建出的全部实例
 **Q：`familyDef(...).forget(key)` 之后，之前拿到的旧 token 还能用吗？**
 能，旧 token 依旧是一个合法的定义，已经用它实例化过的 `AtomStore` 状态不受影响。但 `forget` 之后同一个 key 再查会创建一个**新** token，新旧 token 互不相通——如果代码里还有地方持有旧 token 并继续用它读写，会和"新 token 那一份状态"永久分裂成两份。`forget` 之后应该确保调用方统一切换到新的查找结果，不要混用。
 
-**Q：为什么 `reactive/family.ts` 里的 `createFamily`/`computedFamily` 用不了？**
-它们是包内部测试专用的未发布源码，没有出现在 `package.json` 的 `exports` 字段或主入口 `index.ts` 里，任何 `import ... from '@migaia/store-keyed/reactive/family'` 都会在构建产物里找不到该子路径。如果需要"实例式 family"的能力，应基于 `familyDef`/`derivedFamilyDef`（definition 级）加 `createAtomStore` 组合出来，或直接依赖 `@migaia/reactive` 自建。
+**Q：如何创建按 key 分组的状态？**
+使用 `familyDef`/`derivedFamilyDef` 与 `createAtomStore` 的公开组合。未发布的实例式 family 源码及其测试已删除；仅属于该实现的 `FAMILY_DISPOSED`/`EVICTION_FAILED` 错误码成员也已移除。
 
 ---
 
