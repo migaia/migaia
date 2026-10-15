@@ -8,7 +8,9 @@ export const LifecycleErrorCode = {
   /**
    * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer
    * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in
-   * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code.
+   * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also
+   * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or
+   * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string.
    */
   scopeClosed: 'SCOPE_CLOSED',
 
@@ -59,7 +61,8 @@ export const LifecycleErrorCode = {
   /**
    * Identifies a result discarded at commit because a newer generation supersedes it. This is
    * normal race handling rather than an operation failure. Callers usually ignore it unless
-   * diagnostics need to observe the event.
+   * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted
+   * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack.
    */
   generationSuperseded: 'GENERATION_SUPERSEDED',
 
@@ -73,9 +76,17 @@ export const LifecycleErrorCode = {
 
   /**
    * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create
-   * a new controller.
+   * a new controller. Also tags the `signal.reason` of the active generation aborted when a
+   * `LifecycleUnit` is disposed; the work it carried must stop and is not retried.
    */
   generationDisposed: 'GENERATION_DISPOSED',
+
+  /**
+   * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget
+   * elapsed. The generation is no longer current; start a new generation to retry, or raise the
+   * budget. Not thrown by the controller itself; consumers see it through the aborted signal.
+   */
+  generationTimedOut: 'GENERATION_TIMED_OUT',
 
   /**
    * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing,
@@ -94,7 +105,8 @@ export const LifecycleErrorCode = {
    * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects
    * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including
    * rollback after failed-commit compensation. Commit and rollback are alternative terminal
-   * actions. Check callers that try to register or commit again.
+   * actions. Check callers that try to register or commit again. Also tags the provisional
+   * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one.
    */
   provisionalSettled: 'PROVISIONAL_SETTLED',
 

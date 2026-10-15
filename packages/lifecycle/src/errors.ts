@@ -1,7 +1,8 @@
 import type { ICollectedError, IErrorPolicy } from './types.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
+import { attachErrorIdentity, attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 import { assimilateCapturedThen, probeThenable, type IThenableProbe } from '@migaia/utils/function'
 import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
 export { assimilateCapturedThen, probeThenable }
 export type { IThenableProbe }
 
@@ -20,8 +21,8 @@ export type ILifecycleError = Error & {
   readonly detail?: Readonly<Record<string, unknown>>
   readonly cause?: unknown
   /**
-   * Stores a frozen snapshot of secondary failures such as cleanup errors. Keeps them separate from
-   * `cause` so the primary error retains its identity.
+   * Stores a frozen, non-enumerable list of secondary failures such as cleanup errors, appended in
+   * occurrence order. Keeps them separate from `cause` so the primary error retains its identity.
    */
   readonly errors?: readonly unknown[]
 }
@@ -80,13 +81,41 @@ export function createLifecycleError(
   if (options?.detail !== undefined) {
     Object.defineProperty(error, 'detail', { value: options.detail, enumerable: true })
   }
-  if (options?.errors !== undefined && options.errors.length > 0) {
-    Object.defineProperty(error, 'errors', {
-      value: Object.freeze([...options.errors]),
-      enumerable: true
-    })
-  }
+  if (options?.errors !== undefined) attachSecondaryErrors(error, options.errors)
   return error as ILifecycleError
+}
+
+/**
+ * Lifecycle's single entry point for attaching secondary failures (cleanup, rollback, cancellation)
+ * to a primary failure. Delegates to `@migaia/utils/error` `attachSecondaryErrors`, which appends
+ * to any existing `errors` list as a non-enumerable, frozen array and keeps the primary's identity.
+ * Entries identical to the primary and repeated entries are dropped first. When the primary cannot
+ * carry the list (primitive, frozen, hostile `errors` accessor), the returned `AggregateError`
+ * fallback lists the primary first, takes the primary's reason (or `fallbackMessage`) as its
+ * message and is tagged with `fallbackCode` (`SCOPE_DISPOSAL_FAILED` unless the call site owns a
+ * narrower code). Returns the value the caller must throw or reject with.
+ */
+export function attachLifecycleSecondaryErrors(
+  primary: unknown,
+  secondaryErrors: readonly unknown[],
+  fallbackMessage: string,
+  fallbackCode: string = LifecycleErrorCode.scopeDisposalFailed
+): unknown {
+  /** Secondary failures without the primary itself or repeated objects, in first-seen order. */
+  const distinct = secondaryErrors.filter(
+    (error, index) => error !== primary && secondaryErrors.indexOf(error) === index
+  )
+  /** Either the primary (attached in place) or utils' freshly built AggregateError fallback. */
+  const attached = attachSecondaryErrors(primary, distinct)
+  if (attached === primary) return primary
+  // The fallback aggregate is a fresh object owned by this call, so giving it a message is safe.
+  Object.defineProperty(attached, 'message', {
+    configurable: true,
+    enumerable: false,
+    value: safeErrorReason(primary, fallbackMessage),
+    writable: true
+  })
+  return tagLifecycleError(attached as AggregateError, fallbackCode)
 }
 
 /**
@@ -212,6 +241,42 @@ export function containAsyncRejection(value: unknown, onRejected: (error: unknow
   })
 }
 
+/**
+ * Hands `error` to a caller-supplied reporter, the last error boundary of a lifecycle operation.
+ * The reporter's own synchronous throw and async rejection are contained here because no lower
+ * layer exists to receive them (L-T26, L-T35). An absent reporter makes this a no-op.
+ */
+export function safeReport(report: ((error: unknown) => void) | undefined, error: unknown): void {
+  if (!report) return
+  try {
+    const result: unknown = report(error)
+    containAsyncRejection(result, () => {
+      // The reporter's own async failure has no lower layer to report to; it terminates here.
+    })
+  } catch {
+    // The reporter is the last error boundary for its own failures too (L-T35).
+  }
+}
+
+/**
+ * Rejects, at the creating factory, an error policy whose only observation channel is a reporter
+ * that was not supplied. `report` hands every failure to the reporter and `firstError` hands every
+ * failure after the first to it; without one those failures would vanish (X2=a, LC-B5). Throws an
+ * `INVALID_OPTION` TypeError carrying `detail.field = 'report'`.
+ */
+export function assertErrorPolicyReporter(
+  policy: IErrorPolicy,
+  report: ((error: unknown) => void) | undefined
+): void {
+  if (policy !== 'report' && policy !== 'firstError') return
+  if (typeof report === 'function') return
+  throw createLifecycleTypeError(
+    LifecycleErrorCode.invalidOption,
+    LifecycleErrorText.errorPolicyReporterMissing,
+    { detail: { field: 'report', errorPolicy: policy } }
+  )
+}
+
 /** Collects errors under one of the four policies (D-4) and produces the correct finalize behavior. */
 export type IErrorCollector = {
   readonly policy: IErrorPolicy
@@ -233,17 +298,8 @@ export function createErrorCollector(
   let firstError: unknown
   let hasFirstError = false
 
-  const invokeReport = (error: unknown): void => {
-    if (!report) return
-    try {
-      const result: unknown = report(error)
-      containAsyncRejection(result, () => {
-        // The reporter's own async failure has no lower layer to report to; it terminates here.
-      })
-    } catch {
-      // The reporter is the last error boundary for its own failures too (L-T35).
-    }
-  }
+  /** Hands one failure to the configured reporter under the shared containment rules. */
+  const invokeReport = (error: unknown): void => safeReport(report, error)
 
   return {
     policy,
@@ -258,7 +314,7 @@ export function createErrorCollector(
           firstError = error
         } else {
           // L-T38：后续错误必须被观测，但不得改变「首错原样抛出」的结果。经 reporter 观测（与 `report`
-          // 策略同通道），绝不静默吞掉；无 reporter 时与 `report` 策略一致地降级为无观测通道。
+          // 策略同通道），绝不静默吞掉；reporter 由创建方经 `assertErrorPolicyReporter` 保证存在。
           invokeReport(error)
         }
         return

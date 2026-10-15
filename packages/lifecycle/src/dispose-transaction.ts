@@ -1,21 +1,21 @@
 import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
 import type { IDisposerContext } from './disposer-context.js'
 import {
+  assertErrorPolicyReporter,
   assimilateCapturedThen,
-  containAsyncRejection,
+  attachLifecycleSecondaryErrors,
   createErrorCollector,
   createLifecycleError,
   createLifecycleTypeError,
   probeThenable,
-  tagLifecycleError
+  safeReport
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 import { boundedWait } from './bounded-wait.js'
-import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import {
-  resolveScheduler,
+  defaultLifecycleScheduler,
   resolveSchedulerOption,
   addSchedulerTime,
   validateSchedulerDelay,
@@ -58,10 +58,20 @@ const assimilateThenable = (
   }
 }
 
-async function runCallback(
+/** A synchronous result, or a Promise of it once a release callback returned a thenable (LC-P4). */
+type IMaybePromise<T> = T | Promise<T>
+
+/** Shared successful callback outcome; outcomes are read-only, so one instance serves every call. */
+const callbackSucceeded: ICallbackOutcome = Object.freeze({ ok: true })
+
+/**
+ * Runs one release callback. Stays synchronous when the callback returns a non-thenable, so an
+ * all-synchronous release chain costs no microtask turn; only a thenable result yields a Promise.
+ */
+function runCallback(
   callback: (context: IReleaseContext) => void | PromiseLike<void>,
   context: IReleaseContext
-): Promise<ICallbackOutcome> {
+): IMaybePromise<ICallbackOutcome> {
   let result: void | PromiseLike<void>
   try {
     result = callback(context)
@@ -70,13 +80,11 @@ async function runCallback(
   }
   const assimilated = assimilateThenable(result)
   if (assimilated.kind === ThenableProbeKind.failed) return { ok: false, error: assimilated.error }
-  if (assimilated.kind === 'not-thenable') return { ok: true }
-  try {
-    await assimilated.promise
-    return { ok: true }
-  } catch (error) {
-    return { ok: false, error }
-  }
+  if (assimilated.kind === 'not-thenable') return callbackSucceeded
+  return assimilated.promise.then(
+    () => callbackSucceeded,
+    (error: unknown): ICallbackOutcome => ({ ok: false, error })
+  )
 }
 
 /**
@@ -100,14 +108,18 @@ type IGracefulOutcome =
   | { readonly ok: false; readonly error: unknown }
   | { readonly ok: false; readonly timedOut: true }
 
-async function raceGraceful(
+/**
+ * Runs `graceful` against its budget. A synchronous graceful settles synchronously (LC-P4); a
+ * thenable result continues in `awaitGraceful` with the clock sample taken before user code ran.
+ */
+function raceGraceful(
   graceful: (context: IReleaseContext) => void | PromiseLike<void>,
   context: IReleaseContext,
   gracefulTimeoutMs: number | undefined
-): Promise<IGracefulOutcome> {
+): IMaybePromise<IGracefulOutcome> {
   // Start the graceful budget before user code runs so synchronous work cannot earn a fresh
   // timeout after it has already consumed the caller's budget.
-  const scheduler = context.scheduler ?? resolveScheduler(systemScheduler)
+  const scheduler = context.scheduler ?? defaultLifecycleScheduler
   const start = scheduler.now()
   const effectiveDeadline = computeEffectiveDeadline(gracefulTimeoutMs, context.deadlineAt, start)
   let result: void | PromiseLike<void>
@@ -130,13 +142,23 @@ async function raceGraceful(
         )
       )
     }
-    return { ok: true }
+    return callbackSucceeded
   }
-  const promise = assimilated.promise
+  return awaitGraceful(assimilated.promise, context, scheduler, start, effectiveDeadline)
+}
+
+/** Waits for an asynchronous graceful phase within its effective deadline. */
+async function awaitGraceful(
+  promise: Promise<void>,
+  context: IReleaseContext,
+  scheduler: IScheduler,
+  start: number,
+  effectiveDeadline: number | undefined
+): Promise<IGracefulOutcome> {
   if (effectiveDeadline === undefined) {
     try {
       await promise
-      return { ok: true }
+      return callbackSucceeded
     } catch (error) {
       return { ok: false, error }
     }
@@ -149,18 +171,21 @@ async function raceGraceful(
     context.report(
       createLifecycleError(
         LifecycleErrorCode.deadlineExceeded,
-        '[lifecycle] shared deadline already passed before this graceful phase could start'
+        LifecycleErrorText.sharedDeadlinePassed
       )
     )
     return { ok: false, timedOut: true }
   }
   try {
     const won = await boundedWait(promise, effectiveDeadline, { scheduler })
-    return won ? { ok: true } : { ok: false, timedOut: true }
+    return won ? callbackSucceeded : { ok: false, timedOut: true }
   } catch (error) {
     return { ok: false, error }
   }
 }
+
+/** Shared empty error list for a fully successful release; never mutated. */
+const noReleaseErrors: readonly unknown[] = Object.freeze([])
 
 /**
  * Runs the descriptor's degrade chain for exactly one resource: `custom` (if present, skips
@@ -169,12 +194,90 @@ async function raceGraceful(
  * Returns every error raised along the way (empty on full success) instead of throwing, so the
  * caller can attribute them to the right item and fold them into whatever error policy is active.
  * `graceful` throwing (not timing out) does not stop `force` from running (L-T24); a `graceful`
- * timeout abandons waiting without cancelling it and silently proceeds to `force` (L-T23).
+ * timeout abandons waiting without cancelling it and silently proceeds to `force` (L-T23). The
+ * result is synchronous while every callback returns synchronously (LC-P4). `context` must already
+ * be admitted: the transaction builds its own, and `executeReleaseDescriptor` normalizes a public
+ * one.
  */
-async function executeAdmittedReleaseDescriptor(
+function executeAdmittedReleaseDescriptor(
   descriptor: IReleaseDescriptor,
   context: IReleaseContext
-): Promise<readonly unknown[]> {
+): IMaybePromise<readonly unknown[]> {
+  if (descriptor.custom) {
+    const outcome = runCallback(descriptor.custom, context)
+    return outcome instanceof Promise ? outcome.then(outcomeErrors) : outcomeErrors(outcome)
+  }
+  const errors: unknown[] = []
+  if (descriptor.graceful) {
+    const gracefulOutcome = raceGraceful(descriptor.graceful, context, descriptor.gracefulTimeoutMs)
+    return gracefulOutcome instanceof Promise
+      ? gracefulOutcome.then((outcome) =>
+          continueAfterGraceful(descriptor, context, errors, outcome)
+        )
+      : continueAfterGraceful(descriptor, context, errors, gracefulOutcome)
+  }
+  return runForce(descriptor, context, errors)
+}
+
+/** Maps a `custom` callback outcome to the item's error list. */
+const outcomeErrors = (outcome: ICallbackOutcome): readonly unknown[] =>
+  outcome.ok ? noReleaseErrors : [outcome.error]
+
+/** Ends the chain on graceful success; otherwise records a graceful throw and runs `force`. */
+function continueAfterGraceful(
+  descriptor: IReleaseDescriptor,
+  context: IReleaseContext,
+  errors: unknown[],
+  outcome: IGracefulOutcome
+): IMaybePromise<readonly unknown[]> {
+  if (outcome.ok) return noReleaseErrors
+  if (!('timedOut' in outcome)) errors.push(outcome.error)
+  return runForce(descriptor, context, errors)
+}
+
+/** Runs `force`, the unconditional last phase, and appends its failure to `errors`. */
+function runForce(
+  descriptor: IReleaseDescriptor,
+  context: IReleaseContext,
+  errors: unknown[]
+): IMaybePromise<readonly unknown[]> {
+  const forceOutcome = runCallback(descriptor.force, context)
+  return forceOutcome instanceof Promise
+    ? forceOutcome.then((outcome) => finishForce(context, errors, outcome))
+    : finishForce(context, errors, forceOutcome)
+}
+
+/** Records a failed `force` on the diagnostic channel and in the item's error list. */
+function finishForce(
+  context: IReleaseContext,
+  errors: unknown[],
+  forceOutcome: ICallbackOutcome
+): readonly unknown[] {
+  if (!forceOutcome.ok) {
+    // The collector keeps the raw, caller-produced error untouched (so `throw` policy's single-error
+    // case still throws it exactly as-is) — this tagged wrapper is a parallel diagnostic channel
+    // only, carrying `(source, code)` for callers that want that without losing the raw error's own
+    // identity/type.
+    context.report(
+      createLifecycleError(
+        LifecycleErrorCode.releaseForceFailed,
+        LifecycleErrorText.releaseForceFailed,
+        {
+          cause: forceOutcome.error
+        }
+      )
+    )
+    errors.push(forceOutcome.error)
+  }
+  return errors
+}
+
+/**
+ * Reads a caller-supplied release context once and re-admits its scheduler, so the public
+ * `executeReleaseDescriptor` path sees one stable snapshot. Accessor failures become
+ * `INVALID_OPTION`; an invalid `deadlineAt` throws its clock-domain error.
+ */
+function normalizeReleaseContext(context: IReleaseContext): IReleaseContext {
   let signal: IReleaseContext['signal']
   let deadlineAt: number | undefined
   let schedulerOption: unknown
@@ -197,44 +300,15 @@ async function executeAdmittedReleaseDescriptor(
   const scheduler = resolveSchedulerOption({ scheduler: schedulerOption })
   const hasSchedulerGetter =
     Object.getOwnPropertyDescriptor(context, 'scheduler')?.get !== undefined
-  const normalizedContext: IReleaseContext =
-    scheduler === undefined && !hasSchedulerGetter
-      ? context
-      : {
-          signal,
-          deadlineAt,
-          scheduler,
-          report,
-          disposer
-        }
-  if (descriptor.custom) {
-    const outcome = await runCallback(descriptor.custom, normalizedContext)
-    return outcome.ok ? [] : [outcome.error]
-  }
-  const errors: unknown[] = []
-  if (descriptor.graceful) {
-    const gracefulOutcome = await raceGraceful(
-      descriptor.graceful,
-      normalizedContext,
-      descriptor.gracefulTimeoutMs
-    )
-    if (gracefulOutcome.ok) return []
-    if (!('timedOut' in gracefulOutcome)) errors.push(gracefulOutcome.error)
-  }
-  const forceOutcome = await runCallback(descriptor.force, normalizedContext)
-  if (!forceOutcome.ok) {
-    // The collector keeps the raw, caller-produced error untouched (so `throw` policy's single-error
-    // case still throws it exactly as-is) — this tagged wrapper is a parallel diagnostic channel
-    // only, carrying `(source, code)` for callers that want that without losing the raw error's own
-    // identity/type.
-    normalizedContext.report(
-      createLifecycleError(LifecycleErrorCode.releaseForceFailed, '[lifecycle] force() failed', {
-        cause: forceOutcome.error
-      })
-    )
-    errors.push(forceOutcome.error)
-  }
-  return errors
+  return scheduler === undefined && !hasSchedulerGetter
+    ? context
+    : {
+        signal,
+        deadlineAt,
+        scheduler,
+        report,
+        disposer
+      }
 }
 
 /** Admits a public release descriptor once before executing its degrade chain. */
@@ -244,7 +318,7 @@ export async function executeReleaseDescriptor(
 ): Promise<readonly unknown[]> {
   const admission = admitDescriptor(descriptor, false)
   if (!admission.ok) return [admission.error]
-  return executeAdmittedReleaseDescriptor(admission.descriptor, context)
+  return executeAdmittedReleaseDescriptor(admission.descriptor, normalizeReleaseContext(context))
 }
 
 export type IDisposeItem = {
@@ -281,6 +355,11 @@ export type IDisposeTransactionMode =
 
 export type IDisposeTransactionOptions = {
   readonly errorPolicy?: IErrorPolicy
+  /**
+   * Reporter for failures the error policy does not throw or collect. Required when `errorPolicy`
+   * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field:
+   * 'report'`.
+   */
   readonly report?: (error: unknown) => void
   /** Absolute deadline shared, unchanged, across every item in this run (L-T32). */
   readonly deadlineAt?: number
@@ -301,18 +380,6 @@ export type IDisposeTransactionOptions = {
 export type IDisposeTransaction = {
   readonly mode: IDisposeTransactionMode
   run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>
-}
-
-const safeReport = (report: ((error: unknown) => void) | undefined, error: unknown): void => {
-  if (!report) return
-  try {
-    const result: unknown = report(error)
-    containAsyncRejection(result, () => {
-      // No lower layer to escalate a reporter's own async failure to.
-    })
-  } catch {
-    // The reporter is the last error boundary for its own synchronous failures too.
-  }
 }
 
 /** Creates one tagged lifecycle error for a descriptor value that violates admission shape. */
@@ -422,20 +489,6 @@ const admitItems = (
   return { admitted, rejected }
 }
 
-/** Keeps transaction cleanup failures reachable while preserving Lifecycle's fallback identity. */
-const appendCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
-  if (cleanupErrors.length === 0) return primary
-  const attached = attachSecondaryErrors(primary, cleanupErrors)
-  if (attached === primary) return primary
-  return tagLifecycleError(
-    new AggregateError(
-      [primary, ...cleanupErrors],
-      safeErrorReason(primary, LifecycleErrorText.disposeTransactionFailed)
-    ),
-    LifecycleErrorCode.scopeDisposalFailed
-  )
-}
-
 export function createDisposeTransaction(
   mode: IDisposeTransactionMode,
   options: IDisposeTransactionOptions = {}
@@ -443,10 +496,21 @@ export function createDisposeTransaction(
   const errorPolicy = options.errorPolicy ?? 'throw'
   const scheduler = resolveSchedulerOption(options)
   const report = options.report
+  assertErrorPolicyReporter(errorPolicy, report)
   const deadlineAt = options.deadlineAt
   const signalOption = options.signal
   const pending = options.pending
   const createController = captureAbortControllerFactory()
+  /** Whether `deadlineAt` is absent or a valid scheduler time; checked once per transaction. */
+  let deadlineValid = true
+  if (deadlineAt !== undefined) {
+    try {
+      validateSchedulerTime(deadlineAt, 'deadlineAt')
+    } catch {
+      // Recorded per item at run time, matching the former per-item context admission.
+      deadlineValid = false
+    }
+  }
   return {
     mode,
     async run(items) {
@@ -479,16 +543,22 @@ export function createDisposeTransaction(
       try {
         const admission = admitItems(items, mode)
         for (const item of admission.rejected) record(item.source, item.error)
+        // Every context field is per-run, so one admitted context serves all items (LC-P4).
+        const context: IReleaseContext = {
+          signal: controller?.signal ?? inertReleaseSignal,
+          deadlineAt,
+          scheduler,
+          report: (error) => safeReport(report, error),
+          disposer: options.disposer
+        }
         for (const item of admission.admitted) {
-          const context: IReleaseContext = {
-            signal: controller?.signal ?? inertReleaseSignal,
-            deadlineAt,
-            scheduler,
-            report: (error) => safeReport(report, error),
-            disposer: options.disposer
-          }
           try {
-            const errors = await executeAdmittedReleaseDescriptor(item.descriptor, context)
+            // Each item re-checks an invalid `deadlineAt`, so every item still records its own
+            // fresh INVALID_OPTION instead of running against a broken clock.
+            if (!deadlineValid) validateSchedulerTime(deadlineAt, 'deadlineAt')
+            const pendingErrors = executeAdmittedReleaseDescriptor(item.descriptor, context)
+            // Await only a genuinely asynchronous chain; synchronous releases stay on this turn.
+            const errors = pendingErrors instanceof Promise ? await pendingErrors : pendingErrors
             for (const error of errors) record(item.source, error)
           } catch (error) {
             // Keep one unexpected item failure from preventing later admitted resources from release.
@@ -519,7 +589,11 @@ export function createDisposeTransaction(
       } catch (error) {
         const additionalCleanupErrors =
           errorPolicy === 'throw' && !cleanupErrors.includes(error) ? cleanupErrors : []
-        throw appendCleanupErrors(error, additionalCleanupErrors)
+        throw attachLifecycleSecondaryErrors(
+          error,
+          additionalCleanupErrors,
+          LifecycleErrorText.disposeTransactionFailed
+        )
       }
     }
   }
