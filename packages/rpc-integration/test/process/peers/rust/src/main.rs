@@ -211,8 +211,8 @@ fn native_envelope_valid(message: &Value) -> bool {
     true
 }
 
-/// Reject a framing header before allocating attacker-controlled payload length.
-fn read_frame(input: &mut impl Read) -> io::Result<Option<Vec<u8>>> {
+/// Apply the current connection-phase limit before allocating or reading its payload.
+fn read_frame(input: &mut impl Read, max_bytes: usize) -> io::Result<Option<Vec<u8>>> {
     let mut header = [0u8; 4];
     let mut first = [0u8; 1];
     if input.read(&mut first)? == 0 {
@@ -221,7 +221,7 @@ fn read_frame(input: &mut impl Read) -> io::Result<Option<Vec<u8>>> {
     header[0] = first[0];
     input.read_exact(&mut header[1..])?;
     let length = u32::from_be_bytes(header) as usize;
-    if !(1..=MAX_FRAME).contains(&length) {
+    if !(1..=max_bytes).contains(&length) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "invalid frame length",
@@ -247,7 +247,7 @@ fn write_frame(output: &mut impl Write, value: &Value) -> io::Result<()> {
 }
 
 fn read_json(input: &mut impl Read) -> io::Result<Option<Value>> {
-    let frame = match read_frame(input)? {
+    let frame = match read_frame(input, MAX_FRAME)? {
         Some(frame) => frame,
         None => return Ok(None),
     };
@@ -538,12 +538,9 @@ fn serve(
     required_auth: Option<&str>,
 ) -> io::Result<()> {
     let handshake_invalid = || io::Error::new(io::ErrorKind::InvalidData, "HANDSHAKE_INVALID");
-    let frame = read_frame(input)
+    let frame = read_frame(input, MAX_HANDSHAKE)
         .map_err(|_| handshake_invalid())?
         .ok_or_else(|| handshake_invalid())?;
-    if frame.len() > MAX_HANDSHAKE {
-        return Err(handshake_invalid());
-    }
     let first = json::parse(&frame).map_err(|_| handshake_invalid())?;
     let agreement = match negotiate(&first) {
         Ok(value)
@@ -1069,5 +1066,51 @@ fn main() {
         };
         eprintln!("PEER_FAIL {label}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn handshake_oversize_is_rejected_before_payload_read() {
+        let mut input = Cursor::new(((MAX_HANDSHAKE + 1) as u32).to_be_bytes());
+        let error = read_frame(&mut input, MAX_HANDSHAKE).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(input.position(), 4);
+    }
+
+    #[test]
+    fn phase_limits_accept_their_exact_boundary_without_narrowing_ready_frames() {
+        for (size, limit) in [
+            (MAX_HANDSHAKE, MAX_HANDSHAKE),
+            (MAX_HANDSHAKE + 1, MAX_FRAME),
+        ] {
+            let mut bytes = (size as u32).to_be_bytes().to_vec();
+            bytes.resize(size + 4, b' ');
+            assert_eq!(
+                read_frame(&mut Cursor::new(bytes), limit)
+                    .unwrap()
+                    .unwrap()
+                    .len(),
+                size
+            );
+        }
+    }
+
+    #[test]
+    fn duplicate_json_names_are_rejected_after_decoding_at_every_depth() {
+        for input in [
+            br#"{"auth":"a","auth":"b"}"#.as_slice(),
+            br#"{"auth":"a","\u0061uth":"b"}"#.as_slice(),
+            br#"{"outer":{"key":1,"key":2}}"#.as_slice(),
+        ] {
+            assert!(json::parse(input)
+                .unwrap_err()
+                .starts_with("duplicate JSON field at offset "));
+        }
+        assert!(json::parse(br#"{"auth":"a","nested":{"auth":"b"}}"#).is_ok());
     }
 }

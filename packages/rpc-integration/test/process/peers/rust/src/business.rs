@@ -995,7 +995,7 @@ pub(super) fn serve_bridge(
 /// Read native stdin bootstrap with the existing bounded length reader before starting hello.
 pub fn bootstrap(input: &mut impl Read) -> io::Result<String> {
     String::from_utf8(
-        read_frame(input)?
+        read_frame(input, crate::MAX_FRAME)?
             .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "BOOTSTRAP_INVALID"))?,
     )
     .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "BOOTSTRAP_INVALID"))
