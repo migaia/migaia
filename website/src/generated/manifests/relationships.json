@@ -10133,36 +10133,6 @@
     },
     {
       "from": "/en/docs/lifecycle/api",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "to": "/en/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api",
       "to": "/en/docs/lifecycle/api#lifecycle-index--IUnitState",
       "type": "api-symbol"
     },
@@ -10339,36 +10309,6 @@
     {
       "from": "/en/docs/lifecycle",
       "to": "/en/docs/lifecycle/api#lifecycle-index--LifecycleUnitState",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "to": "/en/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
       "type": "architecture-symbol"
     },
     {
@@ -11733,36 +11673,6 @@
     },
     {
       "from": "/zh/docs/lifecycle/api",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "to": "/zh/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--IThenableProbeKind",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api",
       "to": "/zh/docs/lifecycle/api#lifecycle-index--IUnitState",
       "type": "api-symbol"
     },
@@ -11939,36 +11849,6 @@
     {
       "from": "/zh/docs/lifecycle",
       "to": "/zh/docs/lifecycle/api#lifecycle-index--LifecycleUnitState",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "to": "/zh/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--ThenableProbeKind",
       "type": "architecture-symbol"
     },
     {
@@ -22443,36 +22323,6 @@
     },
     {
       "from": "/en/docs/plugin-host/api",
-      "to": "/en/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "to": "/en/docs/plugin-host/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "to": "/en/docs/plugin-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/plugin-host/getting-started",
-      "to": "/en/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "to": "/en/docs/plugin-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/plugin-host",
-      "to": "/en/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/plugin-host/api",
       "to": "/en/docs/plugin-host/api#plugin-host-index--IMergePluginExts",
       "type": "api-symbol"
     },
@@ -25419,36 +25269,6 @@
     {
       "from": "/zh/docs/plugin-host",
       "to": "/zh/docs/plugin-host/api#plugin-host-index--IHostHandle",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api",
-      "to": "/zh/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "to": "/zh/docs/plugin-host/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "to": "/zh/docs/plugin-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/plugin-host/getting-started",
-      "to": "/zh/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api#plugin-host-index--ILocaleKey",
-      "to": "/zh/docs/plugin-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/plugin-host",
-      "to": "/zh/docs/plugin-host/api#plugin-host-index--ILocaleKey",
       "type": "architecture-symbol"
     },
     {

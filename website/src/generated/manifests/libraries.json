@@ -2690,8 +2690,8 @@
                     "事务性所有权：`createProvisionalScope`",
                     "变更队列：`createMutationQueue`",
                     "调度器、中止与有界等待：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`",
-                    "错误基础设施：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`",
-                    "状态常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`",
+                    "错误基础设施：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`",
+                    "状态常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                     "按需导入与 tree-shaking",
                     "高阶组合示例",
                     "构建门禁"
@@ -3091,7 +3091,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/lifecycle/errors'"
+                  "code": "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -3110,7 +3110,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -3185,6 +3185,10 @@
                 {
                   "type": "paragraph",
                   "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
                 },
                 {
                   "type": "paragraph",
@@ -3272,7 +3276,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -3292,7 +3296,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ThenableProbeKind`｜3 秒上手 —— `probeThenable`/内部归化逻辑的判别结果：`{ notThenable: 'not-thenable', thenable: 'thenable', failed: 'failed', promise: 'promise' }`。"
+                  "text": "`ThenableProbeKind` 由 `@migaia/utils/function` 提供，取值为 `notThenable`、`thenable`、`failed`；lifecycle 不再提供平行常量或 `promise` 变体。"
                 },
                 {
                   "type": "paragraph",
@@ -3398,8 +3402,8 @@
                     "事务性所有权模块：`createProvisionalScope`",
                     "变更队列模块：`createMutationQueue`",
                     "调度器、中止与有界等待模块：`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`",
-                    "错误基础设施模块：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`createLifecycleTypeError`、`createLifecycleFailure`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`",
-                    "状态常量模块：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`",
+                    "错误基础设施模块：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`createLifecycleTypeError`、`createLifecycleFailure`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`",
+                    "状态常量模块：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                     "按需导入与 tree-shaking",
                     "错误码：`LifecycleErrorCode`（20 个码）逐条语义",
                     "诊断消息：`LifecycleErrorText`",
@@ -4158,7 +4162,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  probeThenable,\n  assimilateCapturedThen,\n  createErrorCollector,\n  type ILifecycleError,\n  type IThenableProbe,\n  type IErrorCollector\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -4293,9 +4297,13 @@
               ]
             },
             {
-              "id": "probethenable",
-              "heading": "probeThenable",
+              "id": "probethenable-utils",
+              "heading": "probeThenable（utils）",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "从 `@migaia/utils/function` 导入；下述工具属于 utils，不是 lifecycle 的公开导出。"
+                },
                 {
                   "type": "code",
                   "language": "ts",
@@ -4371,7 +4379,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  ThenableProbeKind,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  LifecycleState,\n  LifecycleUnitState,\n  LifecycleErrorPolicy,\n  DisposeTransactionKind\n} from '@migaia/lifecycle'\nimport { ThenableProbeKind } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -4395,11 +4403,6 @@
                       "`LifecycleErrorPolicy`",
                       "`{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }`",
                       "释放错误策略；`firstError` 只为兼容 `web-rpc` discovery-registry 的迁移语义存在，不是通用默认值"
-                    ],
-                    [
-                      "`ThenableProbeKind`",
-                      "`{ notThenable: 'not-thenable', thenable: 'thenable', failed: 'failed', promise: 'promise' }`",
-                      "`probeThenable`/内部归化逻辑的判别结果"
                     ],
                     [
                       "`DisposeTransactionKind`",
@@ -4664,9 +4667,9 @@
                 {
                   "type": "list",
                   "items": [
-                    "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
-                    "常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。",
-                    "类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IThenableProbeKind`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IThenableProbe`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。"
+                    "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
+                    "常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。",
+                    "类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。"
                   ]
                 },
                 {
@@ -6611,13 +6614,6 @@
                       "`(value) => AsyncGenerator<...>`",
                       "`this`",
                       "仅 async-generator mode 可用。"
-                    ],
-                    [
-                      "`PluginHost.setLocale(locale)`",
-                      "`locale: 'en' \\",
-                      "'zh'`（静态方法）",
-                      "`void`",
-                      "切换内置错误文案语言，影响全局、全部 Host 实例。"
                     ]
                   ]
                 },
@@ -6834,7 +6830,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  type ILocaleKey,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "list",
@@ -6859,8 +6855,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`ERROR_TEXT`（根入口的命名导出）：本包内置的中/英双语错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
-                    "`PluginHost.setLocale(locale: ILocaleKey)`：静态方法，`ILocaleKey = 'en' | 'zh'`，切换 `ERROR_TEXT` 与后续抛出错误的默认语言，默认 `'zh'`，全局生效（不是每个 Host 实例独立）。",
+                    "`ERROR_TEXT`（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
                     "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
                     "`PluginHostRegistrationLifecycle`：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。",
@@ -7246,13 +7241,6 @@
                       "`stage: (value) => AsyncGenerator<...>`",
                       "`this`",
                       "仅 async-generator mode 可用。"
-                    ],
-                    [
-                      "`PluginHost.setLocale(locale)`",
-                      "`locale: 'en' \\",
-                      "'zh'`（静态方法）",
-                      "`void`",
-                      "切换内置错误文案语言，默认 `'zh'`，影响全局、全部 Host 实例（非按实例隔离）。"
                     ]
                   ]
                 },
@@ -9401,7 +9389,7 @@
                   "items": [
                     "`createGenerationController()`（来自 `@migaia/lifecycle`）——每次 `#startRequest()` 调用 `begin()` 开一代新请求；`refetch()`/`invalidate()`/依赖变化都会使旧一代失效（`supersede()`），只有 `isCurrent(token)` 为真的那一代结果才会写回 `#stateSignal`。`dispose()` 时调用其 `dispose()` 终结控制器。",
                     "`createTerminalController()`（来自 `@migaia/lifecycle`）——驱动 `Resource` 自身的容器存活轴（`open → closing → terminal`）；`disposed` getter 直接读它的 `lifecycle === 'terminal'`。",
-                    "`probeThenable()` / `assimilateCapturedThen()`（来自 `@migaia/lifecycle`）——用于安全探测 `fetcher` 同步抛出的值是否是 thenable（Suspense 抛 Promise 模式），只读一次 `.then`，避免 hostile getter 被读取两次或异常被吞掉。",
+                    "`probeThenable()` / `assimilateCapturedThen()`（来自 `@migaia/utils/function`）——用于安全探测 `fetcher` 同步抛出的值是否是 thenable（Suspense 抛 Promise 模式），只读一次 `.then`，避免 hostile getter 被读取两次或异常被吞掉。",
                     "`systemScheduler`（来自 `@migaia/utils/scheduler`）/ `snapshotScheduler()`（来自 `@migaia/lifecycle`）——`scheduler` 选项的默认值与校验函数；TTL 到期判定、重试延迟计时都通过它，不直接使用宿主 `setTimeout`/`Date.now`。",
                     "`internalRuntimeOf()` / `internalsOf()` / `claimOwnership()` / `registerDeps()` / `registerDepVersions()`（来自 `@migaia/reactive` 的 `/node-factories`、`/internals`、`/ownership`、`/node-internals` 子路径）——`Resource` 把自己注册为 `@migaia/reactive` 依赖图里的一个 `IObserver`（实现 `markDirty()`/`onDependencyDisconnected()`），复用其依赖追踪、所有权登记与 `deferIdle` 挂起通道，语义与 `Computed` 的自动挂起完全对称。"
                   ]
@@ -23456,7 +23444,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "同步 Atom 禁止 Promise/thenable 初值。守卫覆盖 object 与 function thenable，并通过 lifecycle probe（`@migaia/lifecycle` 的 `probeThenable`）只读取一次 `then`；hostile getter 失败同步转换为 Store Keyed tagged `INVALID_OPTION`，原异常保留在 `cause`。Factory 定义在首次 `get`/`peek`/`preview` 执行返回值时应用同一守卫。"
+                  "text": "同步 Atom 禁止 Promise/thenable 初值。守卫覆盖 object 与 function thenable，并通过 utils probe（`@migaia/utils/function` 的 `probeThenable`）只读取一次 `then`；hostile getter 失败同步转换为 Store Keyed tagged `INVALID_OPTION`，原异常保留在 `cause`。Factory 定义在首次 `get`/`peek`/`preview` 执行返回值时应用同一守卫。"
                 }
               ]
             },

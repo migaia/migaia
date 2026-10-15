@@ -1107,12 +1107,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/en/docs/lifecycle/api/IThenableProbeKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/en/docs/lifecycle/api/IUnitState",
       "locale": "en",
       "domain": "docs",
@@ -1144,12 +1138,6 @@
     },
     {
       "path": "/en/docs/lifecycle/api/LifecycleUnitState",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/ThenableProbeKind",
       "locale": "en",
       "domain": "docs",
       "library": "lifecycle"
@@ -2392,12 +2380,6 @@
     },
     {
       "path": "/en/docs/plugin-host/api/IHostHandle",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/api/ILocaleKey",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -16707,12 +16689,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/zh/docs/lifecycle/api/IThenableProbeKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/zh/docs/lifecycle/api/IUnitState",
       "locale": "zh",
       "domain": "docs",
@@ -16744,12 +16720,6 @@
     },
     {
       "path": "/zh/docs/lifecycle/api/LifecycleUnitState",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/ThenableProbeKind",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"
@@ -17992,12 +17962,6 @@
     },
     {
       "path": "/zh/docs/plugin-host/api/IHostHandle",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/api/ILocaleKey",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"

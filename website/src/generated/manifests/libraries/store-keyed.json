@@ -1001,7 +1001,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "同步 Atom 禁止 Promise/thenable 初值。守卫覆盖 object 与 function thenable，并通过 lifecycle probe（`@migaia/lifecycle` 的 `probeThenable`）只读取一次 `then`；hostile getter 失败同步转换为 Store Keyed tagged `INVALID_OPTION`，原异常保留在 `cause`。Factory 定义在首次 `get`/`peek`/`preview` 执行返回值时应用同一守卫。"
+                "text": "同步 Atom 禁止 Promise/thenable 初值。守卫覆盖 object 与 function thenable，并通过 utils probe（`@migaia/utils/function` 的 `probeThenable`）只读取一次 `then`；hostile getter 失败同步转换为 Store Keyed tagged `INVALID_OPTION`，原异常保留在 `cause`。Factory 定义在首次 `get`/`peek`/`preview` 执行返回值时应用同一守卫。"
               }
             ]
           },
