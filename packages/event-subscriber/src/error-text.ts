@@ -34,5 +34,7 @@ export const EventSubscriberErrorText = {
   /** Stable text for failed handle descriptor projection; used by the raw subscription owner. */
   subscriptionHandleProjectionFailed: 'event-subscriber subscription handle projection failed',
   /** Stable text for invocation entries that are no longer callable. */
-  invocationClosed: 'event-subscriber invocation is closed'
+  invocationClosed: 'event-subscriber invocation is closed',
+  /** Stable aggregate text for several failed disposers in one subscription-chain close. */
+  subscriptionDisposeFailed: 'event-subscriber subscription disposers failed'
 } as const
