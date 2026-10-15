@@ -104,7 +104,6 @@ const host = new Host({
 | `host.useAsyncPipeline(stage)`          | `stage: (value, next) => void \| Promise<void>`                    | `this`                                                                        | 仅 async mode 可用；`next()` 返回 Promise。                                   |
 | `host.useGeneratorPipeline(stage)`      | `stage: (value) => Generator<...>`                                 | `this`                                                                        | 可用于 generator 与 async-generator mode，后者由 runner 提升。                |
 | `host.useAsyncGeneratorPipeline(stage)` | `stage: (value) => AsyncGenerator<...>`                            | `this`                                                                        | 仅 async-generator mode 可用。                                                |
-| `PluginHost.setLocale(locale)`          | `locale: 'en' \| 'zh'`（静态方法）                                 | `void`                                                                        | 切换内置错误文案语言，默认 `'zh'`，影响全局、全部 Host 实例（非按实例隔离）。 |
 
 无法提升的组合会同步抛顶层 `PluginHostError`，`code === 'PIPELINE_MODE_MISMATCH'`；其 `cause` 是 middleware-pipeline 原始 `TypeError`，携带 `code === 'INVALID_OPTION'` 与 `source === '@migaia/middleware-pipeline'`。
 

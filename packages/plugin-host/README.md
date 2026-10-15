@@ -141,7 +141,6 @@ import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host'
 | `host.useAsyncPipeline(stage)`          | `(value, next) => void \| Promise<void>`                           | `this`                                                                        | 仅 async mode 可用；`next()` 返回 Promise。                                         |
 | `host.useGeneratorPipeline(stage)`      | `(value) => Generator<...>`                                        | `this`                                                                        | 可用于 generator 与 async-generator mode，后者由 runner 提升。                      |
 | `host.useAsyncGeneratorPipeline(stage)` | `(value) => AsyncGenerator<...>`                                   | `this`                                                                        | 仅 async-generator mode 可用。                                                      |
-| `PluginHost.setLocale(locale)`          | `locale: 'en' \| 'zh'`（静态方法）                                 | `void`                                                                        | 切换内置错误文案语言，影响全局、全部 Host 实例。                                    |
 
 无法提升的组合会同步抛顶层 `PluginHostError`，`code === 'PIPELINE_MODE_MISMATCH'`；其 `cause` 是 middleware-pipeline 原始 `TypeError`，携带 `code === 'INVALID_OPTION'` 与 `source === '@migaia/middleware-pipeline'`。
 
@@ -287,7 +286,6 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 import {
   PluginHostError,
   ERROR_TEXT,
-  type ILocaleKey,
   PluginHostErrorCode,
   type IPluginHostErrorCode,
   PluginHostStatus,
@@ -303,8 +301,7 @@ import {
 
 完整稳定码集合：`HOST_DISPOSED`、`HOST_DISPOSING`、`PLUGIN_DUPLICATE`、`PLUGIN_NOT_INSTALLED`、`PLUGIN_DISABLED`、`PLUGIN_SUSPENDED`、`PLUGIN_NOT_ACTIVATED`、`FEATURE_NOT_DECLARED`、`PREREQUISITE_MISSING`、`DEPENDENCY_CYCLE`、`DEPENDENCY_BLOCKED`、`REPLACE_NAME_MISMATCH`、`DEPENDENT_RESTART_FAILED`、`PLUGIN_DEFINITION_INVALID`、`PLUGIN_INSTALL_FAILED`、`SETUP_REQUIRES_ASYNC_INSTALL`、`PLUGIN_DISPOSE_FAILED`、`EXTENSION_DUPLICATE`、`EXTENSION_OBJECT_PROTOTYPE`、`EXTENSION_RESERVED`、`PREREQUISITE_DISABLED`、`PREREQUISITE_REMOVED`、`RESOURCE_OUTSIDE_INSTALL`、`LIFECYCLE_MUTATION`、`INVALID_PIPELINE_MODE`、`PIPELINE_MODE_MISMATCH`、`PIPELINE_NEXT_DUPLICATE`、`PIPELINE_NEXT_LATE`、`PIPELINE_EXECUTING`、`PIPELINE_FAILED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`、`EXTENSION_NON_ENUMERABLE_IGNORED`、`MUTATION_QUEUE_TIMEOUT`、`DISPOSE_STEP_TIMEOUT`、`INVALID_OPTION`、`INVALID_CONFIG_VALUE`、`CONFIG_CYCLE_REJECTED`、`MUTATION_EXECUTION_TIMEOUT`、`REGISTRATION_REVOKED`、`INSTALL_RESULT_THENABLE`、`PIPELINE_DRAIN_TIMEOUT`、`CLEANUP_INCOMPLETE`、`COMPOSITION_TARGET_UNMANAGED`。
 
-- **`ERROR_TEXT`**（根入口的命名导出）：本包内置的中/英双语错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。
-- **`PluginHost.setLocale(locale: ILocaleKey)`**：静态方法，`ILocaleKey = 'en' | 'zh'`，切换 `ERROR_TEXT` 与后续抛出错误的默认语言，默认 `'zh'`，全局生效（不是每个 Host 实例独立）。
+- **`ERROR_TEXT`**（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。
 - **`PluginHostStatus`**：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。
 - **`MiddlewarePipelineMode`**：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。
 - **`PluginHostRegistrationLifecycle`**：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。
