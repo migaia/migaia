@@ -1,4 +1,8 @@
-import { containAsyncRejection, createLifecycleError } from './errors.js'
+import {
+  attachLifecycleSecondaryErrors,
+  containAsyncRejection,
+  createLifecycleError
+} from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
@@ -49,26 +53,6 @@ type IMutationRecord = {
   timeoutError: unknown
   timeoutSettled: boolean
   queueIndex: number
-}
-
-/** Keeps a timeout task's cancellation failure attached to the timeout primary. */
-const appendCancellationError = (primary: unknown, cleanupError: unknown): unknown => {
-  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
-    try {
-      Object.defineProperty(primary, 'errors', {
-        value: Object.freeze([cleanupError]),
-        enumerable: true
-      })
-      return primary
-    } catch {
-      // Frozen primary — fall through to a wrapper that keeps both identities reachable.
-    }
-  }
-  return createLifecycleError(
-    LifecycleErrorCode.queueAdmissionTimeout,
-    primary instanceof Error ? primary.message : LifecycleErrorText.mutationAdmissionTimedOut,
-    { cause: primary, errors: [cleanupError] }
-  )
 }
 
 /**
@@ -230,7 +214,12 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
         record.reject(
           cancelError === undefined
             ? record.timeoutError
-            : appendCancellationError(record.timeoutError, cancelError)
+            : attachLifecycleSecondaryErrors(
+                record.timeoutError,
+                [cancelError],
+                LifecycleErrorText.mutationAdmissionTimedOut,
+                LifecycleErrorCode.queueAdmissionTimeout
+              )
         )
       }
     }, timeoutMs)
@@ -242,7 +231,12 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       record.reject(
         cancelError === undefined
           ? record.timeoutError
-          : appendCancellationError(record.timeoutError, cancelError)
+          : attachLifecycleSecondaryErrors(
+              record.timeoutError,
+              [cancelError],
+              LifecycleErrorText.mutationAdmissionTimedOut,
+              LifecycleErrorCode.queueAdmissionTimeout
+            )
       )
     }
   }

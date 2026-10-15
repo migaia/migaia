@@ -2,16 +2,15 @@ import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor
 import type { IDisposerContext } from './disposer-context.js'
 import {
   assimilateCapturedThen,
+  attachLifecycleSecondaryErrors,
   containAsyncRejection,
   createErrorCollector,
   createLifecycleError,
   createLifecycleTypeError,
-  probeThenable,
-  tagLifecycleError
+  probeThenable
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 import { boundedWait } from './bounded-wait.js'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import {
@@ -422,20 +421,6 @@ const admitItems = (
   return { admitted, rejected }
 }
 
-/** Keeps transaction cleanup failures reachable while preserving Lifecycle's fallback identity. */
-const appendCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
-  if (cleanupErrors.length === 0) return primary
-  const attached = attachSecondaryErrors(primary, cleanupErrors)
-  if (attached === primary) return primary
-  return tagLifecycleError(
-    new AggregateError(
-      [primary, ...cleanupErrors],
-      safeErrorReason(primary, LifecycleErrorText.disposeTransactionFailed)
-    ),
-    LifecycleErrorCode.scopeDisposalFailed
-  )
-}
-
 export function createDisposeTransaction(
   mode: IDisposeTransactionMode,
   options: IDisposeTransactionOptions = {}
@@ -519,7 +504,11 @@ export function createDisposeTransaction(
       } catch (error) {
         const additionalCleanupErrors =
           errorPolicy === 'throw' && !cleanupErrors.includes(error) ? cleanupErrors : []
-        throw appendCleanupErrors(error, additionalCleanupErrors)
+        throw attachLifecycleSecondaryErrors(
+          error,
+          additionalCleanupErrors,
+          LifecycleErrorText.disposeTransactionFailed
+        )
       }
     }
   }

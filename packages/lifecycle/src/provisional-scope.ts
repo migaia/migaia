@@ -1,6 +1,6 @@
 import type { ILifecycleOwner, IReleaseDescriptor } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
-import { createLifecycleError, tagLifecycleError } from './errors.js'
+import { attachLifecycleSecondaryErrors, createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
@@ -46,34 +46,6 @@ type IEntry = {
 }
 
 /**
- * Keeps cleanup failures reachable without replacing the primary construction or registration
- * error.
- */
-const attachCleanupErrors = (primary: unknown, cleanupErrors: readonly unknown[]): unknown => {
-  const distinctCleanupErrors = cleanupErrors.filter(
-    (error, index) => error !== primary && cleanupErrors.indexOf(error) === index
-  )
-  if (distinctCleanupErrors.length === 0) return primary
-  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
-    try {
-      Object.defineProperty(primary, 'errors', {
-        value: Object.freeze([...distinctCleanupErrors]),
-        enumerable: true
-      })
-      return primary
-    } catch {
-      // Frozen / non-extensible primary — fall through to the aggregate wrapper.
-    }
-  }
-  const message =
-    primary instanceof Error ? primary.message : LifecycleErrorText.provisionalCleanupFailed
-  return tagLifecycleError(
-    new AggregateError([primary, ...distinctCleanupErrors], message),
-    LifecycleErrorCode.scopeDisposalFailed
-  )
-}
-
-/**
  * A two-phase ownership transaction for async `setup()` work: resources accumulate here first, then
  * either move to a real owner via prefix transfer + awaited compensation (`commitTo`) or get torn
  * down (`rollback`) — never both, never neither (§4.9).
@@ -96,7 +68,11 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
       parentSubscription.retryRegistrationCleanup()
       if (registrationErrors.length > 0) throw registrationErrors[0]
     } catch (error) {
-      throw attachCleanupErrors(error, registrationErrors)
+      throw attachLifecycleSecondaryErrors(
+        error,
+        registrationErrors,
+        LifecycleErrorText.provisionalCleanupFailed
+      )
     }
   }
 
@@ -180,7 +156,12 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
     try {
       detachParent()
     } catch (error) {
-      if (abortFailed) abortError = attachCleanupErrors(abortError, [error])
+      if (abortFailed)
+        abortError = attachLifecycleSecondaryErrors(
+          abortError,
+          [error],
+          LifecycleErrorText.provisionalCleanupFailed
+        )
       else {
         abortFailed = true
         abortError = error
@@ -193,7 +174,14 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
         else resolveRollback()
       },
       (cleanupError: unknown) => {
-        if (abortFailed) rejectRollback(attachCleanupErrors(abortError, [cleanupError]))
+        if (abortFailed)
+          rejectRollback(
+            attachLifecycleSecondaryErrors(
+              abortError,
+              [cleanupError],
+              LifecycleErrorText.provisionalCleanupFailed
+            )
+          )
         else rejectRollback(cleanupError)
       }
     )
@@ -218,7 +206,12 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
     try {
       detachParent()
     } catch (error) {
-      if (abortFailed) abortError = attachCleanupErrors(abortError, [error])
+      if (abortFailed)
+        abortError = attachLifecycleSecondaryErrors(
+          abortError,
+          [error],
+          LifecycleErrorText.provisionalCleanupFailed
+        )
       else {
         abortFailed = true
         abortError = error
@@ -231,7 +224,11 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
         throw abortError
       },
       (transferError: unknown) => {
-        throw attachCleanupErrors(transferError, [abortError])
+        throw attachLifecycleSecondaryErrors(
+          transferError,
+          [abortError],
+          LifecycleErrorText.provisionalCleanupFailed
+        )
       }
     )
   }
@@ -271,7 +268,11 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
           { cause: error, errors: cleanupErrors }
         )
       }
-      throw attachCleanupErrors(error, cleanupErrors)
+      throw attachLifecycleSecondaryErrors(
+        error,
+        cleanupErrors,
+        LifecycleErrorText.provisionalCleanupFailed
+      )
     }
   }
 
