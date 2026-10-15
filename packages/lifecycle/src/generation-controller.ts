@@ -18,8 +18,12 @@ import {
   observeAbortSubscription,
   type IObservedAbortSubscription
 } from './observed-subscription.js'
-import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { resolveScheduler, resolveSchedulerOption, validateSchedulerDelay } from './scheduler.js'
+import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
+import {
+  defaultLifecycleScheduler,
+  resolveSchedulerOption,
+  validateSchedulerDelay
+} from './scheduler.js'
 
 export type IGenerationToken = object
 
@@ -140,7 +144,7 @@ function createAdmissionFailure(
 export function createGenerationController(
   options: IGenerationControllerOptions = {}
 ): IGenerationController {
-  const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
+  const scheduler = resolveSchedulerOption(options, defaultLifecycleScheduler)
   const createController = captureAbortControllerFactory()
   const parentSignal = options.parentSignal
   /** Controller-level last-boundary reporter; see `IGenerationControllerOptions.report`. */
