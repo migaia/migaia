@@ -119,8 +119,16 @@ async function raceGraceful(
   const assimilated = assimilateThenable(result)
   if (assimilated.kind === ThenableProbeKind.failed) return { ok: false, error: assimilated.error }
   if (assimilated.kind === 'not-thenable') {
+    // A synchronous graceful that returned has already released the resource, so it counts as
+    // success even past its budget; running `force` now would release the same resource twice.
+    // The overrun stays observable as a diagnostic only.
     if (effectiveDeadline !== undefined && scheduler.now() >= effectiveDeadline) {
-      return { ok: false, timedOut: true }
+      context.report(
+        createLifecycleError(
+          LifecycleErrorCode.deadlineExceeded,
+          LifecycleErrorText.syncGracefulOverBudget
+        )
+      )
     }
     return { ok: true }
   }
@@ -322,8 +330,11 @@ const invalidDescriptor = (field: string): unknown =>
  * failure remains the caller's original error; an invalid value receives the lifecycle
  * invalid-option code. Order is read only for order-mode transactions, preserving plan-mode's
  * order-blind contract.
+ *
+ * Package-internal (not exported from the index): scope `own()` calls it as a validation-only entry
+ * check and discards the snapshot; release still re-admits the descriptor at dispose time.
  */
-const admitDescriptor = (
+export const admitDescriptor = (
   descriptor: IReleaseDescriptor,
   includeOrder: boolean
 ): IDescriptorAdmission => {

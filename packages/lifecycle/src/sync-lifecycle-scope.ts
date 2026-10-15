@@ -12,6 +12,7 @@ import { LifecycleErrorText } from './error-text.js'
 import { createTerminalController } from './terminal-controller.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import { LifecycleState, ThenableProbeKind } from './state-constants.js'
+import { admitDescriptor } from './dispose-transaction.js'
 
 const disposeKey = (Symbol as typeof Symbol & { dispose?: symbol }).dispose
 
@@ -125,6 +126,10 @@ export function createSyncLifecycleScope(
         '[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor'
       )
     }
+    // Validation only, shared with the async path so a bad `order` or missing `force` gets the same
+    // INVALID_OPTION at registration; dispose() keeps its own descriptor snapshot.
+    const admission = admitDescriptor(descriptor, true)
+    if (!admission.ok) throw admission.error
     const brand = (resource as { readonly [ASYNC_OWNER_BRAND]?: true } | null | undefined)?.[
       ASYNC_OWNER_BRAND
     ]

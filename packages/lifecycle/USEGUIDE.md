@@ -102,7 +102,7 @@ type IReleaseDescriptor = {
 
 - `syncSafe?: boolean` —— 声明该 descriptor 可被 `SyncLifecycleScope` 接受，不改变 `LifecycleScope` 本身的静态类型（同/异步由构造的具体类型决定，不由 descriptor 推断）。
 - `order?: number` —— 释放排序键，缺省按 `0`；只在 `DisposeTransaction` 的 `order` 模式下生效，数值大者先释放（往「释放顺序的下方」沉降，与分配顺序相反）。
-- `graceful?` —— 优雅释放；超时**只放弃等待**（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。
+- `graceful?` —— 优雅释放；超时**只放弃等待**（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。同步返回的 `graceful` 视为已完成释放：即使超过预算也不再跑 `force`，只通过 `context.report` 上报一条 `DEADLINE_EXCEEDED` 诊断。
 - `gracefulTimeoutMs?: number` —— 优雅阶段自己的预算，会被事务共享的绝对 `deadlineAt` 进一步封顶（取两者较小值）。
 - `force: (context) => void | PromiseLike<void>`（**必填**）—— 必须无条件完成，不得依赖任何前置条件。
 - `gcFallback?: boolean` —— 置为 `true` 时向内部 `FinalizationRegistry` 注册一个不强引用 `resource`/闭包 target 的兜底；显式释放（`dispose()`/`release()`）会自动 unregister 它。
@@ -147,7 +147,7 @@ const failures = await scope.dispose() // 逆序释放，'throw' 策略下失败
 
 边界行为：
 
-- `own(resource, descriptor)`：容器处于 `closing`/`terminal` 时抛 `SCOPE_CLOSED`/`SCOPE_TERMINAL`；在 disposer 内部重入调用抛 `SCOPE_REENTRANT_OWN`。
+- `own(resource, descriptor)`：容器处于 `closing`/`terminal` 时抛 `SCOPE_CLOSED`/`SCOPE_TERMINAL`；在 disposer 内部重入调用抛 `SCOPE_REENTRANT_OWN`；descriptor 形状非法（`order`/`custom`/`graceful`/`gracefulTimeoutMs`/`force`，规则同 dispose 时的 descriptor 校验）时在注册时就抛 `INVALID_OPTION`，访问器抛错则原样抛出。
 - `release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。
 - `close()`：同步、幂等；`open → closing`。
 - `dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。
@@ -186,6 +186,7 @@ const failures = scope.dispose() // 同步返回
 约束与边界：
 
 - 每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在**注册时**（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`。
+- descriptor 形状校验与异步版本相同：`order` 非有限数、`force` 缺失等非法值在 `own()` 时抛 `INVALID_OPTION`。
 - 不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例（内部品牌检测），命中同样抛 `SCOPE_SYNC_VIOLATION`。
 - 某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。
 - 降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。
@@ -571,7 +572,7 @@ try {
 
 边界行为：
 
-- `own(resource, descriptor)`：已 commit/rollback 后调用抛 `PROVISIONAL_SETTLED`。
+- `own(resource, descriptor)`：已 commit/rollback 后调用抛 `PROVISIONAL_SETTLED`；descriptor 形状非法时抛 `INVALID_OPTION`（不读取 `order`，commit 时由 parent 的 `own()` 校验）。
 - `commitTo(parent)`：按注册顺序逐个调用 `parent.own(resource, descriptor)`；某项失败时，已转移给 parent 的部分保留在 parent 名下，尚未转移的部分由本作用域**逆序释放并 await 完成**后才重新抛出原错误——不会有资源被两边都不持有，也不会有资源留给"none"；若失败原因是 `parent` 已处于 `closing`/`terminal`（错误码为 `SCOPE_CLOSED`/`SCOPE_TERMINAL`），额外包一层 `PROVISIONAL_PARENT_CLOSED`，原错误仍在 `cause`，遗留资源的释放失败列表挂在 `errors`。
 - `rollback()`：逆序释放全部已注册资源，聚合失败为携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`；幂等——并发/重复调用复用同一个 settle Promise。
 - `commitTo`/`rollback` 二次调用（或 commit 后 rollback / rollback 后 commit）一律抛 `PROVISIONAL_SETTLED`（`rollback()` 以 rejected Promise 形式返回，不是同步抛出）。
@@ -1059,7 +1060,7 @@ if (error.code === LifecycleErrorCode.scopeClosed) {
 | `queueAdmissionTimeout`        | `QUEUE_ADMISSION_TIMEOUT`        | mutation 在队列中等待超过配置的 `queueAdmissionTimeoutMs`                                                             |
 | `queueSelfDependency`          | `QUEUE_SELF_DEPENDENCY`          | 同一 `owner` 在自己尚未完成时又向同一队列提交新任务且被等待，会死锁                                                   |
 | `releaseForceFailed`           | `RELEASE_FORCE_FAILED`           | descriptor 的 `force` 抛出/reject（契约要求 `force` 必须无条件成功）                                                  |
-| `deadlineExceeded`             | `DEADLINE_EXCEEDED`              | 共享绝对 deadline 已过去，但仍有资源被要求进入新的 graceful 阶段（诊断码，正常降级路径不抛这个码）                    |
+| `deadlineExceeded`             | `DEADLINE_EXCEEDED`              | 共享绝对 deadline 已过去，但仍有资源被要求进入新的 graceful 阶段；或同步 `graceful` 超过预算才返回（仍算成功，不跑 `force`）。两者都只经 `report` 上报，正常降级路径不用这个码 |
 | `envUnsupported`               | `ENV_UNSUPPORTED`                | lifecycle 需要的宿主 `AbortController` 能力缺失；调度器宿主能力缺失由 utils `ENV_UNSUPPORTED` 报告                    |
 | `invalidOption`                | `INVALID_OPTION`                 | scheduler 收到非法时间/延迟参数，或 descriptor 字段类型非法                                                           |
 
