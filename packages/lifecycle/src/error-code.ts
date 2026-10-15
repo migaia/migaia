@@ -129,9 +129,10 @@ export const LifecycleErrorCode = {
   releaseForceFailed: 'RELEASE_FORCE_FAILED',
 
   /**
-   * Identifies a new graceful phase requested after the shared absolute deadline passes. This
-   * explicit code is reserved for diagnostic or boundary cases. Normal graceful-timeout fallback to
-   * `force` is a degradation path and does not throw this code.
+   * Identifies a new graceful phase requested after the shared absolute deadline passes, or a
+   * synchronous `graceful` that returned only after its budget (that release still succeeds and
+   * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown.
+   * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code.
    */
   deadlineExceeded: 'DEADLINE_EXCEEDED',
 
