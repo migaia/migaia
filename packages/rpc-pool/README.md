@@ -75,3 +75,5 @@ try {
 本包 source 为 `@migaia/rpc-pool`：`INVALID_OPTIONS`（TypeError/RangeError）、`POOL_CLOSED`、`QUEUE_FULL`、`CALL_ABORTED`（DOMException）、`CLOSE_FAILED`（AggregateError）。原 Native/Peer 错误保持自己的 source/code 与实例；启动回滚的 secondary cleanup 报告，原 primary 保留；关闭汇总保留原 errors/cause。
 
 只依赖 rpc-core、rpc-process、rpc-threads 的公开入口。没有工作窃取、跨机器池或另一套 RPC/native supervision。
+
+Pool options accept `scheduler?: IScheduler` for idle retirement. This controls the pool's own timers, while Peer restart/deadline policy still belongs to the original spawn sources. Idle handles cancel on reservation, retirement and close, and request optional unref so housekeeping alone does not keep a host alive. Current idleTimeoutMs bounds remain unchanged.

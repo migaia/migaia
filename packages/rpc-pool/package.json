@@ -36,6 +36,10 @@
     "lint": "oxlint src test vitest.config.ts",
     "test": "vitest run --coverage"
   },
+  "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
   "devDependencies": {
     "@migaia/rpc-core": "workspace:*",
     "@migaia/rpc-process": "workspace:*",
