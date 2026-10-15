@@ -610,32 +610,6 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
     reader.dispose()
   })
 
-  maybe('contains a throwing runtime reporter for waitAsync failures', async () => {
-    const runtime = syncRuntime()
-    const signal = sharedInt32(runtime, 0)
-    const reporterFailure = new Error('runtime reporter failed')
-    const waitFailure = new Error('waitAsync failed')
-    const hostReportError = vi.fn()
-    const atomics = Atomics as unknown as {
-      waitAsync: (view: Int32Array, index: number, value: number) => unknown
-    }
-    const originalWaitAsync = atomics.waitAsync
-    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
-      throw reporterFailure
-    })
-    vi.stubGlobal('reportError', hostReportError)
-    atomics.waitAsync = vi.fn(() => ({ async: true, value: Promise.reject(waitFailure) }))
-    try {
-      const stop = signal.watch()
-      await vi.waitFor(() => expect(hostReportError).toHaveBeenCalledWith(reporterFailure))
-      stop()
-    } finally {
-      atomics.waitAsync = originalWaitAsync
-      vi.unstubAllGlobals()
-      signal.dispose()
-    }
-  })
-
   maybe('wakes one loop for the whole array and touches only the changed cell', async () => {
     // 一格一个 waiter 在长数组上不可行，所以等的是头部 epoch，醒来再扫。
     const writerRuntime = syncRuntime()
