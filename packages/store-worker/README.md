@@ -411,3 +411,6 @@ pnpm --filter @migaia/store-worker build
 
 
 独立调用请用 `Promise.all`：已协商 `batch@1` 的内建载体在物理写空闲时立即单帧发送，写进行中就绪的调用由 RPC core 自动合并；请求与响应共用该机制。`request` 等对端处理完成，现有 worker contract endpoint 的 `notify` 只等发出。有依赖的串行 `await` 无法自动合并。`WorkerAdapter` 继续使用现有 `request` API。
+
+
+Stream cancellation keeps its native DOMException/AbortError and original message/stack. Worker credit waits and explicit stream stop attach the existing @migaia/store-worker / REQUEST_ABORTED identity; cancellation remains separate from codec or cleanup failure.

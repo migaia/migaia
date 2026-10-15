@@ -19,7 +19,8 @@ export const StoreWorkerErrorCode = {
   adapterDisposed: 'ADAPTER_DISPOSED',
 
   /**
-   * Worker serialization is cooperatively cancelled through `AbortSignal`.
+   * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream
+   * stop.
    *
    * Treat this as cancellation. With `ownership: 'transfer'`, the input is already detached and
    * cannot be retried.
