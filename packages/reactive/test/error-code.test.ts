@@ -4,7 +4,7 @@ import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRuntime } from '../src/index.js'
 import { createObserverBinding } from '../src/entry/extension.js'
-import { internalsOf, registerInternals } from '../src/entry/internals.js'
+import { internalsOf, registerInternals } from '../src/runtime/internals.js'
 import { assertReactiveOwnedBy, claimOwnership } from '../src/entry/extension.js'
 import {
   assertSingleRuntimeCopy,
@@ -365,7 +365,7 @@ describe('M-T36 (§3.7.1) reverse direction: the table is exhaustive and does no
   it('code values are unique within this source, so (source, code) is unique by construction', () => {
     const declared = Object.values(ReactiveErrorCode)
     expect(new Set(declared).size).toBe(declared.length)
-    expect(declared).toHaveLength(16) // §3.7.1 表格行数
+    expect(declared).toHaveLength(17) // Includes extension graph-registration conflict.
   })
 
   it('every tagged error carries source === "@migaia/reactive"', () => {

@@ -1,5 +1,8 @@
 import type { IObserver } from '../runtime/types.js'
 import { forwardCollectionCallback } from './receiver.js'
+import { createReactiveError } from '../errors.js'
+import { ReactiveErrorCode } from '../error-code.js'
+import { ReactiveErrorText } from '../error-text.js'
 
 const sets = new WeakMap<object, Set<IObserver>>()
 const depSets = new WeakMap<object, Set<object>>()
@@ -81,18 +84,29 @@ class ReadonlyMapView<K, V> implements ReadonlyMap<K, V> {
   }
 }
 
+/** Registers the canonical version slot used by custom sources before they enter the graph. */
 export function registerVersion(node: object, initial: number): void {
   versions.set(node, { value: initial })
 }
 
+/** Runtime source publication updates only registered slots; built-in nodes own their versions. */
 export function setVersion(node: object, value: number): void {
-  const state = versions.get(node)
-  if (state) state.value = value
-  else (node as { version: number }).version = value
+  versions.get(node)!.value = value
 }
 
-export function readVersion(node: object, fallback: number): number {
-  return versions.get(node)?.value ?? fallback
+/** Reads a bound source's version without falling back to writable node properties. */
+export function readVersion(node: object): number {
+  return versions.get(node)!.value
+}
+
+/** A new extension binding must not replace bookkeeping retained by live graph edges. */
+export function assertGraphNodeUnregistered(node: object): void {
+  if (sets.has(node) || depSets.has(node)) {
+    throw createReactiveError(
+      ReactiveErrorCode.graphNodeRegistered,
+      ReactiveErrorText.graphNodeAlreadyRegistered
+    )
+  }
 }
 
 /** Register a built-in node's mutable edge set without exposing that set. */

@@ -4,8 +4,14 @@ import {
   type IDisposer,
   type IRuntime
 } from '@migaia/reactive'
-import { claimOwnership, type IObservable, type IObserver } from '@migaia/reactive/extension'
-import { internalsOf, registerSubs, registerVersion, readVersion } from '@migaia/reactive/internals'
+import {
+  claimOwnership,
+  createSourceBinding,
+  isRuntimeTracking,
+  type IRuntimeSourceBinding,
+  type IObservable,
+  type IObserver
+} from '@migaia/reactive/extension'
 import { createStoreSharedError, createStoreSharedRangeError } from './errors.js'
 import { StoreSharedErrorCode } from './error-code.js'
 import { StoreSharedErrorText } from './error-text.js'
@@ -344,11 +350,11 @@ function watchSlot(
 export class SharedInt32Signal implements IObservable, IDisposable {
   readonly runtime: IRuntime
   readonly buffer: SharedArrayBuffer
-  #subs = new Set<IObserver>()
+  /** Canonical source metadata and graph operations bound to this exact SAB node. */
+  readonly #binding: IRuntimeSourceBinding
   readonly subs: ReadonlySet<IObserver>
-  #initialVersion: number
   get version(): number {
-    return readVersion(this, this.#initialVersion)
+    return this.#binding.version
   }
   #valueView: Int32Array
   #versionView: BigInt64Array
@@ -394,10 +400,8 @@ export class SharedInt32Signal implements IObservable, IDisposable {
       SIGNAL_VALUE_SLOT,
       0
     ).version
-    this.#initialVersion = internalsOf(runtime).clock.next()
-    this.subs = registerSubs(this, this.#subs)
-    registerVersion(this, this.#initialVersion)
-    claimOwnership(this, runtime)
+    this.#binding = createSourceBinding(this)
+    this.subs = this.#binding.subs
   }
 
   get disposed(): boolean {
@@ -407,7 +411,7 @@ export class SharedInt32Signal implements IObservable, IDisposable {
   get value(): number {
     this.#assertActive()
     this.sync()
-    internalsOf(this.runtime).tracker.track(this)
+    this.#binding.source.track()
     return this.#read().value
   }
 
@@ -426,7 +430,7 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     // Publish the committed version before local Reactive fanout: a hostile
     // scheduler/observer must not leave remote readers asleep after a write.
     Atomics.notify(this.#versionView as never, 0)
-    internalsOf(this.runtime).notify(this)
+    this.#binding.source.notify()
   }
 
   /**
@@ -440,7 +444,7 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     const { version } = this.#read()
     if (version === this.#observedSharedVersion) return false
     this.#observedSharedVersion = version
-    internalsOf(this.runtime).notify(this)
+    this.#binding.source.notify()
     return true
   }
 
@@ -488,7 +492,7 @@ export class SharedInt32Signal implements IObservable, IDisposable {
     if (this.#disposed) return
     this.#disposed = true
     this.#stopWatching?.()
-    internalsOf(this.runtime).tracker.disconnectObservable(this, 'dispose')
+    this.#binding.source.dispose()
   }
 
   #read(): { readonly value: number; readonly version: bigint } {
@@ -526,11 +530,11 @@ const ARRAY_VERSION_BYTES = BigInt64Array.BYTES_PER_ELEMENT
 
 class SharedInt32ArrayCell implements IObservable {
   readonly runtime: IRuntime
-  #subs = new Set<IObserver>()
+  /** Canonical source metadata and graph operations bound to this exact SAB node. */
+  readonly #binding: IRuntimeSourceBinding
   readonly subs: ReadonlySet<IObserver>
-  #initialVersion: number
   get version(): number {
-    return readVersion(this, this.#initialVersion)
+    return this.#binding.version
   }
   #owner: SharedInt32Array
   #index: number
@@ -541,16 +545,14 @@ class SharedInt32ArrayCell implements IObservable {
     this.runtime = owner.runtime
     this.#index = index
     this.#observedSharedVersion = owner.readCell(index).version
-    this.#initialVersion = internalsOf(this.runtime).clock.next()
-    this.subs = registerSubs(this, this.#subs)
-    registerVersion(this, this.#initialVersion)
-    claimOwnership(this, this.runtime)
+    this.#binding = createSourceBinding(this)
+    this.subs = this.#binding.subs
   }
 
   read(): number {
     this.#owner.assertActive()
     this.sync()
-    internalsOf(this.runtime).tracker.track(this)
+    this.#binding.source.track()
     return this.#owner.readCell(this.#index).value
   }
 
@@ -569,7 +571,7 @@ class SharedInt32ArrayCell implements IObservable {
     // Publish the generation before local Reactive fanout: a hostile
     // scheduler/observer must not leave remote readers asleep after a write.
     this.#owner.notifyWaiters()
-    internalsOf(this.runtime).notify(this)
+    this.#binding.source.notify()
   }
 
   sync(): boolean {
@@ -577,12 +579,17 @@ class SharedInt32ArrayCell implements IObservable {
     const { version } = this.#owner.readCell(this.#index)
     if (version === this.#observedSharedVersion) return false
     this.#observedSharedVersion = version
-    internalsOf(this.runtime).notify(this)
+    this.#binding.source.notify()
     return true
   }
 
   isStale(): boolean {
     return this.#owner.readCell(this.#index).version !== this.#observedSharedVersion
+  }
+
+  /** Releases the cell's graph source when its owning array evicts or disposes it. */
+  dispose(): void {
+    this.#binding.source.dispose()
   }
 }
 
@@ -717,7 +724,7 @@ export class SharedInt32Array implements IDisposable {
 
   get(index: number): number {
     this.#assertIndex(index)
-    if (!internalsOf(this.runtime).tracker.isTracking()) {
+    if (!isRuntimeTracking(this.runtime)) {
       return this.readCell(index).value
     }
     return this.#cell(index).read()
@@ -856,7 +863,7 @@ export class SharedInt32Array implements IDisposable {
     let removed = 0
     for (const [index, cell] of this.#cells) {
       if (cell.subs.size !== 0) continue
-      internalsOf(this.runtime).tracker.disconnectObservable(cell, 'dispose')
+      cell.dispose()
       this.#cells.delete(index)
       removed++
     }
@@ -868,7 +875,7 @@ export class SharedInt32Array implements IDisposable {
     this.#disposed = true
     this.#stopWatching?.()
     for (const cell of this.#cells.values()) {
-      internalsOf(this.runtime).tracker.disconnectObservable(cell, 'dispose')
+      cell.dispose()
     }
   }
 
@@ -927,7 +934,7 @@ export class SharedInt32Array implements IDisposable {
       // observer. Reclaim that cell instead of retaining it until array dispose.
       queueMicrotask(() => {
         if (this.#disposed || created.subs.size !== 0) return
-        internalsOf(this.runtime).tracker.disconnectObservable(created, 'dispose')
+        created.dispose()
         if (this.#cells.get(index) === created) this.#cells.delete(index)
       })
     }

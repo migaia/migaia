@@ -5,16 +5,24 @@ export {
   assertOwnedBy,
   assertReactiveOwnedBy
 } from '../runtime/ownership.js'
-export { createFieldSource, type IRuntimeFieldSource } from '../runtime/source.js'
+export {
+  createFieldSource,
+  createSourceBinding,
+  type IRuntimeFieldSource,
+  type IRuntimeSourceBinding
+} from '../runtime/source.js'
 export {
   internalRuntimeOf,
   isRuntimeTracking,
   isAnyRuntimeTracking,
   currentRuntimeVersion,
+  invalidateObservable,
   type IInternalRuntime
 } from '../runtime/node-factories.js'
 export {
   createObserverBinding,
+  createTrackedObserver,
+  type ITrackedObserverBinding,
   type IObserverBinding,
   type IObserverCommitResult,
   type IObserverRetrackResult

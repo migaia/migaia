@@ -1,12 +1,11 @@
 # `@migaia/reactive` 使用指南
 
-本指南列出三个已发布入口的 API、边界行为与错误码。节点统一经 Runtime 工厂创建；`Signal`、`Computed`、`Effect` 类保留为内部实现。包的定位与五分钟上手见 [README](./README.md)。
+本指南列出两个已发布入口的 API、边界行为与错误码。节点统一经 Runtime 工厂创建；`Signal`、`Computed`、`Effect` 类保留为内部实现。包的定位与五分钟上手见 [README](./README.md)。
 
 ## 目录
 
 - [主入口 `@migaia/reactive`](#主入口)：Runtime 工厂、窄节点类型、诊断常量与错误码
 - [`/extension` 入口](#extension-入口)：所有权、受控 source、observer binding、图类型与只读版本查询
-- [`/internals` 入口](#internals-入口)：内部服务、节点版本与可变边集
 - [错误码](#错误码)
 - [Trace 事件与常量](#trace-事件与常量)
 - [高阶组合示例](#高阶组合示例)
@@ -343,7 +342,7 @@ import {
 } from '@migaia/reactive/extension';
 ```
 
-- `internalRuntimeOf(runtime: IRuntime): IInternalRuntime` —— 校验本库 Runtime 登记，未登记抛 `NOT_RUNTIME_OWNED`。`signal()` 返回 `IReactiveSignal<T> & IObservable`，`computed()` 返回 `IReactiveComputed<T> & IObservable & IObserver`。关系只读；observer 操作与所有权登记属于扩展能力，内部服务对象和可变边集仍在危险面。公开节点本身已经具有 `dispose()`。
+- `internalRuntimeOf(runtime: IRuntime): IInternalRuntime` —— 校验本库 Runtime 登记，未登记抛 `NOT_RUNTIME_OWNED`。`signal()` 返回 `IReactiveSignal<T> & IObservable`，`computed()` 返回 `IReactiveComputed<T> & IObservable & IObserver`。关系只读；observer 操作与所有权登记属于扩展能力，内部服务对象和可变边集不再公开。公开节点本身已经具有 `dispose()`。
 - `isRuntimeTracking(runtime: IRuntime): boolean` —— 只读查询：该 `Runtime` 当前是否正在收集依赖帧。
 - `isAnyRuntimeTracking(): boolean` —— 只读查询：进程内任意 `Runtime` 当前是否有依赖帧处于活跃状态。
 
@@ -351,52 +350,15 @@ import {
 
 ---
 
-<a id="internals-入口"></a>
+### 自定义 source 与 observer
 
-## `/internals` 入口
+`createSourceBinding(node)` 为实现 `IObservable` 的新节点登记canonical版本与订阅者集合，返回只读 `version/subs` 和绑定原节点的 `source` 操作。构造时把只读元数据接入节点，再公开实例；保留SAB节点原身份。一般外部字段仍直接用 `createFieldSource(runtime)`。
 
-```ts
-import {
-  registerInternals,
-  internalsOf,
-  isRuntime,
-  type IRuntimeInternals
-} from '@migaia/reactive/internals';
-```
+`createTrackedObserver(observer)` 为实现 `IObserver` 的新节点创建只读 `deps/depVersions`，提供绑定自身的 `runTracked/clear/suspend/isSuspended/revalidate/hasStaleDependencies/deferIdle`。`clear` 只断图依赖，资源请求与取消仍由调用方管理；它不创建另一个Effect或tracker。框架render/commit适配继续用 `createObserverBinding(runtime)`。
 
-内核内部面（`clock`/`tracker`/`scheduler`/`notify`/`commitSource`/`deferIdle` 等），只供内核自身与被明确授权的高级入口使用（`architecture.test.ts` 约束哪些模块允许 import 它）。
+这两个factory不能重绑已登记图节点（包括内置节点）：抛 `GRAPH_NODE_REGISTERED`，不会替换仍有活跃边的集合。`invalidateObservable(runtime, node)` 只摘节点下游、保留上游与缓存，供Atom routing切换；真正释放节点仍调用其dispose。
 
-- `registerInternals(runtime, internals): void` —— `Runtime` 构造时自报内部面；重复登记（同一 `runtime` 对象二次调用）抛 `INTERNALS_REGISTERED`。
-- `internalsOf(runtime): IRuntimeInternals` —— 取内部面；拿不到时不是返回 `undefined` 而是抛 `NOT_RUNTIME_OWNED`（一个没登记内部面的对象冒充 `Runtime`，静默放行会在后续每一步产生难以追溯的错误）。
-- `isRuntime(candidate): candidate is IRuntime` —— 判断是否是本库创建的 `Runtime`，不泄漏内部面本身。
-
-一般应用代码不需要这个入口；实现自定义节点类型或框架适配层时才会用到。
-
----
-
-### 节点版本与可变边集
-
-```ts
-import {
-  registerVersion,
-  setVersion,
-  readVersion,
-  registerSubs,
-  mutableSubs,
-  registerDeps,
-  mutableDeps,
-  registerDepVersions,
-  mutableDepVersions
-} from '@migaia/reactive/internals';
-```
-
-可变依赖边的登记与访问，供实现新的响应式基础设施（自定义 `IObservable`/`IObserver`）时手工接入依赖图使用：
-
-- `registerVersion(node, initial): void` / `setVersion(node, value): void` / `readVersion(node, fallback): number` —— 节点版本号的登记、写入、读取（版本状态存在私有 `WeakMap`，不是节点自身字段）。
-- `registerSubs(node, subs): ReadonlySet<IObserver>` —— 登记一个内置节点的可变下游边集合，返回一份只读视图供节点对外暴露；`mutableSubs(node, fallback)` 取回可变的原始 `Set`（未登记过时回落到 `fallback`）。
-- `registerDeps`/`mutableDeps`、`registerDepVersions`/`mutableDepVersions` —— 对应上游依赖集合/依赖版本映射的登记与可变访问，语义与 `subs` 对称。
-
-一般应用代码不需要这个入口；只有需要自己实现 `IObservable`/`IObserver` 协议、并让其反向边受同一套只读视图保护的节点实现层才会用到。
+迁移：`@migaia/reactive/internals` 已删除。旧 `internalsOf/registerSubs/registerVersion/registerDeps` 等不能通过换名导入整个tracker；按上述角色迁移到 `/extension` 的绑定能力。`tracker/scheduler/clock` 和可写集合始终仅在kernel内部。
 
 ---
 
@@ -426,6 +388,7 @@ import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive';
 | `schedulerFailed`      | `SCHEDULER_FAILED`     | 预留：异步调度策略回调或 `reportError()` 捕获到未处理错误的诊断通道码（默认无内置抛出/上报点）                   |
 | `captureInvalid`       | `CAPTURE_INVALID`      | `capture()` 产生的 token 在 `commitCapture()` 时已失效、已被消费、属于另一个 tracker，或对应 observer 已 dispose |
 | `bindingDuplicate`     | `BINDING_DUPLICATE`    | 同一个 `IObserverBinding` 被重复调用 `observe()`（已处于 observed 状态）                                         |
+| `graphNodeRegistered` | `GRAPH_NODE_REGISTERED` | source/observer binding尝试替换已有graph node的集合，须创建新节点 |
 | `internalsRegistered`  | `INTERNALS_REGISTERED` | 同一个 `Runtime` 对象被重复注册内部面（`registerInternals()`）                                                   |
 | `invalidOption`        | `INVALID_OPTION`       | 构造 `Runtime`/`Scheduler`/`VersionClock` 时传入的选项不满足取值要求                                             |
 

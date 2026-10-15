@@ -146,6 +146,13 @@ export const ReactiveErrorCode = {
   bindingDuplicate: 'BINDING_DUPLICATE',
 
   /**
+   * Thrown when an extension binding targets a node with existing graph bookkeeping. Replacing its
+   * sets would orphan live edges. Bind a fresh custom node once; do not rebind a Signal, Computed,
+   * Effect, Resource, or an already bound custom node.
+   */
+  graphNodeRegistered: 'GRAPH_NODE_REGISTERED',
+
+  /**
    * Thrown when `registerInternals()` registers the same `Runtime` object twice.
    *
    * Register internals once during construction. Duplicate registration is a programming error, not

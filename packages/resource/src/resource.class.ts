@@ -8,11 +8,11 @@ import {
 } from '@migaia/reactive'
 import {
   internalRuntimeOf,
-  claimOwnership,
+  createTrackedObserver,
+  type ITrackedObserverBinding,
   type IObservable,
   type IObserver
 } from '@migaia/reactive/extension'
-import { internalsOf, registerDeps, registerDepVersions } from '@migaia/reactive/internals'
 import { attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
 import {
   abortableDelay,
@@ -395,8 +395,8 @@ const appendDisposeCleanupErrors = (
  * moved into a Computed read before awaiting.
  */
 export class Resource<T> implements IObserver, IDisposable {
-  #_deps = new Set<IObservable>()
-  #_depVersions = new Map<IObservable, number>()
+  /** Bound graph capabilities operate only on this Resource observer. */
+  readonly #tracking: ITrackedObserverBinding
   readonly deps: ReadonlySet<IObservable>
   readonly depVersions: ReadonlyMap<IObservable, number>
   readonly runtime: IRuntime
@@ -425,11 +425,10 @@ export class Resource<T> implements IObserver, IDisposable {
 
   constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options: IResourceOptions<T> = {}) {
     const admittedOptions = snapshotResourceOptions(options)
-    this.deps = registerDeps(this, this.#_deps)
-    this.depVersions = registerDepVersions(this, this.#_depVersions)
     this.runtime = runtime
-    // 归属登记走唯一那张表，不再靠字段名让下游去猜
-    claimOwnership(this, runtime)
+    this.#tracking = createTrackedObserver(this)
+    this.deps = this.#tracking.deps
+    this.depVersions = this.#tracking.depVersions
     this.debugName = admittedOptions.debugName
     this.#fetcher = fetcher
     this.#ttl = admittedOptions.ttl
@@ -591,7 +590,7 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#requests.supersede()
     this.#requestPending = false
     this.#paused = false
-    internalsOf(this.runtime).tracker.clearDependencies(this)
+    this.#tracking.clear()
     this.#updatedAt = updatedAt
     this.#expiresAt = expiresAt ?? Infinity
     this.#stateSignal.value = {
@@ -640,7 +639,7 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#forceRefresh = false
     this.#requestPending = false
     this.#currentPromise = undefined
-    runCleanup(() => internalsOf(this.runtime).tracker.clearDependencies(this))
+    runCleanup(() => this.#tracking.clear())
     runCleanup(() => this.#stateSignal.dispose())
     this.#terminal.forceTerminal()
 
@@ -691,11 +690,11 @@ export class Resource<T> implements IObserver, IDisposable {
     const state = this.#stateSignal.peek()
     if (state.status === ResourceStatus.success) {
       /** Dependency tracker that owns this resource's suspended snapshot. */
-      const tracker = internalsOf(this.runtime).tracker
+      const tracker = this.#tracking
       // An idle suspension kept the dependency snapshot. Unchanged dependencies keep the cache
       // (TTL still applies below) and reattach the edges; a changed dependency expires it.
-      if (tracker.isSuspended(this)) {
-        if (tracker.revalidate(this)) this.#scheduleSuspension()
+      if (tracker.isSuspended()) {
+        if (tracker.revalidate()) this.#scheduleSuspension()
         else this.#expiresAt = 0
       }
     }
@@ -792,9 +791,7 @@ export class Resource<T> implements IObserver, IDisposable {
         /** The fetcher's synchronous reads participate in the same dependency frame. */
         let fetched: T | PromiseLike<T>
         try {
-          fetched = internalsOf(this.runtime).tracker.runTracked(this, () =>
-            this.#fetcher({ signal: controller.signal })
-          )
+          fetched = this.#tracking.runTracked(() => this.#fetcher({ signal: controller.signal }))
         } catch (error) {
           /** Capture a thrown thenable once, preserving getter failures and the original value. */
           const probe = probeThenable(error)
@@ -1086,13 +1083,13 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#refreshScheduled = true
     // 与 Computed 挂起同一条 idle 通道：Resource 不得私自 queueMicrotask，
     // 否则 schedulerStrategy / scheduleIdle 对异步失效无效。
-    internalsOf(this.runtime).deferIdle(() => {
+    this.#tracking.deferIdle(() => {
       if (!this.#refreshScheduled || this.#terminal.lifecycle !== LifecycleState.open) return
       this.#refreshScheduled = false
       const mustRefresh = this.#forceRefresh
       this.#forceRefresh = false
       try {
-        if (!mustRefresh && !internalsOf(this.runtime).tracker.hasStaleDependencies(this)) {
+        if (!mustRefresh && !this.#tracking.hasStaleDependencies()) {
           return
         }
         this.#observe(this.#startRequest())
@@ -1107,7 +1104,7 @@ export class Resource<T> implements IObserver, IDisposable {
   #scheduleSuspension(): void {
     if (this.#keepAlive || this.#terminal.lifecycle !== LifecycleState.open) return
     const generation = ++this.#suspensionGeneration
-    internalsOf(this.runtime).deferIdle(() => {
+    this.#tracking.deferIdle(() => {
       if (
         this.#terminal.lifecycle !== LifecycleState.open ||
         this.#keepAlive ||
@@ -1118,7 +1115,7 @@ export class Resource<T> implements IObserver, IDisposable {
       }
       // Keep the version snapshot instead of expiring the cache: `#ensureFresh` refetches only when
       // a dependency changed meanwhile or the TTL expired.
-      internalsOf(this.runtime).tracker.suspendDependencies(this)
+      this.#tracking.suspend()
     })
   }
 }

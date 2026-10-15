@@ -344,14 +344,10 @@ test('createObserverBinding quick start keeps authored comments and host phases 
   }
 })
 
-test('class pages expose structured instance APIs and reactive publishes only its three surfaces', () => {
+test('class pages expose structured instance APIs and reactive publishes only its two controlled surfaces', () => {
   /** The generated website contract must follow the package's converged entry boundaries. */
   const reactiveApis = typedApiManifest.apis.filter((api) => api.library === 'reactive')
-  assert.deepEqual(reactiveApis.map((api) => api.module).sort(), [
-    'extension',
-    'index',
-    'internals'
-  ])
+  assert.deepEqual(reactiveApis.map((api) => api.module).sort(), ['extension', 'index'])
 
   /** Application references expose node contracts and factories without internal constructors. */
   const root = reactiveApis.find((api) => api.module === 'index')
