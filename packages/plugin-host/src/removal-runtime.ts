@@ -14,6 +14,8 @@ type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   /** Removes an exact committed registration and its dependency node atomically. */
   readonly removeRegistration: (registration: IRegistration<TDomainCore, TValue>) => void
+  /** Withdraws exact attempt publication while retaining the cold registration and topology. */
+  readonly clearRegistrationPublication: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly pipelineLeases: IQuiescenceTracker<object>
   readonly retireLeaseOwner: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly host: object
@@ -76,14 +78,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     registration.lifecycle = PluginHostRegistrationLifecycle.dispose
     registration.featureExposeValid = false
     this.#port.retireLeaseOwner(registration)
-    for (const detach of [...registration.pipelineDisposers].reverse()) {
-      try {
-        detach()
-      } catch (error) {
-        errors.push(error)
-      }
-    }
-    registration.pipelineDisposers = []
+    this.#detachStages(registration, errors)
     this.#removeOwnedPublication(registration)
     // The name-keyed slot retains its ordinal across a same-name reinstall. Composition-issued
     // tokens remain under their holder's explicit retireDataOrderSlot authority.
@@ -134,11 +129,33 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
   }
 
   /** Runs bounded normal cleanup and optionally preserves raw rollback error identities. */
-  async disposeRegistration(
+  disposeRegistration(
     registration: IRegistration<TDomainCore, TValue>,
     preserveErrorIdentity = false
   ): Promise<unknown[]> {
-    const errors = this.revokeRegistration(registration)
+    return this.#disposeRegistration(registration, preserveErrorIdentity, false)
+  }
+
+  /** Resets failed lazy installation without permanently revoking its registration identity. */
+  resetRegistration(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]> {
+    return this.#disposeRegistration(registration, true, true)
+  }
+
+  /** Runs the same physical cleanup for permanent removal and retryable installation rollback. */
+  async #disposeRegistration(
+    registration: IRegistration<TDomainCore, TValue>,
+    preserveErrorIdentity: boolean,
+    reset: boolean
+  ): Promise<unknown[]> {
+    /** Reset withdraws attempt visibility while permanent removal also revokes lifetime authority. */
+    const errors: unknown[] = []
+    if (reset) {
+      registration.lifecycle = PluginHostRegistrationLifecycle.dispose
+      registration.featureExposeValid = false
+      this.#detachStages(registration, errors)
+      this.#port.clearRegistrationPublication(registration)
+      registration.extensions = []
+    } else errors.push(...this.revokeRegistration(registration))
     const pluginDispose = this.#resolvePluginDispose(registration)
     if (registration.installed && pluginDispose)
       errors.push(
@@ -165,18 +182,41 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
         else errors.push(error)
       }
       registration.provisional = undefined
-    } else {
-      errors.push(
-        ...(await this.#port.cleanupRuntime.disposeScope(
-          registration.scope,
-          'resource disposer',
-          preserveErrorIdentity
-        ))
-      )
     }
-    this.#removeOwnedPublication(registration)
+    // A failed commit can leave a transferred prefix in scope and a remainder in provisional.
+    errors.push(
+      ...(await this.#port.cleanupRuntime.disposeScope(
+        registration.scope,
+        'resource disposer',
+        preserveErrorIdentity
+      ))
+    )
+    registration.resourceDisposers = []
+    if (reset) {
+      registration.scope = undefined
+      registration.core = undefined
+      registration.descriptor = undefined
+      registration.setupOutput = undefined
+      registration.featureExpose = undefined
+      registration.featureOutputs = undefined
+      registration.installed = false
+      registration.activated = false
+    } else this.#removeOwnedPublication(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.idle
     return errors
+  }
+
+  /** Detaches all exact stage entries even when one captured disposer fails. */
+  #detachStages(registration: IRegistration<TDomainCore, TValue>, errors: unknown[]): void {
+    for (const detach of [...registration.pipelineDisposers].reverse()) {
+      try {
+        detach()
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+    registration.pipelineDisposers = []
+    registration.stageEntries = []
   }
 
   /** Captures the already-admitted plugin disposer without re-reading hostile owner properties. */

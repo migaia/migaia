@@ -41,6 +41,13 @@
 
 ### Behavior
 
+- Failed lazy plugin activation withdraws stages, shared receipts and extensions,
+  releases provisional and committed resources, and keeps the same cold handle
+  retryable with a fresh scope and batch-bound core. Cleanup failures remain
+  secondary. Previously committed resources leaked or cleanup replaced primary.
+  Shared publication failures on non-extensible Hosts retain native TypeError
+  with `PLUGIN_INSTALL_FAILED`, and reserve no failed shared family.
+
 - Capability publishes `GraphReadinessState` at its root, `GraphBlockedReason`
   at `/graph`, and `GraphBindingReleaseReason` at `/graph/dynamic` as canonical
   constants for existing string domains. Host error text has one private owner;

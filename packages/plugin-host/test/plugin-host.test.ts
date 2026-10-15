@@ -1088,6 +1088,7 @@ describe('PluginHost', () => {
       host: {},
       registrations: new Map([[registration.name, registration]]),
       removeRegistration: () => undefined,
+      clearRegistrationPublication: () => undefined,
       pipelineLeases: { seal: () => undefined } as any,
       retireLeaseOwner: () => undefined,
       executionSignal: {} as any,
@@ -1225,6 +1226,7 @@ describe('PluginHost', () => {
         // The original Host state port owns extension retirement with registration removal.
         if (extensionOwners.get('owned') === current) extensionOwners.delete('owned')
       },
+      clearRegistrationPublication: () => undefined,
       pipelineLeases: { seal: () => undefined } as any,
       retireLeaseOwner: () => undefined,
       executionSignal: {} as any,

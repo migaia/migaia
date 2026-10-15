@@ -779,3 +779,14 @@ import {
 `createView(token)` 只发布该 exact registration 的 extensions。token 是 opaque identity，foreign
 或已撤销 token 会 fail closed；view 不包含 Host、config、shared 或 mutation 能力。历史
 `IPluginRegistrationReceipt` 仍是 deprecated 的 `IRegistrationToken` 类型别名，保持编译兼容。
+
+
+### Lazy activation failure and retry
+
+失败的 `activate(name)` 会撤销本次 stage、extension 与 shared receipt，并清理 provisional 及已提交 scope 的资源；
+保留同一个 cold registration/handle，下一次显式 activate 使用新 scope 与绑定新 batch 的 core。清理错误通过
+rollback diagnostic 和 primary 的 `errors` 链保留，不会替换原始安装错误。Host 的既有 dispose step budget
+仍约束清理观察，超时后的物理工作由原 pending tracker 继续观测。
+
+不可扩展 Host 上新增 shared getter 的发布失败保留原生 TypeError，并附 `PLUGIN_INSTALL_FAILED`；
+失败发布不保留共享 family。普通 handle extension 仍遵循原有不可扩展 Host 契约。

@@ -284,6 +284,11 @@ export class PluginHostState<TDomainCore extends object, TValue> {
           PluginHostErrorCode.registrationRevoked,
           ERROR_TEXT.REGISTRATION_REVOKED
         )
+    // Concrete Host descriptors must be admissible before any committed table changes. In
+    // particular a non-extensible Host must not reserve a family for a publication that failed.
+    for (const registration of installed)
+      for (const reservation of registration.sharedSlots ?? [])
+        this.#sharedPublication?.publish(reservation.slot.key)
     /** Replacement's old and new exact receipts may retain one slot in this same commit. */
     const retainedSlots = new Set([...batch.extensionOwners.values()].filter(isSharedExtensionSlot))
     for (const registration of installed) {
@@ -317,7 +322,6 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         /** Publication still occurs once in the original install commit, not in register(). */
         const slot = reservation.slot
         slot.registrations.set(registration, reservation)
-        this.#sharedPublication?.publish(slot.key)
       }
     for (const receipt of batch.sharedContributions) {
       this.#updateSharedContribution(receipt, true)
@@ -344,13 +348,18 @@ export class PluginHostState<TDomainCore extends object, TValue> {
    * nothing belonging to whoever claimed the key next.
    */
   closeRegistration(registration: IRegistration<TDomainCore, TValue>): void {
-    this.#revokeSharedContributions(registration)
-    for (const { key } of [...registration.extensions].reverse())
-      if (this.extensionOwners.get(key) === registration) this.extensionOwners.delete(key)
+    this.clearRegistrationPublication(registration)
     if (this.registrations.get(registration.name) === registration) {
       this.registrations.delete(registration.name)
       this.#index.remove(registration.name)
     }
+  }
+
+  /** Withdraws exact installation receipts while retaining a lazy registration for retry. */
+  clearRegistrationPublication(registration: IRegistration<TDomainCore, TValue>): void {
+    this.#revokeSharedContributions(registration)
+    for (const { key } of [...registration.extensions].reverse())
+      if (this.extensionOwners.get(key) === registration) this.extensionOwners.delete(key)
   }
 
   /** Retire only this exact receipt; candidate rollback and late cleanup cannot touch a successor. */
