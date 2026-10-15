@@ -3,7 +3,6 @@ import { GraphReadinessState } from '@migaia/capability'
 import {
   createCapabilityGraph,
   CapabilityGraphState,
-  CapabilityGraphNodeState,
   type IGraphNodeDefinition,
   type IGraphNodeId
 } from '@migaia/capability/graph'
@@ -204,10 +203,9 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
     ready: runGate,
     get<T>(key: ITrayKey) {
       find(key)
-      const diagnostic = graph.nodeState(keyOf(key))
-      if (graph.state !== CapabilityGraphState.ready || diagnostic.state !== CapabilityGraphNodeState.ready)
+      if (graph.state !== CapabilityGraphState.ready)
         throw createTrayError(TrayErrorCode.unavailable)
-      return diagnostic.value as T
+      return graph.readValue<T>(keyOf(key)) as T
     },
     entryState(key) {
       find(key)

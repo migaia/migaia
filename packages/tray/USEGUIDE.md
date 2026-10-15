@@ -435,4 +435,6 @@ throws and async rejections are reported on their side; later listeners still ru
 A rejected delivery send is reported on the parent, and a failed delivery handler
 is reported on the child. Neither failure rejects the publisher.
 
+静态组合的 `get(key)` 直接读取 Capability Graph 自己的可见 value；没有第二份 Tray value 表。调用方仍须先等待 ready，关闭后和启动失败后均以 `TRAY_UNAVAILABLE` 拒绝。
+
 路由选择仍按同一记录表的 spawn 顺序扫描，传给自定义 policy 的快照每次独立冻结，反映当次 inFlight，不缓存旧计数。

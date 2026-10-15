@@ -108,6 +108,12 @@ export type ICapabilityGraph = {
   register<T>(node: IGraphNodeDefinition<T>): void
   ready(): Promise<void>
   nodeState(id: IGraphNodeId): IGraphNodeDiagnostic
+  /**
+   * Read the same value projection as nodeState without allocating a diagnostic. Existing nodes
+   * return undefined until the whole graph is ready and after disposal; undefined is valid data. An
+   * unknown id retains GRAPH_UNKNOWN_NODE. Payload identity and mutability stay caller-owned.
+   */
+  readValue<T = unknown>(id: IGraphNodeId): T | undefined
   readonly nodes: readonly IGraphNodeId[]
   readonly state: ICapabilityGraphState
   readonly error: unknown | undefined
@@ -196,6 +202,19 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
     code: ICapabilityGraphErrorCode,
     detail?: Readonly<Record<string, unknown>>
   ): ICapabilityGraphError => createCapabilityGraphError(code, graphMessageFor(code), { detail })
+
+  /** Resolve one actual registered node for the two public read-only projections. */
+  const findNode = (id: IGraphNodeId): IAdmittedNode => {
+    /** Unknown identifiers use the existing query error without acquiring any resource. */
+    const node = nodesById.get(id)
+    if (!node) throw fail(CapabilityGraphErrorCode.unknownNode, { id })
+    return node
+  }
+  /** Visibility is shared by diagnostics and direct reads, with no mirrored value/lifecycle state. */
+  const visibleValue = (node: IAdmittedNode): unknown =>
+    graphState === CapabilityGraphState.ready && node.state === CapabilityGraphNodeState.ready
+      ? node.value
+      : undefined
 
   const assertMutationOpen = (): void => {
     if (graphState === CapabilityGraphState.terminal)
@@ -645,18 +664,19 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
     },
     ready,
     nodeState(id) {
-      const node = nodesById.get(id)
-      if (!node) throw fail(CapabilityGraphErrorCode.unknownNode, { id })
+      /** Diagnostics and direct reads resolve the same canonical node. */
+      const node = findNode(id)
       return Object.freeze({
         id: node.id,
         kind: node.kind,
         state: node.state,
-        value:
-          graphState === CapabilityGraphState.ready && node.state === CapabilityGraphNodeState.ready
-            ? node.value
-            : undefined,
+        value: visibleValue(node),
         error: node.error
       })
+    },
+    /** Project data from the original node without creating or retaining a diagnostic object. */
+    readValue<T>(id: IGraphNodeId): T | undefined {
+      return visibleValue(findNode(id)) as T | undefined
     },
     get<T>(consumer: IGraphNodeId, provider: IGraphNodeId): T {
       const consumerNode = nodesById.get(consumer)

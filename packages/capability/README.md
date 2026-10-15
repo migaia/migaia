@@ -576,3 +576,10 @@ readiness 的 `ready/blocked/failed` 使用根入口 `GraphReadinessState`；节
 `IGraphDependencyMutationPolicy` 复用 `@migaia/capability/graph/dependency` 的 `DependencyPolicy.reject/cascade`，
 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建，
 既有错误文案、native TypeError 和 code 保持原契约。
+
+
+### Static graph value reads
+
+`graph.readValue<T>(id)` reads the same payload as `graph.nodeState(id).value` without constructing a diagnostic snapshot. It returns the original object, and only exposes data while the whole graph is ready. An existing node may legitimately hold `undefined`; inspect `graph.state` to distinguish availability. An unknown identifier still throws `GRAPH_UNKNOWN_NODE`.
+
+Inside a node's `start`, keep using `context.get(provider)` and declared dependencies. The unscoped read is for an external composition root after startup. Custom implementations or mocks of the public `ICapabilityGraph` type must add `readValue`; factory callers receive the method automatically.

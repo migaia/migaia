@@ -488,3 +488,27 @@ readiness 的 `ready/blocked/failed` 使用根入口 `GraphReadinessState`；节
 `IGraphDependencyMutationPolicy` 复用 `@migaia/capability/graph/dependency` 的 `DependencyPolicy.reject/cascade`，
 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建，
 既有错误文案、native TypeError 和 code 保持原契约。
+
+
+### 直接读取静态 Graph 的结果
+
+完整启动后，组合层可用 `readValue` 取得原 payload，避免为每次读取创建冻结的诊断对象。它与 `nodeState(id).value` 使用同一可见性规则：启动前、启动失败和关闭后均不可见。诊断本身继续是不可变的时间点快照；返回的业务对象仍保留自己的身份与可变性。
+
+```ts
+import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'
+
+const serviceId = 'service' as IGraphNodeId
+const graph = createCapabilityGraph()
+graph.register({
+  id: serviceId, kind: 'service', dependencies: [],
+  start: () => ({ value: { read: () => 42 }, release: () => undefined })
+})
+try {
+  await graph.ready()
+  console.log(graph.readValue<{ read(): number }>(serviceId)?.read()) // 42
+} finally {
+  await graph.dispose()
+}
+```
+
+这不改变 `get(consumer, provider)` 和启动 context 的依赖约束。手写 `ICapabilityGraph` 替代实现需要实现新方法；缺失 id 的错误仍为 `GRAPH_UNKNOWN_NODE`，不能把 undefined 当作不存在的标记。

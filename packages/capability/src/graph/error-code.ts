@@ -25,7 +25,7 @@ export const CapabilityGraphErrorCode = {
   disposeFailed: 'GRAPH_DISPOSE_FAILED',
   /** Startup or new work is rejected while the graph is quiescing. */
   admissionClosed: 'GRAPH_ADMISSION_CLOSED',
-  /** Diagnostics query names a node absent from the registry. */
+  /** Diagnostic or direct value query names an absent node; correct the id before retrying. */
   unknownNode: 'GRAPH_UNKNOWN_NODE',
   /** A lifecycle callback synchronously re-enters the same graph operation. */
   reentrantOperation: 'GRAPH_REENTRANT_OPERATION',
