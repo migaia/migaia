@@ -181,7 +181,7 @@ class TopologyIndex implements ITopologyIndex {
   readonly #nodes: IKeyedStore<string, IStoredTopologyNode>
 
   /** Reverse adjacency for present and dangling provider IDs. */
-  readonly #consumers: IKeyedStore<string, Set<string>>
+  readonly #consumers: IKeyedStore<string, Map<string, boolean>>
 
   /** Next monotonic registration ordinal; removals never reclaim it. */
   #nextOrdinal: number
@@ -242,13 +242,9 @@ class TopologyIndex implements ITopologyIndex {
     const required: string[] = []
     /** Optional consumers in registration order. */
     const optional: string[] = []
-    for (const consumerId of this.#sortedConsumerIds(id)) {
-      const consumer = this.#nodes.get(consumerId)
-      if (!consumer) continue
-      const dependency = consumer.dependencies.find((edge) => edge.provider === id)
-      if (!dependency) continue
+    for (const [consumerId, requiredEdge] of this.#consumers.get(id) ?? []) {
       this.#visitedEdges += 1
-      ;(dependency.required ? required : optional).push(consumerId)
+      ;(requiredEdge ? required : optional).push(consumerId)
     }
     return Object.freeze({
       required: Object.freeze(required),
@@ -285,13 +281,9 @@ class TopologyIndex implements ITopologyIndex {
     for (let index = 0; index < queue.length; index += 1) {
       const provider = queue[index]!
       this.#visitedNodes += 1
-      for (const consumerId of this.#sortedConsumerIds(provider)) {
-        const consumer = this.#nodes.get(consumerId)
-        if (!consumer) continue
-        const dependency = consumer.dependencies.find((edge) => edge.provider === provider)
-        if (!dependency) continue
+      for (const [consumerId, required] of this.#consumers.get(provider) ?? []) {
         this.#visitedEdges += 1
-        if (!dependency.required || reached.has(consumerId)) continue
+        if (!required || reached.has(consumerId)) continue
         reached.add(consumerId)
         queue.push(consumerId)
       }
@@ -416,8 +408,9 @@ class TopologyIndex implements ITopologyIndex {
       })
     )
     this.#nextOrdinal += 1
-    for (const dependency of node.dependencies) this.#addReverseEdge(dependency.provider, node.id)
-    this.#recomputeLevels([node.id, ...(danglingConsumers ?? [])])
+    for (const dependency of node.dependencies)
+      this.#addReverseEdge(dependency.provider, node.id, dependency.required)
+    this.#recomputeLevels([node.id, ...(danglingConsumers?.keys() ?? [])])
   }
 
   /** Removes one node while retaining incoming edges as dangling reverse facts. */
@@ -425,7 +418,7 @@ class TopologyIndex implements ITopologyIndex {
     this.#assertWritable()
     const node = this.#requireNode(id)
     /** Present consumers whose level may fall after this provider disappears. */
-    const affected = [...(this.#consumers.get(id) ?? [])]
+    const affected = [...(this.#consumers.get(id)?.keys() ?? [])]
     this.#visitedNodes += 1
     for (const dependency of node.dependencies) {
       this.#visitedEdges += 1
@@ -454,7 +447,8 @@ class TopologyIndex implements ITopologyIndex {
 
     for (const dependency of node.dependencies)
       this.#removeReverseEdge(dependency.provider, node.id)
-    for (const dependency of snapshots) this.#addReverseEdge(dependency.provider, node.id)
+    for (const dependency of snapshots)
+      this.#addReverseEdge(dependency.provider, node.id, dependency.required)
     this.#nodes.set(node.id, Object.freeze({ ...node, dependencies: snapshots }))
     this.#recomputeLevels([node.id])
   }
@@ -480,7 +474,7 @@ class TopologyIndex implements ITopologyIndex {
   /** Applies a transaction view's overlay writes and its own visit counts, then releases ownership. */
   #adopt(working: TopologyIndex): void {
     ;(working.#nodes as OverlayStore<string, IStoredTopologyNode>).applyTo(this.#nodes)
-    ;(working.#consumers as OverlayStore<string, Set<string>>).applyTo(this.#consumers)
+    ;(working.#consumers as OverlayStore<string, Map<string, boolean>>).applyTo(this.#consumers)
     this.#nextOrdinal = working.#nextOrdinal
     this.#visitedNodes += working.#visitedNodes - working.#visitBaseline.visitedNodes
     this.#visitedEdges += working.#visitedEdges - working.#visitBaseline.visitedEdges
@@ -510,24 +504,39 @@ class TopologyIndex implements ITopologyIndex {
   }
 
   /**
-   * Returns the consumer set of `provider` that this view may mutate. In a transaction view a set
+   * Returns the consumer map of `provider` that this view may mutate. In a transaction view a map
    * still shared with the base is copied first, so base readers never observe transaction edges.
    */
-  #writableConsumers(provider: string): Set<string> | undefined {
+  #writableConsumers(provider: string): Map<string, boolean> | undefined {
     const consumers = this.#consumers.get(provider)
     if (!consumers || !(this.#consumers instanceof OverlayStore) || this.#consumers.owns(provider))
       return consumers
     /** Transaction-owned copy of a base bucket. */
-    const copy = new Set(consumers)
+    const copy = new Map(consumers)
     this.#consumers.set(provider, copy)
     return copy
   }
 
-  /** Adds one reverse edge without disturbing an existing consumer's ordinal semantics. */
-  #addReverseEdge(provider: string, consumer: string): void {
+  /** Stores edge kind once and maintains registration order when an old consumer is rewired. */
+  #addReverseEdge(provider: string, consumer: string, required: boolean): void {
+    /** Transaction-owned provider bucket; new nodes append in monotonic ordinal order. */
     const consumers = this.#writableConsumers(provider)
-    if (consumers) consumers.add(consumer)
-    else this.#consumers.set(provider, new Set([consumer]))
+    if (!consumers) {
+      this.#consumers.set(provider, new Map([[consumer, required]]))
+      return
+    }
+    consumers.set(consumer, required)
+    if (this.#nodes.get(consumer)!.ordinal === this.#nextOrdinal - 1) return
+    // Existing consumers may regain an edge after newer registrations. Restore order on this
+    // write so every reverse read can iterate directly without copying, sorting or edge lookup.
+    this.#consumers.set(
+      provider,
+      new Map(
+        [...consumers].sort(
+          ([left], [right]) => this.#nodes.get(left)!.ordinal - this.#nodes.get(right)!.ordinal
+        )
+      )
+    )
   }
 
   /** Removes one reverse edge and prunes empty provider buckets. */
@@ -536,13 +545,6 @@ class TopologyIndex implements ITopologyIndex {
     if (!consumers) return
     consumers.delete(consumer)
     if (consumers.size === 0) this.#consumers.delete(provider)
-  }
-
-  /** Returns present consumer IDs in stable registration order. */
-  #sortedConsumerIds(provider: string): readonly string[] {
-    return [...(this.#consumers.get(provider) ?? [])]
-      .filter((id) => this.#nodes.has(id))
-      .sort((left, right) => this.#nodes.get(left)!.ordinal - this.#nodes.get(right)!.ordinal)
   }
 
   /** Rejects a candidate edge set when stable dependency traversal closes a cycle. */
@@ -610,7 +612,7 @@ class TopologyIndex implements ITopologyIndex {
       }
       if (level === node.level) continue
       this.#nodes.set(id, Object.freeze({ ...node, level }))
-      for (const consumer of this.#sortedConsumerIds(id)) {
+      for (const consumer of this.#consumers.get(id)?.keys() ?? []) {
         if (queued.has(consumer)) continue
         queued.add(consumer)
         queue.push(consumer)
