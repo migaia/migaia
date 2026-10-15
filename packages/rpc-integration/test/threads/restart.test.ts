@@ -1,4 +1,4 @@
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import * as remoteRetry from '../../../rpc-core/dist/remote/retry.js'
 import { createRemoteRetryPort } from '@migaia/rpc-core/remote'
@@ -112,7 +112,8 @@ describe('thread generation recovery', () => {
     }
   })
   it('[A5] callWallTimeMs bounds the total request and cancels its timer', async () => {
-    const scheduler = createManualScheduler()
+    /** Policy timers are virtual; original native generation jobs retain host ordering. */
+    const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
     const fixture = nativeFixture({
       scheduler,
       spec: {
@@ -136,7 +137,8 @@ describe('thread generation recovery', () => {
   it.each([60, 110])(
     '[A5] preserves the original 100ms total deadline across a %sms rebind',
     async (delay) => {
-      const scheduler = createManualScheduler()
+      /** Policy timers are virtual; original native generation jobs retain host ordering. */
+      const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
       const fixture = nativeFixture(
         {
           scheduler,
@@ -252,7 +254,8 @@ describe('thread generation recovery', () => {
     }
   })
   it('[A5] terminal restart budget drains retry while another facade remains callable', async () => {
-    const scheduler = createManualScheduler()
+    /** Policy timers are virtual; original native generation jobs retain host ordering. */
+    const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
     const terminal = nativeFixture(
       { scheduler, supervisor: { restart: { maxRestarts: 0 } } },
       { crash: true }

@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { PluginHost } from '@migaia/plugin-host'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { createRemotePlugin } from '@migaia/rpc-core/remote'
 import { createSpawnProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
 import type { IProcessHandle } from '@migaia/supervision/process'
@@ -62,7 +62,8 @@ async function settle(): Promise<void> {
 
 describe('process resilience platform health', () => {
   it('[A5] restarts real busy-loop children through native RPC ping in later generations', async () => {
-    const scheduler = createManualScheduler()
+    /** Policy timers are virtual; original native generation jobs retain host ordering. */
+    const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
     const handles: IProcessHandle[] = []
     const exits: unknown[] = []
     const reports: unknown[] = []

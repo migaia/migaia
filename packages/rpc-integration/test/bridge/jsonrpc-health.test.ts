@@ -1,7 +1,7 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { PluginHost } from '@migaia/plugin-host'
 import { createUnitBudget } from '@migaia/supervision'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
 import { createSpawnProcessBinding } from '../../../rpc-process/dist/process/plugin/binding.js'
 import { createRemotePlugin } from '@migaia/rpc-core/remote'
@@ -21,7 +21,8 @@ describe('JSON-RPC real process health', () => {
     '[I16 A5/M2] busy child obeys health none/custom and generation retest (custom=%s)',
     async (custom) => {
       /** Shared scheduler owns supervision checks, request deadlines and restart delay. */
-      const scheduler = createManualScheduler()
+      /** Policy timers are virtual; original native generation jobs retain host ordering. */
+      const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
       /** Real handles distinguish process-level recovery from facade reconnection. */
       const handles: IFixtureHandle[] = []
       /** Current-generation endpoints implement the caller-supplied health operation. */

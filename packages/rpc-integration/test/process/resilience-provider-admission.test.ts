@@ -123,6 +123,8 @@ describe('process session provider admission', () => {
     const first = () => test.provider()(test.context)
     expect(first).toThrowError(expect.objectContaining({ code: 'PROCESS_CONNECTION_LIMIT' }))
     expect(first).toThrowError(expect.objectContaining({ code: 'PROCESS_CONNECTION_LIMIT' }))
+    // Deferred refusal-close is owned by the injected manual clock.
+    test.scheduler.advance(0)
     await Promise.resolve()
     expect(test.close).toHaveBeenCalledTimes(1)
     test.admission.close()
