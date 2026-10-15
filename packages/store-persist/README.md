@@ -258,4 +258,4 @@ window.addEventListener('beforeunload', () => {
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test && pnpm run build
 ```
 
-`maxWaitMs` 限制防抖后请求写入的时间，不限制串行队列或存储适配器的实际完成时间。`flush()`、`clear()`、`dispose()` 都取消当前防抖窗口；卸载前尚未触发的最新快照仍会发起最终写入，最终失败保留在 `writeError`，即使状态已是 disposed。
+`maxWaitMs` 限制防抖后请求写入的时间，不限制串行队列或存储适配器的实际完成时间。`flush()`、`clear()`、`dispose()` 都取消当前防抖窗口；卸载前尚未触发的最新快照仍会发起最终写入，最终失败保留在 `writeError`，即使状态已是 disposed。计时和取消能力分别复用 scheduler 与 lifecycle 的原生 controller 工厂；原生 signal、默认 AbortError reason 与持久化失败的原始 cause 保持不变。
