@@ -243,6 +243,8 @@ describe('AF-T34 rule gate: no Function.prototype call/apply/bind; Reflect.apply
     expect(forbidden).toEqual([])
     expect([...reflectFiles].sort()).toEqual([
       'capability/src/index.ts',
+      // Abort registration invokes captured host methods with their original signal receiver.
+      'lifecycle/src/observed-subscription.ts',
       'lifecycle/src/scheduler.ts',
       'plugin-host/src/invocation.ts',
       'reactive/src/runtime/receiver.ts'
