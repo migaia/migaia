@@ -183,6 +183,7 @@
       "createSourceBinding": "@migaia/reactive/extension",
       "createTrackedObserver": "@migaia/reactive/extension",
       "currentRuntimeVersion": "@migaia/reactive/extension",
+      "deferRuntimeCleanup": "@migaia/reactive/extension",
       "getDefaultRuntime": "@migaia/reactive/extension",
       "ICapture": "@migaia/reactive/extension",
       "IInternalRuntime": "@migaia/reactive/extension",

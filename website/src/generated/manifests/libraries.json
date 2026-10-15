@@ -8314,7 +8314,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\n\nconst count = runtime.signal(1);\nconst doubled = runtime.computed(() => count.value * 2);\n\nconst seen: number[] = [];\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value);\n}); // 创建时立即同步跑一次：seen = [2]\n\ncount.value = 3;\nruntime.flush(); // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose();\ndoubled.dispose();\ncount.dispose();"
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\n\nconst count = runtime.signal(1)\nconst doubled = runtime.computed(() => count.value * 2)\n\nconst seen: number[] = []\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value)\n}) // 创建时立即同步跑一次：seen = [2]\n\ncount.value = 3\nruntime.flush() // 手动冲刷待处理的副作用：seen = [2, 6]\n\neffect.dispose()\ndoubled.dispose()\ncount.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -8402,7 +8402,16 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => { node.value = 2 })\nconsole.log(node.value)\nnode.dispose()"
+                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => {\n  node.value = 2\n})\nconsole.log(node.value)\nnode.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true"
                 }
               ]
             }
@@ -8444,7 +8453,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createRuntime, defaultRuntime, assertSingleRuntimeCopy,\n  ReactiveErrorCode, REACTIVE_SOURCE, ReactiveErrorPhase, ReactiveTracePhase,\n  ReactiveTraceType, ReactiveTraceReason, ReactiveDependencyKind,\n  type IReactiveSignal, type IReactiveComputed, type IReactiveEffect,\n  type IComputedConfig, type IReactiveNodeOptions, type IDisposable, type IDisposer,\n  type IRuntime, type IRuntimeOptions, type ISchedulerStrategy, type IFlushResult,\n  type IRuntimeTraceEvent, type IRuntimeErrorContext, type IReactiveErrorCode,\n  type IReactiveError\n} from '@migaia/reactive';"
+                  "code": "import {\n  createRuntime,\n  defaultRuntime,\n  assertSingleRuntimeCopy,\n  ReactiveErrorCode,\n  REACTIVE_SOURCE,\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  ReactiveTraceReason,\n  ReactiveDependencyKind,\n  type IReactiveSignal,\n  type IReactiveComputed,\n  type IReactiveEffect,\n  type IComputedConfig,\n  type IReactiveNodeOptions,\n  type IDisposable,\n  type IDisposer,\n  type IRuntime,\n  type IRuntimeOptions,\n  type ISchedulerStrategy,\n  type IFlushResult,\n  type IRuntimeTraceEvent,\n  type IRuntimeErrorContext,\n  type IReactiveErrorCode,\n  type IReactiveError\n} from '@migaia/reactive'"
                 }
               ]
             },
@@ -8455,7 +8464,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IReactiveSignal<T> = IDisposable & {\n  readonly runtime: IRuntime;\n  readonly debugName?: string;\n  readonly version: number;\n  readonly disposed: boolean;\n  readonly observed: boolean; // !disposed && 有下游订阅\n  value: T; // 读建立依赖；写触发下游\n  peek(): T; // 读，不建立依赖\n  dispose(): void;\n  addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void }): () => void;\n}"
+                  "code": "type IReactiveSignal<T> = IDisposable & {\n  readonly runtime: IRuntime\n  readonly debugName?: string\n  readonly version: number\n  readonly disposed: boolean\n  readonly observed: boolean // !disposed && 有下游订阅\n  value: T // 读建立依赖；写触发下游\n  peek(): T // 读，不建立依赖\n  dispose(): void\n  addObservedHooks(hooks: { onObserved?: () => void; onUnobserved?: () => void }): () => void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8464,7 +8473,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\nconst count = runtime.signal(1);\ncount.value; // 1，在 Computed/Effect 内读取会建立依赖\ncount.value = 2; // Object.is 判定；写入相同值不触发任何通知，也不推进版本\ncount.peek(); // 2，不建立依赖\ncount.dispose();\ncount.value; // 抛 NODE_DISPOSED"
+                  "code": "const runtime = createRuntime()\nconst count = runtime.signal(1)\ncount.value // 1，在 Computed/Effect 内读取会建立依赖\ncount.value = 2 // Object.is 判定；写入相同值不触发任何通知，也不推进版本\ncount.peek() // 2，不建立依赖\ncount.dispose()\ncount.value // 抛 NODE_DISPOSED"
                 },
                 {
                   "type": "paragraph",
@@ -8489,7 +8498,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IComputedOptions<T> = {\n  equals?: (a: T, b: T) => boolean;\n  keepAlive?: boolean;\n  debugName?: string;\n};\ntype IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean);\n\ntype IReactiveComputed<T> = IDisposable & {\n  readonly runtime: IRuntime;\n  readonly debugName?: string;\n  readonly version: number;\n  readonly disposed: boolean;\n  readonly observed: boolean;\n  readonly value: T; // 读建立依赖 + 惰性重算\n  peek(): T; // 读、重算，但不建立依赖\n  dispose(): void;\n}"
+                  "code": "type IComputedOptions<T> = {\n  equals?: (a: T, b: T) => boolean\n  keepAlive?: boolean\n  debugName?: string\n}\ntype IComputedConfig<T> = IComputedOptions<T> | ((a: T, b: T) => boolean)\n\ntype IReactiveComputed<T> = IDisposable & {\n  readonly runtime: IRuntime\n  readonly debugName?: string\n  readonly version: number\n  readonly disposed: boolean\n  readonly observed: boolean\n  readonly value: T // 读建立依赖 + 惰性重算\n  peek(): T // 读、重算，但不建立依赖\n  dispose(): void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8498,7 +8507,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const doubled = runtime.computed(() => count.value * 2);\ndoubled.value; // 首次读取才真正计算\ndoubled.value; // 依赖未变则直接返回缓存，不重算\n\nconst clamped = runtime.computed(() => Math.max(0, count.value), { keepAlive: true }); // 无订阅者也保持热态\nconst custom = runtime.computed(() => ({ n: count.value }), (a, b) => a.n === b.n); // 配置参数可直接传比较函数"
+                  "code": "const doubled = runtime.computed(() => count.value * 2)\ndoubled.value // 首次读取才真正计算\ndoubled.value // 依赖未变则直接返回缓存，不重算\n\nconst clamped = runtime.computed(() => Math.max(0, count.value), { keepAlive: true }) // 无订阅者也保持热态\nconst custom = runtime.computed(\n  () => ({ n: count.value }),\n  (a, b) => a.n === b.n\n) // 配置参数可直接传比较函数"
                 },
                 {
                   "type": "paragraph",
@@ -8523,7 +8532,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IReactiveEffect = IDisposable & {\n  readonly runtime: IRuntime;\n  readonly debugName?: string;\n  readonly disposed: boolean;\n  dispose(): void;\n}"
+                  "code": "type IReactiveEffect = IDisposable & {\n  readonly runtime: IRuntime\n  readonly debugName?: string\n  readonly disposed: boolean\n  dispose(): void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8532,7 +8541,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const seen: number[] = [];\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value);\n  return () => console.log('cleanup'); // 可选：返回值作为下次重跑/dispose 前的清理回调\n}); // 构造时立即同步跑一次\neffect.dispose(); // 释放：清理依赖边 + 跑最后一次 cleanup（untracked 执行，不建立依赖）"
+                  "code": "const seen: number[] = []\nconst effect = runtime.effect(() => {\n  seen.push(doubled.value)\n  return () => console.log('cleanup') // 可选：返回值作为下次重跑/dispose 前的清理回调\n}) // 构造时立即同步跑一次\neffect.dispose() // 释放：清理依赖边 + 跑最后一次 cleanup（untracked 执行，不建立依赖）"
                 },
                 {
                   "type": "paragraph",
@@ -8556,12 +8565,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createRuntime(options?: IRuntimeOptions): IRuntime;\nconst defaultRuntime: IRuntime;"
+                  "code": "function createRuntime(options?: IRuntimeOptions): IRuntime\nconst defaultRuntime: IRuntime"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IRuntimeOptions = {\n  adapter?: Partial<IReactiveRuntimeAdapter>; // scheduleMicrotask/now/timestamp/reportError\n  onError?: (error: unknown, context: IRuntimeErrorContext) => void;\n  onTrace?: (event: IRuntimeTraceEvent) => void;\n  maxFlushPasses?: number; // 默认 100，须为正整数\n  scheduleIdle?: (task: () => void) => void; // 默认走 adapter.scheduleMicrotask\n  schedulerStrategy?: ISchedulerStrategy; // 创建期选择，默认微任务合并\n};"
+                  "code": "type IRuntimeOptions = {\n  adapter?: Partial<IReactiveRuntimeAdapter> // scheduleMicrotask/now/timestamp/reportError\n  onError?: (error: unknown, context: IRuntimeErrorContext) => void\n  onTrace?: (event: IRuntimeTraceEvent) => void\n  maxFlushPasses?: number // 默认 100，须为正整数\n  scheduleIdle?: (task: () => void) => void // 默认走 adapter.scheduleMicrotask\n  schedulerStrategy?: ISchedulerStrategy // 创建期选择，默认微任务合并\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8570,7 +8579,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime({\n  maxFlushPasses: 50,\n  onError: (e, ctx) => console.error(ctx.phase, e)\n});"
+                  "code": "const runtime = createRuntime({\n  maxFlushPasses: 50,\n  onError: (e, ctx) => console.error(ctx.phase, e)\n})"
                 },
                 {
                   "type": "paragraph",
@@ -8593,7 +8602,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IRuntime = {\n  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>;\n  computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>;\n  effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IReactiveEffect; // 返回现有节点的生命周期句柄\n  batch<T>(fn: () => T): T;\n  untracked<T>(fn: () => T): T;\n  flush(): 'completed' | 'deferred';\n  runTracedAction<T>(name: string, fn: () => T): T;\n  reportError(\n    error: unknown,\n    context: { phase: IRuntimeErrorContext['phase']; observer?: object; observable?: object }\n  ): void;\n  subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer;\n}"
+                  "code": "type IRuntime = {\n  signal<T>(value: T, options?: IReactiveNodeOptions): IReactiveSignal<T>\n  computed<T>(fn: () => T, config?: IComputedConfig<T>): IReactiveComputed<T>\n  effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IReactiveEffect // 返回现有节点的生命周期句柄\n  batch<T>(fn: () => T): T\n  untracked<T>(fn: () => T): T\n  flush(): 'completed' | 'deferred'\n  runTracedAction<T>(name: string, fn: () => T): T\n  reportError(\n    error: unknown,\n    context: { phase: IRuntimeErrorContext['phase']; observer?: object; observable?: object }\n  ): void\n  subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8634,7 +8643,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createObserverBinding, type IObserverBinding, type IObserverCommitResult, type IObserverRetrackResult, type ICapture } from '@migaia/reactive/extension';"
+                  "code": "import {\n  createObserverBinding,\n  type IObserverBinding,\n  type IObserverCommitResult,\n  type IObserverRetrackResult,\n  type ICapture\n} from '@migaia/reactive/extension'"
                 }
               ]
             },
@@ -8645,7 +8654,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createObserverBinding(runtime: IRuntime): IObserverBinding;\n\ntype IObserverBinding = {\n  capture<R>(read: () => R): ICapture<R>;\n  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer;\n  commit(capture: ICapture<unknown>): IObserverCommitResult;\n  retrack(): IObserverRetrackResult;\n};\n\ntype IObserverCommitResult = 'committed' | 'stale' | 'no-observer';\ntype IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer';"
+                  "code": "function createObserverBinding(runtime: IRuntime): IObserverBinding\n\ntype IObserverBinding = {\n  capture<R>(read: () => R): ICapture<R>\n  observe(fn: () => void | IDisposer, options?: IReactiveNodeOptions): IDisposer\n  commit(capture: ICapture<unknown>): IObserverCommitResult\n  retrack(): IObserverRetrackResult\n}\n\ntype IObserverCommitResult = 'committed' | 'stale' | 'no-observer'\ntype IObserverRetrackResult = 'changed' | 'unchanged' | 'no-observer'"
                 },
                 {
                   "type": "paragraph",
@@ -8654,7 +8663,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const binding = createObserverBinding(runtime);\nconst dispose = binding.observe(() => {\n  // 真正的订阅者体；依赖变化后被正常调度重跑\n});\n\n// 渲染期（可能被丢弃）：\nconst capture = binding.capture(() => doubled.value); // 只记录读了谁、当时版本，不建边\n\n// 提交期：\nconst result = binding.commit(capture); // 'committed' | 'stale' | 'no-observer'\nif (result === 'stale') {\n  // 捕获后依赖已变化：调用方应重新求值，不要复用同一个 capture token\n}\n\nbinding.retrack(); // 强制当前订阅者重跑一次，返回其依赖集合是否发生变化\ndispose();"
+                  "code": "const binding = createObserverBinding(runtime)\nconst dispose = binding.observe(() => {\n  // 真正的订阅者体；依赖变化后被正常调度重跑\n})\n\n// 渲染期（可能被丢弃）：\nconst capture = binding.capture(() => doubled.value) // 只记录读了谁、当时版本，不建边\n\n// 提交期：\nconst result = binding.commit(capture) // 'committed' | 'stale' | 'no-observer'\nif (result === 'stale') {\n  // 捕获后依赖已变化：调用方应重新求值，不要复用同一个 capture token\n}\n\nbinding.retrack() // 强制当前订阅者重跑一次，返回其依赖集合是否发生变化\ndispose()"
                 },
                 {
                   "type": "paragraph",
@@ -8678,7 +8687,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  claimOwnership,\n  ownerOf,\n  assertOwnedBy,\n  assertReactiveOwnedBy\n} from '@migaia/reactive/extension';"
+                  "code": "import {\n  claimOwnership,\n  ownerOf,\n  assertOwnedBy,\n  assertReactiveOwnedBy\n} from '@migaia/reactive/extension'"
                 },
                 {
                   "type": "paragraph",
@@ -8696,7 +8705,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\nconst node = {};\nclaimOwnership(node, runtime);\nassertOwnedBy(node, runtime, 'my-node'); // 通过\nassertOwnedBy(node, otherRuntime, 'my-node'); // 抛 CROSS_RUNTIME"
+                  "code": "const runtime = createRuntime()\nconst node = {}\nclaimOwnership(node, runtime)\nassertOwnedBy(node, runtime, 'my-node') // 通过\nassertOwnedBy(node, otherRuntime, 'my-node') // 抛 CROSS_RUNTIME"
                 }
               ]
             },
@@ -8707,12 +8716,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createFieldSource, type IRuntimeFieldSource } from '@migaia/reactive/extension';"
+                  "code": "import { createFieldSource, type IRuntimeFieldSource } from '@migaia/reactive/extension'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createFieldSource(\n  runtime: IRuntime,\n  debugName?: string\n): {\n  track(): void;\n  notify(): void;\n  commit<T>(write: () => T): T;\n  readonly observed: boolean;\n  readonly disposed: boolean;\n  dispose(): void;\n};"
+                  "code": "function createFieldSource(\n  runtime: IRuntime,\n  debugName?: string\n): {\n  track(): void\n  notify(): void\n  commit<T>(write: () => T): T\n  readonly observed: boolean\n  readonly disposed: boolean\n  dispose(): void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -8721,7 +8730,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const field = createFieldSource(runtime, 'wasm-counter');\nfunction read(): number {\n  field.track(); // 建立依赖，不返回值——真实值由外部存储持有\n  return wasmMemory.getValue();\n}\nfunction write(v: number): void {\n  field.commit(() => wasmMemory.setValue(v)); // 领取版本、执行写入、再发布，三步原子\n}\nfield.dispose();"
+                  "code": "const field = createFieldSource(runtime, 'wasm-counter')\nfunction read(): number {\n  field.track() // 建立依赖，不返回值——真实值由外部存储持有\n  return wasmMemory.getValue()\n}\nfunction write(v: number): void {\n  field.commit(() => wasmMemory.setValue(v)) // 领取版本、执行写入、再发布，三步原子\n}\nfield.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -8736,7 +8745,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  internalRuntimeOf,\n  isRuntimeTracking,\n  isAnyRuntimeTracking,\n  currentRuntimeVersion,\n  type IObservable,\n  type IObserver,\n  type IInternalRuntime\n} from '@migaia/reactive/extension';"
+                  "code": "import {\n  internalRuntimeOf,\n  isRuntimeTracking,\n  isAnyRuntimeTracking,\n  currentRuntimeVersion,\n  type IObservable,\n  type IObserver,\n  type IInternalRuntime\n} from '@migaia/reactive/extension'"
                 },
                 {
                   "type": "list",
@@ -8783,7 +8792,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive';"
+                  "code": "import { ReactiveErrorCode, type IReactiveErrorCode } from '@migaia/reactive'"
                 },
                 {
                   "type": "paragraph",
@@ -8889,7 +8898,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
+                  "code": "import {\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive'"
                 },
                 {
                   "type": "paragraph",
@@ -8898,7 +8907,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IRuntimeTraceEvent =\n  | {\n      type: 'observable-change';\n      timestamp: number;\n      observable: IRuntimeNodeDescriptor;\n      reason: 'set' | 'notify';\n    }\n  | {\n      type: 'dependency';\n      timestamp: number;\n      phase: 'connect' | 'disconnect';\n      observable: IRuntimeNodeDescriptor;\n      observer: IRuntimeNodeDescriptor;\n      reason?: 'retrack' | 'invalidate' | 'dispose';\n    }\n  | {\n      type: 'observer-run';\n      timestamp: number;\n      phase: 'start' | 'end' | 'error';\n      observer: IRuntimeNodeDescriptor;\n      durationMs?: number;\n      error?: unknown;\n    }\n  | {\n      type: 'action';\n      timestamp: number;\n      phase: 'start' | 'end' | 'error';\n      name: string;\n      durationMs?: number;\n      error?: unknown;\n    };"
+                  "code": "type IRuntimeTraceEvent =\n  | {\n      type: 'observable-change'\n      timestamp: number\n      observable: IRuntimeNodeDescriptor\n      reason: 'set' | 'notify'\n    }\n  | {\n      type: 'dependency'\n      timestamp: number\n      phase: 'connect' | 'disconnect'\n      observable: IRuntimeNodeDescriptor\n      observer: IRuntimeNodeDescriptor\n      reason?: 'retrack' | 'invalidate' | 'dispose'\n    }\n  | {\n      type: 'observer-run'\n      timestamp: number\n      phase: 'start' | 'end' | 'error'\n      observer: IRuntimeNodeDescriptor\n      durationMs?: number\n      error?: unknown\n    }\n  | {\n      type: 'action'\n      timestamp: number\n      phase: 'start' | 'end' | 'error'\n      name: string\n      durationMs?: number\n      error?: unknown\n    }"
                 },
                 {
                   "type": "paragraph",
@@ -8939,7 +8948,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive';\n\nfunction renderOnce() {\n  const runtime = createRuntime(); // 每次请求/每个用例独立一份，互不污染\n  const count = runtime.signal(1);\n  const doubled = runtime.computed(() => count.value * 2);\n  const seen: number[] = [];\n  const dispose = runtime.effect(() => {\n    seen.push(doubled.value);\n  });\n  count.value = 5;\n  runtime.flush(); // 手动同步冲刷，SSR 场景不依赖微任务时机\n  dispose.dispose();\n  return seen; // [2, 10]\n}"
+                  "code": "import { createRuntime } from '@migaia/reactive'\n\nfunction renderOnce() {\n  const runtime = createRuntime() // 每次请求/每个用例独立一份，互不污染\n  const count = runtime.signal(1)\n  const doubled = runtime.computed(() => count.value * 2)\n  const seen: number[] = []\n  const dispose = runtime.effect(() => {\n    seen.push(doubled.value)\n  })\n  count.value = 5\n  runtime.flush() // 手动同步冲刷，SSR 场景不依赖微任务时机\n  dispose.dispose()\n  return seen // [2, 10]\n}"
                 }
               ]
             },
@@ -8950,7 +8959,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createObserverBinding } from '@migaia/reactive/extension';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst count = runtime.signal(0);\nconst doubled = runtime.computed(() => count.value * 2);\n\nfunction useReactiveValue<T>(read: () => T): T {\n  const binding = createObserverBinding(runtime);\n  const capture = binding.capture(read); // 渲染期：只读捕获，可能被丢弃\n  // ……渲染真正提交时：\n  const result = binding.commit(capture);\n  if (result === 'stale') {\n    // 依赖已变，重新求值（真实框架适配层这里会触发一次重渲染）\n  }\n  binding.observe(() => {\n    // 订阅变化后触发重渲染\n  });\n  return capture.result;\n}"
+                  "code": "import { createObserverBinding } from '@migaia/reactive/extension'\nimport { createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst count = runtime.signal(0)\nconst doubled = runtime.computed(() => count.value * 2)\n\nfunction useReactiveValue<T>(read: () => T): T {\n  const binding = createObserverBinding(runtime)\n  const capture = binding.capture(read) // 渲染期：只读捕获，可能被丢弃\n  // ……渲染真正提交时：\n  const result = binding.commit(capture)\n  if (result === 'stale') {\n    // 依赖已变，重新求值（真实框架适配层这里会触发一次重渲染）\n  }\n  binding.observe(() => {\n    // 订阅变化后触发重渲染\n  })\n  return capture.result\n}"
                 }
               ]
             },
@@ -8961,7 +8970,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\ntry {\n  runtime.batch(() => {\n    signalA.value = 1;\n    signalB.value = 2;\n    throw new Error('business failure');\n  });\n} catch (error) {\n  // error 就是 'business failure' 本身；若收尾 flush 也失败，flush 错误挂在 error.cause 上\n}"
+                  "code": "const runtime = createRuntime()\ntry {\n  runtime.batch(() => {\n    signalA.value = 1\n    signalB.value = 2\n    throw new Error('business failure')\n  })\n} catch (error) {\n  // error 就是 'business failure' 本身；若收尾 flush 也失败，flush 错误挂在 error.cause 上\n}"
                 }
               ]
             },
@@ -8972,7 +8981,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime({\n  schedulerStrategy: (flush) => {\n    requestAnimationFrame(() => flush());\n  }\n});"
+                  "code": "const runtime = createRuntime({\n  schedulerStrategy: (flush) => {\n    requestAnimationFrame(() => flush())\n  }\n})"
                 }
               ]
             },
@@ -9010,7 +9019,16 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => { node.value = 2 })\nconsole.log(node.value)\nnode.dispose()"
+                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => {\n  node.value = 2\n})\nconsole.log(node.value)\nnode.dispose()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`deferRuntimeCleanup(runtime, task)` from `@migaia/reactive/extension` schedules synchronous adapter cleanup on that Runtime's `scheduleIdle` channel (the default uses microtasks). Thrown cleanup errors reach its `reportError` sink. It returns no mutable scheduler or graph capability and does not own asynchronous resources."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({\n  scheduleIdle: (task) => {\n    idle.push(task)\n  }\n})\nlet released = false\ndeferRuntimeCleanup(runtime, () => {\n  released = true\n})\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true"
                 }
               ]
             }
@@ -21769,6 +21787,10 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm run typecheck:e2e && pnpm run test:e2e"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Abandoned speculative cells use their owning Runtime idle channel (`scheduleIdle`, default microtasks). Observed cells still follow the canonical observer lifecycle."
                 }
               ]
             }
@@ -21837,7 +21859,7 @@
                   "type": "list",
                   "items": [
                     "无人订阅就回收：一个新建的 cell 挂上 `onUnobserved` 钩子——它的最后一个订阅者取消订阅时，立即尝试回收。",
-                    "从未被订阅也会回收：如果一次 cell 创建之后，直到当前微任务结束都没有任何 effect/computed 订阅这个 cell（比如只是一次性读了一下），会在微任务尾部被当作\"从未使用\"回收，不会因为一次孤立的读而永久占用内存。",
+                    "从未被订阅也会回收：如果一次 cell 创建之后，直到所属 Runtime 的 idle 清理执行（默认微任务）都没有任何 effect/computed 订阅这个 cell（比如只是一次性读了一下），会在 Runtime idle 清理阶段（默认微任务）被当作\"从未使用\"回收，不会因为一次孤立的读而永久占用内存。",
                     "值消失后不会立刻消失：某个 key 被 `delete()` 后，如果它的 cell 仍被订阅（还有依赖它的 effect 存在），cell 不会被摘除——它会把值置为\"缺失\"标记，继续存在，直到订阅者自己解除订阅。这保证了\"正在观察这个 key 的代码，会正确看到它变成 undefined\"，而不是让 cell 无声消失导致订阅者拿到陈旧状态。"
                   ]
                 }
@@ -22434,7 +22456,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "cell 的自动回收是\"事件驱动\"的：一个 cell 的最后一个订阅者取消订阅时立即触发回收；一个从未被订阅过的 cell 在创建后的当前微任务尾部被回收。但存在一种中间状态：一个 key 被 `delete()` 时，如果它的 cell 当时仍有订阅者，这个 cell 不会被摘除（要保证订阅者能看到它变成\"缺失\"），而是留在原地，直到订阅者自己解除订阅才会经由 `onUnobserved` 钩子回收。"
+                  "text": "cell 的自动回收是\"事件驱动\"的：一个 cell 的最后一个订阅者取消订阅时立即触发回收；一个从未被订阅过的 cell 在创建后的 Runtime idle 清理阶段回收（默认微任务）。但存在一种中间状态：一个 key 被 `delete()` 时，如果它的 cell 当时仍有订阅者，这个 cell 不会被摘除（要保证订阅者能看到它变成\"缺失\"），而是留在原地，直到订阅者自己解除订阅才会经由 `onUnobserved` 钩子回收。"
                 },
                 {
                   "type": "paragraph",
@@ -22544,6 +22566,10 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm run typecheck:e2e && pnpm run test:e2e"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Abandoned speculative cells use their owning Runtime idle channel (`scheduleIdle`, default microtasks). Observed cells still follow the canonical observer lifecycle."
                 }
               ]
             }
@@ -22630,7 +22656,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  atomDef,\n  atomDefFactory,\n  previewSafeAtomDefFactory,\n  derivedDef,\n  writableDef,\n  isAtomDefinition,\n  assertNotThenable,\n  AtomKind\n} from '@migaia/store-keyed';"
+                  "code": "import {\n  atomDef,\n  atomDefFactory,\n  previewSafeAtomDefFactory,\n  derivedDef,\n  writableDef,\n  isAtomDefinition,\n  assertNotThenable,\n  AtomKind\n} from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -22643,7 +22669,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const count = atomDef(0, 'count');"
+                  "code": "const count = atomDef(0, 'count')"
                 },
                 {
                   "type": "paragraph",
@@ -22656,7 +22682,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const list = atomDefFactory(() => [], 'list');"
+                  "code": "const list = atomDefFactory(() => [], 'list')"
                 },
                 {
                   "type": "paragraph",
@@ -22669,7 +22695,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const list = previewSafeAtomDefFactory(() => [], 'list');"
+                  "code": "const list = previewSafeAtomDefFactory(() => [], 'list')"
                 },
                 {
                   "type": "paragraph",
@@ -22682,7 +22708,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const doubled = derivedDef((get) => get(count) * 2, 'doubled');"
+                  "code": "const doubled = derivedDef((get) => get(count) * 2, 'doubled')"
                 },
                 {
                   "type": "paragraph",
@@ -22695,7 +22721,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const filterText = writableDef(\n  (get) => get(state).filter,\n  (get, set, next) => set(state, (s) => ({ ...s, filter: next }))\n);"
+                  "code": "const filterText = writableDef(\n  (get) => get(state).filter,\n  (get, set, next) => set(state, (s) => ({ ...s, filter: next }))\n)"
                 },
                 {
                   "type": "paragraph",
@@ -22708,7 +22734,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "isAtomDefinition(count); // true\nisAtomDefinition({}); // false"
+                  "code": "isAtomDefinition(count) // true\nisAtomDefinition({}) // false"
                 },
                 {
                   "type": "paragraph",
@@ -22721,7 +22747,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "assertNotThenable(value, 'myFactory create()');"
+                  "code": "assertNotThenable(value, 'myFactory create()')"
                 },
                 {
                   "type": "paragraph",
@@ -22734,7 +22760,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "AtomKind.primitive; // 'primitive'\nAtomKind.primitiveFactory; // 'primitive-factory'\nAtomKind.derived; // 'derived'\nAtomKind.writableDerived; // 'writable-derived'"
+                  "code": "AtomKind.primitive // 'primitive'\nAtomKind.primitiveFactory // 'primitive-factory'\nAtomKind.derived // 'derived'\nAtomKind.writableDerived // 'writable-derived'"
                 },
                 {
                   "type": "paragraph",
@@ -22749,7 +22775,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive';\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed';"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -22758,7 +22784,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const store = createAtomStore(createRuntime());"
+                  "code": "const store = createAtomStore(createRuntime())"
                 },
                 {
                   "type": "paragraph",
@@ -22771,7 +22797,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const store = defaultAtomStore(defaultRuntime);"
+                  "code": "const store = defaultAtomStore(defaultRuntime)"
                 },
                 {
                   "type": "paragraph",
@@ -22788,7 +22814,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.get(doubled); // 2"
+                  "code": "store.get(doubled) // 2"
                 },
                 {
                   "type": "paragraph",
@@ -22801,7 +22827,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.peek(doubled);"
+                  "code": "store.peek(doubled)"
                 },
                 {
                   "type": "paragraph",
@@ -22814,11 +22840,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.preview(doubled);"
+                  "code": "store.preview(doubled)"
                 },
                 {
                   "type": "paragraph",
-                  "text": "单参数同上。已有真实实例时直接走 `peek()` 语义；否则计算一个只在当前版本时钟值内有效（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取）的临时值，一个 microtask 后若始终未提交就自动丢弃。`primitive-factory` 必须标记 `previewSafe: true` 才能在这里执行，否则抛 `Error('[store] atom factory is not marked preview-safe')`；出现循环自我依赖抛 `Error('[store] circular atom preview detected')`。"
+                  "text": "单参数同上。已有真实实例时直接走 `peek()` 语义；否则计算一个只在当前版本时钟值内有效（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取）的临时值，Runtime idle cleanup 后（默认 microtask）若始终未提交就自动丢弃。`primitive-factory` 必须标记 `previewSafe: true` 才能在这里执行，否则抛 `Error('[store] atom factory is not marked preview-safe')`；出现循环自我依赖抛 `Error('[store] circular atom preview detected')`。"
                 },
                 {
                   "type": "paragraph",
@@ -22827,7 +22853,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.set(count, 1);\nstore.set(count, (previous) => previous + 1); // 函数式更新"
+                  "code": "store.set(count, 1)\nstore.set(count, (previous) => previous + 1) // 函数式更新"
                 },
                 {
                   "type": "paragraph",
@@ -22840,7 +22866,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const unsubscribe = store.sub(doubled, () => console.log('changed ->', store.peek(doubled)));"
+                  "code": "const unsubscribe = store.sub(doubled, () => console.log('changed ->', store.peek(doubled)))"
                 },
                 {
                   "type": "paragraph",
@@ -22853,7 +22879,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const undo = store.override(\n  doubled,\n  derivedDef(() => 999)\n); // 只读定义可路由到任意同值定义\nundo(); // 撤销，状态原样保留"
+                  "code": "const undo = store.override(\n  doubled,\n  derivedDef(() => 999)\n) // 只读定义可路由到任意同值定义\nundo() // 撤销，状态原样保留"
                 },
                 {
                   "type": "paragraph",
@@ -22866,7 +22892,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.isObserved(doubled); // 是否已建实例且有活跃订阅者"
+                  "code": "store.isObserved(doubled) // 是否已建实例且有活跃订阅者"
                 },
                 {
                   "type": "paragraph",
@@ -22879,7 +22905,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.release(count); // 返回是否确实释放了什么"
+                  "code": "store.release(count) // 返回是否确实释放了什么"
                 },
                 {
                   "type": "paragraph",
@@ -22892,7 +22918,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.size;"
+                  "code": "store.size"
                 },
                 {
                   "type": "paragraph",
@@ -22901,7 +22927,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.dispose();"
+                  "code": "store.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -22914,7 +22940,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.runtime; // 创建时传入的 IRuntime\nstore.disposed; // boolean"
+                  "code": "store.runtime // 创建时传入的 IRuntime\nstore.disposed // boolean"
                 }
               ]
             },
@@ -22925,7 +22951,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { selectDef, opticDef, focusDef, splitDef } from '@migaia/store-keyed';"
+                  "code": "import { selectDef, opticDef, focusDef, splitDef } from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -22938,7 +22964,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const userName = selectDef(userDef, (user) => user.name);"
+                  "code": "const userName = selectDef(userDef, (user) => user.name)"
                 },
                 {
                   "type": "paragraph",
@@ -22951,7 +22977,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const nameField = opticDef(userDef, {\n  get: (user) => user.name,\n  set: (user, name) => ({ ...user, name })\n});"
+                  "code": "const nameField = opticDef(userDef, {\n  get: (user) => user.name,\n  set: (user, name) => ({ ...user, name })\n})"
                 },
                 {
                   "type": "paragraph",
@@ -22964,7 +22990,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const userName = focusDef(sessionDef, 'user', 'name');"
+                  "code": "const userName = focusDef(sessionDef, 'user', 'name')"
                 },
                 {
                   "type": "paragraph",
@@ -22977,7 +23003,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const todosSplit = splitDef(todosDef, (todo) => todo.id);\nconst item = todosSplit.of('t1');"
+                  "code": "const todosSplit = splitDef(todosDef, (todo) => todo.id)\nconst item = todosSplit.of('t1')"
                 },
                 {
                   "type": "paragraph",
@@ -23007,7 +23033,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  readOpticPath,\n  writeOpticPath,\n  findKeyIndex,\n  requireKeyIndex,\n  shallowArrayEquals,\n  computeUniqueKeys,\n  spliceInsert,\n  filterOutKey,\n  replaceAtIndex,\n  KeyedSplitCache\n} from '@migaia/store-keyed';"
+                  "code": "import {\n  readOpticPath,\n  writeOpticPath,\n  findKeyIndex,\n  requireKeyIndex,\n  shallowArrayEquals,\n  computeUniqueKeys,\n  spliceInsert,\n  filterOutKey,\n  replaceAtIndex,\n  KeyedSplitCache\n} from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -23020,7 +23046,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens'); // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens'); // { a: { b: 2 } }，原对象不变"
+                  "code": "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens') // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens') // { a: { b: 2 } }，原对象不变"
                 },
                 {
                   "type": "paragraph",
@@ -23033,7 +23059,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "findKeyIndex(todos, (t) => t.id, 't1');"
+                  "code": "findKeyIndex(todos, (t) => t.id, 't1')"
                 },
                 {
                   "type": "paragraph",
@@ -23046,7 +23072,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "requireKeyIndex(todos, (t) => t.id, 't1', 'item was removed');"
+                  "code": "requireKeyIndex(todos, (t) => t.id, 't1', 'item was removed')"
                 },
                 {
                   "type": "paragraph",
@@ -23059,7 +23085,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "shallowArrayEquals([1, 2], [1, 2]); // true"
+                  "code": "shallowArrayEquals([1, 2], [1, 2]) // true"
                 },
                 {
                   "type": "paragraph",
@@ -23072,7 +23098,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "computeUniqueKeys(todos, (t) => t.id, 'myList'); // 冻结的 Key[]"
+                  "code": "computeUniqueKeys(todos, (t) => t.id, 'myList') // 冻结的 Key[]"
                 },
                 {
                   "type": "paragraph",
@@ -23085,7 +23111,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "spliceInsert([1, 2], 3, 1); // [1, 3, 2]"
+                  "code": "spliceInsert([1, 2], 3, 1) // [1, 3, 2]"
                 },
                 {
                   "type": "paragraph",
@@ -23098,7 +23124,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "filterOutKey(todos, (t) => t.id, 't1'); // { removed: boolean, next: readonly T[] }"
+                  "code": "filterOutKey(todos, (t) => t.id, 't1') // { removed: boolean, next: readonly T[] }"
                 },
                 {
                   "type": "paragraph",
@@ -23111,7 +23137,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "replaceAtIndex([1, 2, 3], 1, 9); // [1, 9, 3]"
+                  "code": "replaceAtIndex([1, 2, 3], 1, 9) // [1, 9, 3]"
                 },
                 {
                   "type": "paragraph",
@@ -23124,7 +23150,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const cache = new KeyedSplitCache<string, MyToken>();\nconst token = cache.of('k1', () => makeToken('k1'));"
+                  "code": "const cache = new KeyedSplitCache<string, MyToken>()\nconst token = cache.of('k1', () => makeToken('k1'))"
                 },
                 {
                   "type": "paragraph",
@@ -23139,7 +23165,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { familyDef, derivedFamilyDef } from '@migaia/store-keyed';"
+                  "code": "import { familyDef, derivedFamilyDef } from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -23152,7 +23178,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const sessionByChat = familyDef((chatId: string) => ({ messages: [] }));\nconst def = sessionByChat('chat-1'); // 同一个 key 永远拿到同一个 token"
+                  "code": "const sessionByChat = familyDef((chatId: string) => ({ messages: [] }))\nconst def = sessionByChat('chat-1') // 同一个 key 永远拿到同一个 token"
                 },
                 {
                   "type": "paragraph",
@@ -23176,7 +23202,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const doneCountByChat = derivedFamilyDef(\n  (chatId: string) => (get) => get(sessionByChat(chatId)).messages.length\n);"
+                  "code": "const doneCountByChat = derivedFamilyDef(\n  (chatId: string) => (get) => get(sessionByChat(chatId)).messages.length\n)"
                 },
                 {
                   "type": "paragraph",
@@ -23207,7 +23233,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed';"
+                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -23220,7 +23246,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input');"
+                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
                 },
                 {
                   "type": "paragraph",
@@ -23233,7 +23259,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive');\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition');"
+                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
                 },
                 {
                   "type": "paragraph",
@@ -23242,7 +23268,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n);"
+                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -23268,7 +23294,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "error.source === STORE_KEYED_SOURCE;"
+                  "code": "error.source === STORE_KEYED_SOURCE"
                 }
               ]
             },
@@ -23279,7 +23305,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';"
+                  "code": "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
                 },
                 {
                   "type": "paragraph",
@@ -23292,7 +23318,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const get = atomGetter(runtime);\nget(someInstanceAtom); // 读取前校验 atom.runtime === runtime"
+                  "code": "const get = atomGetter(runtime)\nget(someInstanceAtom) // 读取前校验 atom.runtime === runtime"
                 },
                 {
                   "type": "paragraph",
@@ -23305,7 +23331,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const set = atomSetter(runtime);\nset(someWritableInstanceAtom, nextValue);"
+                  "code": "const set = atomSetter(runtime)\nset(someWritableInstanceAtom, nextValue)"
                 },
                 {
                   "type": "paragraph",
@@ -23324,7 +23350,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createAtomStore, defaultAtomStore } from '@migaia/store-keyed/atom/store';\nimport { atomDef, derivedDef, writableDef } from '@migaia/store-keyed/atom/definition';"
+                  "code": "import { createAtomStore, defaultAtomStore } from '@migaia/store-keyed/atom/store'\nimport { atomDef, derivedDef, writableDef } from '@migaia/store-keyed/atom/definition'"
                 },
                 {
                   "type": "paragraph",
@@ -23339,7 +23365,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] });\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nstore.dispose(); // 释放这个作用域建出的全部实例"
+                  "code": "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
                 }
               ]
             },
@@ -23350,7 +23376,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport type { IRuntime } from '@migaia/reactive';\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }));\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime);\n  const state = sessionByChatId(chatId); // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }));\n  return store;\n}"
+                  "code": "import { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport type { IRuntime } from '@migaia/reactive'\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }))\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime)\n  const state = sessionByChatId(chatId) // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }))\n  return store\n}"
                 }
               ]
             },
@@ -23361,7 +23387,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createAtomStore, derivedDef } from '@migaia/store-keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst store = createAtomStore(createRuntime());\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留"
+                  "code": "import { createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
                 }
               ]
             },
@@ -23372,7 +23398,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed';\n\nconst todos = [{ id: 't1', done: false }];\nconst index = findKeyIndex(todos, (t) => t.id, 't1');\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true });\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity);"
+                  "code": "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 't1', done: false }]\nconst index = findKeyIndex(todos, (t) => t.id, 't1')\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true })\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity)"
                 }
               ]
             },
@@ -23383,7 +23409,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { StoreKeyedErrorCode } from '@migaia/store-keyed';\n\ntry {\n  store.set(readOnlyDerivedDef as never, 1);\n} catch (error) {\n  if ((error as { code?: string }).code === StoreKeyedErrorCode.overrideContract) {\n    // 处理\"写契约不匹配\"\n  }\n}"
+                  "code": "import { StoreKeyedErrorCode } from '@migaia/store-keyed'\n\ntry {\n  store.set(readOnlyDerivedDef as never, 1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreKeyedErrorCode.overrideContract) {\n    // 处理\"写契约不匹配\"\n  }\n}"
                 }
               ]
             },
@@ -23408,6 +23434,10 @@
                 {
                   "type": "paragraph",
                   "text": "未发布的实例式 family 源码已移除。按 key 管理状态使用公开的 `familyDef`/`derivedFamilyDef` 和 `createAtomStore` 组合；`StoreKeyedErrorCode.familyDisposed`、`.evictionFailed` 及对应 union 值随无触发路径删除，调用方应移除这两种无效检查。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Speculative cleanup uses the owning Runtime idle channel (`scheduleIdle`, default microtasks); no adapter-owned microtask queue is created."
                 }
               ]
             }
@@ -23531,7 +23561,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const AtomKind = {\n  primitive: 'primitive',\n  primitiveFactory: 'primitive-factory',\n  derived: 'derived',\n  writableDerived: 'writable-derived'\n} as const;\ntype IAtomKind = (typeof AtomKind)[keyof typeof AtomKind];"
+                  "code": "const AtomKind = {\n  primitive: 'primitive',\n  primitiveFactory: 'primitive-factory',\n  derived: 'derived',\n  writableDerived: 'writable-derived'\n} as const\ntype IAtomKind = (typeof AtomKind)[keyof typeof AtomKind]"
                 },
                 {
                   "type": "paragraph",
@@ -23544,7 +23574,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T>; // writable-derived 在读侧被擦除掉具体 Args"
+                  "code": "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T> // writable-derived 在读侧被擦除掉具体 Args"
                 },
                 {
                   "type": "paragraph",
@@ -23567,7 +23597,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive';\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed';\n\nconst store = createAtomStore(createRuntime());"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed'\n\nconst store = createAtomStore(createRuntime())"
                 },
                 {
                   "type": "table",
@@ -23618,7 +23648,7 @@
                       "同上",
                       "同上",
                       "同步",
-                      "React 并发渲染下的推测性读。若该定义在本 store 已经有真实实例，直接返回该实例当前值（`peek()` 语义）；否则计算一个只在当前 runtime 版本内有效的临时值，不创建持久实例，一个 microtask 后若始终未被提交（即没有变成真实实例）就自动丢弃缓存。`primitive-factory` 必须显式标记 `previewSafe` 才能在这里执行，否则抛错；出现自我依赖的循环会抛 `[store] circular atom preview detected`。"
+                      "React 并发渲染下的推测性读。若该定义在本 store 已经有真实实例，直接返回该实例当前值（`peek()` 语义）；否则计算一个只在当前 runtime 版本内有效的临时值，不创建持久实例，Runtime idle cleanup 后（默认 microtask）若始终未被提交（即没有变成真实实例）就自动丢弃缓存。`primitive-factory` 必须显式标记 `previewSafe` 才能在这里执行，否则抛错；出现自我依赖的循环会抛 `[store] circular atom preview detected`。"
                     ]
                   ]
                 }
@@ -23631,7 +23661,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.set(countDef, 1);\nstore.set(countDef, (previous) => previous + 1); // 函数式更新\nstore.set(writableDerivedDef, ...customArgs); // 走 write(get, set, ...args)"
+                  "code": "store.set(countDef, 1)\nstore.set(countDef, (previous) => previous + 1) // 函数式更新\nstore.set(writableDerivedDef, ...customArgs) // 走 write(get, set, ...args)"
                 },
                 {
                   "type": "paragraph",
@@ -23654,7 +23684,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const unsubscribe = store.sub(doubledDef, () => {\n  console.log('changed ->', store.peek(doubledDef));\n});"
+                  "code": "const unsubscribe = store.sub(doubledDef, () => {\n  console.log('changed ->', store.peek(doubledDef))\n})"
                 },
                 {
                   "type": "paragraph",
@@ -23669,7 +23699,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// 只读定义：可以路由到任意同值类型定义\nstore.override(derivedDef, replacement);\n// primitive：只能被 primitive/primitive-factory 替换\nstore.override(primitiveDef, replacementPrimitiveDef);\n// writable-derived：只能被同 Args/Result 的 writable-derived 替换\nstore.override(writableDerivedDef, replacementWritableDerivedDef);"
+                  "code": "// 只读定义：可以路由到任意同值类型定义\nstore.override(derivedDef, replacement)\n// primitive：只能被 primitive/primitive-factory 替换\nstore.override(primitiveDef, replacementPrimitiveDef)\n// writable-derived：只能被同 Args/Result 的 writable-derived 替换\nstore.override(writableDerivedDef, replacementWritableDerivedDef)"
                 },
                 {
                   "type": "paragraph",
@@ -23762,7 +23792,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>;"
+                  "code": "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>"
                 },
                 {
                   "type": "paragraph",
@@ -23777,7 +23807,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus;\n  set(source: Source, focus: Focus): Source;\n};\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;"
+                  "code": "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>"
                 },
                 {
                   "type": "paragraph",
@@ -23820,7 +23850,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>;\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>;\n  of(key: Key): ISplitItemDef<T>;\n  insert(store: IAtomStore, item: T, index?: number): void;\n  remove(store: IAtomStore, key: Key): boolean;\n  prune(store: IAtomStore): number;\n};\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>;"
+                  "code": "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
                 },
                 {
                   "type": "table",
@@ -23875,7 +23905,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function readOpticPath(value: unknown, path: readonly PropertyKey[], label: string): unknown;\nfunction writeOpticPath(\n  value: unknown,\n  path: readonly PropertyKey[],\n  next: unknown,\n  label: string\n): unknown;"
+                  "code": "function readOpticPath(value: unknown, path: readonly PropertyKey[], label: string): unknown\nfunction writeOpticPath(\n  value: unknown,\n  path: readonly PropertyKey[],\n  next: unknown,\n  label: string\n): unknown"
                 },
                 {
                   "type": "paragraph",
@@ -23884,7 +23914,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function findKeyIndex<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key\n): number;"
+                  "code": "function findKeyIndex<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key\n): number"
                 },
                 {
                   "type": "paragraph",
@@ -23893,7 +23923,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function requireKeyIndex<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key,\n  label: string\n): number;"
+                  "code": "function requireKeyIndex<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key,\n  label: string\n): number"
                 },
                 {
                   "type": "paragraph",
@@ -23902,7 +23932,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): boolean;"
+                  "code": "function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): boolean"
                 },
                 {
                   "type": "paragraph",
@@ -23911,7 +23941,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function computeUniqueKeys<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  label: string\n): readonly Key[];"
+                  "code": "function computeUniqueKeys<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  label: string\n): readonly Key[]"
                 },
                 {
                   "type": "paragraph",
@@ -23920,7 +23950,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function spliceInsert<T>(list: readonly T[], item: T, index: number): readonly T[];"
+                  "code": "function spliceInsert<T>(list: readonly T[], item: T, index: number): readonly T[]"
                 },
                 {
                   "type": "paragraph",
@@ -23929,7 +23959,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function filterOutKey<T, Key>(\n  list: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key\n): { readonly removed: boolean; readonly next: readonly T[] };"
+                  "code": "function filterOutKey<T, Key>(\n  list: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key\n): { readonly removed: boolean; readonly next: readonly T[] }"
                 },
                 {
                   "type": "paragraph",
@@ -23938,7 +23968,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function replaceAtIndex<T>(list: readonly T[], index: number, value: T): readonly T[];"
+                  "code": "function replaceAtIndex<T>(list: readonly T[], index: number, value: T): readonly T[]"
                 },
                 {
                   "type": "paragraph",
@@ -23947,7 +23977,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class KeyedSplitCache<Key, Item> {\n  get(key: Key): Item | undefined;\n  of(key: Key, create: () => Item): Item;\n  prune(\n    isLive: (key: Key) => boolean,\n    shouldEvict?: (item: Item) => boolean, // 默认 () => true\n    onEvict?: (item: Item) => void\n  ): number;\n  readonly size: number;\n  keys(): IterableIterator<Key>;\n  values(): IterableIterator<Item>;\n  clear(): void;\n}"
+                  "code": "class KeyedSplitCache<Key, Item> {\n  get(key: Key): Item | undefined\n  of(key: Key, create: () => Item): Item\n  prune(\n    isLive: (key: Key) => boolean,\n    shouldEvict?: (item: Item) => boolean, // 默认 () => true\n    onEvict?: (item: Item) => void\n  ): number\n  readonly size: number\n  keys(): IterableIterator<Key>\n  values(): IterableIterator<Item>\n  clear(): void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -23970,7 +24000,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IFamilyDefOptions = {\n  readonly maxSize?: number; // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string; // 默认 'family' / 'derived-family'\n};\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D;\n  readonly size: number;\n  forget(key: K): boolean;\n  clear(): void;\n};\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>;\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>;"
+                  "code": "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
                 },
                 {
                   "type": "paragraph",
@@ -24025,7 +24055,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreKeyedError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreKeyedRangeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError;\n\nfunction createStoreKeyedTypeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\n\nfunction createStoreKeyedAggregateError(\n  code: IStoreKeyedErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreKeyedError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreKeyedRangeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError\n\nfunction createStoreKeyedTypeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\n\nfunction createStoreKeyedAggregateError(\n  code: IStoreKeyedErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -24034,7 +24064,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_KEYED_SOURCE = '@migaia/store-keyed';"
+                  "code": "const STORE_KEYED_SOURCE = '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -24049,7 +24079,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -24220,7 +24250,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';"
+                  "code": "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
                 },
                 {
                   "type": "paragraph",
@@ -24281,7 +24311,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "store.dispose();"
+                  "code": "store.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -24316,7 +24346,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有\"还没有真实实例\"的定义才会走推测计算路径，且该路径产出的值只在当前版本时钟值内复用（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取），一个 microtask 后如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。"
+                  "text": "`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有\"还没有真实实例\"的定义才会走推测计算路径，且该路径产出的值只在当前版本时钟值内复用（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取），Runtime idle cleanup 后（默认 microtask）如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。"
                 }
               ]
             },
@@ -24369,7 +24399,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n});\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}));\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime);\n  const state = sessionBySessionId(sessionId);\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));\n  return store;\n}\n\n// —— 用法 ——\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false });\n\nconst item = todosSplit.of('t1');\nstore.set(item, (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef));\n});\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留\n\nunsubscribe();\ntodosSplit.remove(store, 't2');\ntodosSplit.prune(store); // 只清 splitDef 自己的 key 缓存\nstore.dispose(); // 释放这个作用域建出的全部实例"
+                  "code": "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例"
                 }
               ]
             },
@@ -24432,6 +24462,10 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm --filter @migaia/store-keyed typecheck:e2e\npnpm --filter @migaia/store-keyed test:e2e"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Speculative cleanup uses the owning Runtime idle channel (`scheduleIdle`, default microtasks); no adapter-owned microtask queue is created."
                 }
               ]
             }
@@ -24544,7 +24578,7 @@
                   "items": [
                     "`runtime?: IRuntime` —— 默认 `defaultRuntime`；显式隔离运行时（SSR 每请求、单测、多 root 互不串状态）",
                     "`debugName?: string` —— 默认 `'Store'`；仅用作内部节点 `debugName` 前缀，不参与语义",
-                    "`warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `console.warn` 提示\"只有首个 await 之前的写入被自动 batch\"",
+                    "`warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\"",
                     "`mutationPolicy?: IMutationPolicy` —— 默认无；接入 MobX 风格的严格写入守卫（见 USEGUIDE §7）"
                   ]
                 },
@@ -24800,6 +24834,8 @@
                 {
                   "type": "list",
                   "items": [
+                    "`runtime?: IRuntime` - owns idle cleanup and diagnostics; defaults to the lazy shared Runtime.",
+                    "`scheduler?: IScheduler` - owns cache and provisional-capture timers; defaults to `systemScheduler`, admitted once at creation.",
                     "`keepAliveMs?: number` —— 默认 `1000`；无持有者之后缓存值继续存活的毫秒数，必须是有限非负数",
                     "`dispose?: (value: T) => void | PromiseLike<void>` —— 自定义清理；提供后值必须是引用类型，否则抛 `TypeError`；不提供时若值自带 `$dispose` 方法会自动调用",
                     "`onError?: (error: unknown, phase: 'load' | 'dispose' | 'listener') => void` —— 观察三个阶段的失败",
@@ -24894,6 +24930,18 @@
                 {
                   "type": "paragraph",
                   "text": "单独导入 Store light 不创建默认 Runtime。第一次未显式传入 `options.runtime` 的 store 创建才取得 reactive 的共享默认实例；显式 runtime 的构造路径直接使用给定 owner。该实例与随后导入 reactive root 的 `defaultRuntime` 保持同一 identity。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Store Actions keep their original return value or Promise outside the synchronous mutation callback. Only writes before the first await share that batch; use `$batch()` for continuation writes. Mutation-policy callbacks remain synchronous. With `warnAsyncActions`, the first thenable result reports `ACTION_BATCH_BOUNDARY` through the Store Runtime."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "StoreResource uses its captured Runtime for idle cleanup and diagnostics, and its admitted scheduler for cache TTL and the 4000ms provisional capture window. `keepAliveMs: 0` still evicts synchronously. Missing `onError` forwards the original failure to Runtime; if a user reporter throws or rejects, both the primary and reporter failure reach that sink by identity."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "No host console or global reportError fallback is used."
                 }
               ]
             }
@@ -25062,7 +25110,7 @@
                       "`boolean`",
                       "可选",
                       "`false`",
-                      "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `console.warn` 提示\"只有首个 await 之前的写入被自动 batch\""
+                      "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\""
                     ],
                     [
                       "`mutationPolicy`",
@@ -25419,6 +25467,20 @@
                   "headers": ["字段", "类型", "必填性", "默认值", "说明"],
                   "rows": [
                     [
+                      "`runtime`",
+                      "`IRuntime`",
+                      "optional",
+                      "shared Runtime",
+                      "Owns deferred idle cleanup and diagnostics."
+                    ],
+                    [
+                      "`scheduler`",
+                      "`IScheduler`",
+                      "optional",
+                      "`systemScheduler`",
+                      "Captured once for cache TTL and provisional expiry; task cancellation and unref are preserved."
+                    ],
+                    [
                       "`keepAliveMs`",
                       "`number`",
                       "可选",
@@ -25440,14 +25502,14 @@
                       "无",
                       "观察 `'load' \\",
                       "'dispose' \\",
-                      "'listener'` 三个阶段的失败；reporter 自身抛错会被吞掉，不影响资源状态"
+                      "'listener'` 三个阶段的失败；reporter 自身抛错或拒绝时，原失败与 reporter 失败均由所属 Runtime 报告，资源状态不变"
                     ],
                     ["`onTerminal`", "`() => void`", "可选", "无", "资源到达终态时调用一次"]
                   ]
                 },
                 {
                   "type": "paragraph",
-                  "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
+                  "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
                 },
                 {
                   "type": "paragraph",
@@ -25728,6 +25790,18 @@
                 {
                   "type": "paragraph",
                   "text": "单独导入 Store light 不创建默认 Runtime。第一次未显式传入 `options.runtime` 的 store 创建才取得 reactive 的共享默认实例；显式 runtime 的构造路径直接使用给定 owner。该实例与随后导入 reactive root 的 `defaultRuntime` 保持同一 identity。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Store Actions keep their original return value or Promise outside the synchronous mutation callback. Only writes before the first await share that batch; use `$batch()` for continuation writes. Mutation-policy callbacks remain synchronous. With `warnAsyncActions`, the first thenable result reports `ACTION_BATCH_BOUNDARY` through the Store Runtime."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "StoreResource uses its captured Runtime for idle cleanup and diagnostics, and its admitted scheduler for cache TTL and the 4000ms provisional capture window. `keepAliveMs: 0` still evicts synchronously. Missing `onError` forwards the original failure to Runtime; if a user reporter throws or rejects, both the primary and reporter failure reach that sink by identity."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "No host console or global reportError fallback is used."
                 }
               ]
             }
@@ -29211,6 +29285,10 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`watch(scheduler?: IScheduler)` captures an injected scheduler on the first watch call; it defaults to `systemScheduler`. The scheduler owns zero-delay yielding and cancellation between waitAsync wakeups. Repeated calls return the active stop handle and retain its scheduler. Errors are reported only through the owning Runtime. Abandoned cells use that Runtime idle channel (default microtasks)."
                 }
               ]
             }
@@ -29322,7 +29400,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class SharedInt32Signal implements IObservable, IDisposable {\n  readonly runtime: IRuntime\n  readonly buffer: SharedArrayBuffer\n  readonly subs: ReadonlySet<IObserver>\n  get version(): number\n  get disposed(): boolean\n  get value(): number\n  set value(next: number)\n  peek(): number\n  sync(): boolean\n  watch(): IDisposer\n  onObserved(): void\n  onUnobserved(): void\n  isStale(): boolean\n  dispose(): void\n}"
+                  "code": "class SharedInt32Signal implements IObservable, IDisposable {\n  readonly runtime: IRuntime\n  readonly buffer: SharedArrayBuffer\n  readonly subs: ReadonlySet<IObserver>\n  get version(): number\n  get disposed(): boolean\n  get value(): number\n  set value(next: number)\n  peek(): number\n  sync(): boolean\n  watch(scheduler?: IScheduler): IDisposer\n  onObserved(): void\n  onUnobserved(): void\n  isStale(): boolean\n  dispose(): void\n}"
                 },
                 {
                   "type": "list",
@@ -29336,7 +29414,7 @@
                     "`value`（setter）—— `#assertActive()` → `asInt32(next, 'shared signal value')` 校验（不合法抛 `RangeError`,`invalidOption`）→ 以无条件写方式 `writeLocked`；若返回 `undefined`（新值与当前值经 `Atomics` 比较相同,未变）则直接返回,不推进版本号、不通知、不唤醒;若返回新版本,则更新本地 `#observedSharedVersion`、调用 `internalsOf(runtime).notify(this)` 通知本地观察者、并 `Atomics.notify` 唤醒可能正在 `watch()` 挂起的其他线程。已释放时抛 `Error`（`signalDisposed`）。",
                     "`peek(): number` —— `#assertActive()` → 直接一致读并返回 `value`,不调用 `sync()`（不主动拉取远端更新,只读本地视图截至上次已知状态）、不登记依赖追踪。适合诊断/日志等不希望产生响应式依赖或触发通知的读取场景。",
                     "`sync(): boolean` —— `#assertActive()` → 一致读当前共享内存的 `version`;若与本地记录的 `#observedSharedVersion` 相同返回 `false`（无变化）;否则更新本地记录、调用 `internalsOf(runtime).notify(this)` 通知观察者,返回 `true`。这是\"手动拉取远端写入\"的入口,`watch()` 内部也是靠调它完成同步。",
-                    "`watch(): IDisposer` —— `#assertActive()` → 若已经在 watch,直接返回同一个停止函数(不会叠加第二条回路);否则在 seq slot 上起一条 `Atomics.waitAsync` 唤醒回路:每次被唤醒就调用 `sync()`（如果此时未 disposed）,唤醒回调抛错会经 `reportSharedWatchFailure` 上报（优先 `runtime.reportError`,失败再退回全局 `reportError`/`console.error`,不会让跨线程 Promise 边界吞掉诊断信息）。环境不支持 `Atomics.waitAsync` → 抛 `Error`（`envUnsupported`）。返回的停止函数调用时会 `Atomics.notify` 唤醒挂起中的 `waitAsync`,让它尽快 settle 并释放对共享内存视图的引用,而不是一直等到下一次真正的远端写入。`dispose()` 也会自动调用这个停止函数。",
+                    "`watch(scheduler?: IScheduler): IDisposer` —— `#assertActive()` → 若已经在 watch,直接返回同一个停止函数(不会叠加第二条回路);否则在 seq slot 上起一条 `Atomics.waitAsync` 唤醒回路:每次被唤醒就调用 `sync()`（如果此时未 disposed）,唤醒回调抛错会经 `reportSharedWatchFailure` 上报（只经 `runtime.reportError`，宿主诊断由该 Runtime 的 adapter 负责）。环境不支持 `Atomics.waitAsync` → 抛 `Error`（`envUnsupported`）。返回的停止函数调用时会 `Atomics.notify` 唤醒挂起中的 `waitAsync`,让它尽快 settle 并释放对共享内存视图的引用,而不是一直等到下一次真正的远端写入。`dispose()` 也会自动调用这个停止函数。",
                     "`onObserved()` / `onUnobserved()` —— `IObservable` 接口要求的钩子,本类实现为空操作(信号本身没有\"被观察/不再被观察\"时需要额外处理的资源)。",
                     "`isStale(): boolean` —— 直接比较一致读到的 `version` 与本地记录的 `#observedSharedVersion` 是否不同,不做 `#assertActive()` 校验（即使已经 `dispose()` 之后调用也不会抛错,因为它只读取底层视图,不依赖响应式追踪状态）。",
                     "`dispose(): void` —— 幂等；置位 `#disposed`、停止 `watch()` 回路（若存在）、从所属 `Runtime` 的追踪器断开（`tracker.disconnectObservable(this, 'dispose')`）。释放之后再调用 `value`/`sync()`/`watch()`/`peek()` 会抛 `Error`（`signalDisposed`）；`isStale()`/`buffer`/`runtime` 字段仍可安全访问。"
@@ -29409,7 +29487,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class SharedInt32Array implements IDisposable {\n  readonly runtime: IRuntime\n  readonly buffer: SharedArrayBuffer\n  readonly length: number\n  get disposed(): boolean\n  get(index: number): number\n  set(index: number, value: number): void\n  update(index: number, update: (current: number) => number): number\n  sync(index?: number): number\n  watch(): IDisposer\n  snapshot(): Int32Array\n  dispose(): void\n  assertActive(): void\n  readCell(index: number): { readonly value: number; readonly version: number }\n  writeCell(index: number, value: number, expected?: number): bigint | undefined\n  notifyWaiters(): void\n  recordObservedVersion(index: number, version: number): void\n}"
+                  "code": "class SharedInt32Array implements IDisposable {\n  readonly runtime: IRuntime\n  readonly buffer: SharedArrayBuffer\n  readonly length: number\n  get disposed(): boolean\n  get(index: number): number\n  set(index: number, value: number): void\n  update(index: number, update: (current: number) => number): number\n  sync(index?: number): number\n  watch(scheduler?: IScheduler): IDisposer\n  snapshot(): Int32Array\n  dispose(): void\n  assertActive(): void\n  readCell(index: number): { readonly value: number; readonly version: number }\n  writeCell(index: number, value: number, expected?: number): bigint | undefined\n  notifyWaiters(): void\n  recordObservedVersion(index: number, version: number): void\n}"
                 },
                 {
                   "type": "list",
@@ -29422,7 +29500,7 @@
                     "`sync(index?): number`",
                     "传 `index`：先做下标校验；比较该下标的一致读版本号与本地记录，未变返回 `0`；变了则更新记录、若已物化 cell 则调用其 `sync()`（触发通知），返回 `1`。",
                     "不传：先比较 64 位 generation；未变返回 0，变化后在一次 `runtime.batch()` 内扫描全部格的 seqlock。每个读者使用独立版本游标，统计所有变化下标（含无观察者格），只通知已物化 cell。",
-                    "`watch(): IDisposer` —— 语义与 `SharedInt32Signal.watch()` 一致，但监听的是头部 epoch slot 而不是逐格 seq（一格一个 waiter 在长数组上不可行）；唤醒后调用整体 `sync()`（不带 `index`）。已在 watch 时重复调用返回同一停止函数；环境不支持 `waitAsync` 抛 `Error`（`envUnsupported`）。",
+                    "`watch(scheduler?: IScheduler): IDisposer` —— 语义与 `SharedInt32Signal.watch()` 一致，但监听的是头部 epoch slot 而不是逐格 seq（一格一个 waiter 在长数组上不可行）；唤醒后调用整体 `sync()`（不带 `index`）。已在 watch 时重复调用返回同一停止函数；环境不支持 `waitAsync` 抛 `Error`（`envUnsupported`）。",
                     "`snapshot(): Int32Array` —— `assertActive()` 后遍历 `[0, length)`，对每个下标 `readCell(i).value`，写入一个新分配的 `Int32Array(length)` 并返回。返回值是普通、非共享的数组，修改它不会影响共享内存。",
                     "`dispose(): void` —— 幂等；停止 `watch()`、把所有已物化 cell 从追踪器断开。释放之后调用 `get`/`set`/`update`/`sync`/`watch`/`snapshot` 等会抛 `Error`（`arrayDisposed`）。",
                     "`assertActive(): void` —— 已释放则抛 `Error`（`arrayDisposed`，消息 `[store] shared array is disposed`）；公开方法，正常业务代码不需要直接调用，供组合式底层用法（如包装类）复用同一校验。",
@@ -29642,7 +29720,7 @@
                     "两者都是 `IObservable`：通过 `@migaia/reactive/extension` 的 `createSourceBinding` 绑定原节点身份与只读版本/订阅者元数据，用受控source操作接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。",
                     "单一归属：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。",
                     "`SharedInt32Array` 的按需物化：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。",
-                    "cell 的自动回收：最后一个观察者退订时，canonical `onUnobserved` 立即回收该 cell。`Effect`/`Computed` 可能在提交观察之前就放弃一次\"投机读\"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。"
+                    "cell 的自动回收：最后一个观察者退订时，canonical `onUnobserved` 立即回收该 cell。`Effect`/`Computed` 可能在提交观察之前就放弃一次\"投机读\"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在所属 Runtime 的 idle 清理阶段检查（默认微任务）是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。"
                   ]
                 }
               ]
@@ -29781,6 +29859,14 @@
                 {
                   "type": "paragraph",
                   "text": "测试覆盖 seqlock 一致读、跨 Runtime 同步、`watch()` 生命周期、数组稀疏同步与错误码（`test/shared-state.test.ts`、`test/error-code.test.ts`）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`watch(scheduler?: IScheduler)` captures an injected scheduler on the first watch call; it defaults to `systemScheduler`. The scheduler owns zero-delay yielding and cancellation between waitAsync wakeups. Repeated calls return the active stop handle and retain its scheduler. Errors are reported only through the owning Runtime. Abandoned cells use that Runtime idle channel (default microtasks)."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Import `IScheduler` or `systemScheduler` from `@migaia/utils/scheduler` when supplying the optional watch timer owner."
                 }
               ]
             }

@@ -3201,6 +3201,12 @@
       "library": "reactive"
     },
     {
+      "path": "/en/docs/reactive/api/extension/deferRuntimeCleanup",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/en/docs/reactive/api/extension/getDefaultRuntime",
       "locale": "en",
       "domain": "docs",
@@ -18694,6 +18700,12 @@
     },
     {
       "path": "/zh/docs/reactive/api/extension/currentRuntimeVersion",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/deferRuntimeCleanup",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"

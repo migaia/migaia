@@ -29433,6 +29433,36 @@
     },
     {
       "from": "/en/docs/reactive/api/extension",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "to": "/en/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "to": "/en/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/reactive/getting-started",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "to": "/en/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/reactive",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension",
       "to": "/en/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
       "type": "api-symbol"
     },
@@ -30199,6 +30229,36 @@
     {
       "from": "/zh/docs/reactive",
       "to": "/zh/docs/reactive/api/extension#reactive-extension--currentRuntimeVersion",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "to": "/zh/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "to": "/zh/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/reactive/getting-started",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
+      "to": "/zh/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/reactive",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--deferRuntimeCleanup",
       "type": "architecture-symbol"
     },
     {
