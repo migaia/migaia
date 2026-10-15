@@ -703,6 +703,36 @@
     },
     {
       "from": "/en/docs/capability/api",
+      "to": "/en/docs/capability/api#capability-index--GraphReadinessState",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/capability/api#capability-index--GraphReadinessState",
+      "to": "/en/docs/capability/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/capability/api#capability-index--GraphReadinessState",
+      "to": "/en/docs/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/capability/getting-started",
+      "to": "/en/docs/capability/api#capability-index--GraphReadinessState",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/capability/api#capability-index--GraphReadinessState",
+      "to": "/en/docs/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/capability",
+      "to": "/en/docs/capability/api#capability-index--GraphReadinessState",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/capability/api",
       "to": "/en/docs/capability/api#capability-index--ICapabilityDefinition",
       "type": "api-symbol"
     },
@@ -1263,6 +1293,36 @@
     },
     {
       "from": "/zh/docs/capability/api",
+      "to": "/zh/docs/capability/api#capability-index--GraphReadinessState",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/api#capability-index--GraphReadinessState",
+      "to": "/zh/docs/capability/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/capability/api#capability-index--GraphReadinessState",
+      "to": "/zh/docs/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/capability/getting-started",
+      "to": "/zh/docs/capability/api#capability-index--GraphReadinessState",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/api#capability-index--GraphReadinessState",
+      "to": "/zh/docs/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/capability",
+      "to": "/zh/docs/capability/api#capability-index--GraphReadinessState",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/api",
       "to": "/zh/docs/capability/api#capability-index--ICapabilityDefinition",
       "type": "api-symbol"
     },
@@ -1819,6 +1879,36 @@
     {
       "from": "/en/docs/capability",
       "to": "/en/docs/capability/api/graph#capability-graph--createCapabilityGraph",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/capability/api/graph",
+      "to": "/en/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "to": "/en/docs/capability/api/graph",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "to": "/en/docs/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/capability/getting-started",
+      "to": "/en/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "to": "/en/docs/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/capability",
+      "to": "/en/docs/capability/api/graph#capability-graph--GraphBlockedReason",
       "type": "architecture-symbol"
     },
     {
@@ -2439,6 +2529,36 @@
     {
       "from": "/zh/docs/capability",
       "to": "/zh/docs/capability/api/graph#capability-graph--createCapabilityGraph",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/api/graph",
+      "to": "/zh/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "to": "/zh/docs/capability/api/graph",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "to": "/zh/docs/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/capability/getting-started",
+      "to": "/zh/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/api/graph#capability-graph--GraphBlockedReason",
+      "to": "/zh/docs/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/capability",
+      "to": "/zh/docs/capability/api/graph#capability-graph--GraphBlockedReason",
       "type": "architecture-symbol"
     },
     {
@@ -4243,6 +4363,36 @@
     },
     {
       "from": "/en/docs/capability/api/graph/dynamic",
+      "to": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "to": "/en/docs/capability/api/graph/dynamic",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "to": "/en/docs/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/capability/getting-started",
+      "to": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "to": "/en/docs/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/capability",
+      "to": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/capability/api/graph/dynamic",
       "to": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--IDynamicCapabilityGraph",
       "type": "api-symbol"
     },
@@ -4709,6 +4859,36 @@
     {
       "from": "/zh/docs/capability",
       "to": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--createDynamicCapabilityGraph",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/api/graph/dynamic",
+      "to": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "to": "/zh/docs/capability/api/graph/dynamic",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "to": "/zh/docs/capability/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/capability/getting-started",
+      "to": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
+      "to": "/zh/docs/capability",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/capability",
+      "to": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--GraphBindingReleaseReason",
       "type": "architecture-symbol"
     },
     {

@@ -51,6 +51,12 @@
       "library": "capability"
     },
     {
+      "path": "/en/docs/capability/api/GraphReadinessState",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
       "path": "/en/docs/capability/api/ICapabilityDefinition",
       "locale": "en",
       "domain": "docs",
@@ -154,6 +160,12 @@
     },
     {
       "path": "/en/docs/capability/api/graph/CapabilityGraphState",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/api/graph/GraphBlockedReason",
       "locale": "en",
       "domain": "docs",
       "library": "capability"
@@ -376,6 +388,12 @@
     },
     {
       "path": "/en/docs/capability/api/graph/dynamic",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/api/graph/dynamic/GraphBindingReleaseReason",
       "locale": "en",
       "domain": "docs",
       "library": "capability"
@@ -15597,6 +15615,12 @@
       "library": "capability"
     },
     {
+      "path": "/zh/docs/capability/api/GraphReadinessState",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
       "path": "/zh/docs/capability/api/ICapabilityDefinition",
       "locale": "zh",
       "domain": "docs",
@@ -15700,6 +15724,12 @@
     },
     {
       "path": "/zh/docs/capability/api/graph/CapabilityGraphState",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/api/graph/GraphBlockedReason",
       "locale": "zh",
       "domain": "docs",
       "library": "capability"
@@ -15922,6 +15952,12 @@
     },
     {
       "path": "/zh/docs/capability/api/graph/dynamic",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/api/graph/dynamic/GraphBindingReleaseReason",
       "locale": "zh",
       "domain": "docs",
       "library": "capability"
