@@ -24168,7 +24168,7 @@
           "name": "IDimFn",
           "kind": "type",
           "signature": "export type IDimFn = (text: string) => string;",
-          "declarationLine": 213,
+          "declarationLine": 214,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "IDimFn is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDimFn.",
@@ -24230,7 +24230,7 @@
           "name": "IErrorInfo",
           "kind": "type",
           "signature": "export type IErrorInfo = {\n  name: string;\n  message: string;\n  stack?: string | undefined;\n  /** * Reference to the original error, never a reconstructed object. JSON serialization does not * preserve the native error type or its non-enumerable built-in fields. A plain error normally * becomes `{}` under `raw`; enumerable custom properties can be serialized. Console and custom * sinks use this reference for native stack inspection or APIs such as * `Sentry.captureException()`. The `message` and `stack` fields are serializable projections * instead of the original error. */ raw: Error;\n};",
-          "declarationLine": 8,
+          "declarationLine": 9,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Repository convention: use `type` when interface semantics are unnecessary. Named type aliases begin with `I` to distinguish them from runtime values, classes, and functions. Generic parameters such as `P` and `T` retain conventional names and are exempt.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IErrorInfo.",
@@ -24294,7 +24294,7 @@
           "name": "IFlusher",
           "kind": "type",
           "signature": "export type IFlusher = () => void | Promise<void>;",
-          "declarationLine": 64,
+          "declarationLine": 65,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "IFlusher is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFlusher.",
@@ -24356,7 +24356,7 @@
           "name": "ILogDispatchOptions",
           "kind": "type",
           "signature": "export type ILogDispatchOptions = { asyncOutput?: boolean | undefined };",
-          "declarationLine": 49,
+          "declarationLine": 50,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Per-call scheduling choice supplied by the initiating plugin according to its configuration.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogDispatchOptions.",
@@ -24420,7 +24420,7 @@
           "name": "ILogEntry",
           "kind": "type",
           "signature": "export type ILogEntry = {\n  readonly id: string;\n  readonly tag: string;\n  readonly time: Date;\n  readonly message: string;\n  readonly args: readonly unknown[];\n  readonly meta?: Record<string, unknown> | undefined;\n  readonly context: readonly string[];\n  readonly error?: IErrorInfo | undefined;\n  /** * Plugin-owned data area that avoids replacing each other's entry fields. For example, reasoning * sets `data.silent = true` to tell the ansis console sink to skip printing. HTTP and batch sinks * can still consume the entry. */ readonly data: Record<\n    string,\n    unknown\n  >;\n};",
-          "declarationLine": 27,
+          "declarationLine": 28,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "The core assigns no built-in level semantics to `tag`. Installed plugins interpret this general label, such as `debug`, `info`, `warn`, `error`, or `fatal` for levels and `thinking` or `response` for reasoning. The core stays independent of plugin semantics.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogEntry.",
@@ -24484,7 +24484,7 @@
           "name": "ILogFailure",
           "kind": "type",
           "signature": "export type ILogFailure = {\n  readonly source:\n    | 'defer'\n    | 'hook'\n    | 'sink'\n    | 'pipeline'\n    | 'flush'\n    | 'forward'\n    | 'shutdown';\n  readonly error: unknown;\n};",
-          "declarationLine": 57,
+          "declarationLine": 58,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "An observed asynchronous logger failure. Business dispatch remains non-throwing.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogFailure.",
@@ -24548,7 +24548,7 @@
           "name": "ILogFailureHook",
           "kind": "type",
           "signature": "export type ILogFailureHook = (failure: ILogFailure) => void;",
-          "declarationLine": 61,
+          "declarationLine": 62,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "ILogFailureHook is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogFailureHook.",
@@ -24610,7 +24610,7 @@
           "name": "ILogFilter",
           "kind": "type",
           "signature": "export type ILogFilter = (entry: ILogEntry) => boolean;",
-          "declarationLine": 52,
+          "declarationLine": 53,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "ILogFilter is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogFilter.",
@@ -24778,7 +24778,7 @@
           "name": "ILoggerConfig",
           "kind": "type",
           "signature": "export type ILoggerConfig = {\n  get(path: string): unknown | undefined;\n  update<T extends IPluginConfig = IPluginConfig>(\n    name: string,\n    recipe: (previous: Readonly<T>) => Partial<T>,\n  ): Promise<void>;\n};",
-          "declarationLine": 76,
+          "declarationLine": 77,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Public logger config facade. It reads nested plugin config paths and updates plugins by name.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerConfig.",
@@ -24842,7 +24842,7 @@
           "name": "ILoggerContext",
           "kind": "type",
           "signature": "export type ILoggerContext = {\n  /** * Stable logger identity generated at construction and retained for the instance lifetime. * `extends()` detects cycles through this ID rather than topic names, which can be empty or * duplicated. */ readonly id: string;\n  readonly options: Readonly<Record<string, unknown>>;\n  readonly path: readonly string[];\n  readonly topic: string;\n  readonly createdAt: Date;\n  readonly env: ILoggerEnv;\n};",
-          "declarationLine": 87,
+          "declarationLine": 88,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Plugins receive `core.ctx` during `install(core)` to read logger options, prefix path, creation time, and environment. Construction freezes the context, path, top-level options, and environment containers. Strict-mode writes such as `core.ctx.path.push(...)` or `core.ctx.options.x = 1` throw a `TypeError`. Nested option values and the creation `Date` retain their original identity and remain mutable.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerContext.",
@@ -24906,7 +24906,7 @@
           "name": "ILoggerCore",
           "kind": "type",
           "signature": "export type ILoggerCore<\n  TMode extends IPipelineConfig['mode'] = 'sync',\n  TShared extends Record<string, unknown> = Record<string, never>,\n> = {\n  /** * Plugins read their own configuration through `core.config.get<TConfig>()`, not `this.config`. * This scoped reader exposes the host-owned snapshot without a plugin-name argument. Keeping * reads at the core boundary makes plugin configuration available to host diagnostics. */ readonly config: ILoggerPluginConfig;\n  /** Read-only context containers. See `ILoggerContext` for the mutability boundary. */ readonly ctx: ILoggerContext;\n  /** * The logger's monotonic clock source (R-9). `flush`, `shutdown`, batch deadlines, and * `boundedWait` use this scheduler. Defaults to lifecycle `systemScheduler`. Plugins use it to * share the host's clock domain. */ readonly scheduler: IScheduler;\n  /** * Synchronously constructs and dispatches an entry. Use `dispatchRaw` scheduling options for * asynchronous output. */ log(\n    tag: string,\n    message: string,\n    ...args: unknown[]\n  ): void;\n  /** Dispatches explicit entry fields such as `meta`, `data`, and `context`. */ dispatchRaw(\n    input: IRawEntryInput,\n    options?: ILogDispatchOptions,\n  ): void;\n  /** * Registers a pipeline stage that can transform an entry, forward it with `next`, or drop it by * omitting `next`. * * Supported methods follow the middleware-pipeline promotion table. Sync stages run in any mode. * Generator stages also promote to `async-generator`. Other stages require their matching mode. * An unresolved mode union retains all methods and leaves validation to runtime admission. */ usePipeline: (\n    stage: IPipelineStage,\n  ) => ILoggerCore<TMode>;\n  useAsyncPipeline: [TMode] extends ['async']\n    ? (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>\n    : [TMode] extends ['sync'] | ['generator'] | ['async-generator']\n      ? never\n      : (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>;\n  useGeneratorPipeline: [TMode] extends ['generator' | 'async-generator']\n    ? (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>\n    : [TMode] extends ['sync'] | ['async']\n      ? never\n      : (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>;\n  useAsyncGeneratorPipeline: [TMode] extends ['async-generator']\n    ? (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>\n    : [TMode] extends ['sync'] | ['async'] | ['generator']\n      ? never\n      : (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>;\n  /** * Registers a sink. Every registered sink processes entries that pass the full pipeline, such as * console and HTTP sinks together. */ useSink(\n    sink: ISink,\n  ): IOff;\n  /** * Registers a named lifecycle hook. Built-in names are `before`, `after`, `before:${tag}`, and * `after:${tag}`. Plugins can also define their own hook names. */ hook(\n    name: string,\n    fn: ILogHookFn,\n  ): () => void;\n  fireHook(name: string, entry: ILogEntry): void;\n  /** Observes asynchronous output failures without changing normal log-call control flow. */ onFailure(\n    fn: ILogFailureHook,\n  ): IOff;\n  /** * Schedules work outside the current synchronous stack through the runtime manager. `flush` and * `shutdown` wait for this work. Plugins configured for async output use this path for rendering, * stdout writes, or network requests. */ defer(\n    task: () => void | Promise<void>,\n  ): void;\n  /** * Registers a callback to empty a buffer during `flush()`. The core invokes these callbacks and * also waits for unfinished `defer()` tasks and Promises returned by sinks. For example, an HTTP * sink without batching still keeps each pending request in the drain wait. */ onFlush(\n    fn: IFlusher,\n  ): IOff;\n  flush(): Promise<void>;\n  /** Shutdown disposes installed plugins after draining; subsequent log calls are ignored. */ onShutdown(\n    fn: IShutdownHandler,\n  ): IOff;\n  shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>;\n  /** * Installs plugins on an existing logger through the same host admission path used by constructor * installation. Duplicate plugin names, extension conflicts, and dependency cycles are rejected * by that host. Providers declare Feature names. * * Returns a Promise of plugin handles, preserving each plugin's extension types on its handle. * The existing logger variable does not gain new TypeScript methods. */ use<\n    const NewP extends readonly ILoggerPluginConstraint[],\n  >(\n    ...plugins: NewP\n  ): Promise<IPluginHandleTuple<NewP>>;\n  /** * Removes an installed plugin by name through the owning host and releases its registered * resources. This includes pipeline stages, sinks, hooks, flush callbacks, shutdown callbacks, * and plugin extensions. Missing plugin names reject with `PLUGIN_NOT_INSTALLED`. * * Required Feature dependents can block removal. */ unUse(\n    name: string,\n  ): Promise<void>;\n  /** * Writes raw text to stdout without passing through the pipeline or sinks. `asyncOutput: true` * schedules the write through `defer`. Streaming plugins such as reasoning use this for token * output without a complete log format per token. */ raw(\n    text: string,\n    options?: ILogDispatchOptions,\n  ): void;\n  /** * Forwards entries to the full pipelines and sinks of each target after the current logger * processes them. After `log1.extends(log2, log3)`, target level thresholds and filters still * apply to forwarded entries. * * Each forwarding hop records its topic in internal forwarding state carried in `entry.data`. * Registration detects cycles using logger context IDs. Runtime forwarding also skips IDs already * present in the internal forwarding path. * * This composes forwarding behavior, not plugin extension types. The returned logger keeps the * current logger's TypeScript capabilities; target-only methods are not added. */ extends(\n    ...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]\n  ): ILoggerCore<TMode, TShared>;\n  /** Removes named extension edges; returns true when at least one edge was removed. */ unextend(\n    ...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]\n  ): boolean;\n};",
-          "declarationLine": 105,
+          "declarationLine": 106,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Core capabilities supplied to plugins through `install(core)`. Plugins built on these primitives compose without depending on each other's implementations. Cross-plugin capabilities arrive through declared Feature dependencies.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerCore.",
@@ -24970,7 +24970,7 @@
           "name": "ILoggerDomainCore",
           "kind": "type",
           "signature": "export type ILoggerDomainCore<\n  TMode extends IPipelineConfig['mode'] = 'sync',\n  TShared extends Record<string, unknown> = Record<string, never>,\n> = Omit<\n  ILoggerCore<TMode, TShared>,\n  | 'config'\n  | 'usePipeline'\n  | 'useAsyncPipeline'\n  | 'useGeneratorPipeline'\n  | 'useAsyncGeneratorPipeline'\n  | 'use'\n  | 'unUse'\n>;",
-          "declarationLine": 208,
+          "declarationLine": 209,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Logger-specific capabilities owned by LoggerCore, excluding PluginHost abilities.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerDomainCore.",
@@ -25034,7 +25034,7 @@
           "name": "ILoggerEnv",
           "kind": "type",
           "signature": "export type ILoggerEnv = { readonly isTTY: boolean; readonly isCI: boolean };",
-          "declarationLine": 67,
+          "declarationLine": 68,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "ILoggerEnv is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerEnv.",
@@ -25226,7 +25226,7 @@
           "name": "ILoggerOptions",
           "kind": "type",
           "signature": "export type ILoggerOptions<\n  P extends readonly ILoggerPluginConstraint[] = [],\n  TMode extends IMiddlewarePipelineMode = 'sync',\n> = {\n  /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */ execution: IPluginHostOptions['execution'];\n  context?: string[];\n  /** Topic for this logger's internal `extends()` forwarding bookkeeping. */ topic?: string;\n  /** Registers constructor hooks, equivalent to calling `core.hook(name, fn)` for each entry. */ on?: Record<\n    string,\n    ILogHookFn\n  >;\n  plugins?: P;\n  /** * Custom application options exposed through `core.ctx.options` to every plugin. Framework fields * such as `context`, `on`, and `plugins` have separate roles and are not included here. */ options?: Record<\n    string,\n    unknown\n  >;\n  pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode };\n  /** * Defaults to lifecycle `systemScheduler`. Flush, shutdown, and batch deadlines share its clock * domain (R-9). */ scheduler?: IScheduler;\n};",
-          "declarationLine": 224,
+          "declarationLine": 225,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "ILoggerOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerOptions.",
@@ -25290,7 +25290,7 @@
           "name": "ILoggerPlugin",
           "kind": "type",
           "signature": "export type ILoggerPlugin<\n  TExt extends Record<string, unknown> = IEmptyPluginExt,\n  TConfig extends IPluginConfig = IPluginConfig,\n  TMode extends IMiddlewarePipelineMode = IMiddlewarePipelineMode,\n  TFeatures extends IFeatureRecord = Record<never, never>,\n  TExpose extends object = Record<never, never>,\n> = IPlugin<\n  ILoggerPluginCore<TMode>,\n  TExt,\n  TConfig,\n  Record<never, never>,\n  TFeatures,\n  TExpose\n>;",
-          "declarationLine": 220,
+          "declarationLine": 221,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "ILoggerPlugin is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerPlugin.",
@@ -25354,7 +25354,7 @@
           "name": "ILoggerPluginConfig",
           "kind": "type",
           "signature": "export type ILoggerPluginConfig = {\n  get<T extends IPluginConfig = IPluginConfig>(): Readonly<T>;\n};",
-          "declarationLine": 72,
+          "declarationLine": 73,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Plugin-facing config reader. It exposes only the current plugin's snapshot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerPluginConfig.",
@@ -25418,7 +25418,7 @@
           "name": "ILoggerPluginCore",
           "kind": "type",
           "signature": "export type ILoggerPluginCore<\n  TMode extends IPipelineConfig['mode'] = IMiddlewarePipelineMode,\n  TShared extends Record<string, unknown> = Record<string, never>,\n> = Omit<ILoggerCore<TMode, TShared>, 'use' | 'unUse' | 'onDispose'> & {\n  onDispose(resource: import('@migaia/plugin-host').IPluginResource): void;\n};",
-          "declarationLine": 216,
+          "declarationLine": 217,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Plugin-facing logger capabilities exclude Host-level topology mutation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoggerPluginCore.",
@@ -25738,7 +25738,7 @@
           "name": "ILogHookFn",
           "kind": "type",
           "signature": "export type ILogHookFn = (entry: ILogEntry) => void | Promise<void>;",
-          "declarationLine": 54,
+          "declarationLine": 55,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "ILogHookFn is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILogHookFn.",
@@ -25802,7 +25802,7 @@
           "name": "IOff",
           "kind": "type",
           "signature": "export type IOff = () => void;",
-          "declarationLine": 53,
+          "declarationLine": 54,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "IOff is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IOff.",
@@ -25864,7 +25864,7 @@
           "name": "IPaintFn",
           "kind": "type",
           "signature": "export type IPaintFn = (tag: string, text: string) => string;",
-          "declarationLine": 212,
+          "declarationLine": 213,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Contract for the shared painting capability.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPaintFn.",
@@ -25926,7 +25926,7 @@
           "name": "IPipelineStage",
           "kind": "type",
           "signature": "export type IPipelineStage = (\n  entry: ILogEntry,\n  next: (entry: ILogEntry) => void,\n) => void;",
-          "declarationLine": 63,
+          "declarationLine": 64,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Koa-style stage. Call `next(entry)` to forward the entry; omitting the call drops it.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPipelineStage.",
@@ -25990,7 +25990,7 @@
           "name": "IRawEntryInput",
           "kind": "type",
           "signature": "export type IRawEntryInput = Partial<Omit<ILogEntry, 'id'>> & {\n  tag: string;\n  message: string;\n};",
-          "declarationLine": 44,
+          "declarationLine": 45,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Allows dispatch to override entry fields except `id`, which the core generates.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRawEntryInput.",
@@ -26054,7 +26054,7 @@
           "name": "IShutdownHandler",
           "kind": "type",
           "signature": "export type IShutdownHandler = (reason: IShutdownReason) => void | Promise<void>;",
-          "declarationLine": 66,
+          "declarationLine": 67,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "IShutdownHandler is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IShutdownHandler.",
@@ -26118,7 +26118,7 @@
           "name": "IShutdownReason",
           "kind": "type",
           "signature": "export type IShutdownReason =\n  | 'signal'\n  | 'uncaughtException'\n  | 'unhandledRejection'\n  | 'manual';",
-          "declarationLine": 65,
+          "declarationLine": 66,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "IShutdownReason is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IShutdownReason.",
@@ -26182,7 +26182,7 @@
           "name": "ISink",
           "kind": "type",
           "signature": "export type ISink = (entry: ILogEntry) => void | Promise<void>;",
-          "declarationLine": 55,
+          "declarationLine": 56,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "ISink is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ISink.",
@@ -26244,7 +26244,7 @@
           "name": "IStaticLoggerCtor",
           "kind": "type",
           "signature": "export type IStaticLoggerCtor = {\n  new <\n    const LocalP extends readonly ILoggerPluginConstraint[] = readonly [],\n    const TMode extends IMiddlewarePipelineMode = 'sync',\n  >(\n    options: ILoggerOptions<LocalP, TMode>,\n  ): Omit<ILoggerCore<TMode, IResolvedPluginShared<LocalP>>, 'config' | 'onDispose'> & {\n    readonly config: ILoggerConfig;\n  } & IMergePluginExts<LocalP>;\n};",
-          "declarationLine": 248,
+          "declarationLine": 249,
           "source": "packages/logger/dist/typing.d.ts",
           "purpose": "Logger constructor type, kept separate so plugin extension types remain on instances.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStaticLoggerCtor.",
@@ -32810,9 +32810,9 @@
           "name": "asyncDisposeKey",
           "kind": "const",
           "signature": "export declare const asyncDisposeKey: typeof Symbol.asyncDispose;",
-          "declarationLine": 9,
+          "declarationLine": 8,
           "source": "packages/plugin-host/dist/symbols.d.ts",
-          "purpose": "asyncDisposeKey is part of this module's public const contract.",
+          "purpose": "Disposal symbols for resource contracts (R-7). Synchronous resources use the native Symbol.dispose or a callback. Async callers may use the exported asyncDisposeKey when the host lacks a native symbol. Admission and extension validation share these captured key lists instead of introducing another synchronous symbol.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for asyncDisposeKey.",
           "advanced": "No additional advanced behavior is declared for asyncDisposeKey.",
           "parameters": ["This const declaration has no parameters."],
@@ -32821,9 +32821,9 @@
           "errors": ["No documented errors are declared for asyncDisposeKey."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for asyncDisposeKey.",
           "examples": [
-            "import { definePlugin, disposeKey, asyncDisposeKey } from '@migaia/plugin-host'\n\nconst resources = definePlugin('resources', (core) => ({\n  install: () => {\n    const cleanup = () => console.log('resource released')\n    core.onDispose(() => cleanup()) // 普通函数\n    core.onDispose({ [disposeKey]: () => cleanup() }) // 同步 disposable\n    core.onDispose({ [asyncDisposeKey]: async () => cleanup() }) // 异步 disposable\n    return {}\n  }\n}))",
-            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'",
-            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
+            "import {\n  definePlugin,\n  asyncDisposeKey\n} from '@migaia/plugin-host'\n\nconst resources = definePlugin('resources', (core) => ({\n  install: () => {\n    const cleanup = () => console.log('resource released')\n    core.onDispose(() => cleanup()) // 普通函数\n    if (Symbol.dispose) core.onDispose({ [Symbol.dispose]: () => cleanup() }) // 同步 disposable\n    core.onDispose({ [asyncDisposeKey]: async () => cleanup() }) // 异步 disposable\n    return {}\n  }\n}))",
+            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostDisposalNodeKind,\n  readPluginHostDisposalProvenance,\n  asyncDisposeKey\n} from '@migaia/plugin-host'",
+            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\nimport {\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
           "members": [],
           "aliasOf": "asyncDisposeKey",
@@ -32839,7 +32839,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "asyncDisposeKey is part of this module's public const contract."
+              "content": "Disposal symbols for resource contracts (R-7). Synchronous resources use the native Symbol.dispose or a callback. Async callers may use the exported asyncDisposeKey when the host lacks a native symbol. Admission and extension validation share these captured key lists instead of introducing another synchronous symbol."
             },
             {
               "id": "getting-started",
@@ -32942,7 +32942,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",
@@ -33027,7 +33027,7 @@
               ]
             }
           ],
-          "usageScore": 58,
+          "usageScore": 56,
           "configuration": [],
           "fragment": "plugin-host-index--asyncDisposeKey"
         },
@@ -33605,7 +33605,7 @@
             "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\nconst host = new PluginHost<Record<string, never>>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst plugin = definePlugin({\n  name: 'prepared',\n  setup: async (context) => {\n    const resource = { closed: false }\n    context.onDispose(() => {\n      resource.closed = true\n    })\n    await Promise.resolve()\n    return { resource }\n  },\n  featureExpose: (_core, output) => ({ isOpen: () => !output.resource.closed }),\n  install: (_core, output) => ({ isOpen: () => !output.resource.closed })\n})\nconst [handle] = await host.use(plugin)\nhandle.extensions.isOpen() // true\nawait host.dispose()",
             "import { definePlugin, PluginHost } from '@migaia/plugin-host'\n\nconst prefix = definePlugin({\n  name: 'prefix',\n  config: { prefix: 'hello' },\n  install: () => ({})\n})\nconst host = new PluginHost<Record<string, never>>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nawait host.use(prefix)\nawait host.config.update('prefix', (previous) => ({\n  prefix: `${previous.prefix ?? 'hello'}!`\n}))\nawait host.dispose()",
             "import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'\n\nconst formatFeature = defineFeature(\n  (core: { featureExpose: { format(value: string): string } }) => ({\n    format: core.featureExpose.format\n  })\n)\n\nconst provider = definePlugin(\n  'provider',\n  () => ({\n    install: () => ({}),\n    featureExpose: () => ({ format: (value: string) => value.trim() })\n  }),\n  { format: formatFeature }\n)\n\nconst consumerFormat = defineFeature((_core, dependencies) => dependencies.format, {\n  format: provider.getFeature('format')\n})\nconst consumer = definePlugin(\n  'consumer',\n  (core) => ({\n    install: () => ({ formatValue: (value: string) => core.features.format.format(value) })\n  }),\n  { format: consumerFormat }\n)\n\nconst host = new PluginHost<Record<string, never>>({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst [consumerHandle] = await host.use(consumer, provider)\nconsumerHandle.extensions.formatValue(' value ')",
-            "import { definePlugin, disposeKey, asyncDisposeKey } from '@migaia/plugin-host'\n\nconst resources = definePlugin('resources', (core) => ({\n  install: () => {\n    const cleanup = () => console.log('resource released')\n    core.onDispose(() => cleanup()) // 普通函数\n    core.onDispose({ [disposeKey]: () => cleanup() }) // 同步 disposable\n    core.onDispose({ [asyncDisposeKey]: async () => cleanup() }) // 异步 disposable\n    return {}\n  }\n}))",
+            "import {\n  definePlugin,\n  asyncDisposeKey\n} from '@migaia/plugin-host'\n\nconst resources = definePlugin('resources', (core) => ({\n  install: () => {\n    const cleanup = () => console.log('resource released')\n    core.onDispose(() => cleanup()) // 普通函数\n    if (Symbol.dispose) core.onDispose({ [Symbol.dispose]: () => cleanup() }) // 同步 disposable\n    core.onDispose({ [asyncDisposeKey]: async () => cleanup() }) // 异步 disposable\n    return {}\n  }\n}))",
             "import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'\n\ntype ICore = { write(text: string): void }\nconst format = defineFeature((core: { featureExpose: { format(value: string): string } }) => ({\n  format: core.featureExpose.format\n}))\nconst formatter = definePlugin({\n  name: 'formatter',\n  config: { prefix: '[app]' },\n  features: { format },\n  featureExpose: (core: { config: { get(): { prefix?: string } } }) => ({\n    format: (value: string) => `${core.config.get().prefix} ${value}`\n  }),\n  install: () => ({})\n})\nconst writerFormat = defineFeature((_core, dependencies) => dependencies.format, {\n  format: formatter.getFeature('format')\n})\nconst writer = definePlugin<\n  ICore,\n  { log(msg: string): void },\n  never,\n  'writer',\n  { format: typeof writerFormat }\n>(\n  'writer',\n  (core) => ({\n    install: () => ({ log: (msg: string) => core.write(core.features.format.format(msg)) })\n  }),\n  { format: writerFormat }\n)\n\nclass Host extends PluginHost<ICore, never> {\n  protected createPluginDomainCore(): ICore {\n    return { write: (text) => console.log(text) }\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n})\nconst [, writerHandle] = await host.use(formatter, writer)\nwriterHandle.extensions.log('server started') // \"[app] server started\"\n\nawait host.config.update('formatter', () => ({ prefix: '[api]' }))\nwriterHandle.extensions.log('request handled') // \"[api] request handled\"\n\nawait host.dispose()",
             "import { definePlugin, PluginHost, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst events: { message: string; code?: IPluginHostErrorCode }[] = []\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  diagnostic: (message, code) => events.push({ message, code }),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  queueAdmissionDiagnosticMs: 200, // 未配置拒绝阈值时才会用到；这里已配置拒绝阈值，实际不会走这一条\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒\n})\n\nawait host.use(\n  definePlugin({\n    name: 'slow',\n    install: (core) => {\n      core.onDispose(() => new Promise<void>((resolve) => setTimeout(resolve, 10)))\n      return {}\n    }\n  })\n)\nawait host.dispose()\n// events 里可能包含非枚举扩展被忽略等诊断，取决于实际时序",
             "import { definePlugin, PluginHost, PluginHostError } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst broken = definePlugin({\n  name: 'broken',\n  install: () => {\n    throw new Error('boom')\n  }\n})\n\ntry {\n  await new Host({\n    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 }\n  }).use(broken)\n} catch (error) {\n  if (error instanceof PluginHostError && error.code === 'PLUGIN_INSTALL_FAILED') {\n    console.error('安装失败，原始错误:', (error.cause as Error).message) // 'boom'\n    console.error('失败插件:', error.detail?.failedName)\n    console.error('回滚错误身份:', error.detail?.rollbackErrors)\n  }\n}",
@@ -33736,229 +33736,6 @@
           "usageScore": 204,
           "configuration": [],
           "fragment": "plugin-host-index--definePlugin"
-        },
-        {
-          "name": "disposeKey",
-          "kind": "const",
-          "signature": "export declare const disposeKey: unique symbol;",
-          "declarationLine": 8,
-          "source": "packages/plugin-host/dist/symbols.d.ts",
-          "purpose": "Disposal symbols for resource contracts (R-7). The declared `unique symbol` supplies the type-level disposal key. Runtime capability detection reads host `Symbol.dispose` and `Symbol.asyncDispose` and recognizes them alongside the declared keys. Plugins can use either module-exported symbols or host-global symbols.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for disposeKey.",
-          "advanced": "No additional advanced behavior is declared for disposeKey.",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for disposeKey."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for disposeKey.",
-          "examples": [
-            "import { definePlugin, disposeKey, asyncDisposeKey } from '@migaia/plugin-host'\n\nconst resources = definePlugin('resources', (core) => ({\n  install: () => {\n    const cleanup = () => console.log('resource released')\n    core.onDispose(() => cleanup()) // 普通函数\n    core.onDispose({ [disposeKey]: () => cleanup() }) // 同步 disposable\n    core.onDispose({ [asyncDisposeKey]: async () => cleanup() }) // 异步 disposable\n    return {}\n  }\n}))",
-            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'",
-            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
-          ],
-          "members": [],
-          "aliasOf": "disposeKey",
-          "exportPath": ".",
-          "overloadSignatures": ["export declare const disposeKey: unique symbol;"],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use disposeKey when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when disposeKey does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Disposal symbols for resource contracts (R-7). The declared `unique symbol` supplies the type-level disposal key. Runtime capability detection reads host `Symbol.dispose` and `Symbol.asyncDispose` and recognizes them alongside the declared keys. Plugins can use either module-exported symbols or host-global symbols."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import disposeKey from @migaia/plugin-host, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use disposeKey when its const contract and declared inputs match the result you need. Choose a different public symbol when disposeKey does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for disposeKey."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for disposeKey."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/symbols.d.ts:disposeKey:export declare const disposeKey: unique symbol;",
-          "guidance": [
-            {
-              "id": "9-错误码完整参考",
-              "heading": "9. 错误码完整参考",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "`PluginHostErrorCode` 导出以下稳定错误码，均可通过 `error.code` 分支处理："
-                },
-                {
-                  "type": "table",
-                  "headers": ["code", "含义"],
-                  "rows": [
-                    ["`HOST_DISPOSED`", "Host 已完成卸载，不能再访问或变更。"],
-                    ["`HOST_DISPOSING`", "Host 正在卸载，不能开始新的变更。"],
-                    ["`PLUGIN_DUPLICATE`", "插件已安装，或同一批次中出现重复名字。"],
-                    [
-                      "`PLUGIN_NOT_INSTALLED`",
-                      "目标插件未安装（`unUse`/`config.update` 找不到对应插件）。"
-                    ],
-                    ["`PLUGIN_DISABLED`", "句柄所指插件当前已禁用；先启用该插件再访问。"],
-                    [
-                      "`PLUGIN_SUSPENDED`",
-                      "插件因必需 provider 不可用而挂起；恢复 provider，或显式卸载该插件。"
-                    ],
-                    [
-                      "`PLUGIN_NOT_ACTIVATED`",
-                      "惰性插件尚未激活；先执行 `await host.activate(name)`。"
-                    ],
-                    ["`FEATURE_NOT_DECLARED`", "`getFeature(name)` 请求了插件未声明的 feature。"],
-                    ["`PREREQUISITE_MISSING`", "必需 feature provider 尚未安装。"],
-                    ["`DEPENDENCY_CYCLE`", "feature 引用形成依赖环；本批次不会执行任何 install。"],
-                    [
-                      "`DEPENDENCY_BLOCKED`",
-                      "卸载或禁用 provider 时仍有必需依赖者；查看 `detail.blockedBy`，或使用 `policy: 'cascade'`、`policy: 'suspend'` 或 `dryRun`。"
-                    ],
-                    ["`REPLACE_NAME_MISMATCH`", "`replace(name, next)` 的两个插件名不一致。"],
-                    [
-                      "`DEPENDENT_RESTART_FAILED`",
-                      "`replace()` 已提交新实现，但需要重启的依赖者重装失败；它们保持卸载。`cause` 为 `AggregateError`（首项为重装失败），`detail.dependents` 列出受影响插件；修复后重新安装它们。"
-                    ],
-                    [
-                      "`PLUGIN_DEFINITION_INVALID`",
-                      "插件定义含已退役或不受支持的字段（例如 `shared`）。"
-                    ],
-                    ["`PLUGIN_INSTALL_FAILED`", "插件安装失败；原始错误位于 `cause`。"],
-                    [
-                      "`SETUP_REQUIRES_ASYNC_INSTALL`",
-                      "`useSync()` 即时安装遇到声明了 setup 的插件；改用 `use()`。"
-                    ],
-                    [
-                      "`PLUGIN_INSTALL_ROLLBACK_FAILED`",
-                      "诊断（非抛出）：插件安装失败且回滚清理也失败；原始安装错误保持 primary（顶层码 `PLUGIN_INSTALL_FAILED`），回滚失败经 `diagnostic` 上报。"
-                    ],
-                    [
-                      "`INSTALL_RESULT_THENABLE`",
-                      "插件 `install()` 返回值自带 `then` key；同步 `useSync()` 与异步 `use()` 一致拒绝，不会发布可被误当作 Promise 的扩展。"
-                    ],
-                    [
-                      "`COMPOSITION_TARGET_UNMANAGED`",
-                      "`openComposition()` 的目标不是本包登记的托管宿主。托管协议只对本包构造出的宿主开放，普通对象、另一份包副本产出的宿主都会被拒绝；组合方应先用 `isManagedHost()` 判定。"
-                    ],
-                    [
-                      "`PLUGIN_DISPOSE_FAILED`",
-                      "插件 `beforeRelease` 或卸载步骤失败；原始错误位于 `cause`，后续清理继续。"
-                    ],
-                    ["`EXTENSION_DUPLICATE`", "extension key 与已有成员冲突。"],
-                    [
-                      "`EXTENSION_OBJECT_PROTOTYPE`",
-                      "extension key 与 `Object.prototype` 上的成员冲突（如 `toString`）。"
-                    ],
-                    [
-                      "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
-                    ],
-                    [
-                      "`EXTENSION_NON_ENUMERABLE_IGNORED`",
-                      "诊断（非抛出）：`install()` 返回值上的非枚举 key 被有意忽略，未挂载到 Host；通过 `diagnostic` 回调上报。"
-                    ],
-                    ["`PREREQUISITE_DISABLED`", "feature provider 被禁用；可启用该插件后重试。"],
-                    ["`PREREQUISITE_REMOVED`", "feature provider 已卸载；需重新安装 provider。"],
-                    [
-                      "`RESOURCE_OUTSIDE_INSTALL`",
-                      "在允许的插件生命周期之外注册资源或 pipeline stage；setup 尝试关闭后的 `context.onDispose` 先释放有效资源再抛此码。"
-                    ],
-                    [
-                      "`LIFECYCLE_MUTATION`",
-                      "插件生命周期钩子内，或 setup / beforeRelease 等待期间尝试变更 Host；该期间的 `config.update` 也同步抛此码，见 §8。"
-                    ],
-                    ["`INVALID_PIPELINE_MODE`", "构造时传入的 pipeline mode 无效。"],
-                    [
-                      "`PIPELINE_MODE_MISMATCH`",
-                      "stage 不能由 middleware-pipeline runner 提升到 Host mode；顶层为带 Host 身份的 `PluginHostError`，`cause` 保留上游 `TypeError`（`INVALID_OPTION`，source 为 `@migaia/middleware-pipeline`）。"
-                    ],
-                    ["`PIPELINE_NEXT_DUPLICATE`", "同一次 stage 调用里重复调用了 `next()`。"],
-                    [
-                      "`PIPELINE_NEXT_LATE`",
-                      "诊断（非抛出）：stage 已经返回/完成之后才调用 `next()`；通过 `diagnostic` 回调上报，该次调用被忽略。"
-                    ],
-                    ["`PIPELINE_EXECUTING`", "pipeline 执行期间尝试注册新 stage。"],
-                    [
-                      "`PIPELINE_FAILED`",
-                      "async pipeline 的 stage 与 downstream 同时失败，聚合为 `errors` 顺序固定为 `[stageError, downstreamError]` 的 `AggregateError`。"
-                    ],
-                    [
-                      "`MUTATION_QUEUE_TIMEOUT`",
-                      "mutation 在 FIFO 队列中等待超过已配置的 `queueAdmissionTimeoutMs` 阈值后被拒绝（默认未配置该阈值，不会触发）；不会中断已经开始执行的插件代码。语义是终止：该 mutation 不会再被执行。"
-                    ],
-                    [
-                      "`DISPOSE_STEP_TIMEOUT`",
-                      "`beforeRelease` 或 disposal 期间单个 pipeline disposer / 插件 dispose 钩子 / resource disposer 等待超过 `disposeStepTimeoutMs`（默认 5000ms）仍未完成（含自依赖等待）。语义是降级继续：该步骤被计为失败，disposal 事务继续推进直至收敛到 `disposed`。"
-                    ],
-                    [
-                      "`MUTATION_EXECUTION_TIMEOUT`",
-                      "已取得执行权的 lifecycle hook 超过 mutation 预算；提交资格已撤销，协作插件应停止并清理其 operation 资源。"
-                    ],
-                    [
-                      "`REGISTRATION_REVOKED`",
-                      "已取出的 extension 函数所属 registration 已被卸载、禁用或替换；调用方应从当前句柄重新读取 extension。"
-                    ],
-                    [
-                      "`PIPELINE_DRAIN_TIMEOUT`",
-                      "Host 进入逻辑终态前 active pipeline 未在 drain 预算内归零；检查返回的 disposal result 与 physical completion。"
-                    ],
-                    [
-                      "`CLEANUP_INCOMPLETE`",
-                      "逻辑关闭已提交，但清理发生错误或尚未完成。读取 `cleanupErrors`。`cleanupComplete: false` 时继续观察 `physicalCompletion`。"
-                    ],
-                    [
-                      "`INVALID_CONFIG_VALUE`",
-                      "config 值不满足准入的 plain-data 语法（如 symbol、非法原型、危险键名、descriptor、thenable）；调用方需改用受支持的取值。"
-                    ],
-                    [
-                      "`CONFIG_CYCLE_REJECTED`",
-                      "config 输入存在引用循环；调用方需提供无环的值图。"
-                    ],
-                    [
-                      "`INVALID_OPTION`",
-                      "入参校验失败（`TypeError`）：插件名/配置路径/pipeline stage/extension/domain core/资源 disposer/构造选项等输入不满足契约，检查用 `error instanceof TypeError`，不按 `PluginHostError` 分支。"
-                    ]
-                  ]
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { PluginHostErrorCode, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nPluginHostErrorCode.mutationQueueTimeout // 'MUTATION_QUEUE_TIMEOUT'"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`diagnostic` 是构造 `PluginHost` 时可选传入的回调（`IPluginHostDiagnostic`：`(message: string, code?: IPluginHostErrorCode, error?: unknown) => void`；被吞下改为上报的错误会以原始对象经 `error` 送达），用于接收\"不构成错误、但值得关注\"的信息：`PIPELINE_NEXT_LATE`、`EXTENSION_NON_ENUMERABLE_IGNORED`、`PLUGIN_INSTALL_ROLLBACK_FAILED`，以及未配置 `queueAdmissionTimeoutMs` 时的队列排队等待提示（这一条不携带错误码）。`MUTATION_QUEUE_TIMEOUT` 与 `DISPOSE_STEP_TIMEOUT` 是正式抛出/reject 的错误，不再只经 `diagnostic` 上报。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "diagnostic 回调自身抛出的异常永远不会影响宿主的正常执行流程。"
-                }
-              ]
-            }
-          ],
-          "usageScore": 58,
-          "configuration": [],
-          "fragment": "plugin-host-index--disposeKey"
         },
         {
           "name": "getPluginRuntimeIntegration",
@@ -35383,72 +35160,6 @@
           "fragment": "plugin-host-index--IMergePluginExts"
         },
         {
-          "name": "invokeCaptured",
-          "kind": "const",
-          "signature": "export declare const invokeCaptured: <T>(\n  callable: Function,\n  receiver: unknown,\n  args: readonly unknown[],\n) => T;",
-          "declarationLine": 6,
-          "source": "packages/plugin-host/dist/invocation.d.ts",
-          "purpose": "Invokes an admitted callable with its captured receiver and arguments. This is the module-owned boundary for preserving JavaScript receiver, argument, and thrown error identity while keeping the exception to the repository context-rule explicit.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invokeCaptured.",
-          "advanced": "No additional advanced behavior is declared for invokeCaptured.",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for invokeCaptured."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for invokeCaptured.",
-          "examples": [
-            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
-          ],
-          "members": [],
-          "aliasOf": "invokeCaptured",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const invokeCaptured: <T>(callable: Function, receiver: unknown, args: readonly unknown[]) => T;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use invokeCaptured when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when invokeCaptured does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Invokes an admitted callable with its captured receiver and arguments. This is the module-owned boundary for preserving JavaScript receiver, argument, and thrown error identity while keeping the exception to the repository context-rule explicit."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import invokeCaptured from @migaia/plugin-host, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use invokeCaptured when its const contract and declared inputs match the result you need. Choose a different public symbol when invokeCaptured does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for invokeCaptured."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for invokeCaptured."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/invocation.d.ts:invokeCaptured:export declare const invokeCaptured: <T>(callable: Function, receiver: unknown, args: readonly unknown[]) => T;",
-          "guidance": [],
-          "usageScore": 14,
-          "configuration": [],
-          "fragment": "plugin-host-index--invokeCaptured"
-        },
-        {
           "name": "IPipelineConfig",
           "kind": "type",
           "signature": "export type IPipelineConfig = { mode?: IMiddlewarePipelineMode };",
@@ -35648,7 +35359,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",
@@ -35863,7 +35574,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "list",
@@ -35890,9 +35601,9 @@
                   "items": [
                     "`ERROR_TEXT`（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
-                    "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
+                    "`MiddlewarePipelineMode`：由 `@migaia/middleware-pipeline` 定义的模式常量；`host.pipelineMode` 返回其中之一。",
                     "`PluginHostRegistrationLifecycle`：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。",
-                    "`MiddlewarePipelineViolation`：从 `@migaia/middleware-pipeline` 原名转发的 `next()` 违规分类。"
+                    "`MiddlewarePipelineViolation`：由 `@migaia/middleware-pipeline` 定义的 `next()` 违规分类。"
                   ]
                 }
               ]
@@ -36415,7 +36126,7 @@
         {
           "name": "IPluginConstraint",
           "kind": "type",
-          "signature": "export type IPluginConstraint<\n  TCore,\n  TFeatures extends IFeatureRecord = Record<never, never>,\n  TExpose extends object = Record<never, never>,\n> = {\n  readonly name: string;\n  readonly config?: unknown;\n  readonly features?: TFeatures;\n  readonly activation?: 'eager' | 'lazy';\n  update?: (\n    next: never,\n    core: TCore &\n      IPluginLifecycleCore<any> &\n      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>,\n  ) => IPluginAwaitable<void>;\n  onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>;\n  onDisable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>;\n  onDependencyReplaced?: (\n    name: string,\n    outputs: Readonly<Record<string, object>>,\n  ) => IPluginAwaitable<void>;\n  dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>;\n  /** Captured before the registration enters its bounded release step. */ beforeRelease?: (\n    context: IPluginBeforeReleaseContext,\n  ) => IPluginAwaitable<void>;\n  [asyncDisposeKey]?: () => IPluginAwaitable<void>;\n  [disposeKey]?: () => void;\n} & (\n  | IPluginPlainHooks<TCore, Record<string, unknown>, any, TFeatures, TExpose>\n  | {\n      readonly setup: (context: IPluginSetupContext<any>) => unknown;\n      readonly featureExpose?:\n        | TExpose\n        | ((core: TCore & IPluginLifecycleCore<any>, setupOutput?: any) => TExpose);\n      install: (\n        core: IPluginHookCore<TCore, any, TFeatures, TExpose>,\n        setupOutput?: any,\n      ) => IPluginAwaitable<Record<string, unknown>>;\n    }\n);",
+          "signature": "export type IPluginConstraint<\n  TCore,\n  TFeatures extends IFeatureRecord = Record<never, never>,\n  TExpose extends object = Record<never, never>,\n> = {\n  readonly name: string;\n  readonly config?: unknown;\n  readonly features?: TFeatures;\n  readonly activation?: 'eager' | 'lazy';\n  update?: (\n    next: never,\n    core: TCore &\n      IPluginLifecycleCore<any> &\n      Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose }>,\n  ) => IPluginAwaitable<void>;\n  onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>;\n  onDisable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>;\n  onDependencyReplaced?: (\n    name: string,\n    outputs: Readonly<Record<string, object>>,\n  ) => IPluginAwaitable<void>;\n  dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>;\n  /** Captured before the registration enters its bounded release step. */ beforeRelease?: (\n    context: IPluginBeforeReleaseContext,\n  ) => IPluginAwaitable<void>;\n  [asyncDisposeKey]?: () => IPluginAwaitable<void>;\n  [Symbol.dispose]?: () => void;\n} & (\n  | IPluginPlainHooks<TCore, Record<string, unknown>, any, TFeatures, TExpose>\n  | {\n      readonly setup: (context: IPluginSetupContext<any>) => unknown;\n      readonly featureExpose?:\n        | TExpose\n        | ((core: TCore & IPluginLifecycleCore<any>, setupOutput?: any) => TExpose);\n      install: (\n        core: IPluginHookCore<TCore, any, TFeatures, TExpose>,\n        setupOutput?: any,\n      ) => IPluginAwaitable<Record<string, unknown>>;\n    }\n);",
           "declarationLine": 147,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Constrains a plugin tuple while preserving each plugin's precise generic arguments.",
@@ -36431,7 +36142,7 @@
           "aliasOf": "IPluginConstraint",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly activation?: 'eager' | 'lazy'; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDisable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDependencyReplaced?: (name: string, outputs: Readonly<Record<string, object>>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; /** Captured before the registration enters its bounded release step. */ beforeRelease?: (context: IPluginBeforeReleaseContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; } & (IPluginPlainHooks<TCore, Record<string, unknown>, any, TFeatures, TExpose> | { readonly setup: (context: IPluginSetupContext<any>) => unknown; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>, setupOutput?: any) => TExpose); install: (core: IPluginHookCore<TCore, any, TFeatures, TExpose>, setupOutput?: any) => IPluginAwaitable<Record<string, unknown>>; });"
+            "export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly activation?: 'eager' | 'lazy'; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDisable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDependencyReplaced?: (name: string, outputs: Readonly<Record<string, object>>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; /** Captured before the registration enters its bounded release step. */ beforeRelease?: (context: IPluginBeforeReleaseContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [Symbol.dispose]?: () => void; } & (IPluginPlainHooks<TCore, Record<string, unknown>, any, TFeatures, TExpose> | { readonly setup: (context: IPluginSetupContext<any>) => unknown; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>, setupOutput?: any) => TExpose); install: (core: IPluginHookCore<TCore, any, TFeatures, TExpose>, setupOutput?: any) => IPluginAwaitable<Record<string, unknown>>; });"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -36470,7 +36181,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginConstraint:export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly activation?: 'eager' | 'lazy'; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDisable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDependencyReplaced?: (name: string, outputs: Readonly<Record<string, object>>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; /** Captured before the registration enters its bounded release step. */ beforeRelease?: (context: IPluginBeforeReleaseContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; } & (IPluginPlainHooks<TCore, Record<string, unknown>, any, TFeatures, TExpose> | { readonly setup: (context: IPluginSetupContext<any>) => unknown; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>, setupOutput?: any) => TExpose); install: (core: IPluginHookCore<TCore, any, TFeatures, TExpose>, setupOutput?: any) => IPluginAwaitable<Record<string, unknown>>; });",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginConstraint:export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly activation?: 'eager' | 'lazy'; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDisable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDependencyReplaced?: (name: string, outputs: Readonly<Record<string, object>>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; /** Captured before the registration enters its bounded release step. */ beforeRelease?: (context: IPluginBeforeReleaseContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [Symbol.dispose]?: () => void; } & (IPluginPlainHooks<TCore, Record<string, unknown>, any, TFeatures, TExpose> | { readonly setup: (context: IPluginSetupContext<any>) => unknown; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>, setupOutput?: any) => TExpose); install: (core: IPluginHookCore<TCore, any, TFeatures, TExpose>, setupOutput?: any) => IPluginAwaitable<Record<string, unknown>>; });",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -38202,7 +37913,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",
@@ -38749,7 +38460,7 @@
           "examples": [
             "import { PluginHostErrorCode, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nPluginHostErrorCode.mutationQueueTimeout // 'MUTATION_QUEUE_TIMEOUT'",
             "import { definePlugin, PluginHost, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst events: { message: string; code?: IPluginHostErrorCode }[] = []\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  diagnostic: (message, code) => events.push({ message, code }),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  queueAdmissionDiagnosticMs: 200, // 未配置拒绝阈值时才会用到；这里已配置拒绝阈值，实际不会走这一条\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒\n})\n\nawait host.use(\n  definePlugin({\n    name: 'slow',\n    install: (core) => {\n      core.onDispose(() => new Promise<void>((resolve) => setTimeout(resolve, 10)))\n      return {}\n    }\n  })\n)\nawait host.dispose()\n// events 里可能包含非枚举扩展被忽略等诊断，取决于实际时序",
-            "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'",
+            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'",
             "import { PluginHost, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<{}, never> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n}\n\nconst events: { message: string; code?: IPluginHostErrorCode }[] = []\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  diagnostic: (message, code) => events.push({ message, code }),\n  queueAdmissionTimeoutMs: 2000, // 显式开启拒绝阈值——默认是\"只诊断不拒绝\"\n  queueAdmissionDiagnosticMs: 200, // 未配置拒绝阈值时才使用；本例不会触发该诊断\n  disposeStepTimeoutMs: 3000 // 单个 disposer 最多等 3 秒\n})\n\nawait host.use({\n  name: 'slow',\n  install: (core) => {\n    core.onDispose(async () => new Promise((resolve) => setTimeout(resolve, 10)))\n    return {}\n  }\n})\nawait host.dispose()\n// events 里可能包含非枚举扩展被忽略等诊断，取决于实际时序"
           ],
           "members": [],
@@ -38869,7 +38580,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",
@@ -39084,7 +38795,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "list",
@@ -39111,9 +38822,9 @@
                   "items": [
                     "`ERROR_TEXT`（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
-                    "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
+                    "`MiddlewarePipelineMode`：由 `@migaia/middleware-pipeline` 定义的模式常量；`host.pipelineMode` 返回其中之一。",
                     "`PluginHostRegistrationLifecycle`：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。",
-                    "`MiddlewarePipelineViolation`：从 `@migaia/middleware-pipeline` 原名转发的 `next()` 违规分类。"
+                    "`MiddlewarePipelineViolation`：由 `@migaia/middleware-pipeline` 定义的 `next()` 违规分类。"
                   ]
                 }
               ]
@@ -40522,7 +40233,7 @@
         {
           "name": "IPluginResource",
           "kind": "type",
-          "signature": "export type IPluginResource =\n  | IPluginDisposer\n  | { [asyncDisposeKey](): IPluginAwaitable<void> }\n  | { [disposeKey](): void };",
+          "signature": "export type IPluginResource =\n  | IPluginDisposer\n  | { [asyncDisposeKey](): IPluginAwaitable<void> }\n  | { [Symbol.dispose](): void };",
           "declarationLine": 10,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginResource is part of this module's public type contract.",
@@ -40540,7 +40251,7 @@
           "aliasOf": "IPluginResource",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPluginResource = IPluginDisposer | { [asyncDisposeKey](): IPluginAwaitable<void>; } | { [disposeKey](): void; };"
+            "export type IPluginResource = IPluginDisposer | { [asyncDisposeKey](): IPluginAwaitable<void>; } | { [Symbol.dispose](): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -40579,9 +40290,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginResource:export type IPluginResource = IPluginDisposer | { [asyncDisposeKey](): IPluginAwaitable<void>; } | { [disposeKey](): void; };",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginResource:export type IPluginResource = IPluginDisposer | { [asyncDisposeKey](): IPluginAwaitable<void>; } | { [Symbol.dispose](): void; };",
           "guidance": [],
-          "usageScore": 28,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "plugin-host-index--IPluginResource"
         },
@@ -41396,7 +41107,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",
@@ -41622,7 +41333,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "list",
@@ -41649,9 +41360,9 @@
                   "items": [
                     "`ERROR_TEXT`（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
-                    "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
+                    "`MiddlewarePipelineMode`：由 `@migaia/middleware-pipeline` 定义的模式常量；`host.pipelineMode` 返回其中之一。",
                     "`PluginHostRegistrationLifecycle`：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。",
-                    "`MiddlewarePipelineViolation`：从 `@migaia/middleware-pipeline` 原名转发的 `next()` 违规分类。"
+                    "`MiddlewarePipelineViolation`：由 `@migaia/middleware-pipeline` 定义的 `next()` 违规分类。"
                   ]
                 }
               ]
@@ -41792,7 +41503,7 @@
           "errors": ["No documented errors are declared for PluginHostDisposalNodeKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PluginHostDisposalNodeKind.",
           "examples": [
-            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
+            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostDisposalNodeKind,\n  readPluginHostDisposalProvenance,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
           "members": [],
           "aliasOf": "PluginHostDisposalNodeKind",
@@ -42074,7 +41785,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",
@@ -42289,7 +42000,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "list",
@@ -42316,9 +42027,9 @@
                   "items": [
                     "`ERROR_TEXT`（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
-                    "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
+                    "`MiddlewarePipelineMode`：由 `@migaia/middleware-pipeline` 定义的模式常量；`host.pipelineMode` 返回其中之一。",
                     "`PluginHostRegistrationLifecycle`：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。",
-                    "`MiddlewarePipelineViolation`：从 `@migaia/middleware-pipeline` 原名转发的 `next()` 违规分类。"
+                    "`MiddlewarePipelineViolation`：由 `@migaia/middleware-pipeline` 定义的 `next()` 违规分类。"
                   ]
                 }
               ]
@@ -42344,7 +42055,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PluginHostErrorCode.",
           "examples": [
             "import { PluginHostErrorCode, type IPluginHostErrorCode } from '@migaia/plugin-host'\n\nPluginHostErrorCode.mutationQueueTimeout // 'MUTATION_QUEUE_TIMEOUT'",
-            "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
           ],
           "members": [],
           "aliasOf": "PluginHostErrorCode",
@@ -42463,7 +42174,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",
@@ -42678,7 +42389,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "list",
@@ -42705,9 +42416,9 @@
                   "items": [
                     "`ERROR_TEXT`（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
-                    "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
+                    "`MiddlewarePipelineMode`：由 `@migaia/middleware-pipeline` 定义的模式常量；`host.pipelineMode` 返回其中之一。",
                     "`PluginHostRegistrationLifecycle`：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。",
-                    "`MiddlewarePipelineViolation`：从 `@migaia/middleware-pipeline` 原名转发的 `next()` 违规分类。"
+                    "`MiddlewarePipelineViolation`：由 `@migaia/middleware-pipeline` 定义的 `next()` 违规分类。"
                   ]
                 }
               ]
@@ -42732,7 +42443,7 @@
           "errors": ["No documented errors are declared for PluginHostRegistrationLifecycle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PluginHostRegistrationLifecycle.",
           "examples": [
-            "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
           ],
           "members": [],
           "aliasOf": "PluginHostRegistrationLifecycle",
@@ -42786,7 +42497,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "list",
@@ -42813,9 +42524,9 @@
                   "items": [
                     "`ERROR_TEXT`（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
-                    "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
+                    "`MiddlewarePipelineMode`：由 `@migaia/middleware-pipeline` 定义的模式常量；`host.pipelineMode` 返回其中之一。",
                     "`PluginHostRegistrationLifecycle`：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。",
-                    "`MiddlewarePipelineViolation`：从 `@migaia/middleware-pipeline` 原名转发的 `next()` 违规分类。"
+                    "`MiddlewarePipelineViolation`：由 `@migaia/middleware-pipeline` 定义的 `next()` 违规分类。"
                   ]
                 }
               ]
@@ -42840,7 +42551,7 @@
           "errors": ["No documented errors are declared for PluginHostStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PluginHostStatus.",
           "examples": [
-            "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
           ],
           "members": [],
           "aliasOf": "PluginHostStatus",
@@ -42894,7 +42605,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "list",
@@ -42921,9 +42632,9 @@
                   "items": [
                     "`ERROR_TEXT`（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
-                    "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
+                    "`MiddlewarePipelineMode`：由 `@migaia/middleware-pipeline` 定义的模式常量；`host.pipelineMode` 返回其中之一。",
                     "`PluginHostRegistrationLifecycle`：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。",
-                    "`MiddlewarePipelineViolation`：从 `@migaia/middleware-pipeline` 原名转发的 `next()` 违规分类。"
+                    "`MiddlewarePipelineViolation`：由 `@migaia/middleware-pipeline` 定义的 `next()` 违规分类。"
                   ]
                 }
               ]
@@ -43014,7 +42725,7 @@
           "errors": ["No documented errors are declared for readPluginHostDisposalProvenance."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readPluginHostDisposalProvenance.",
           "examples": [
-            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
+            "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostDisposalNodeKind,\n  readPluginHostDisposalProvenance,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
           ],
           "members": [],
           "aliasOf": "readPluginHostDisposalProvenance",
@@ -43229,7 +42940,7 @@
           "declaredConfiguration": [],
           "identity": "packages/plugin-host/dist/composition-entry.d.ts:createView:export declare const createView: <TPlugin extends IPluginConstraint<any>>(token: IRegistrationToken<TPlugin>) => IRegistrationView<TPlugin>;",
           "guidance": [],
-          "usageScore": 16,
+          "usageScore": 20,
           "configuration": [],
           "fragment": "plugin-host-composition--createView"
         },
@@ -43688,7 +43399,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",
@@ -43910,7 +43621,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",

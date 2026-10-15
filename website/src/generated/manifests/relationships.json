@@ -21423,36 +21423,6 @@
     },
     {
       "from": "/en/docs/plugin-host/api",
-      "to": "/en/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "to": "/en/docs/plugin-host/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "to": "/en/docs/plugin-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/plugin-host/getting-started",
-      "to": "/en/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "to": "/en/docs/plugin-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/plugin-host",
-      "to": "/en/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/plugin-host/api",
       "to": "/en/docs/plugin-host/api#plugin-host-index--getPluginRuntimeIntegration",
       "type": "api-symbol"
     },
@@ -22109,36 +22079,6 @@
     {
       "from": "/en/docs/plugin-host",
       "to": "/en/docs/plugin-host/api#plugin-host-index--IMergePluginExts",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/plugin-host/api",
-      "to": "/en/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "to": "/en/docs/plugin-host/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "to": "/en/docs/plugin-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/plugin-host/getting-started",
-      "to": "/en/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "to": "/en/docs/plugin-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/plugin-host",
-      "to": "/en/docs/plugin-host/api#plugin-host-index--invokeCaptured",
       "type": "architecture-symbol"
     },
     {
@@ -24373,36 +24313,6 @@
     },
     {
       "from": "/zh/docs/plugin-host/api",
-      "to": "/zh/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "to": "/zh/docs/plugin-host/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "to": "/zh/docs/plugin-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/plugin-host/getting-started",
-      "to": "/zh/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "to": "/zh/docs/plugin-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/plugin-host",
-      "to": "/zh/docs/plugin-host/api#plugin-host-index--disposeKey",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api",
       "to": "/zh/docs/plugin-host/api#plugin-host-index--getPluginRuntimeIntegration",
       "type": "api-symbol"
     },
@@ -25059,36 +24969,6 @@
     {
       "from": "/zh/docs/plugin-host",
       "to": "/zh/docs/plugin-host/api#plugin-host-index--IMergePluginExts",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api",
-      "to": "/zh/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "to": "/zh/docs/plugin-host/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "to": "/zh/docs/plugin-host/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/plugin-host/getting-started",
-      "to": "/zh/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/plugin-host/api#plugin-host-index--invokeCaptured",
-      "to": "/zh/docs/plugin-host",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/plugin-host",
-      "to": "/zh/docs/plugin-host/api#plugin-host-index--invokeCaptured",
       "type": "architecture-symbol"
     },
     {

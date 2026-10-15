@@ -2859,19 +2859,7 @@
       "library": "plugin-host"
     },
     {
-      "path": "/en/docs/plugin-host/api/disposeKey",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
       "path": "/en/docs/plugin-host/api/getPluginRuntimeIntegration",
-      "locale": "en",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/en/docs/plugin-host/api/invokeCaptured",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -18435,19 +18423,7 @@
       "library": "plugin-host"
     },
     {
-      "path": "/zh/docs/plugin-host/api/disposeKey",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
       "path": "/zh/docs/plugin-host/api/getPluginRuntimeIntegration",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "plugin-host"
-    },
-    {
-      "path": "/zh/docs/plugin-host/api/invokeCaptured",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"

@@ -6412,7 +6412,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "包公开根入口 `@migaia/plugin-host`，另有稳定的 `@migaia/plugin-host/composition` 子路径。根入口 提供 `PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、 `GENERATOR_*` 信号量与 dispose symbol；composition 子路径提供 opaque `IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist` 内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。托管组合 owner 可使用该子路径的 `openComposition()` 协议。"
+                  "text": "包公开根入口 `@migaia/plugin-host`，另有稳定的 `@migaia/plugin-host/composition` 子路径。根入口 提供 `PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、 `asyncDisposeKey`；管线 API 从 `@migaia/middleware-pipeline` 导入；composition 子路径提供 opaque `IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist` 内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。托管组合 owner 可使用该子路径的 `openComposition()` 协议。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "同一注册的 token view 复用扩展函数引用，调用时保留 concrete Host receiver。token 权限随注册生命周期失效；`disable()` 期间仍有效。完整 Host view 在禁用期间拒绝访问，启用后恢复原函数引用；卸载会使两类视图同时失效。"
                 }
               ]
             },
@@ -6672,7 +6676,7 @@
                     "`features?: Record<string, IFeature>`（可选）—— 声明实例能力；消费者通过 provider 定义的 `getFeature()` 引用建立依赖。",
                     "`update?: (next, core) => void | Promise<void>`（可选）—— 响应 `config.update`；`next` 是候选完整配置的只读视图，成功返回才提交。",
                     "`dispose?: () => void | Promise<void>`（可选）—— 插件级清理。",
-                    "`[Symbol.dispose]?: () => void` / `[Symbol.asyncDispose]?: () => void | Promise<void>`（可选）—— 未声明 `dispose` 时的清理兜底，也接受本包导出的 `disposeKey`/`asyncDisposeKey`。"
+                    "`[Symbol.dispose]?: () => void` / `[Symbol.asyncDispose]?: () => void | Promise<void>`（可选）—— 未声明 `dispose` 时的清理兜底，异步资源也接受本包导出的 `asyncDisposeKey`。"
                   ]
                 },
                 {
@@ -6681,7 +6685,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`install()` 返回值只有可枚举的 data property 会通过 `handle.extensions` 发布；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。保留键不能作为 extension key：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object."
+                  "text": "`install()` 返回值只有可枚举的 data property 会通过 `handle.extensions` 发布；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。保留键不能作为 extension key：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、`asyncDisposeKey` 和可用的原生 `Symbol.dispose`/`Symbol.asyncDispose`，命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object."
                 },
                 {
                   "type": "paragraph",
@@ -6795,7 +6799,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { GENERATOR_CONTINUE, PluginHost } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<Record<string, never>, string> {}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async-generator' }\n})\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await Promise.resolve() // 可以在 yield 之间做任意异步工作\n  yield value.trim()\n  yield value.trim().toUpperCase()\n  return GENERATOR_CONTINUE // 下一 stage 收到最后一次 yield 的大写字符串\n})\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  return `[${value}]` // 收到上一个 stage 的最后一次 yield，继续产生最终结果\n})"
+                  "code": "import {\n  GENERATOR_CONTINUE\n} from '@migaia/middleware-pipeline'\nimport { PluginHost } from '@migaia/plugin-host'\n\nclass Host extends PluginHost<Record<string, never>, string> {}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async-generator' }\n})\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await Promise.resolve() // 可以在 yield 之间做任意异步工作\n  yield value.trim()\n  yield value.trim().toUpperCase()\n  return GENERATOR_CONTINUE // 下一 stage 收到最后一次 yield 的大写字符串\n})\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  return `[${value}]` // 收到上一个 stage 的最后一次 yield，继续产生最终结果\n})"
                 },
                 {
                   "type": "paragraph",
@@ -6848,7 +6852,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle,\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostError,\n  ERROR_TEXT,\n  PluginHostErrorCode,\n  type IPluginHostErrorCode,\n  PluginHostStatus,\n  PluginHostRegistrationLifecycle\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "list",
@@ -6875,9 +6879,9 @@
                   "items": [
                     "`ERROR_TEXT`（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。",
                     "`PluginHostStatus`：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。",
-                    "`MiddlewarePipelineMode`：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。",
+                    "`MiddlewarePipelineMode`：由 `@migaia/middleware-pipeline` 定义的模式常量；`host.pipelineMode` 返回其中之一。",
                     "`PluginHostRegistrationLifecycle`：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。",
-                    "`MiddlewarePipelineViolation`：从 `@migaia/middleware-pipeline` 原名转发的 `next()` 违规分类。"
+                    "`MiddlewarePipelineViolation`：由 `@migaia/middleware-pipeline` 定义的 `next()` 违规分类。"
                   ]
                 }
               ]
@@ -6889,17 +6893,21 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\nimport {\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "mode、violation 与四种 stage 类型均从 `@migaia/middleware-pipeline` 原名转发，没有 plugin-host 自己的重复声明。Host 在 stage 注册时使用其唯一的 `createPipeline` runner 提升到宿主 mode；需要手工提升或执行时直接使用 middleware-pipeline 的 `createPipeline`。"
+                  "text": "管线 mode、violation、stage 类型与 generator 信号直接从 `@migaia/middleware-pipeline` 导入。Host 使用其唯一的 `createPipeline` runner 执行和提升 stage。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "使用这些管线 API 时，将 `@migaia/middleware-pipeline` 声明为应用的直接依赖。"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`GENERATOR_CONTINUE`/`GENERATOR_HALT`/`GENERATOR_UNDEFINED` —— generator pipeline 专用的哨兵值（`unique symbol`，直接从 `@migaia/middleware-pipeline` 转发，保持跨包同一身份）：generator stage 的 `return` 可以返回它们中的一个来表达\"继续/终止/显式 undefined\"，语义见上方 Pipeline 处理管线 表格。",
-                    "`disposeKey`/`asyncDisposeKey` —— 本包自声明的 `unique symbol`（不依赖 `ESNext.Disposable` lib），语义等价于宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`。插件/资源可以用这两个 key 之一声明清理方法，运行时会把自声明 symbol 与宿主真实 symbol（若存在）都识别为等价键。"
+                    "`GENERATOR_CONTINUE`/`GENERATOR_HALT`/`GENERATOR_UNDEFINED` —— generator pipeline 专用的哨兵值（`unique symbol`，从 `@migaia/middleware-pipeline` 导入）：generator stage 的 `return` 可以返回它们中的一个来表达\"继续/终止/显式 undefined\"，语义见上方 Pipeline 处理管线 表格。",
+                    "`asyncDisposeKey` —— 宿主提供 `Symbol.asyncDispose` 时使用该原生键，否则使用包内 fallback。同步资源使用原生 `Symbol.dispose` 或普通清理函数。"
                   ]
                 }
               ]
@@ -6955,7 +6963,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, GENERATOR_HALT } from '@migaia/plugin-host'\n\ntype IEvent = { level: 'info' | 'debug'; message: string }\n\nclass Host extends PluginHost<{}, IEvent> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  emit(event: IEvent): void {\n    this.runPipeline(event, (final) => console.log(final.level, final.message))\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'generator' }\n})\nhost.useGeneratorPipeline(function* (value) {\n  if (value.level === 'debug') return GENERATOR_HALT // 直接丢弃 debug 事件，后续 stage 不再执行\n  return value\n})\n\nhost.emit({ level: 'info', message: 'ready' }) // 打印\nhost.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印"
+                  "code": "import {\n  GENERATOR_HALT\n} from '@migaia/middleware-pipeline'\nimport { PluginHost } from '@migaia/plugin-host'\n\ntype IEvent = { level: 'info' | 'debug'; message: string }\n\nclass Host extends PluginHost<{}, IEvent> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  emit(event: IEvent): void {\n    this.runPipeline(event, (final) => console.log(final.level, final.message))\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'generator' }\n})\nhost.useGeneratorPipeline(function* (value) {\n  if (value.level === 'debug') return GENERATOR_HALT // 直接丢弃 debug 事件，后续 stage 不再执行\n  return value\n})\n\nhost.emit({ level: 'info', message: 'ready' }) // 打印\nhost.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印"
                 }
               ]
             },
@@ -6966,7 +6974,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, GENERATOR_CONTINUE } from '@migaia/plugin-host'\n\nclass FetchHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(url: string): Promise<string> {\n    let result = url\n    return Promise.resolve(\n      this.runPipeline(url, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new FetchHost({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async-generator' }\n})\nhost.useAsyncGeneratorPipeline(async function* (url) {\n  yield url // 中间 yield 仅用于观测，不会提前进入下一 stage\n  const response = await fetch(url)\n  return await response.text()\n})\n\nconst text = await host.run('https://example.com/data')"
+                  "code": "import {\n  GENERATOR_CONTINUE\n} from '@migaia/middleware-pipeline'\nimport { PluginHost } from '@migaia/plugin-host'\n\nclass FetchHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(url: string): Promise<string> {\n    let result = url\n    return Promise.resolve(\n      this.runPipeline(url, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new FetchHost({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async-generator' }\n})\nhost.useAsyncGeneratorPipeline(async function* (url) {\n  yield url // 中间 yield 仅用于观测，不会提前进入下一 stage\n  const response = await fetch(url)\n  return await response.text()\n})\n\nconst text = await host.run('https://example.com/data')"
                 },
                 {
                   "type": "paragraph",
@@ -6981,7 +6989,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, GENERATOR_CONTINUE, type IGeneratorMiddlewareStage } from '@migaia/plugin-host'\n\n// 已有的一个同步 generator stage（比如从 generator 模式的 Host 上迁移过来的）\nconst trimStage: IGeneratorMiddlewareStage<string> = function* (value) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n}\n\nclass TextHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(value: string): Promise<string> {\n    let result = value\n    return Promise.resolve(\n      this.runPipeline(value, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new TextHost({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async-generator' }\n})\n\n// 不用重写或手工适配：Host runner 直接提升 generator stage\nhost.useGeneratorPipeline(trimStage)\n\n// 第二个 stage 真正做异步工作\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await new Promise((resolve) => setTimeout(resolve, 0))\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\n\nawait host.run('  migaia  ') // 'MIGAIA'"
+                  "code": "import {\n  GENERATOR_CONTINUE,\n  type IGeneratorMiddlewareStage\n} from '@migaia/middleware-pipeline'\nimport { PluginHost } from '@migaia/plugin-host'\n\n// 已有的一个同步 generator stage（比如从 generator 模式的 Host 上迁移过来的）\nconst trimStage: IGeneratorMiddlewareStage<string> = function* (value) {\n  yield value.trim()\n  return GENERATOR_CONTINUE\n}\n\nclass TextHost extends PluginHost<{}, string> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  run(value: string): Promise<string> {\n    let result = value\n    return Promise.resolve(\n      this.runPipeline(value, (final) => {\n        result = final\n      })\n    ).then(() => result)\n  }\n}\n\nconst host = new TextHost({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'async-generator' }\n})\n\n// 不用重写或手工适配：Host runner 直接提升 generator stage\nhost.useGeneratorPipeline(trimStage)\n\n// 第二个 stage 真正做异步工作\nhost.useAsyncGeneratorPipeline(async function* (value) {\n  await new Promise((resolve) => setTimeout(resolve, 0))\n  yield value.toUpperCase()\n  return GENERATOR_CONTINUE\n})\n\nawait host.run('  migaia  ') // 'MIGAIA'"
                 },
                 {
                   "type": "paragraph",
@@ -7380,7 +7388,7 @@
                       "插件级清理。"
                     ],
                     [
-                      "`[disposeKey]?` / `[Symbol.dispose]?`",
+                      "`[Symbol.dispose]?` / `[Symbol.dispose]?`",
                       "无",
                       "可选",
                       "`void`",
@@ -7884,7 +7892,7 @@
                     ],
                     [
                       "`EXTENSION_RESERVED`",
-                      "extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。"
+                      "extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。"
                     ],
                     [
                       "`EXTENSION_NON_ENUMERABLE_IGNORED`",
@@ -7975,15 +7983,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { definePlugin, disposeKey, asyncDisposeKey } from '@migaia/plugin-host'\n\nconst resources = definePlugin('resources', (core) => ({\n  install: () => {\n    const cleanup = () => console.log('resource released')\n    core.onDispose(() => cleanup()) // 普通函数\n    core.onDispose({ [disposeKey]: () => cleanup() }) // 同步 disposable\n    core.onDispose({ [asyncDisposeKey]: async () => cleanup() }) // 异步 disposable\n    return {}\n  }\n}))"
+                  "code": "import {\n  definePlugin,\n  asyncDisposeKey\n} from '@migaia/plugin-host'\n\nconst resources = definePlugin('resources', (core) => ({\n  install: () => {\n    const cleanup = () => console.log('resource released')\n    core.onDispose(() => cleanup()) // 普通函数\n    if (Symbol.dispose) core.onDispose({ [Symbol.dispose]: () => cleanup() }) // 同步 disposable\n    core.onDispose({ [asyncDisposeKey]: async () => cleanup() }) // 异步 disposable\n    return {}\n  }\n}))"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`onDispose(resource)` 接受三种形状（`IPluginResource`）：普通函数、带 `[disposeKey]`/`Symbol.dispose` 的同步 disposable、带 `[asyncDisposeKey]`/`Symbol.asyncDispose` 的异步 disposable。同一个资源如果同时提供多种清理方式，优先级是：显式的函数形态 > `Symbol.asyncDispose`/`asyncDisposeKey` > `Symbol.dispose`/`disposeKey`（源码 `src/disposal.ts` 的 `snapshotDisposer`：先扫描全部 async 候选键，再扫描 sync 候选键，取第一个值为函数的）。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "异步（`use()` 或 `useSync`）插件的资源清理支持完整的 async disposer；`useSync` 安装失败时通过 `detail.completion` 取得最终 rollback detail，见 §4。"
+                  "text": "`onDispose(resource)` 接受普通清理函数、带 `Symbol.dispose` 的同步资源或带 `asyncDisposeKey`/`Symbol.asyncDispose` 的异步资源。普通函数直接执行；对象优先使用异步 disposer，其次同步 disposer。没有原生同步 symbol 的环境可传清理函数。资源逆序释放，异步回滚的完整错误从 `detail.completion` 取得。"
                 },
                 {
                   "type": "paragraph",
@@ -7998,18 +8002,21 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED,\n  PluginHostDisposalNodeKind,\n  invokeCaptured,\n  readPluginHostDisposalProvenance,\n  disposeKey,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
+                  "code": "import {\n  MiddlewarePipelineMode,\n  MiddlewarePipelineViolation,\n  type IMiddlewarePipelineMode,\n  type ISyncMiddlewareStage,\n  type IAsyncMiddlewareStage,\n  type IGeneratorMiddlewareStage,\n  type IAsyncGeneratorMiddlewareStage,\n  GENERATOR_CONTINUE,\n  GENERATOR_HALT,\n  GENERATOR_UNDEFINED\n} from '@migaia/middleware-pipeline'\nimport {\n  PluginHostDisposalNodeKind,\n  readPluginHostDisposalProvenance,\n  asyncDisposeKey\n} from '@migaia/plugin-host'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "mode、violation 与四种 stage 类型都从 `@migaia/middleware-pipeline` 原名转发。plugin-host 不再维护重复的 mode/stage 声明或公开适配器；宿主在注册 stage 时通过其唯一的 `createPipeline` runner 执行提升。需要手工提升或直接执行 pipeline 时使用 `@migaia/middleware-pipeline` 的 `createPipeline`。"
+                  "text": "管线 mode、violation、stage 类型与 generator 信号直接从 `@migaia/middleware-pipeline` 导入。Host 使用其唯一的 `createPipeline` runner 执行和提升 stage。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "使用这些管线 API 时，将 `@migaia/middleware-pipeline` 声明为应用的直接依赖。"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`GENERATOR_CONTINUE` / `GENERATOR_HALT` / `GENERATOR_UNDEFINED`——generator/async-generator pipeline 共用的哨兵值（`unique symbol`，从 `@migaia/middleware-pipeline` 转发，保持跨包同一身份）：stage 的 `return` 可以返回它们中的一个来表达\"继续/终止/显式 undefined\"，语义见 §7 表格。",
-                    "`disposeKey: unique symbol` / `asyncDisposeKey: unique symbol`——本包自声明的 symbol（不依赖 `ESNext.Disposable` lib，因此不强制要求该 lib 的类型声明）。插件/资源可以用这两个 key 之一声明清理方法，运行时会把自声明 symbol 与宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`（若当前运行时提供）都识别为等价键；宿主不提供原生 symbol 时，只有自声明 symbol 生效。",
-                    "`invokeCaptured(callable, receiver, args)`——框架适配器用于保留 JavaScript receiver、参数顺序和抛出值身份的低层调用边界。业务插件应直接调用自己的函数；只有已经独立完成 callable/receiver/args 准入的适配器才应使用它。",
+                    "`GENERATOR_CONTINUE` / `GENERATOR_HALT` / `GENERATOR_UNDEFINED`——generator/async-generator pipeline 共用的哨兵值（`unique symbol`，从 `@migaia/middleware-pipeline` 导入）：stage 的 `return` 可以返回它们中的一个来表达\"继续/终止/显式 undefined\"，语义见 §7 表格。",
+                    "`asyncDisposeKey` —— 宿主提供 `Symbol.asyncDispose` 时使用该原生键，否则使用包内 fallback。同步资源使用原生 `Symbol.dispose` 或普通清理函数。",
                     "`PluginHostDisposalNodeKind` / `readPluginHostDisposalProvenance(error)`——清理诊断协议。前者区分 host error、aggregate 和 disposer wrapper；后者只读取本物理包实例登记的 provenance，未知错误或另一份重复安装的包实例会返回 `undefined`，不会按对象外形猜测。它用于日志与审计，不应代替 `source`/`code`/`cause` 错误处理。"
                   ]
                 }
@@ -8066,7 +8073,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { PluginHost, GENERATOR_HALT } from '@migaia/plugin-host'\n\ntype IEvent = { level: 'info' | 'debug'; message: string }\n\nclass Host extends PluginHost<{}, IEvent> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  emit(event: IEvent): void {\n    this.runPipeline(event, (final) => console.log(final.level, final.message))\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'generator' }\n})\nhost.useGeneratorPipeline(function* (value) {\n  if (value.level === 'debug') return GENERATOR_HALT // 直接丢弃 debug 事件，后续 stage 不再执行\n  return value\n})\n\nhost.emit({ level: 'info', message: 'ready' }) // 打印\nhost.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印"
+                  "code": "import {\n  GENERATOR_HALT\n} from '@migaia/middleware-pipeline'\nimport { PluginHost } from '@migaia/plugin-host'\n\ntype IEvent = { level: 'info' | 'debug'; message: string }\n\nclass Host extends PluginHost<{}, IEvent> {\n  protected createPluginDomainCore() {\n    return {}\n  }\n  emit(event: IEvent): void {\n    this.runPipeline(event, (final) => console.log(final.level, final.message))\n  }\n}\n\nconst host = new Host({\n  execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },\n  pipeline: { mode: 'generator' }\n})\nhost.useGeneratorPipeline(function* (value) {\n  if (value.level === 'debug') return GENERATOR_HALT // 直接丢弃 debug 事件，后续 stage 不再执行\n  return value\n})\n\nhost.emit({ level: 'info', message: 'ready' }) // 打印\nhost.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印"
                 }
               ]
             },
@@ -8129,6 +8136,10 @@
                 {
                   "type": "paragraph",
                   "text": "`createView(token)` 只发布该 exact registration 的 extensions。token 是 opaque identity，foreign 或已撤销 token 会 fail closed；view 不包含 Host、config、shared 或 mutation 能力。历史 `IPluginRegistrationReceipt` 仍是 deprecated 的 `IRegistrationToken` 类型别名，保持编译兼容。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "反复 `createView(token)` 取得的扩展函数保持同一引用，receiver 是 concrete Host。token view 随注册生命周期撤销，禁用期间仍可使用。完整 Host view 检查当前启用状态；重新启用会恢复原函数引用。卸载后两类视图均拒绝调用。"
                 }
               ]
             },
