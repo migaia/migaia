@@ -17,6 +17,7 @@ import {
 } from '../remote/runtime-api/peer.js'
 import type { IRuntimeTypedPeer } from '../remote/runtime-api/typing.js'
 import { PeerPairName, PeerPairErrorText } from './text.js'
+import { defaultRpcReporter } from '../core/internal/diagnostic-reporter.js'
 
 /** Each testing side configures only the same canonical method/deadline/admission owners. */
 type IPeerPairSide<P extends IRuntimePeerProvide> = Pick<
@@ -73,7 +74,7 @@ export async function createPeerPair(
   const report = (error: unknown): void => {
     try {
       if (options.report) options.report(error)
-      else console.error(error)
+      else defaultRpcReporter(error)
     } catch (failure) {
       hostRethrowReporter(failure, IpcReporterContext)
     }

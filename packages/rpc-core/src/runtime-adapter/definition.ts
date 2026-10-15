@@ -50,6 +50,7 @@ import type { IAdapterInitialMessageResource } from './message/types.js'
 import type { IRemoteChannel } from '../remote/types.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from './data.js'
+import { defaultRpcReporter } from '../core/internal/diagnostic-reporter.js'
 
 /**
  * Definition identity retains physical operations without accepting an external Peer/channel
@@ -206,7 +207,7 @@ async function constructDefinitionPeer<TInput>(
   const key = recipe.kind === 'message' ? RuntimePluginKey.thread : RuntimePluginKey.process
   const task = captureAdapterTask(definition, original, key)
   const provenance = readRuntimePreparationContext(original)
-  const report = options.report ?? console.error
+  const report = options.report ?? defaultRpcReporter
   /** Mutually exclusive raw source values map to the existing single-source Core grammar. */
   const sources = [original.spawn, original.connect, original.listen].filter(
     (source) => source !== undefined

@@ -35,24 +35,13 @@ import {
 } from './definition.js'
 import { AtomKind } from './kind-constants.js'
 
-/** Contains diagnostics when a Runtime reporter fails during atom lifecycle callbacks. */
+/** Routes atom lifecycle failures to the Runtime reporter, which already contains reporter failures. */
 function reportAtomFailure(
   runtime: IRuntime,
   error: unknown,
   phase: Parameters<IRuntime['reportError']>[1]['phase']
 ): void {
-  try {
-    runtime.reportError(error, { phase })
-    return
-  } catch (reporterError) {
-    const hostReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError
-    try {
-      if (hostReportError) hostReportError(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // A diagnostic sink is best effort and must not invalidate the atom graph.
-    }
-  }
+  runtime.reportError(error, { phase })
 }
 
 /**

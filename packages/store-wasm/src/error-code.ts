@@ -47,7 +47,15 @@ export const StoreWasmErrorCode = {
    * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution
    * order.
    */
-  cleanupFailed: 'CLEANUP_FAILED'
+  cleanupFailed: 'CLEANUP_FAILED',
+
+  /**
+   * Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised
+   * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every
+   * later export would trap again; the instance is unusable for the rest of the page or process.
+   * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed.
+   */
+  instancePoisoned: 'INSTANCE_POISONED'
 } as const
 
 export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]

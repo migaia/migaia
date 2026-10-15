@@ -97,20 +97,9 @@ function validateOptions(options: IFamilyOptions): INormalizedFamilyOptions {
   return { maxSize: maxSize ?? Infinity, ttl, now }
 }
 
-/** Reports timer cleanup failures without allowing a hostile reporter to escape the timer. */
+/** Reports timer cleanup failures; the Runtime reporter already contains reporter failures. */
 function reportFamilyTimerFailure(error: unknown): void {
-  try {
-    defaultRuntime.reportError(error, { phase: 'async-flush' })
-    return
-  } catch (reporterError) {
-    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError
-    try {
-      if (host) host(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // No diagnostic sink may turn an asynchronous cleanup report into an uncaught exception.
-    }
-  }
+  defaultRuntime.reportError(error, { phase: 'async-flush' })
 }
 
 /**

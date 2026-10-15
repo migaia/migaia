@@ -15,6 +15,7 @@ import { createRuntimeByteConnection } from './handshake.js'
 import { readRuntimeByteBootstrapSnapshot } from './bootstrap.js'
 import { deferRuntimeByteReceive } from './carrier.js'
 import type { IRuntimeByteIO, IRuntimeByteDiagnostics, IRuntimeConnectionOptions } from './types.js'
+import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
 
 /** Local presentation/configuration cannot supply decoded launch or accepted capability facts. */
 export type IAdapterBytePeerOptions = Readonly<{
@@ -48,7 +49,7 @@ export async function createAdapterBytePeer(
   preparation: IRuntimePreparationContext | undefined
 ): Promise<IRuntimePeer> {
   /** Default diagnostics retain the original options that carry Core preparation provenance. */
-  const report = options.report ?? console.error
+  const report = options.report ?? defaultRpcReporter
   try {
     /** Adapter-returned mutable bytes cannot replace the private snapshot taken during actual read. */
     const raw = readRuntimeByteBootstrapSnapshot(io)

@@ -29,6 +29,7 @@ import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
 import { createAdapterListenerPreparation, type IAdapterListenerPreparation } from './listener.js'
 import { createAdapterBytePeer, type IAdapterBytePeerOptions } from './byte/peer.js'
 import type { IRuntimeByteIO } from './byte/types.js'
+import { defaultRpcReporter } from '../core/internal/diagnostic-reporter.js'
 
 /** Adapter deployment objects are ordinary configuration; resource factories remain adapter-owned. */
 export type IAdapterPeerOptions = Omit<
@@ -243,7 +244,7 @@ class AdapterPeerPreparation {
       defaultTimeoutMs: this.#options.defaultTimeoutMs,
       contract: this.#options.contract,
       endpointFactory: this.#options.endpointFactory,
-      report: this.#options.report ?? console.error
+      report: this.#options.report ?? defaultRpcReporter
     }
     return createAdapterListenerPreparation(options, localOffer, preparation)
   }
@@ -273,7 +274,7 @@ class AdapterPeerPreparation {
     context: IRuntimePreparationContext | undefined
   ) {
     /** Automatic resource cleanup shares the public default without cloning original options. */
-    const report = options.report ?? console.error
+    const report = options.report ?? defaultRpcReporter
     /** Only the exact Core resource can transfer cold capture and actual launch metadata. */
     const preparation = readAdapterMessagePreparation(resource)
     if (!preparation)

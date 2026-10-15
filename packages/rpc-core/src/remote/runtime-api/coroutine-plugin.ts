@@ -10,6 +10,7 @@ import {
   type ICoroutineSupervisorPolicy
 } from './coroutine-binding.js'
 import type { ICoroutineConnect, ICoroutineUserTask } from './coroutine-task.js'
+import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
 
 /** This physical owner retains the stable token for the real Host coroutine slot. */
 const coroutineRuntimeSlotFamily = Object.freeze({})
@@ -86,7 +87,7 @@ export function createCoroutinePlugin<
       const binding = createCoroutineBinding(
         captured.preparation,
         task,
-        peerOptions.report ?? console.error,
+        peerOptions.report ?? defaultRpcReporter,
         policy
       )
       return captured.managed(managedOptions, binding, binding.supervisor)
