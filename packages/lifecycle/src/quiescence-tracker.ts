@@ -127,7 +127,7 @@ export function createQuiescenceTracker<TKey extends object>(): IQuiescenceTrack
  * String-keyed variant. `WeakMap` cannot take string keys, so pristine entries are pruned
  * explicitly.
  */
-export function createStringQuiescenceTracker(): IQuiescenceTracker<string> {
+function createStringQuiescenceTracker(): IQuiescenceTracker<string> {
   return createTrackerCore<string>(new Map())
 }
 

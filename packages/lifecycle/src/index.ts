@@ -33,18 +33,16 @@ export {
 export { LifecycleErrorCode, type ILifecycleErrorCode } from './error-code.js'
 export { LifecycleErrorText, type ILifecycleErrorText } from './error-text.js'
 
-export { snapshotScheduler, validateSchedulerDelay, validateSchedulerTime } from './scheduler.js'
+export { snapshotScheduler } from './scheduler-entry.js'
 
 export {
   LIFECYCLE_SOURCE,
   createLifecycleError,
-  createLifecycleRangeError,
-  tagLifecycleError,
   containAsyncRejection,
   createErrorCollector,
   type ILifecycleError,
   type IErrorCollector
-} from './errors.js'
+} from './errors-entry.js'
 
 export { boundedWait } from './bounded-wait.js'
 export { abortableDelay } from './abortable-delay.js'
@@ -65,12 +63,6 @@ export {
 } from './sync-lifecycle-scope.js'
 
 export {
-  createLifecycleUnit,
-  type ILifecycleUnit,
-  type ILifecycleUnitOptions
-} from './lifecycle-unit.js'
-
-export {
   createGenerationController,
   type IGenerationController,
   type IGenerationControllerOptions,
@@ -80,7 +72,6 @@ export {
 
 export {
   createQuiescenceTracker,
-  createStringQuiescenceTracker,
   createObjectLeaseRegistry,
   createStringLeaseRegistry,
   createPendingTracker,

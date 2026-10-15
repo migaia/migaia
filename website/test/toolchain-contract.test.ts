@@ -713,7 +713,7 @@ test('SITE-T-LIFECYCLE-GUIDES protects the primary ownership and sequencing path
     ['generation', 'createGenerationController'],
     ['index', 'createMutationQueue'],
     ['index', 'createSyncLifecycleScope'],
-    ['index', 'createLifecycleUnit'],
+    ['index', 'abortableDelay'],
     ['index', 'createProvisionalScope'],
     ['index', 'boundedWait'],
     ['index', 'createTerminalController']
@@ -756,7 +756,6 @@ test('SITE-T-LIFECYCLE-INFRA documents advanced containment and lease primitives
     ['disposal', 'createSyncStartedDisposalLedger'],
     ['errors', 'containAsyncRejection'],
     ['errors', 'createErrorCollector'],
-    ['quiescence', 'createStringQuiescenceTracker'],
     ['quiescence', 'createObjectLeaseRegistry'],
     ['quiescence', 'createStringLeaseRegistry'],
     ['scheduler', 'snapshotScheduler']

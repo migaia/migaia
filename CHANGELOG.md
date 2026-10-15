@@ -4,6 +4,14 @@
 
 ### Breaking changes
 
+- Lifecycle keeps unused `createLifecycleUnit` and its option/result types internal.
+  Use a generation controller with domain-owned loading state. String-key tracking
+  uses the existing `createStringLeaseRegistry`; its old
+  `createStringQuiescenceTracker` name is internal. `validateSchedulerTime`,
+  `validateSchedulerDelay`, `tagLifecycleError` and `createLifecycleRangeError`
+  are removed from root and leaf exports. Explicit scheduler/error entry modules
+  prevent internal implementation exports from leaking through package subpaths.
+
 - `@migaia/event-subscriber` subscription helpers now have one public owner:
   import `subscribeOnce`, `subscribeUntil` and `subscribeSubscriber` from
   `@migaia/event-subscriber/subscriber`. Their root aliases and channel

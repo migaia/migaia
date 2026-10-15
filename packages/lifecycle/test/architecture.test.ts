@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import * as publicRoot from '../src/index.js'
+import * as publicErrors from '../src/errors-entry.js'
+import * as publicScheduler from '../src/scheduler-entry.js'
+import * as publicQuiescence from '../src/quiescence-tracker.js'
 import {
   createLifecycleScope,
   createGenerationController,
@@ -31,6 +35,29 @@ const readSrcFiles = (): Map<string, string> => {
 }
 
 describe('§5.1 structural gates', () => {
+  it('keeps unused units and implementation helpers behind package exports', () => {
+    for (const name of [
+      'createLifecycleUnit',
+      'validateSchedulerTime',
+      'validateSchedulerDelay',
+      'tagLifecycleError',
+      'createLifecycleRangeError',
+      'createStringQuiescenceTracker'
+    ])
+      expect(name in publicRoot).toBe(false)
+    expect('tagLifecycleError' in publicErrors).toBe(false)
+    expect('createLifecycleRangeError' in publicErrors).toBe(false)
+    expect('validateSchedulerTime' in publicScheduler).toBe(false)
+    expect('validateSchedulerDelay' in publicScheduler).toBe(false)
+    expect('createStringQuiescenceTracker' in publicQuiescence).toBe(false)
+    expect(publicQuiescence.createStringLeaseRegistry).toBeTypeOf('function')
+    expect(publicQuiescence.createObjectLeaseRegistry).toBeTypeOf('function')
+    /** Package maps must reach the explicit public projection rather than every internal export. */
+    const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+    expect(pkg.exports['./errors'].default).toBe('./dist/errors-entry.js')
+    expect(pkg.exports['./scheduler'].default).toBe('./dist/scheduler-entry.js')
+  })
+
   it('package.json declares only the runtime-neutral utils foundation dependency', () => {
     const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
       dependencies?: Record<string, string>
@@ -185,6 +212,9 @@ describe('L-T20 cross-module: a downstream adapter uses only public primitives',
         name === 'error-boundary.ts' ||
         name === 'default-scheduler.ts' ||
         name === 'sync-dispose-transaction.ts' ||
+        name === 'lifecycle-unit.ts' ||
+        name === 'errors.ts' ||
+        name === 'scheduler.ts' ||
         name === 'disposal.ts'
       )
         continue
