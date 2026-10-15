@@ -1,6 +1,6 @@
 import type { IDisposable, IObservable, IObserver, IRuntime } from '../runtime/types.js'
 import type { ICapture } from '../runtime/dependency-tracker.class.js'
-import { internalsOf } from '../runtime/internals.js'
+import { internalsOf, type IRuntimeInternals } from '../runtime/internals.js'
 import { claimOwnership } from '../runtime/ownership.js'
 import { createObserverRunTrace, describeObserver } from '../runtime/diagnostics.js'
 import { registerSubs } from '../runtime/node-internals.js'
@@ -30,6 +30,8 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     return this.#version
   }
   readonly runtime: IRuntime
+  /** Immutable kernel services captured once from this node's owning Runtime. */
+  readonly #internals: IRuntimeInternals
   debugName?: string
   #value!: T
   #dirty = true
@@ -63,6 +65,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     this.debugName = options.debugName
     this.#equals = options.equals ?? Object.is
     this.#keepAlive = options.keepAlive ?? false
+    this.#internals = internalsOf(runtime)
   }
   get disposed(): boolean {
     return this.#disposed
@@ -79,8 +82,8 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     this.#previewDirty = true
     this.#previewValue = undefined as T
     this.#previewCapture = undefined
-    internalsOf(this.runtime).tracker.clearDependencies(this) // 退订上游 + 清 deps/depVersions
-    internalsOf(this.runtime).tracker.disconnectObservable(this, 'dispose')
+    this.#internals.tracker.clearDependencies(this) // 退订上游 + 清 deps/depVersions
+    this.#internals.tracker.disconnectObservable(this, 'dispose')
   }
   markDirty(): void {
     this.#dirtyEpoch++
@@ -104,7 +107,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     this.markDirty()
   }
   get value(): T {
-    internalsOf(this.runtime).tracker.track(this) // computed 亦可被订阅
+    this.#internals.tracker.track(this) // computed 亦可被订阅
     this.pull()
     return this.#value
   }
@@ -120,7 +123,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
   preview(): T {
     if (this.#disposed)
       throw createReactiveError(ReactiveErrorCode.nodeDisposed, ReactiveErrorText.disposedComputed)
-    const version = internalsOf(this.runtime).clock.current()
+    const version = this.#internals.clock.current()
     if (
       this.#previewVersion === version &&
       this.#previewEpoch === this.#dirtyEpoch &&
@@ -135,7 +138,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     this.#computing = true
     let capture: ICapture<T>
     try {
-      capture = internalsOf(this.runtime).tracker.capture(this.#fn)
+      capture = this.#internals.tracker.capture(this.#fn)
     } finally {
       this.#computing = false
     }
@@ -158,11 +161,12 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     if (this.#disposed)
       throw createReactiveError(ReactiveErrorCode.nodeDisposed, ReactiveErrorText.disposedComputed)
     if (!this.#dirty) return
-    const runtime = internalsOf(this.runtime)
+    /** This node always uses its original Runtime services. */
+    const runtime = this.#internals
     const capture = this.#previewCapture
     if (
       capture &&
-      this.#previewVersion === internalsOf(this.runtime).clock.current() &&
+      this.#previewVersion === this.#internals.clock.current() &&
       this.#previewEpoch === this.#dirtyEpoch &&
       !this.#previewDirty &&
       runtime.tracker.commitCapture(this, capture)
@@ -204,7 +208,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     }
     this.#computing = true
     try {
-      return internalsOf(this.runtime).tracker.revalidate(this)
+      return this.#internals.tracker.revalidate(this)
     } finally {
       this.#computing = false
     }
@@ -218,7 +222,8 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
       )
     }
     this.#computing = true
-    const runtime = internalsOf(this.runtime)
+    /** This node always uses its original Runtime services. */
+    const runtime = this.#internals
     const tracing = runtime.traceEnabled()
     const trace = tracing
       ? createObserverRunTrace(describeObserver(this), {
@@ -261,7 +266,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     // 走 runtime 的 idle 通道而不是裸 queueMicrotask：写死之后这条回收路径不受
     // 任何配置控制。刻意不复用 flush 策略——同步 flush 是合法配置，若共用，
     // 一次读完就立刻断上游边，同 tick 内第二次读会白算一遍。
-    internalsOf(this.runtime).deferIdle(() => {
+    this.#internals.deferIdle(() => {
       if (generation === this.#suspensionGeneration && this.subs.size === 0) {
         this.#suspend()
       }
@@ -271,7 +276,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     if (this.#keepAlive || this.#disposed || this.subs.size > 0) return
     this.#suspensionGeneration++
     // Keep the version snapshot so the next read can reuse the cache when no dependency changed.
-    internalsOf(this.runtime).tracker.suspendDependencies(this)
+    this.#internals.tracker.suspendDependencies(this)
     this.#dirty = true
   }
 }

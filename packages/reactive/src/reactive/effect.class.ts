@@ -6,7 +6,7 @@ import type {
   IReactiveNodeOptions,
   IRuntime
 } from '../runtime/types.js'
-import { internalsOf } from '../runtime/internals.js'
+import { internalsOf, type IRuntimeInternals } from '../runtime/internals.js'
 import { claimOwnership } from '../runtime/ownership.js'
 import { createObserverRunTrace, describeObserver } from '../runtime/diagnostics.js'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
@@ -23,6 +23,8 @@ export class Effect implements IObserver, IDisposable {
   readonly deps: ReadonlySet<IObservable>
   readonly depVersions: ReadonlyMap<IObservable, number>
   readonly runtime: IRuntime
+  /** Immutable kernel services captured once from this node's owning Runtime. */
+  readonly #internals: IRuntimeInternals
   debugName?: string
   #cleanup: void | IDisposer = undefined
   #disposed = false
@@ -36,13 +38,14 @@ export class Effect implements IObserver, IDisposable {
     // 归属登记走唯一那张表，不再靠字段名让下游去猜
     claimOwnership(this, runtime)
     this.debugName = options.debugName
+    this.#internals = internalsOf(runtime)
     this.run()
   }
   get disposed(): boolean {
     return this.#disposed
   }
   markDirty(): void {
-    internalsOf(this.runtime).scheduler.enqueue(this)
+    this.#internals.scheduler.enqueue(this)
   }
   tick(): void {
     // 冲刷时调用：仅当依赖真变才重跑
@@ -52,11 +55,11 @@ export class Effect implements IObserver, IDisposable {
       this.run()
       return
     }
-    if (internalsOf(this.runtime).tracker.hasStaleDependencies(this)) this.run()
+    if (this.#internals.tracker.hasStaleDependencies(this)) this.run()
   }
   onDependencyDisconnected(): void {
     this.#forceRun = true
-    internalsOf(this.runtime).scheduler.enqueue(this)
+    this.#internals.scheduler.enqueue(this)
   }
   /**
    * Runs cleanup and the effect body as one terminal-aware transaction. Cleanup may synchronously
@@ -64,7 +67,8 @@ export class Effect implements IObserver, IDisposable {
    */
   run(): void {
     if (this.#disposed) return
-    const runtime = internalsOf(this.runtime)
+    /** This node always uses its original Runtime services. */
+    const runtime = this.#internals
     const tracing = runtime.traceEnabled()
     const trace = tracing
       ? createObserverRunTrace(describeObserver(this), {
@@ -134,7 +138,7 @@ export class Effect implements IObserver, IDisposable {
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
-    internalsOf(this.runtime).tracker.clearDependencies(this)
+    this.#internals.tracker.clearDependencies(this)
     const previousCleanup = this.#cleanup
     this.#cleanup = undefined
     try {
@@ -143,7 +147,7 @@ export class Effect implements IObserver, IDisposable {
         this.#assertSynchronousResult(cleanupResult, 'effect cleanup')
       }
     } finally {
-      internalsOf(this.runtime).scheduler.dequeue(this)
+      this.#internals.scheduler.dequeue(this)
     }
   }
 }

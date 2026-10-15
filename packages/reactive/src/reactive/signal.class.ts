@@ -5,7 +5,7 @@ import type {
   IReactiveNodeOptions,
   IRuntime
 } from '../runtime/types.js'
-import { internalsOf } from '../runtime/internals.js'
+import { internalsOf, type IRuntimeInternals } from '../runtime/internals.js'
 import { claimOwnership } from '../runtime/ownership.js'
 import { describeObservable, emitTraceSafely } from '../runtime/diagnostics.js'
 import { registerSubs } from '../runtime/node-internals.js'
@@ -39,6 +39,8 @@ export class Signal<T> implements IObservable, IDisposable {
     return this.#composeHooks(this.#unobservedHooks)
   }
   readonly runtime: IRuntime
+  /** Immutable kernel services captured once from this node's owning Runtime. */
+  readonly #internals: IRuntimeInternals
   debugName?: string
   #value: T
   #disposed = false
@@ -49,7 +51,8 @@ export class Signal<T> implements IObservable, IDisposable {
     claimOwnership(this, runtime)
     this.debugName = options.debugName
     this.#value = v
-    this.#version = internalsOf(runtime).clock.next()
+    this.#internals = internalsOf(runtime)
+    this.#version = this.#internals.clock.next()
   }
   get disposed(): boolean {
     return this.#disposed
@@ -64,7 +67,7 @@ export class Signal<T> implements IObservable, IDisposable {
   }
   get value(): T {
     this.#assertActive()
-    internalsOf(this.runtime).tracker.track(this)
+    this.#internals.tracker.track(this)
     return this.#value
   }
   set value(next: T) {
@@ -72,7 +75,8 @@ export class Signal<T> implements IObservable, IDisposable {
     if (Object.is(next, this.#value)) return // 相等短路，杜绝无效触发
     // 先领取版本，再提交值。时钟耗尽时赋值必须保持原子失败，不能留下
     // “值已变、version 未变、下游未通知”的永久陈旧状态。
-    const runtime = internalsOf(this.runtime)
+    /** This node always uses its original Runtime services. */
+    const runtime = this.#internals
     const nextVersion = runtime.clock.next()
     this.#value = next
     this.#version = nextVersion
@@ -119,7 +123,7 @@ export class Signal<T> implements IObservable, IDisposable {
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
-    internalsOf(this.runtime).tracker.disconnectObservable(this, 'dispose')
+    this.#internals.tracker.disconnectObservable(this, 'dispose')
   }
 
   /** Compose an owner lifecycle callback without silently replacing one. */
