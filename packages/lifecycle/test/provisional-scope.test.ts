@@ -183,8 +183,12 @@ describe('L-T12 ProvisionalScope: rollback/abort/expiry', () => {
     const admissionError = new Error('rollback descriptor admission failed')
     const released: string[] = []
     const hostile = { force: vi.fn() } as Record<string, unknown>
+    /** Own() validates the shape on the first read; rollback's admission read then fails. */
+    let gracefulReads = 0
     Object.defineProperty(hostile, 'graceful', {
       get: () => {
+        gracefulReads += 1
+        if (gracefulReads === 1) return undefined
         throw admissionError
       }
     })
