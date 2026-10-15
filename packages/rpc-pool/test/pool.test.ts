@@ -1,3 +1,4 @@
+import { createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IRuntimePeer } from '@migaia/rpc-core/remote'
 import { createThreadPool } from '../dist/index.js'
@@ -474,5 +475,91 @@ describe('public pool scheduling', () => {
     expect(throwConsumer).toHaveBeenCalledTimes(1)
     expect(blockedFixture.members[0]!.close).toHaveBeenCalledTimes(1)
     expect(blocked.stats()).toMatchObject({ inFlight: 0, queued: 0, state: 'closed' })
+  })
+})
+
+describe('SD-T03 pool scheduler ownership', () => {
+  it('captures the idle clock once, unrefs its tasks and cancels them on reserve/close', async () => {
+    /** The existing public factory port keeps native Peer ownership observable. */
+    const { members } = installFactory()
+    /** Virtual time owns every idle deadline without replacing the scheduling algorithm. */
+    const clock = createManualScheduler()
+    /** Each acquired timer requests the optional host liveness hint. */
+    const unref = vi.fn()
+    /** Cancellation counts actual task releases, not repeated owner checks. */
+    let cancels = 0
+    /** Option admission must not reread a changing scheduler getter. */
+    let reads = 0
+    /** The same real heap backs the test's observable task handles. */
+    const scheduler = {
+      now: clock.now,
+      schedule(callback: () => void, delay: number) {
+        /** This one handle remains owned until reservation or close cancels it. */
+        const task = clock.schedule(callback, delay)
+        return {
+          cancel() {
+            cancels++
+            task.cancel()
+          },
+          unref
+        }
+      }
+    }
+    /** Getter admission happens before the original Peer factory acquires anything. */
+    const pool = await createThreadPool<IFixtureApi>({
+      size: 1,
+      spawn,
+      idleTimeoutMs: 10,
+      get scheduler() {
+        reads++
+        return scheduler
+      }
+    })
+    expect(reads).toBe(1)
+    expect(clock.pendingCount).toBe(1)
+    expect(unref).toHaveBeenCalledTimes(1)
+    expect(await pool.request('echo', 7)).toBe(7)
+    expect(cancels).toBe(1)
+    expect(unref).toHaveBeenCalledTimes(2)
+    clock.advance(9)
+    expect(members[0]!.close).not.toHaveBeenCalled()
+    await pool.close()
+    expect(cancels).toBe(2)
+    expect(clock.pendingCount).toBe(0)
+    expect(members[0]!.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('expires idle members only when the injected scheduler advances', async () => {
+    /** Retirement still closes exactly the original public Peer. */
+    const { members } = installFactory()
+    /** No native timer is needed for pool retirement. */
+    const scheduler = createManualScheduler()
+    /** The actual public pool retains its configured target after idle retirement. */
+    const pool = await createThreadPool({ size: 1, spawn, idleTimeoutMs: 10, scheduler })
+    scheduler.advance(10)
+    await vi.waitFor(() => expect(members[0]!.close).toHaveBeenCalledTimes(1))
+    expect(pool.stats().memberCount).toBe(0)
+    expect(scheduler.pendingCount).toBe(0)
+    await pool.close()
+    expect(members[0]!.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves a failed scheduler getter before any native factory starts', async () => {
+    /** Input failure remains the exact cause, without replacing it during admission. */
+    const cause = new Error('pool scheduler getter failed')
+    await expect(
+      createThreadPool({
+        size: 1,
+        spawn,
+        get scheduler(): IScheduler {
+          throw cause
+        }
+      })
+    ).rejects.toMatchObject({
+      source: '@migaia/lifecycle',
+      code: 'INVALID_OPTION',
+      cause
+    })
+    expect(factories.thread).not.toHaveBeenCalled()
   })
 })

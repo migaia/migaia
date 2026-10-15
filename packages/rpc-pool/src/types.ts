@@ -1,3 +1,4 @@
+import type { IScheduler } from '@migaia/utils/scheduler'
 import type { createProcessPeer, IRuntimeProcessPeerOptions } from '@migaia/rpc-process'
 import type { createThreadPeer, IRuntimeThreadPeerOptions } from '@migaia/rpc-threads'
 import type { RpcPoolState } from './text.js'
@@ -37,6 +38,8 @@ export type IRpcPoolOptions = Readonly<{
   size: number
   maxQueue?: number
   idleTimeoutMs?: number
+  /** Controls only pool idle retirement; native Peer lifetimes keep their own source policy. */
+  scheduler?: IScheduler
 }>
 
 /** Every Thread member receives this exact original source value. */

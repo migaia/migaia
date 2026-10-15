@@ -58,3 +58,7 @@ try {
 idleTimeoutMs 必须为有限正数且不超过 2147483647 毫秒，避免原生 timer 溢出变成立即回收。非法 size/maxQueue/idleTimeoutMs 在创建前以 TypeError/RangeError+INVALID_OPTIONS 拒绝。部分启动失败保留原 primary 并关闭本批已取得 Peer；secondary cleanup 报告。close 汇总原失败在 AggregateError.errors/cause，不只保留 code。source 与完整代码列表见 README。
 
 支持环境继承原工厂。当前文档执行使用 Node 24 的真实 Process/Worker；Bun、Deno、浏览器线程仍受原入口、权限与 native lifetime 限制，不把 Node 文档结果当作其他运行时验证。
+
+### Idle clock injection
+
+Pass a host or manual scheduler in the common options of createThreadPool/createProcessPool. The option and scheduler methods are captured before invoking a native Peer factory. Advancing a manual clock drives idle expiry; reserving a member and closing the pool remove their previous tasks. Task unref is a liveness hint, not a change to timeout duration. Native Peer methods and close results retain their original ownership and identity. This option does not replace a member's own supervision scheduler.

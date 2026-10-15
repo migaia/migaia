@@ -3938,10 +3938,12 @@ if (await isThreadChild()) {
   }),
   'rpc-pool:index:createThreadPool': guide({
     quickStart: `import { createThreadPool } from '@migaia/rpc-pool'
+import { systemScheduler } from '@migaia/utils/scheduler'
 
 const pool = await createThreadPool<{ double(value: number): number }>({
   spawn: new URL('./worker.js', import.meta.url),
-  size: 2
+  size: 2,
+  scheduler: systemScheduler // Owns pool idle timers only.
 })
 try {
   console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))
@@ -3949,9 +3951,9 @@ try {
   await pool.close()
 }`,
     purposeEn:
-      'Creates a bounded pool of Worker Peers using the same spawn options as createThreadPeer. Calls go to the member with the fewest in-flight operations; when every member is busy they wait in a bounded FIFO, and close drains accepted work.',
+      'Creates a bounded pool of Worker Peers using the same spawn options as createThreadPeer. Calls go to the member with the fewest in-flight operations; when every member is busy they wait in a bounded FIFO, and close drains accepted work. The optional scheduler owns idle retirement with task cancellation/unref; native Peer policy stays with each source.',
     purposeZh:
-      '使用与 createThreadPeer 相同的 spawn 选项创建有界的 Worker Peer 池。调用派给在途操作最少的成员；全部繁忙时进入有界 FIFO 等待，close 会排空已接纳的工作。',
+      '使用与 createThreadPeer 相同的 spawn 选项创建有界的 Worker Peer 池。调用派给在途操作最少的成员；全部繁忙时进入有界 FIFO 等待，close 会排空已接纳的工作。可选 scheduler 拥有空闲回收任务及取消/unref，原生 Peer 策略仍由来源负责。',
     useEn: [
       'CPU-bound calls should spread across several Workers.',
       'The number of concurrent Workers and queued calls must be bounded.'
@@ -3971,11 +3973,13 @@ try {
   }),
   'rpc-pool:index:createProcessPool': guide({
     quickStart: `import { createProcessPool } from '@migaia/rpc-pool'
+import { systemScheduler } from '@migaia/utils/scheduler'
 
 const pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({
   spawn: new URL('./service.js', import.meta.url),
   size: 2,
-  maxQueue: 16
+  maxQueue: 16,
+  scheduler: systemScheduler // Native Peer supervision keeps its own source policy.
 })
 try {
   console.log(await pool.request('add', { a: 20, b: 22 }))
@@ -3983,9 +3987,9 @@ try {
   await pool.close()
 }`,
     purposeEn:
-      'Creates a bounded pool of child-process Peers using the same spawn options as createProcessPeer. Dispatch, queueing, resizing and draining match the thread pool, while each member keeps its own process isolation and supervision.',
+      'Creates a bounded pool of child-process Peers using the same spawn options as createProcessPeer. Dispatch, queueing, resizing and draining match the thread pool, while each member keeps its own process isolation and supervision. Pool scheduler injection controls only idle timers.',
     purposeZh:
-      '使用与 createProcessPeer 相同的 spawn 选项创建有界的子进程 Peer 池。派发、排队、扩缩容与排空规则与线程池一致，每个成员保留各自的进程隔离与监督。',
+      '使用与 createProcessPeer 相同的 spawn 选项创建有界的子进程 Peer 池。派发、排队、扩缩容与排空规则与线程池一致，每个成员保留各自的进程隔离与监督；池的 scheduler 注入只控制空闲计时器。',
     useEn: [
       'Work needs process isolation and should run on several children at once.',
       'Crashing members should be restarted by the existing supervisor without the caller rebuilding the pool.'

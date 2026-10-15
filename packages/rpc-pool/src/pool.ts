@@ -1,3 +1,5 @@
+import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
+import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import type { IRuntimePeer } from '@migaia/rpc-core/remote'
 import type { IRpcPoolControls, IRpcPoolOptions } from './types.js'
 import { RpcPoolErrorCode } from './error-code.js'
@@ -25,7 +27,7 @@ type IPoolMember = {
   busy: boolean
   inFlight: boolean
   retiring: boolean
-  idleTimer?: ReturnType<typeof setTimeout>
+  idleTimer?: IScheduledTask
   closing?: Promise<void>
   closed: Promise<void>
   resolveClosed(): void
@@ -77,6 +79,8 @@ export async function createPool(
   options: IRpcPoolOptions,
   createPeer: () => Promise<IPoolPeer>
 ): Promise<IPool> {
+  /** Admit one timer capability before any original Peer factory can acquire resources. */
+  const scheduler = resolveSchedulerOption(options, systemScheduler)
   /** Target capacity survives idle retirement; only explicit resize changes it. */
   let targetSize = options.size
   /** Queue capacity excludes tasks already assigned to a member. */
@@ -108,7 +112,7 @@ export async function createPool(
   }
   /** Clear a member's owned idle timer before assignment, retirement or pool close. */
   const clearIdle = (member: IPoolMember): void => {
-    if (member.idleTimer !== undefined) clearTimeout(member.idleTimer)
+    member.idleTimer?.cancel()
     member.idleTimer = undefined
   }
   /** Close through the original Peer once, retaining original failures for the final aggregate. */
@@ -159,12 +163,13 @@ export async function createPool(
     }
     // Another member's activity must not reset this member's actual idle duration.
     if (member.idleTimer !== undefined) return
-    member.idleTimer = setTimeout(() => {
+    member.idleTimer = scheduler.schedule(() => {
       member.idleTimer = undefined
       if (state === RpcPoolState.open && !member.busy && queue.length === 0)
         // The owned close operation already reports its failure while retaining it for close().
         void retire(member).catch(() => undefined)
     }, options.idleTimeoutMs)
+    member.idleTimer.unref?.()
   }
   /** Choose only empty pool slots; native readiness and terminal errors stay with the Peer. */
   const select = (): IPoolMember | undefined => {

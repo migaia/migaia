@@ -410,6 +410,13 @@ importers:
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
   packages/rpc-pool:
+    dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
     devDependencies:
       '@migaia/rpc-core':
         specifier: workspace:*
