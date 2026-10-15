@@ -82,20 +82,12 @@ function backOffContention(
   return true
 }
 
-/** Keeps waitAsync callback diagnostics from escaping the cross-thread promise boundary. */
+/**
+ * Keeps waitAsync callback diagnostics from escaping the cross-thread promise boundary.
+ * `runtime.reportError` already contains reporter failures, so no fallback sink is needed here.
+ */
 function reportSharedWatchFailure(runtime: IRuntime, error: unknown): void {
-  try {
-    runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
-    return
-  } catch (reporterError) {
-    const hostReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError
-    try {
-      if (hostReportError) hostReportError(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // Diagnostics are best effort; a failing sink must not create another unhandled failure.
-    }
-  }
+  runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
 }
 
 /**
