@@ -33355,11 +33355,31 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit."
+                  "text": "`health.intervalMs` must be finite and greater than zero, so recurring health checks cannot run at a zero interval."
                 },
                 {
                   "type": "paragraph",
-                  "text": "The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor."
+                  "text": "`startupTimeoutMs` may be zero for an immediate one-shot startup deadline."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`restart` selects a supported mode and bounded exponential backoff; unknown modes fail option admission."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`terminalPolicy` selects stay or cooldown; unknown modes fail option admission."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`isolation` accepts required or best-effort; unknown modes fail option admission."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`stop` defines drain, exit and reap phases. Their one-shot budgets may be zero for an immediate deadline."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit. The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor."
                 }
               ]
             }
@@ -33374,7 +33394,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createUnitBudget } from '@migaia/supervision'\nimport { createCoroutineSupervisor } from '@migaia/supervision/coroutine'\n\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 2 })\ntype IEchoPort = { call(value: unknown): Promise<unknown> }\nconst supervisor = createCoroutineSupervisor<IEchoPort>({\n  id: 'echo',\n  budget,\n  spec: {\n    task: async ({ signal, expose, heartbeat }) => {\n      const port = { call: async (value: unknown) => value }\n      expose(port)\n      heartbeat()\n      await new Promise<void>((resolve) => signal.addEventListener('abort', resolve, { once: true }))\n      // Close resources owned by this task before returning.\n    }\n  },\n  ready: (unit) => unit.exposed.then(() => undefined),\n  report: (error) => { console.error(error) }\n})\n\nconst ready = await supervisor.start()\nif (ready.state === 'ready') {\n  const port = await ready.unit.exposed\n  await port.call({ message: 'hello' })\n}\nawait supervisor.dispose()"
+                  "code": "import { createUnitBudget } from '@migaia/supervision'\nimport { createCoroutineSupervisor } from '@migaia/supervision/coroutine'\n\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 2 })\ntype IEchoPort = { call(value: unknown): Promise<unknown> }\nconst supervisor = createCoroutineSupervisor<IEchoPort>({\n  id: 'echo',\n  budget,\n  spec: {\n    task: async ({ signal, expose, heartbeat }) => {\n      const port = { call: async (value: unknown) => value }\n      expose(port)\n      heartbeat()\n      await new Promise<void>((resolve) =>\n        signal.addEventListener('abort', resolve, { once: true })\n      )\n      // Close resources owned by this task before returning.\n    }\n  },\n  ready: (unit) => unit.exposed.then(() => undefined),\n  report: (error) => {\n    console.error(error)\n  }\n})\n\nconst ready = await supervisor.start()\nif (ready.state === 'ready') {\n  const port = await ready.unit.exposed\n  await port.call({ message: 'hello' })\n}\nawait supervisor.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -33417,7 +33437,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createUnitBudget } from '@migaia/supervision'\nimport { createProcessSupervisor, StdinMode, StdoutMode, StderrMode } from '@migaia/supervision/process'\nimport type { IProcessLauncher } from '@migaia/supervision/process'\n\ndeclare const launcher: IProcessLauncher\nconst budget = createUnitBudget({ kind: 'process', maxUnits: 2 })\nconst supervisor = createProcessSupervisor({\n  id: 'service',\n  launcher,\n  budget,\n  spec: {\n    command: '/usr/bin/service',\n    args: [],\n    env: { inherit: [], set: {} },\n    stdio: { stdin: StdinMode.ignore, stdout: StdoutMode.drain, stderr: StderrMode.drain }\n  },\n  report: (error) => { console.error(error) }\n})\n\nconst outcome = await supervisor.start()\nif (outcome.state === 'ready') {\n  // Use the adapter-owned channel carried by outcome.unit.\n}\nawait supervisor.dispose()"
+                  "code": "import { createUnitBudget } from '@migaia/supervision'\nimport {\n  createProcessSupervisor,\n  StdinMode,\n  StdoutMode,\n  StderrMode\n} from '@migaia/supervision/process'\nimport type { IProcessLauncher } from '@migaia/supervision/process'\n\ndeclare const launcher: IProcessLauncher\nconst budget = createUnitBudget({ kind: 'process', maxUnits: 2 })\nconst supervisor = createProcessSupervisor({\n  id: 'service',\n  launcher,\n  budget,\n  spec: {\n    command: '/usr/bin/service',\n    args: [],\n    env: { inherit: [], set: {} },\n    stdio: { stdin: StdinMode.ignore, stdout: StdoutMode.drain, stderr: StderrMode.drain }\n  },\n  report: (error) => {\n    console.error(error)\n  }\n})\n\nconst outcome = await supervisor.start()\nif (outcome.state === 'ready') {\n  // Use the adapter-owned channel carried by outcome.unit.\n}\nawait supervisor.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -33460,7 +33480,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createUnitBudget } from '@migaia/supervision'\nimport { createThreadSupervisor, ThreadUnitKind } from '@migaia/supervision/threads'\nimport type { IThreadLauncher } from '@migaia/supervision/threads'\n\ndeclare const launcher: IThreadLauncher\nconst budget = createUnitBudget({ kind: ThreadUnitKind.thread, maxUnits: 2 })\nconst supervisor = createThreadSupervisor({\n  id: 'compute',\n  launcher,\n  budget,\n  spec: { entry: './compute-thread.js', limits: { heapBytes: 32 * 1024 * 1024 } },\n  report: (error) => { console.error(error) }\n})\n\nconst outcome = await supervisor.start()\nif (outcome.state === 'ready') {\n  // Use the adapter-owned channel associated with outcome.unit.\n}\nawait supervisor.dispose()"
+                  "code": "import { createUnitBudget } from '@migaia/supervision'\nimport { createThreadSupervisor, ThreadUnitKind } from '@migaia/supervision/threads'\nimport type { IThreadLauncher } from '@migaia/supervision/threads'\n\ndeclare const launcher: IThreadLauncher\nconst budget = createUnitBudget({ kind: ThreadUnitKind.thread, maxUnits: 2 })\nconst supervisor = createThreadSupervisor({\n  id: 'compute',\n  launcher,\n  budget,\n  spec: { entry: './compute-thread.js', limits: { heapBytes: 32 * 1024 * 1024 } },\n  report: (error) => {\n    console.error(error)\n  }\n})\n\nconst outcome = await supervisor.start()\nif (outcome.state === 'ready') {\n  // Use the adapter-owned channel associated with outcome.unit.\n}\nawait supervisor.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -33476,11 +33496,31 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit."
+                  "text": "`health.intervalMs` must be finite and greater than zero, so recurring health checks cannot run at a zero interval."
                 },
                 {
                   "type": "paragraph",
-                  "text": "The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor."
+                  "text": "`startupTimeoutMs` may be zero for an immediate one-shot startup deadline."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`restart` selects a supported mode and bounded exponential backoff; unknown modes fail option admission."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`terminalPolicy` selects stay or cooldown; unknown modes fail option admission."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`isolation` accepts required or best-effort; unknown modes fail option admission."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`stop` defines drain, exit and reap phases. Their one-shot budgets may be zero for an immediate deadline."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit. The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor."
                 }
               ]
             }
