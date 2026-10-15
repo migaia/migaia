@@ -110,7 +110,7 @@ else {
 
 自派生不支持 REPL、eval、Electron、测试运行器及无可用主模块的单文件可执行程序；传精确 URL 或 `{ command, args }`。Deno 默认用 `run` 与 bootstrap 的 env 权限；额外权限通过显式 command/args 提供。
 
-短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值；`wrap` 可包装计算出的启动命令。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。省略 `report` 使用 `console.error`；默认终止能力提示每进程只报一次，`onNotice` 接收原提示对象。完整来源不改变现有行为。
+短对象的 `args`、`cwd`、`env`、`stdio`、`limits`、`permissions`、`supervision` 可以覆盖默认值；`wrap` 可包装计算出的启动命令。默认每源创建一个 process budget、随机 stdin token、byte channel 与 best-effort supervisor。未配置 `report` 时复用默认控制台出口，并按进程合并预期终止能力通知；配置 `report` 后对每次启动都调用该函数，直接传默认函数与转发包装函数一视同仁。若设置短对象 `onNotice`，该 callback 收到原始通知并替代本项 reporter 调用。完整来源保持原有报告语义。
 
 ### Running the child in an external sandbox
 
@@ -547,5 +547,3 @@ try { console.log(channel.peerId) } finally { await channel.close() }
 **怎样传大文件？**
 单条消息受帧上限约束。用 `stream` 分块传输，或者把文件路径传过去，由对端自己读取。
 
-
-Explicit reporting policy: omitting `report` keeps the short-source default termination notice once per native process. Supplying any `report` function receives every notice, including `defaultRpcReporter` itself; wrapping the same function does not change this policy. `onNotice` receives each expected termination notice instead of the reporter when supplied. Other failures are always reported. No policy depends on function identity.
