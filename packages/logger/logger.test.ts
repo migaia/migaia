@@ -11,7 +11,8 @@ import { uuid } from './src/plugins/uuid'
 import { setLoggerRuntimeManager } from './src/runtime-manager'
 import { LoggerErrorCode } from './src/errors'
 import type { ILogEntry, ILoggerPlugin, ILoggerPluginCore } from './src/typing'
-import { definePlugin, GENERATOR_CONTINUE } from '@migaia/plugin-host'
+import { GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'
+import { definePlugin } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 
 describe('logger plugin host integration', () => {

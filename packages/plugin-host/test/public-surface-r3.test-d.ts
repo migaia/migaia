@@ -7,10 +7,10 @@ import type { ISyncPipelineStage } from '../src/index.js'
 import { adaptSyncStageToAsync } from '../src/index.js'
 import {
   MiddlewarePipelineMode,
-  PluginHostErrorCode,
   type IMiddlewarePipelineMode,
   type ISyncMiddlewareStage
-} from '../src/index.js'
+} from '@migaia/middleware-pipeline'
+import { PluginHostErrorCode } from '../src/index.js'
 
 const mode: IMiddlewarePipelineMode = MiddlewarePipelineMode.sync
 const stage: ISyncMiddlewareStage<number> = (value, next) => next(value + 1)

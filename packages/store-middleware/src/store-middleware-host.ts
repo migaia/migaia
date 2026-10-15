@@ -1,7 +1,7 @@
+import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import {
   defineHost,
   type IHostHandle,
-  MiddlewarePipelineMode,
   type IPlugin,
   type IPluginHostOptions
 } from '@migaia/plugin-host'

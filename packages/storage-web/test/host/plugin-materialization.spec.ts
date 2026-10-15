@@ -1,4 +1,3 @@
-import { invokeCaptured } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { snapshotKeyValueStoreDetailed } from '@migaia/storage-contract'
 import { describe, expect, it } from 'vitest'
@@ -480,7 +479,7 @@ describe('SWV4-B02 R03 PluginHost materialization', () => {
     const directAdmission = snapshotKeyValueStoreDetailed(direct.store)
     expect(directAdmission.valid).toBe(true)
     if (directAdmission.valid)
-      await invokeCaptured(directAdmission.dispose, directAdmission.receiver, [])
+      await Reflect.apply(directAdmission.dispose, directAdmission.receiver, [])
     expect(direct.counts.getterReads).toBe(1)
     expect(direct.counts.calls).toBe(1)
 

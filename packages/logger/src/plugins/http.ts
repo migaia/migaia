@@ -6,7 +6,8 @@ import {
   type IBatchController,
   type IBatchShared
 } from './batch.js'
-import { defineFeature, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
+import { type IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+import { defineFeature } from '@migaia/plugin-host'
 import { getLoggerRuntimeManager } from '../runtime-manager.js'
 import {
   createLoggerAggregateError,

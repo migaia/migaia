@@ -3539,27 +3539,6 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       })
     ])
   ),
-  'plugin-host:index:invokeCaptured': guide({
-    purposeEn:
-      'Invokes a previously admitted callable with its captured receiver and argument list while preserving receiver behavior, argument order, return identity, and the exact thrown error.',
-    purposeZh:
-      '使用此前捕获的 receiver 与参数列表调用已准入函数，并保持 receiver 行为、参数顺序、返回值身份和原始抛出错误不变。',
-    quickStart:
-      "import { invokeCaptured } from '@migaia/plugin-host'\n\nconst counter = { value: 1, add(step: number) { this.value += step; return this.value } }\nconst result = invokeCaptured<number>(counter.add, counter, [2])\nconsole.log(result, counter.value) // 3 3：receiver 和参数都被保留，调用结果可直接用于后续业务判断。",
-    scenariosEn: [
-      'A plugin callback was validated and captured before queued execution.',
-      'The JavaScript receiver must remain identical without rebinding the public function.'
-    ],
-    scenariosZh: [
-      '插件 callback 已在进入执行队列前完成校验和捕获。',
-      '需要保持 JavaScript receiver 身份，同时不能改写公开函数。'
-    ],
-    avoidEn: [
-      'A normal direct function or method call is available.',
-      'Do not pass an unvalidated arbitrary callable from untrusted input.'
-    ],
-    avoidZh: ['可以直接调用普通函数或方法。', '不要传入来自不可信输入且尚未校验的任意 callable。']
-  }),
   'plugin-host:index:createRegistrationView': guide({
     purposeEn:
       'Publishes a frozen extension-only view for the exact live registration identified by a receipt. It rejects unknown, revoked, uninstalled, or disposing registrations instead of exposing Host internals or another plugin generation.',

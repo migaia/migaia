@@ -29,7 +29,7 @@ import {
   registerPluginHostStage
 } from './pipeline-runtime.js'
 import { assertRequiredTimeoutOption, assertTimeoutOption } from './host-options.js'
-import { asyncDisposeKey } from './disposal.js'
+import { asyncDisposeKey } from './symbols.js'
 import {
   createMutationQueue,
   createAbortController,

@@ -1,8 +1,11 @@
 import type {
   IAsyncGeneratorMiddlewareStage,
   IAsyncMiddlewareStage,
-  IFeatureRecord,
   IGeneratorMiddlewareStage,
+  IMiddlewarePipelineMode
+} from '@migaia/middleware-pipeline'
+import type {
+  IFeatureRecord,
   IMergePluginExts,
   IPlugin,
   IPluginConfig,
@@ -10,8 +13,7 @@ import type {
   IPluginHostOptions,
   IPluginHostDisposalResult,
   IPluginHandleTuple,
-  IPipelineConfig,
-  IMiddlewarePipelineMode
+  IPipelineConfig
 } from '@migaia/plugin-host'
 import type { IScheduler } from '@migaia/utils/scheduler'
 

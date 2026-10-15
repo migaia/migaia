@@ -28915,7 +28915,7 @@ export function createSupportingContractGuide(
   const isErrorCode = symbol.name.endsWith('ErrorCode')
   const isErrorText = symbol.name.endsWith('ErrorText')
   const isPluginName = symbol.name.endsWith('_PLUGIN_NAME')
-  const isDisposalKey = symbol.name === 'disposeKey' || symbol.name === 'asyncDisposeKey'
+  const isDisposalKey = symbol.name === 'asyncDisposeKey'
   const isSentinel =
     symbol.name.startsWith('GENERATOR_') ||
     symbol.name.endsWith('_BRAND') ||

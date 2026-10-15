@@ -16,7 +16,7 @@ pnpm add @migaia/plugin-host
 
 包公开根入口 `@migaia/plugin-host`，另有稳定的 `@migaia/plugin-host/composition` 子路径。根入口
 提供 `PluginHost`、插件/配置/pipeline 类型、状态常量、错误码与错误类、
-`GENERATOR_*` 信号量与 dispose symbol；composition 子路径提供 opaque
+`asyncDisposeKey`；管线 API 从 `@migaia/middleware-pipeline` 导入；composition 子路径提供 opaque
 `IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist`
 内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。托管组合 owner 可使用该子路径的 `openComposition()` 协议。
 
@@ -171,11 +171,11 @@ import type { IPlugin, IPluginConfig, IPluginDisposer, IPluginResource } from '@
 - `features?: Record<string, IFeature>`（可选）—— 声明实例能力；消费者通过 provider 定义的 `getFeature()` 引用建立依赖。
 - `update?: (next, core) => void | Promise<void>`（可选）—— 响应 `config.update`；`next` 是候选完整配置的只读视图，成功返回才提交。
 - `dispose?: () => void | Promise<void>`（可选）—— 插件级清理。
-- `[Symbol.dispose]?: () => void` / `[Symbol.asyncDispose]?: () => void | Promise<void>`（可选）—— 未声明 `dispose` 时的清理兜底，也接受本包导出的 `disposeKey`/`asyncDisposeKey`。
+- `[Symbol.dispose]?: () => void` / `[Symbol.asyncDispose]?: () => void | Promise<void>`（可选）—— 未声明 `dispose` 时的清理兜底，异步资源也接受本包导出的 `asyncDisposeKey`。
 
 `readPluginDependencies(pluginOrAdmission)` 从 Feature 引用读取 `{ provider, required }` 列表，包含本地 Feature 的完整依赖闭包，按首次引用排序，同一 provider 的必需引用优先。它接受 `definePlugin` 结果、有效原始描述符和 composition admission；admission 形式直接读取已捕获的定义，不再调用 getter，其他输入经标准 admission 快照读取一次。读取不会执行 setup、install 或 Feature 工厂，非法输入保留 admission 的原生错误。根入口也导出 `IPluginDependency`、`IPluginFeatureName` 和 `IPluginFeatureOutput`；`getFeature()` 引用类型保留 provider 的名称字面量。
 
-`install()` 返回值只有**可枚举的 data property** 会通过 `handle.extensions` 发布；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。**保留键不能作为 extension key**：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、本包的 `disposeKey`/`asyncDisposeKey`（及宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`，若存在），命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object.prototype` 成员（如 `toString`）冲突抛 `EXTENSION_OBJECT_PROTOTYPE`。`catch`、`finally` 可以正常使用。
+`install()` 返回值只有**可枚举的 data property** 会通过 `handle.extensions` 发布；非枚举 key 会被有意忽略并经 `diagnostic` 上报（`EXTENSION_NON_ENUMERABLE_IGNORED`）；getter/setter 形式的属性直接抛 `TypeError`。**保留键不能作为 extension key**：`then`（否则 `await host.use(plugin)` 会把返回值误当成 thenable 解包）、`asyncDisposeKey` 和可用的原生 `Symbol.dispose`/`Symbol.asyncDispose`，命中会抛 `EXTENSION_RESERVED`；与 Host 上已有属性冲突抛 `EXTENSION_DUPLICATE`；与 `Object.prototype` 成员（如 `toString`）冲突抛 `EXTENSION_OBJECT_PROTOTYPE`。`catch`、`finally` 可以正常使用。
 
 **插件 core**（安装时 `install(core)`/`update(next, core)` 拿到的对象）在子类领域方法之上叠加：
 
@@ -246,7 +246,10 @@ host.usePipeline((value, next) => next(value.trim()))
 **`async-generator`｜10 秒上手**：
 
 ```ts doc-test=check
-import { GENERATOR_CONTINUE, PluginHost } from '@migaia/plugin-host'
+import {
+  GENERATOR_CONTINUE
+} from '@migaia/middleware-pipeline'
+import { PluginHost } from '@migaia/plugin-host'
 
 class Host extends PluginHost<Record<string, never>, string> {}
 
@@ -288,14 +291,16 @@ Host 侧注册 stage 后，应由子类在自己的领域入口里调用受保�
 
 ```ts doc-test=check
 import {
+  MiddlewarePipelineMode,
+  MiddlewarePipelineViolation
+} from '@migaia/middleware-pipeline'
+import {
   PluginHostError,
   ERROR_TEXT,
   PluginHostErrorCode,
   type IPluginHostErrorCode,
   PluginHostStatus,
-  PluginHostRegistrationLifecycle,
-  MiddlewarePipelineMode,
-  MiddlewarePipelineViolation
+  PluginHostRegistrationLifecycle
 } from '@migaia/plugin-host'
 ```
 
@@ -307,9 +312,9 @@ import {
 
 - **`ERROR_TEXT`**（根入口的命名导出）：本包稳定的英文错误文案表，主要供内部构造错误消息使用；对外暴露是为了让下游包在自定义 `diagnostic` 回调里复用同一套措辞，一般无需直接调用。
 - **`PluginHostStatus`**：`{ active, closing, disposed }`——Host 的三态生命周期，`closing` 是 `dispose()` 已开始、尚未收敛的窗口。
-- **`MiddlewarePipelineMode`**：从 `@migaia/middleware-pipeline` 原名转发的模式常量；`host.pipelineMode` 返回其中之一。
+- **`MiddlewarePipelineMode`**：由 `@migaia/middleware-pipeline` 定义的模式常量；`host.pipelineMode` 返回其中之一。
 - **`PluginHostRegistrationLifecycle`**：`{ idle, install, dispose }`——单个插件注册记录当前所处的阶段，决定 `onDispose()`/pipeline 注册是否合法（只在 `install` 阶段允许）。一般只在自定义诊断/调试时需要引用。
-- **`MiddlewarePipelineViolation`**：从 `@migaia/middleware-pipeline` 原名转发的 `next()` 违规分类。
+- **`MiddlewarePipelineViolation`**：由 `@migaia/middleware-pipeline` 定义的 `next()` 违规分类。
 
 ---
 
@@ -328,16 +333,19 @@ import {
   type IAsyncGeneratorMiddlewareStage,
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
-  GENERATOR_UNDEFINED,
-  disposeKey,
+  GENERATOR_UNDEFINED
+} from '@migaia/middleware-pipeline'
+import {
   asyncDisposeKey
 } from '@migaia/plugin-host'
 ```
 
-mode、violation 与四种 stage 类型均从 `@migaia/middleware-pipeline` **原名转发**，没有 plugin-host 自己的重复声明。Host 在 stage 注册时使用其唯一的 `createPipeline` runner 提升到宿主 mode；需要手工提升或执行时直接使用 middleware-pipeline 的 `createPipeline`。
+管线 mode、violation、stage 类型与 generator 信号直接从 `@migaia/middleware-pipeline` 导入。Host 使用其唯一的 `createPipeline` runner 执行和提升 stage。
 
-- **`GENERATOR_CONTINUE`/`GENERATOR_HALT`/`GENERATOR_UNDEFINED`** —— generator pipeline 专用的哨兵值（`unique symbol`，直接从 `@migaia/middleware-pipeline` 转发，保持跨包同一身份）：generator stage 的 `return` 可以返回它们中的一个来表达"继续/终止/显式 undefined"，语义见上方 [Pipeline 处理管线](#pipeline-处理管线) 表格。
-- **`disposeKey`/`asyncDisposeKey`** —— 本包自声明的 `unique symbol`（不依赖 `ESNext.Disposable` lib），语义等价于宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`。插件/资源可以用这两个 key 之一声明清理方法，运行时会把自声明 symbol 与宿主真实 symbol（若存在）都识别为等价键。
+使用这些管线 API 时，将 `@migaia/middleware-pipeline` 声明为应用的直接依赖。
+
+- **`GENERATOR_CONTINUE`/`GENERATOR_HALT`/`GENERATOR_UNDEFINED`** —— generator pipeline 专用的哨兵值（`unique symbol`，从 `@migaia/middleware-pipeline` 导入）：generator stage 的 `return` 可以返回它们中的一个来表达"继续/终止/显式 undefined"，语义见上方 [Pipeline 处理管线](#pipeline-处理管线) 表格。
+- **`asyncDisposeKey`** —— 宿主提供 `Symbol.asyncDispose` 时使用该原生键，否则使用包内 fallback。同步资源使用原生 `Symbol.dispose` 或普通清理函数。
 
 ---
 
@@ -492,7 +500,10 @@ try {
 ### 5. generator pipeline：用 `GENERATOR_HALT` 提前截断处理链
 
 ```ts doc-test=check
-import { PluginHost, GENERATOR_HALT } from '@migaia/plugin-host'
+import {
+  GENERATOR_HALT
+} from '@migaia/middleware-pipeline'
+import { PluginHost } from '@migaia/plugin-host'
 
 type IEvent = { level: 'info' | 'debug'; message: string }
 
@@ -521,7 +532,10 @@ host.emit({ level: 'debug', message: 'noisy' }) // 被截断，不打印
 ### 6. Async-generator：串行异步处理 + host 中途 dispose 自动止损
 
 ```ts doc-test=check
-import { PluginHost, GENERATOR_CONTINUE } from '@migaia/plugin-host'
+import {
+  GENERATOR_CONTINUE
+} from '@migaia/middleware-pipeline'
+import { PluginHost } from '@migaia/plugin-host'
 
 class FetchHost extends PluginHost<{}, string> {
   protected createPluginDomainCore() {
@@ -555,7 +569,11 @@ const text = await host.run('https://example.com/data')
 ### 7. Async-generator 多 stage 链式处理，复用已有的同步 generator stage
 
 ```ts doc-test=check
-import { PluginHost, GENERATOR_CONTINUE, type IGeneratorMiddlewareStage } from '@migaia/plugin-host'
+import {
+  GENERATOR_CONTINUE,
+  type IGeneratorMiddlewareStage
+} from '@migaia/middleware-pipeline'
+import { PluginHost } from '@migaia/plugin-host'
 
 // 已有的一个同步 generator stage（比如从 generator 模式的 Host 上迁移过来的）
 const trimStage: IGeneratorMiddlewareStage<string> = function* (value) {

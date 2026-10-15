@@ -3,12 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { mergeCleanupResults } from '@migaia/lifecycle'
 import { runInNewContext } from 'node:vm'
 import { createManualScheduler } from '@migaia/utils/scheduler'
-import {
-  defineHost,
-  PluginHost,
-  MiddlewarePipelineMode,
-  type IPluginHostCore
-} from '../src/index.js'
+import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+import { defineHost, PluginHost, type IPluginHostCore } from '../src/index.js'
 import { createView } from '../src/composition-entry.js'
 import { PluginHostErrorCode } from '../src/error-code.js'
 

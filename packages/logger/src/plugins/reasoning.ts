@@ -1,5 +1,6 @@
 import type { IDimFn, ILoggerPluginCore, ILoggerPlugin, IPaintFn } from '../typing.js'
-import { defineFeature, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
+import { type IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+import { defineFeature } from '@migaia/plugin-host'
 import { optionalColorFeature, type IColorShared } from './color.js'
 import { LoggerReasoningPhase } from '../plugin-constants.js'
 

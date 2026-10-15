@@ -52,6 +52,7 @@
   "dependencies": {
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
+    "@migaia/middleware-pipeline": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
     "@migaia/utils": "workspace:^",
     "ansis": "4.3.1"
