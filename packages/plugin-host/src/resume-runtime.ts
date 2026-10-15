@@ -1,4 +1,6 @@
-import type { ICleanupResult } from '@migaia/lifecycle'
+import type { PluginHostEnablementRuntime } from './enablement-runtime.js'
+import type { PluginHostRemovalRuntime } from './removal-runtime.js'
+
 import {
   DependencyAction,
   planResume,
@@ -8,8 +10,8 @@ import { reportDiagnostic } from './diagnostic-report.js'
 import { PluginHostErrorCode } from './error-code.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import type { PluginHostState } from './host-state.js'
-import type { IInstallBatchContext } from './install-runtime.js'
-import type { IInstallEntry, IRegistration } from './registry.js'
+import type { PluginHostInstallRuntime } from './install-runtime.js'
+import type { IRegistration } from './registry.js'
 import type { IPluginHostDiagnostic } from './typing.js'
 
 /** Host authority used to resume suspended registrations after a provider becomes available. */
@@ -18,21 +20,13 @@ type IPluginHostResumeRuntimePort<TDomainCore extends object, TValue> = Readonly
   readonly invokeHook: <T>(invoke: () => T) => T
   readonly state: PluginHostState<TDomainCore, TValue>
   drainLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void>
-  /** Runs the captured hook before a suspended generation is restarted. */
-  runBeforeRelease(
-    registration: IRegistration<TDomainCore, TValue>
-  ): Promise<ICleanupResult> | undefined
-  disposeRegistration(registration: IRegistration<TDomainCore, TValue>): Promise<ICleanupResult>
-  installBatch(entries: readonly IInstallEntry<TDomainCore, TValue>[]): Promise<{
-    readonly installed: readonly IRegistration<TDomainCore, TValue>[]
-    readonly batch: IInstallBatchContext<TDomainCore, TValue>
-  }>
-  activate(registration: IRegistration<TDomainCore, TValue>): Promise<void>
-  disable(registration: IRegistration<TDomainCore, TValue>): void
-  markRemoved(name: string): void
-  forget(name: string): void
-  settle(): void
   readonly diagnostic: IPluginHostDiagnostic
+  /** Existing installation owner keeps activation and candidate construction together. */
+  readonly installation: PluginHostInstallRuntime<TDomainCore, TValue>
+  /** Existing removal owner performs cleanup; the Host adds no forwarding layer. */
+  readonly removal: PluginHostRemovalRuntime<TDomainCore, TValue>
+  /** Existing enablement owner retains disabled-generation bookkeeping. */
+  readonly enablement: PluginHostEnablementRuntime<TDomainCore, TValue>
 }>
 
 /** Executes capability-owned resume plans without making provider installation fail. */
@@ -133,17 +127,19 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
       .map((name) => this.#port.state.registrations.get(name))
       .filter((registration): registration is IRegistration<TDomainCore, TValue> => !!registration)
     for (const registration of [...restarting].reverse()) {
-      const beforeRelease = this.#port.runBeforeRelease(registration)
+      const beforeRelease = this.#port.removal.runBeforeRelease(registration)
       if (beforeRelease) cleanupErrors.push(...(await beforeRelease).cleanupErrors)
       await this.#port.drainLeases(registration)
-      cleanupErrors.push(...(await this.#port.disposeRegistration(registration)).cleanupErrors)
+      cleanupErrors.push(
+        ...(await this.#port.removal.disposeRegistration(registration)).cleanupErrors
+      )
     }
 
     /** Original reinstall failure, unwrapped from the host install wrapper when present. */
     let restartFailure: unknown
     if (restarting.length > 0) {
       try {
-        await this.#port.installBatch(
+        await this.#port.installation.installBatch(
           restarting.map((registration) => ({
             name: registration.name,
             plugin: registration.plugin,
@@ -153,8 +149,9 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
         for (const registration of restarting) {
           const current = this.#port.state.registrations.get(registration.name)
           if (!current) continue
-          if (registration.activated && !current.activated) await this.#port.activate(current)
-          if (!registration.enabled) this.#port.disable(current)
+          if (registration.activated && !current.activated)
+            await this.#port.installation.activate(current)
+          if (!registration.enabled) this.#port.enablement.disable(current)
         }
       } catch (error) {
         restartFailure =
@@ -163,12 +160,12 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
             : error
         for (const registration of restarting)
           if (!this.#port.state.registrations.has(registration.name)) {
-            this.#port.markRemoved(registration.name)
-            this.#port.forget(registration.name)
+            this.#port.state.removedNames.add(registration.name)
+            this.#port.enablement.forget(registration.name)
           }
       }
     }
-    this.#port.settle()
+    this.#port.state.commit()
     if (restartFailure !== undefined) {
       /** Names of the restart set removed together with the failed reinstall batch. */
       const names = restarting.map((registration) => registration.name)

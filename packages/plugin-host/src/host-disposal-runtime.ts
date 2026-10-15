@@ -1,3 +1,4 @@
+import type { PluginHostState } from './host-state.js'
 import { reportDiagnostic } from './diagnostic-report.js'
 import {
   boundedWait,
@@ -23,11 +24,15 @@ type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly pipelineDrainTimeoutMs: number | false
   readonly enqueueTerminal: <T>(task: () => Promise<T>) => Promise<T>
   readonly registrationsInReverse: () => readonly TRegistration[]
-  readonly runBeforeRelease: (registration: TRegistration) => Promise<ICleanupResult> | undefined
-  readonly disposeRegistration: (registration: TRegistration) => Promise<ICleanupResult>
   readonly clearPipelineState: () => void
-  readonly commitRevision: () => void
   readonly diagnostic: IPluginHostDiagnostic
+  /** Terminal coordination advances the same revision owner as all other mutations. */
+  readonly state: Pick<PluginHostState<object, unknown>, 'commit'>
+  /** Opaque registrations need only the existing removal owner's two cleanup operations. */
+  readonly removal: Readonly<{
+    runBeforeRelease(registration: TRegistration): Promise<ICleanupResult> | undefined
+    disposeRegistration(registration: TRegistration): Promise<ICleanupResult>
+  }>
 }>
 
 /** Owns the Host's unique terminal promise and global physical-cleanup orchestration. */
@@ -79,19 +84,19 @@ export class PluginHostDisposalRuntime<TRegistration> {
           )
         )
       for (const registration of this.#port.registrationsInReverse()) {
-        const beforeRelease = this.#port.runBeforeRelease(registration)
+        const beforeRelease = this.#port.removal.runBeforeRelease(registration)
         if (beforeRelease) {
           const result = await beforeRelease
           errors.push(...result.cleanupErrors)
           if (result.physicalCompletion) physical.push(result.physicalCompletion)
         }
-        const result = await this.#port.disposeRegistration(registration)
+        const result = await this.#port.removal.disposeRegistration(registration)
         errors.push(...result.cleanupErrors)
         if (result.physicalCompletion) physical.push(result.physicalCompletion)
       }
       this.#port.clearPipelineState()
       this.#port.terminal.forceTerminal()
-      this.#port.commitRevision()
+      this.#port.state.commit()
       for (const error of errors) {
         reportDiagnostic(
           this.#port.diagnostic,

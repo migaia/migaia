@@ -1,3 +1,4 @@
+import type { PluginHostOperationRuntime } from './operation-runtime.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IAbortController } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'
@@ -12,12 +13,9 @@ export type IPluginSetupPort = Readonly<{
   readonly executionSignal: IAbortSignal
   readonly scheduler: IScheduler
   readonly setSetupPending: (registration: IRegistration<any, any> | undefined) => void
-  readonly awaitOperation: <T>(
-    result: T | PromiseLike<T>,
-    registration: IRegistration<any, any>
-  ) => Promise<T>
-  readonly assertOperationCurrent: (registration: IRegistration<any, any>) => void
   readonly diagnostic: IPluginHostDiagnostic
+  /** Setup shares the installation's generation owner instead of copying unbound methods. */
+  readonly operations: Pick<PluginHostOperationRuntime, 'await' | 'assertCurrent'>
 }>
 
 /** Exact attempt lifetime retained by contexts that may outlive the registration. */

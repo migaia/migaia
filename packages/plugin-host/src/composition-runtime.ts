@@ -1,3 +1,5 @@
+import { preflightPluginDefinitions } from './admission-runtime.js'
+import type { PluginHostRemovalRuntime } from './removal-runtime.js'
 import { boundedWait, mergeCleanupResults, type ICleanupResult } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
@@ -18,8 +20,7 @@ import {
   registerAdmissionDefinition,
   registerPreparedAdmissions,
   registerPreparedRemoval,
-  resolveAdmissionDefinitions,
-  type IDataOrderSlotState
+  resolveAdmissionDefinitions
 } from './composition.js'
 import ERROR_TEXT, {
   PluginHostError,
@@ -30,8 +31,8 @@ import { PluginHostErrorCode } from './error-code.js'
 import { reportDiagnostic } from './diagnostic-report.js'
 import { PluginHostCleanupMode } from './state-constants.js'
 import type { PluginHostState } from './host-state.js'
-import type { IInstallBatchContext } from './install-runtime.js'
-import type { IInstallEntry, IPluginDefinition, IRegistration } from './registry.js'
+import type { IInstallBatchContext, PluginHostInstallRuntime } from './install-runtime.js'
+import type { IPluginDefinition, IRegistration } from './registry.js'
 import type {
   IPluginAdmission,
   IPluginAdmissionRequest,
@@ -56,44 +57,24 @@ type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue> = Rea
   readonly host: object
   readonly scheduler: IScheduler
   readonly pipelineDrainTimeoutMs: number | false
-  readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   /** Host-owned dependency facts used for one whole-batch removal plan. */
   readonly state: PluginHostState<TDomainCore, TValue>
-  readonly stageSlots: Map<string, IDataOrderSlotState>
-  readonly allocateStageSlot: () => bigint
   readonly assertActive: () => void
   readonly assertMutationAllowed: () => void
   readonly snapshotPlugins: (
     plugins: readonly IPluginConstraint<any>[]
   ) => IPluginDefinition<TDomainCore & IPluginHostCore<TValue>>[]
-  readonly preflight: (
-    definitions: readonly IPluginDefinition<TDomainCore & IPluginHostCore<TValue>>[]
-  ) => IInstallEntry<TDomainCore, TValue>[]
   readonly enqueue: <T>(task: () => Promise<T>) => Promise<T>
-  readonly installBatch: (
-    entries: readonly IInstallEntry<TDomainCore, TValue>[],
-    publish: boolean
-  ) => Promise<{
-    readonly installed: readonly IRegistration<TDomainCore, TValue>[]
-    readonly batch: IInstallBatchContext<TDomainCore, TValue>
-  }>
   readonly publish: (
     installed: readonly IRegistration<TDomainCore, TValue>[],
     batch: IInstallBatchContext<TDomainCore, TValue>
   ) => void
-  readonly revision: () => number
-  readonly commitRevision: () => void
-  readonly disposeRegistration: (
-    registration: IRegistration<TDomainCore, TValue>,
-    preserveErrorIdentity: boolean,
-    mode?: PluginHostCleanupMode,
-    deadlineAt?: number
-  ) => Promise<ICleanupResult>
-  readonly revokeRegistration: (registration: IRegistration<TDomainCore, TValue>) => unknown[]
   readonly createView: () => unknown
-  /** Records a name removed through the managed protocol; see `PREREQUISITE_REMOVED`. */
-  readonly markRemoved: (name: string) => void
   readonly diagnostic: IPluginHostDiagnostic
+  /** Existing installation owner keeps activation and candidate construction together. */
+  readonly installation: PluginHostInstallRuntime<TDomainCore, TValue>
+  /** Existing removal owner performs cleanup; the Host adds no forwarding layer. */
+  readonly removal: PluginHostRemovalRuntime<TDomainCore, TValue>
 }>
 
 /** Owns opaque composition capabilities and staged install/removal transactions. */
@@ -123,15 +104,15 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     this.#port.assertMutationAllowed()
     if (typeof name !== 'string' || name.length === 0 || name.includes('.'))
       throw createPluginHostTypeError(ERROR_TEXT.DATA_ORDER_SLOT_NAME_INVALID)
-    const current = this.#port.stageSlots.get(name)
+    const current = this.#port.state.stageSlots.get(name)
     if (current && !current.retired)
       throw createPluginHostTypeError(ERROR_TEXT.DATA_ORDER_SLOT_LIVE(name))
     const { slot, state } = createDataOrderSlotState(
       this.#port.host,
       name,
-      this.#port.allocateStageSlot()
+      this.#port.state.allocateStageSlot()
     )
-    this.#port.stageSlots.set(name, state)
+    this.#port.state.stageSlots.set(name, state)
     this.#port.state.lanes.ensureSlot(state)
     return slot
   }
@@ -146,7 +127,8 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     if (state.retired) return
     state.retired = true
     this.#port.state.lanes.retireSlot(state)
-    if (this.#port.stageSlots.get(state.name) === state) this.#port.stageSlots.delete(state.name)
+    if (this.#port.state.stageSlots.get(state.name) === state)
+      this.#port.state.stageSlots.delete(state.name)
   }
 
   /** Prepares an install candidate without publishing it. */
@@ -159,12 +141,15 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       IPluginDefinition<TDomainCore & IPluginHostCore<TValue>>
     >(requests, this.#port.host)
     return this.#port.enqueue(async () => {
-      const prepared = await this.#port.installBatch(this.#port.preflight(definitions), false)
+      const prepared = await this.#port.installation.installBatch(
+        preflightPluginDefinitions(definitions, (name) => this.#port.state.registrations.has(name)),
+        false
+      )
       return registerPreparedAdmissions({
         host: this.#port.host,
         installed: prepared.installed,
         batch: prepared.batch,
-        baseRevision: this.#port.revision(),
+        baseRevision: this.#port.state.revision,
         committed: false,
         discarded: false
       })
@@ -190,7 +175,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     // bind to a tombstoned segment that compaction may already have dropped, silently losing its
     // stages; a retired slot is therefore drift for the prepared batch that captured it.
     if (
-      this.#port.revision() !== state.baseRevision ||
+      this.#port.state.revision !== state.baseRevision ||
       state.installed.some((registration) => registration.segment?.retired === true)
     )
       throw new PluginHostError(
@@ -221,7 +206,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       const errors: unknown[] = []
       const physical: Promise<ICleanupResult>[] = []
       for (const registration of [...state.installed].reverse()) {
-        const result = await this.#port.disposeRegistration(registration, true)
+        const result = await this.#port.removal.disposeRegistration(registration, true)
         errors.push(...result.cleanupErrors)
         if (result.physicalCompletion) physical.push(result.physicalCompletion)
       }
@@ -245,7 +230,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       if (
         !match ||
         resolved?.host !== this.#port.host ||
-        this.#port.registrations.get(match.name) !== match ||
+        this.#port.state.registrations.get(match.name) !== match ||
         readRegistrationReceipt(match) !== receipt ||
         seen.has(match)
       )
@@ -282,10 +267,10 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     this.#orderRemoval(state.registrations)
     state.committed = true
     for (const registration of state.registrations) {
-      this.#port.revokeRegistration(registration)
-      this.#port.markRemoved(registration.name)
+      this.#port.removal.revokeRegistration(registration)
+      this.#port.state.removedNames.add(registration.name)
     }
-    this.#port.commitRevision()
+    this.#port.state.commit()
     const snapshot = this.#port.createView() as TView
     /** One deadline covers all registrations and their release steps. False is explicitly unbounded. */
     const deadlineAt =
@@ -372,7 +357,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
         { detail: { blockedBy: plan.blockedBy } }
       )
     return Object.freeze(
-      plan.order.map((name) => this.#port.registrations.get(name)!).filter(Boolean)
+      plan.order.map((name) => this.#port.state.registrations.get(name)!).filter(Boolean)
     )
   }
 
@@ -397,7 +382,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       )
     }
     for (const registration of registrations) {
-      const leaf = await this.#port.disposeRegistration(
+      const leaf = await this.#port.removal.disposeRegistration(
         registration,
         true,
         deadlineAt === undefined ? PluginHostCleanupMode.unbounded : PluginHostCleanupMode.bounded,

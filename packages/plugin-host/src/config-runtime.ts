@@ -1,3 +1,6 @@
+import type { PluginHostCoreRuntime } from './core-runtime.js'
+import type { PluginHostOperationRuntime } from './operation-runtime.js'
+import type { PluginHostState } from './host-state.js'
 import { copyConfigWithPatch, parseConfigPath, readConfigPath } from './config.js'
 import ERROR_TEXT, {
   PluginHostError,
@@ -7,35 +10,25 @@ import ERROR_TEXT, {
 import { PluginHostErrorCode } from './error-code.js'
 import { invokeCaptured } from './invocation.js'
 import type { IRegistration } from './registry.js'
-import type {
-  IPluginConfig,
-  IPluginConstraint,
-  IPluginHostConfigFor,
-  IPluginHostCore
-} from './typing.js'
+import type { IPluginConfig, IPluginConstraint, IPluginHostConfigFor } from './typing.js'
 
 type IPluginHostConfigRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Host-owned synchronous hook boundary, without changing the update result identity. */
   readonly invokeHook: <T>(invoke: () => T) => T
-  readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly assertActive: () => void
   readonly isSetupPending: () => boolean
   readonly isReleasePending: () => boolean
   readonly decorateError: <TError extends PluginHostError>(error: TError) => TError
   readonly enqueue: <T>(task: () => Promise<T>) => Promise<T>
-  readonly beginOperation: (registration: IRegistration<TDomainCore, TValue>) => void
-  readonly awaitOperation: <T>(
-    result: T | PromiseLike<T>,
-    registration: IRegistration<TDomainCore, TValue>
-  ) => Promise<T>
-  readonly assertOperationCurrent: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly setHookRegistration: (
     registration: IRegistration<TDomainCore, TValue> | undefined
   ) => void
-  readonly createCore: (
-    registration: IRegistration<TDomainCore, TValue>
-  ) => TDomainCore & IPluginHostCore<TValue>
-  readonly commitRevision: () => void
+  /** Canonical committed data and revision owner. */
+  readonly state: PluginHostState<TDomainCore, TValue>
+  /** Shared generation owner; method calls retain the original instance receiver. */
+  readonly operations: Pick<PluginHostOperationRuntime, 'begin' | 'await' | 'assertCurrent'>
+  /** Core construction remains owned by its existing runtime. */
+  readonly core: Pick<PluginHostCoreRuntime<TDomainCore, TValue>, 'create'>
 }>
 
 /** Owns the stable public config facade and serialized plugin update transaction. */
@@ -74,7 +67,7 @@ export class PluginHostConfigRuntime<
     /** Plugin names cannot contain dots, so the first path segment is an exact map key. */
     const separator = path.indexOf('.')
     const name = separator < 0 ? path : path.slice(0, separator)
-    const registration = this.#port.registrations.get(name)
+    const registration = this.#port.state.registrations.get(name)
     if (!registration) return undefined
     return readConfigPath(registration.config, parseConfigPath(path))
   }
@@ -93,7 +86,7 @@ export class PluginHostConfigRuntime<
         new PluginHostError(PluginHostErrorCode.lifecycleMutation, ERROR_TEXT.LIFECYCLE_MUTATION)
       )
     return this.#port.enqueue(async () => {
-      const registration = this.#port.registrations.get(name)
+      const registration = this.#port.state.registrations.get(name)
       if (!registration)
         throw new PluginHostError(
           PluginHostErrorCode.pluginNotInstalled,
@@ -104,22 +97,22 @@ export class PluginHostConfigRuntime<
       const next = copyConfigWithPatch(registration.config, patch)
       try {
         if (registration.plugin.update) {
-          this.#port.beginOperation(registration)
+          this.#port.operations.begin(registration)
           this.#port.setHookRegistration(registration)
           const updateResult = this.#port.invokeHook(() =>
             invokeCaptured(registration.plugin.update!, registration.plugin.owner, [
               next as never,
-              this.#port.createCore(registration)
+              this.#port.core.create(registration)
             ])
           )
-          await this.#port.awaitOperation(updateResult, registration)
-          this.#port.assertOperationCurrent(registration)
+          await this.#port.operations.await(updateResult, registration)
+          this.#port.operations.assertCurrent(registration)
         }
       } finally {
         this.#port.setHookRegistration(undefined)
       }
       registration.config = next
-      this.#port.commitRevision()
+      this.#port.state.commit()
     })
   }
 }
