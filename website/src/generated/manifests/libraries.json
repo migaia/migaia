@@ -7388,7 +7388,7 @@
                       "插件级清理。"
                     ],
                     [
-                      "`[Symbol.dispose]?` / `[Symbol.dispose]?`",
+                      "`[Symbol.dispose]?`",
                       "无",
                       "可选",
                       "`void`",
