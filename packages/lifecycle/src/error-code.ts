@@ -6,6 +6,12 @@
  */
 export const LifecycleErrorCode = {
   /**
+   * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces
+   * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to
+   * retry or stop. Cancellation itself resolves the wait and does not use this code.
+   */
+  delayFailed: 'DELAY_FAILED',
+  /**
    * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer
    * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in
    * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also

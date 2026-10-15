@@ -44,7 +44,7 @@ pnpm add @migaia/lifecycle
 - [静默追踪与租约](#静默追踪与租约模块)：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`
 - [事务性所有权](#事务性所有权模块)：`createProvisionalScope`
 - [变更队列](#变更队列模块)：`createMutationQueue`
-- [调度器、中止与有界等待](#调度器中止与有界等待模块)：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`
+- [调度器、中止与有界等待](#调度器中止与有界等待模块)：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`
 - [错误基础设施](#错误基础设施模块)：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`
 - [状态常量](#状态常量模块)：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`
 - [按需导入与 tree-shaking](#按需导入与-tree-shaking)
@@ -512,7 +512,7 @@ const collected = collector.finalize('teardown failed') // 'collect' 策略下�
 
 参数：`policy: 'throw' | 'collect' | 'report' | 'firstError'`（必填）、`report: ((error: unknown) => void) | undefined`（必填，显式传 `undefined` 表示无诊断通道）。`add(source, error)` 按策略即时处理（`report` 策略立即调用 `report`）；`finalize(message)`：`collect` 返回收集到的数组，`report` 返回空数组（已在 `add` 时上报），`throw` 单错原样抛、多错聚合成携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`，`firstError` 有错误时抛首个（其余经 `report` 观测），否则返回空数组。
 
-**`LifecycleErrorCode`｜10 秒上手** —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`：
+**`LifecycleErrorCode`｜10 秒上手** —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`：
 
 ```ts
 if (error.code === LifecycleErrorCode.scopeClosed) {
@@ -520,7 +520,7 @@ if (error.code === LifecycleErrorCode.scopeClosed) {
 }
 ```
 
-全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 [USEGUIDE.md](./USEGUIDE.md#错误码)。
+全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 [USEGUIDE.md](./USEGUIDE.md#错误码)。
 
 **`LifecycleErrorText`｜3 秒上手** —— 稳定诊断消息表（本包内部错误信息的唯一声明处，公开是为了让调用方按文本断言/比对）：
 
@@ -669,3 +669,30 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 ```
 
 验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在 `test/` 下检索到对应用例。
+
+## 可中止的相对延时
+
+`abortableDelay(scheduler, ms, signal, reportCleanup?)` 从 `@migaia/lifecycle` 根入口导入。
+`scheduler` 负责计时，`ms` 必须有限且非负；`signal` 可以传 `undefined`。
+返回 `Promise<boolean>`：到期为 `true`，abort 事件先到为 `false`；调用方决定取消是否应变成领域 AbortError。
+监听器注册与 scheduler 接纳结束前不提交同步 callback 的结果；接纳失败保持 primary，原始错误实例或 cause 链可追溯。
+任务句柄最多 cancel 一次，abort 监听由 canonical observed-subscription 管理。
+
+```ts
+import { abortableDelay, createAbortController } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
+
+const scheduler = createManualScheduler()
+const controller = createAbortController()
+const waiting = abortableDelay(scheduler, 250, controller.signal)
+controller.abort()
+console.log(await waiting) // false；没有遗留 timer
+```
+
+清理失败默认使 wait 拒绝；提供 `reportCleanup(error)` 后，清理失败走该观察渠道，不替换已完成或已取消的结果。
+注册或调度失败仍拒绝，`DELAY_FAILED` 保留 native Error 的身份与 stack，不能附加身份时用 cause 保留原值。
+无效时长或 cleanup reporter 在接纳前以 `INVALID_OPTION` 拒绝。
+
+`boundedWait(task, deadlineAt, { scheduler, reportCleanup? })` 仍负责绝对截止时间与任务竞争，不会取消 task。
+它的默认清理失败行为不变；可选 `reportCleanup` 允许 logger flush 把 timer 清理失败作为诊断，保留任务或 deadline winner。
+批处理 debounce、health 周期调度与预算授予定时器不等同于一次性相对延时，不强行转换其 owner 语义。

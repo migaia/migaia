@@ -47,6 +47,7 @@ export {
 } from './errors.js'
 
 export { boundedWait } from './bounded-wait.js'
+export { abortableDelay } from './abortable-delay.js'
 
 export { createTerminalController, type ITerminalController } from './terminal-controller.js'
 

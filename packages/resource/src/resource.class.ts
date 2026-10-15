@@ -15,13 +15,14 @@ import {
 import { internalsOf, registerDeps, registerDepVersions } from '@migaia/reactive/internals'
 import { attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
 import {
+  abortableDelay,
   createGenerationController,
   createTerminalController,
   snapshotScheduler,
   LifecycleState,
   type IGenerationToken
 } from '@migaia/lifecycle'
-import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { observeAbortSubscription } from '@migaia/lifecycle/abort'
 import {
   createResourceError,
@@ -887,107 +888,25 @@ export class Resource<T> implements IObserver, IDisposable {
         )
       )
     }
-    return new Promise<void>((resolve, reject) => {
-      let timer: IScheduledTask | undefined
-      let settled = false
-      let aborted = false
-      let callbackStarted = false
-      let subscription: ReturnType<typeof observeAbortSubscription> | undefined
-
-      /** Reports cleanup failure without replacing the retry wait's AbortError result. */
-      const reportCleanupFailure = (cleanupError: unknown): void => {
-        this.runtime.reportError(createCancellationFailure(cleanupError), {
-          phase: ReactiveErrorPhase.asyncFlush
-        })
-      }
-
-      /** Reports scheduler admission failure using the existing scheduler diagnostic code. */
-      const reportSchedulerFailure = (schedulerError: unknown): void => {
-        this.runtime.reportError(createSchedulerFailure(schedulerError), {
-          phase: ReactiveErrorPhase.asyncFlush
-        })
-      }
-
-      /** Cancels a task returned after an abort/callback race and reports cancel failures. */
-      const cancelTask = (task: IScheduledTask, cancellation: boolean): void => {
-        try {
-          task.cancel()
-        } catch (cleanupError) {
-          if (cancellation) reportCleanupFailure(cleanupError)
-          else reportSchedulerFailure(cleanupError)
-        }
-      }
-
-      const onAbort = (_reason: unknown): void => {
-        if (settled) return
-        aborted = true
-        settled = true
-        let cleanupError: unknown
-        let cleanupFailed = false
-        if (!callbackStarted) {
-          try {
-            timer?.cancel()
-          } catch (error) {
-            cleanupFailed = true
-            cleanupError = error
-          }
-        }
-        reject(abortError())
-        if (cleanupFailed) reportCleanupFailure(cleanupError)
-      }
-
-      const onTimer = (): void => {
-        if (settled) return
-        callbackStarted = true
-        subscription?.unsubscribe()
+    /** Resource cancellation keeps its AbortError while wait cleanup stays diagnostic-only. */
+    const reportCleanupFailure = (cleanupError: unknown): void => {
+      this.runtime.reportError(createCancellationFailure(cleanupError), {
+        phase: ReactiveErrorPhase.asyncFlush
+      })
+    }
+    return abortableDelay(this.#scheduler, delay, controller.signal, reportCleanupFailure).then(
+      (elapsed) => {
+        if (!elapsed || controller.signal.aborted) throw abortError()
+        return this.#executeFetcher(controller, nextFailureCount)
+      },
+      (error: unknown) => {
         if (controller.signal.aborted) {
-          onAbort(undefined)
-          return
+          reportCleanupFailure(error)
+          throw abortError()
         }
-        settled = true
-        resolve()
+        throw createSchedulerFailure(error)
       }
-
-      try {
-        if (controller.signal.aborted) {
-          settled = true
-          reject(abortError())
-          return
-        }
-        // Install first: schedule() may synchronously trigger the generation abort before it
-        // returns its task. A listener installed afterward would miss that already-fired signal.
-        subscription = observeAbortSubscription(controller.signal, onAbort, reportCleanupFailure)
-        subscription.retryRegistrationCleanup()
-        if (settled) return
-
-        const scheduled = this.#scheduler.schedule(onTimer, delay)
-        timer = scheduled
-        if (aborted) {
-          // Abort won while schedule() was still constructing the task; the task must not remain
-          // armed even though the signal listener had already rejected the wait.
-          cancelTask(scheduled, true)
-          return
-        }
-        if (callbackStarted) {
-          // Preserve synchronous scheduler callback semantics and AF-62 task snapshot cleanup.
-          cancelTask(scheduled, false)
-          return
-        }
-        if (controller.signal.aborted) {
-          onAbort(undefined)
-          if (aborted) cancelTask(scheduled, true)
-        }
-      } catch (error) {
-        if (settled) {
-          if (aborted) reportCleanupFailure(error)
-          else reportSchedulerFailure(error)
-          return
-        }
-        settled = true
-        subscription?.unsubscribe()
-        reject(createSchedulerFailure(error))
-      }
-    }).then(() => this.#executeFetcher(controller, nextFailureCount))
+    )
   }
 
   #withAbort(source: Promise<T>, signal: IAbortSignal): Promise<T> {
