@@ -50,6 +50,27 @@ export const LifecycleErrorText = {
    */
   errorPolicyReporterMissing:
     '[lifecycle] errorPolicy "report" and "firstError" require a report callback',
+  /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */
+  generationSupersededReason: '[lifecycle] superseded by a new generation',
+  /**
+   * `signal.reason` message for a generation whose `timeoutMs` budget elapsed
+   * (GENERATION_TIMED_OUT).
+   */
+  generationTimedOutReason: '[lifecycle] generation timed out',
+  /**
+   * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()`
+   * (GENERATION_DISPOSED).
+   */
+  unitDisposedReason: '[lifecycle] unit disposed',
+  /**
+   * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()`
+   * (SCOPE_CLOSED).
+   */
+  scopeClosedReason: '[lifecycle] scope closed',
+  /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */
+  provisionalRolledBackReason: '[lifecycle] provisional scope rolled back',
+  /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */
+  provisionalCommittedReason: '[lifecycle] provisional scope committed',
   /** Explains that a generation timeout option could not be read at its admission boundary. */
   generationTimeoutAccessorFailed: '[lifecycle] generation timeout option getter failed'
 } as const

@@ -276,7 +276,14 @@ export function createGenerationController(
         )
       }
       if (timeoutMs !== undefined) validateSchedulerDelay(timeoutMs, 'timeoutMs')
-      releaseCurrent('superseded by a new generation')
+      releaseCurrent(
+        currentToken === undefined
+          ? undefined
+          : createLifecycleError(
+              LifecycleErrorCode.generationSuperseded,
+              LifecycleErrorText.generationSupersededReason
+            )
+      )
       generation++
       const token: IGenerationToken = {}
       const controller = createController()
@@ -323,7 +330,12 @@ export function createGenerationController(
             scheduled = scheduler.schedule(() => {
               firedSynchronously = scheduling
               try {
-                releaseCurrent('generation timed out')
+                releaseCurrent(
+                  createLifecycleError(
+                    LifecycleErrorCode.generationTimedOut,
+                    LifecycleErrorText.generationTimedOutReason
+                  )
+                )
               } catch (error) {
                 callbackFailed = true
                 callbackFailure = error

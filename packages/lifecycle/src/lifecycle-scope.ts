@@ -226,7 +226,10 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
 
   const close = (): void => {
     terminal.close()
-    closingController.abort('scope closed')
+    if (closingController.signal.aborted) return
+    closingController.abort(
+      createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
+    )
   }
 
   const performDispose = async (): Promise<readonly ICollectedError[]> => {

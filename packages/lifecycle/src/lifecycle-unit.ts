@@ -6,6 +6,7 @@ import {
   probeThenable
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
 import { createTerminalController } from './terminal-controller.js'
 import { LifecycleState, LifecycleUnitState, ThenableProbeKind } from './state-constants.js'
 import { createGenerationController } from './generation-controller.js'
@@ -150,7 +151,12 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
     dispose() {
       if (terminal.lifecycle === LifecycleState.terminal) return
       terminal.close()
-      generations.dispose('unit disposed')
+      generations.dispose(
+        createLifecycleError(
+          LifecycleErrorCode.generationDisposed,
+          LifecycleErrorText.unitDisposedReason
+        )
+      )
       terminal.forceTerminal()
     }
   }
