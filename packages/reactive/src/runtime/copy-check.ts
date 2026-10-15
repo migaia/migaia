@@ -21,10 +21,10 @@ import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
 
 /** 跨副本共享的键。函数化避免 import 时连全局 Symbol registry 都被触碰。 */
-const registryKey = (): symbol => Symbol.for('@morning-watch/store.runtime-copies')
+const registryKey = (): symbol => Symbol.for('@migaia/reactive.runtime-copies')
 
 /** 本副本的身份。每份模块各自新建一个，因此可用来数副本。 */
-const THIS_COPY = Symbol('@morning-watch/store.runtime-copy')
+const THIS_COPY = Symbol('@migaia/reactive.runtime-copy')
 
 type IRegistry = {
   readonly version: 1
@@ -90,7 +90,7 @@ function registryOf(create: boolean): IRegistry | undefined {
 }
 
 /** 节点上的跨副本诊断品牌；真正的归属权威仍是每份模块私有的 WeakMap。 */
-const ownershipCopyKey = (): symbol => Symbol.for('@morning-watch/store.ownership-copy')
+const ownershipCopyKey = (): symbol => Symbol.for('@migaia/reactive.ownership-copy')
 
 /** Brands objects managed by this library copy immutably so another copy rejects foreign ownership. */
 export function brandOwnedValue(value: object): void {

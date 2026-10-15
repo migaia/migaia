@@ -586,3 +586,6 @@ const runtime = createRuntime({
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
+
+
+跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。
