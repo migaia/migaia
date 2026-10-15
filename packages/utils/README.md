@@ -1001,3 +1001,18 @@ import { isNativeErrorValue } from '@migaia/utils/error'
 const failure: unknown = new TypeError('invalid input')
 if (isNativeErrorValue(failure)) console.log(failure.stack)
 ```
+
+### Deferred scheduler work
+
+`deferTask(scheduler, callback)` registers a non-cancellable asynchronous job. `systemScheduler` uses a native microtask; manual clocks run it at the existing zero-time deadline when advanced. A scheduler with only `now`/`schedule` still works through its zero-delay registration. The separate `schedule(callback, 0)` timer behavior stays unchanged.
+
+```ts
+import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'
+
+const clock = createManualScheduler()
+let delivered = false
+deferTask(clock, () => { delivered = true })
+console.log(delivered) // false
+clock.advance(0)
+console.log(delivered) // true
+```

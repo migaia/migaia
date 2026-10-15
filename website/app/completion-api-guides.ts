@@ -38,6 +38,83 @@ function guide(input: IGuideInput): Readonly<Record<IGuideLocale, IApiGuide>> {
   }
 }
 
+/** One operation is intentionally re-exported by the existing root and scheduler entries. */
+const schedulerDeferGuide = guide({
+  purposeEn:
+    'Registers deferred work through one scheduler while keeping native microtask ordering for the default host. Manual and older two-method clocks control the same work without a new queue or cancellation owner.',
+  purposeZh:
+    '通过同一个 scheduler 登记延后工作，默认宿主保留原生微任务顺序；手动时钟与旧的双方法时钟也能控制它，无需另一套队列或取消所有者。',
+  quickStart: `import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'
+
+// Deterministic test/simulation clock; production hosts supply their own scheduler.
+const clock = createManualScheduler()
+let observed = 0
+deferTask(clock, () => { observed = 1 })
+console.log(observed) // 0
+clock.advance(0)
+console.log(observed) // 1`,
+  scenariosEn: [
+    'A runtime owner must inject the ordering of deferred control work.',
+    'A deterministic test must advance deferred callbacks without a host microtask queue.',
+    'A legacy two-method scheduler should keep using its existing zero-delay task registration.'
+  ],
+  scenariosZh: [
+    '运行时所有者需要注入延后控制工作的执行顺序。',
+    '确定性测试需要在没有宿主微任务队列时推进回调。',
+    '旧的双方法 scheduler 需要继续复用既有零延迟任务登记。'
+  ],
+  avoidEn: [
+    'Use schedule when the job needs a cancel handle or a real deadline.',
+    'Await ordinary Promise work directly when completion is required.',
+    'Do not expect returned callback Promises to be observed by native deferred registration.'
+  ],
+  avoidZh: [
+    '需要取消句柄或真实截止时间时使用 schedule。',
+    '需要完成值时直接 await 普通 Promise 工作。',
+    '不要依赖原生延后登记替你观察回调返回的 Promise。'
+  ],
+  optionsEn: [
+    {
+      name: 'scheduler',
+      type: 'IScheduler',
+      optional: false,
+      description: 'Owns the deferred method or legacy zero-time fallback.',
+      defaultValue: 'required',
+      whenToUse: 'Pass the scheduler already admitted by this runtime owner.',
+      example: 'deferTask(clock, callback)'
+    },
+    {
+      name: 'callback',
+      type: '() => void',
+      optional: false,
+      description: 'Runs asynchronously; callback completion and errors remain with its caller.',
+      defaultValue: 'required',
+      whenToUse: 'Enqueue bounded control work without changing timer semantics.',
+      example: 'deferTask(clock, () => { observed = 1 })'
+    }
+  ],
+  optionsZh: [
+    {
+      name: 'scheduler',
+      type: 'IScheduler',
+      optional: false,
+      description: '拥有 deferred 方法或旧的零时刻回退路径。',
+      defaultValue: '必填',
+      whenToUse: '传入当前运行时所有者已准入的 scheduler。',
+      example: 'deferTask(clock, callback)'
+    },
+    {
+      name: 'callback',
+      type: '() => void',
+      optional: false,
+      description: '异步执行，完成与错误仍由调用方负责。',
+      defaultValue: '必填',
+      whenToUse: '登记有限控制工作并保持计时器语义。',
+      example: 'deferTask(clock, () => { observed = 1 })'
+    }
+  ]
+})
+
 /**
  * One coherent provider-to-consumer scenario kept separate from the descriptor and short-form
  * examples.
@@ -82,6 +159,8 @@ await host.dispose()`
 export const completionApiGuides: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, IApiGuide>>>>
 > = {
+  'utils:scheduler:deferTask': schedulerDeferGuide,
+  'utils:index:deferTask': schedulerDeferGuide,
   'rpc-bridge-jsonrpc:index:createJsonRpcRemoteChannel': guide({
     purposeEn:
       'Adapts an authenticated JSON-RPC byte stream into the maintained remote channel, mapping hello, describe, invoke, cancel and errors while rejecting optional operations the foreign peer cannot implement.',
