@@ -127,7 +127,11 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
   const [query, setQuery] = useState('')
   const [searchLoaded, setSearchLoaded] = useState(false)
   const [theme, setTheme] = useState<IThemeChoice>('light')
-  const [phase, setPhase] = useState<ITimePhase>(() => timePhase(new Date()))
+  /**
+   * Time-theme phase shown in the theme label. Starts fixed so prerendered HTML matches the first
+   * client render; the mount effect replaces it with the reader's local-clock phase.
+   */
+  const [phase, setPhase] = useState<ITimePhase>('sunrise')
   const location = useLocation()
   const locale = localeFromPath(location.pathname)
   /** Opposite locale exposed as the header's single language-switch destination. */
