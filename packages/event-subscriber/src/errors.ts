@@ -146,34 +146,34 @@ export const createEventAggregateError = (
   return attachEventErrorCode(error, code)
 }
 
-/** Returns a stable text for a package error code. */
-export const eventErrorText = (code: IEventSubscriberErrorCode): string => {
-  const entry: Record<IEventSubscriberErrorCode, string> = {
-    [EventSubscriberErrorCode.invalidListener]: EventSubscriberErrorText.invalidListener,
-    [EventSubscriberErrorCode.invalidReporter]: EventSubscriberErrorText.invalidReporter,
-    [EventSubscriberErrorCode.invalidChannel]: EventSubscriberErrorText.invalidChannel,
-    [EventSubscriberErrorCode.invalidSignal]: EventSubscriberErrorText.invalidSignal,
-    [EventSubscriberErrorCode.aborted]: EventSubscriberErrorText.aborted,
-    [EventSubscriberErrorCode.invalidSubscriber]: EventSubscriberErrorText.invalidSubscriber,
-    [EventSubscriberErrorCode.invalidEventKey]: EventSubscriberErrorText.invalidEventKey,
-    [EventSubscriberErrorCode.taskNotFound]: EventSubscriberErrorText.taskNotFound,
-    [EventSubscriberErrorCode.taskNotUnique]: EventSubscriberErrorText.taskNotUnique,
-    [EventSubscriberErrorCode.invalidTaskId]: EventSubscriberErrorText.invalidTaskId,
-    [EventSubscriberErrorCode.invalidOptions]: EventSubscriberErrorText.invalidOptions,
-    [EventSubscriberErrorCode.publishFailed]: EventSubscriberErrorText.publishFailed,
-    [EventSubscriberErrorCode.valueProjectionFailed]:
-      EventSubscriberErrorText.valueProjectionFailed,
-    [EventSubscriberErrorCode.subscriptionClosed]: EventSubscriberErrorText.subscriptionClosed,
-    [EventSubscriberErrorCode.unhandledListenerFailure]:
-      EventSubscriberErrorText.unhandledListenerFailure,
-    [EventSubscriberErrorCode.subscriptionHandleProjectionFailed]:
-      EventSubscriberErrorText.subscriptionHandleProjectionFailed,
-    [EventSubscriberErrorCode.invocationClosed]: EventSubscriberErrorText.invocationClosed,
-    [EventSubscriberErrorCode.subscriptionDisposeFailed]:
-      EventSubscriberErrorText.subscriptionDisposeFailed
-  }
-  return entry[code]
+/** Stable code-to-text lookup allocated once for every error construction path. */
+const eventErrorTextByCode: Record<IEventSubscriberErrorCode, string> = {
+  [EventSubscriberErrorCode.invalidListener]: EventSubscriberErrorText.invalidListener,
+  [EventSubscriberErrorCode.invalidReporter]: EventSubscriberErrorText.invalidReporter,
+  [EventSubscriberErrorCode.invalidChannel]: EventSubscriberErrorText.invalidChannel,
+  [EventSubscriberErrorCode.invalidSignal]: EventSubscriberErrorText.invalidSignal,
+  [EventSubscriberErrorCode.aborted]: EventSubscriberErrorText.aborted,
+  [EventSubscriberErrorCode.invalidSubscriber]: EventSubscriberErrorText.invalidSubscriber,
+  [EventSubscriberErrorCode.invalidEventKey]: EventSubscriberErrorText.invalidEventKey,
+  [EventSubscriberErrorCode.taskNotFound]: EventSubscriberErrorText.taskNotFound,
+  [EventSubscriberErrorCode.taskNotUnique]: EventSubscriberErrorText.taskNotUnique,
+  [EventSubscriberErrorCode.invalidTaskId]: EventSubscriberErrorText.invalidTaskId,
+  [EventSubscriberErrorCode.invalidOptions]: EventSubscriberErrorText.invalidOptions,
+  [EventSubscriberErrorCode.publishFailed]: EventSubscriberErrorText.publishFailed,
+  [EventSubscriberErrorCode.valueProjectionFailed]: EventSubscriberErrorText.valueProjectionFailed,
+  [EventSubscriberErrorCode.subscriptionClosed]: EventSubscriberErrorText.subscriptionClosed,
+  [EventSubscriberErrorCode.unhandledListenerFailure]:
+    EventSubscriberErrorText.unhandledListenerFailure,
+  [EventSubscriberErrorCode.subscriptionHandleProjectionFailed]:
+    EventSubscriberErrorText.subscriptionHandleProjectionFailed,
+  [EventSubscriberErrorCode.invocationClosed]: EventSubscriberErrorText.invocationClosed,
+  [EventSubscriberErrorCode.subscriptionDisposeFailed]:
+    EventSubscriberErrorText.subscriptionDisposeFailed
 }
+
+/** Returns the canonical text without rebuilding the full code table. */
+export const eventErrorText = (code: IEventSubscriberErrorCode): string =>
+  eventErrorTextByCode[code]
 
 export type IEventErrorWithCode = IEventError & {
   readonly source: typeof EVENT_SUBSCRIBER_SOURCE

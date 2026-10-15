@@ -148,7 +148,10 @@ export const invokeSerial = <T, R, V = undefined>(
 const selectTask = <T, R, V = undefined>(
   channel: ICanonicalEventChannel<T, R, undefined, V>,
   taskId: string
-): IEventDispatchSnapshot<T, R, V> => {
+): {
+  readonly snapshot: IEventDispatchSnapshot<T, R, V>
+  readonly capability: ReturnType<typeof getCapability<T, R, V>>['capability']
+} => {
   const validated = validateTaskId(taskId, false) as string
   const { capability } = getCapability(channel)
   const snapshots = capability.snapshot(validated)
@@ -162,7 +165,7 @@ const selectTask = <T, R, V = undefined>(
       snapshots.length
     )
   }
-  return snapshots[0]
+  return { snapshot: snapshots[0], capability }
 }
 
 /** Strict single-task settled publish; selection errors are synchronous throws. */
@@ -171,8 +174,7 @@ export const invokeTaskSettled = <T, R, V = undefined>(
   taskId: string,
   value: T
 ): Promise<IListenerResult<R>> => {
-  const snapshot = selectTask(channel, taskId)
-  const { capability } = getCapability(channel)
+  const { snapshot, capability } = selectTask(channel, taskId)
   const projection = capability.plan
     ? { plan: capability.plan, outcome: capability.project(value) }
     : undefined
