@@ -1125,30 +1125,32 @@ it('standalone adapter observes downstream failure but preserves stage error ide
   ).rejects.toBe(stage)
 })
 
-it('runner combines adapted stage and downstream failures exactly once', async () => {
+it('runner never starts downstream when an adapted stage throws after next()', async () => {
   const stage = new Error('stage')
-  const downstream = new Error('downstream')
   const combinations: unknown[][] = []
+  let downstreamCalls = 0
   const adapted = liftSyncToAsyncForTest((value, next) => {
     next(value)
     throw stage
   })
-  const combined = new Error('combined')
+  // A lifted sync stage keeps linear-reduce order: next() only records the value, so a throw
+  // after it fails the stage before downstream starts and there is nothing to combine.
   await expect(
     runAsyncForTest(
       [adapted],
       1,
       () => {
-        throw downstream
+        downstreamCalls += 1
       },
       {
         onViolation: () => undefined,
         combineStageAndDownstreamError: (stageError, downstreamError) => {
           combinations.push([stageError, downstreamError])
-          return combined
+          return new Error('combined')
         }
       }
     )
-  ).rejects.toBe(combined)
-  expect(combinations).toEqual([[stage, downstream]])
+  ).rejects.toBe(stage)
+  expect(downstreamCalls).toBe(0)
+  expect(combinations).toEqual([])
 })
