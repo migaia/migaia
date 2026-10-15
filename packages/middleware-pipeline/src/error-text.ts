@@ -5,6 +5,12 @@ export const MiddlewarePipelineErrorText = {
    * combiner.
    */
   executionFailed: 'middleware stage and downstream failed',
+  /** Stable signal/control admission text used by construction and later cancellation reads. */
+  invalidOption: 'middleware pipeline signal option is invalid',
+  /** Primitive abort reasons are retained as cause beneath this package-owned message. */
+  aborted: 'middleware pipeline aborted',
+  /** Iterator cleanup keeps abort primary and appends the original cleanup failure. */
+  abortCleanupFailed: 'middleware pipeline abort cleanup failed',
   /** Describes a non-record construction argument before the mode field can be admitted. */
   invalidOptions: 'middleware pipeline options must be an object',
   /** Describes `createPipeline` rejecting a creation option outside the public mode values. */
