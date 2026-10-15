@@ -4662,36 +4662,6 @@
       "type": "architecture-symbol"
     },
     {
-      "from": "/en/docs/capability/api/graph/dynamic",
-      "to": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "to": "/en/docs/capability/api/graph/dynamic",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "to": "/en/docs/capability/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/capability/getting-started",
-      "to": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "to": "/en/docs/capability",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/capability",
-      "to": "/en/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "type": "architecture-symbol"
-    },
-    {
       "from": "/zh/docs/capability/api/graph/dynamic",
       "to": "/zh/docs/capability/getting-started",
       "type": "api-guide"
@@ -5162,36 +5132,6 @@
       "type": "architecture-symbol"
     },
     {
-      "from": "/zh/docs/capability/api/graph/dynamic",
-      "to": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "to": "/zh/docs/capability/api/graph/dynamic",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "to": "/zh/docs/capability/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/capability/getting-started",
-      "to": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "to": "/zh/docs/capability",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/capability",
-      "to": "/zh/docs/capability/api/graph/dynamic#capability-graph/dynamic--IGraphTraversalMetrics",
-      "type": "architecture-symbol"
-    },
-    {
       "from": "/en/docs/capability/api/graph/topology",
       "to": "/en/docs/capability/getting-started",
       "type": "api-guide"
@@ -5389,36 +5329,6 @@
     {
       "from": "/en/docs/capability",
       "to": "/en/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexAdapter",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/capability/api/graph/topology",
-      "to": "/en/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "to": "/en/docs/capability/api/graph/topology",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "to": "/en/docs/capability/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/capability/getting-started",
-      "to": "/en/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "to": "/en/docs/capability",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/capability",
-      "to": "/en/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
       "type": "architecture-symbol"
     },
     {
@@ -5839,36 +5749,6 @@
     {
       "from": "/zh/docs/capability",
       "to": "/zh/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexAdapter",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/capability/api/graph/topology",
-      "to": "/zh/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "to": "/zh/docs/capability/api/graph/topology",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "to": "/zh/docs/capability/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/capability/getting-started",
-      "to": "/zh/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
-      "to": "/zh/docs/capability",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/capability",
-      "to": "/zh/docs/capability/api/graph/topology#capability-graph/topology--ITopologyIndexMetrics",
       "type": "architecture-symbol"
     },
     {

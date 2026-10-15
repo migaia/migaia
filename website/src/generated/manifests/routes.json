@@ -465,12 +465,6 @@
       "library": "capability"
     },
     {
-      "path": "/en/docs/capability/api/graph/dynamic/IGraphTraversalMetrics",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
       "path": "/en/docs/capability/api/graph/dynamic/createDynamicCapabilityGraph",
       "locale": "en",
       "domain": "docs",
@@ -502,12 +496,6 @@
     },
     {
       "path": "/en/docs/capability/api/graph/topology/ITopologyIndexAdapter",
-      "locale": "en",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/en/docs/capability/api/graph/topology/ITopologyIndexMetrics",
       "locale": "en",
       "domain": "docs",
       "library": "capability"
@@ -16023,12 +16011,6 @@
       "library": "capability"
     },
     {
-      "path": "/zh/docs/capability/api/graph/dynamic/IGraphTraversalMetrics",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
       "path": "/zh/docs/capability/api/graph/dynamic/createDynamicCapabilityGraph",
       "locale": "zh",
       "domain": "docs",
@@ -16060,12 +16042,6 @@
     },
     {
       "path": "/zh/docs/capability/api/graph/topology/ITopologyIndexAdapter",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "capability"
-    },
-    {
-      "path": "/zh/docs/capability/api/graph/topology/ITopologyIndexMetrics",
       "locale": "zh",
       "domain": "docs",
       "library": "capability"
