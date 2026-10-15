@@ -3,11 +3,11 @@ import type { IDisposerContext } from './disposer-context.js'
 import {
   assimilateCapturedThen,
   attachLifecycleSecondaryErrors,
-  containAsyncRejection,
   createErrorCollector,
   createLifecycleError,
   createLifecycleTypeError,
-  probeThenable
+  probeThenable,
+  safeReport
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
@@ -300,18 +300,6 @@ export type IDisposeTransactionOptions = {
 export type IDisposeTransaction = {
   readonly mode: IDisposeTransactionMode
   run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>
-}
-
-const safeReport = (report: ((error: unknown) => void) | undefined, error: unknown): void => {
-  if (!report) return
-  try {
-    const result: unknown = report(error)
-    containAsyncRejection(result, () => {
-      // No lower layer to escalate a reporter's own async failure to.
-    })
-  } catch {
-    // The reporter is the last error boundary for its own synchronous failures too.
-  }
 }
 
 /** Creates one tagged lifecycle error for a descriptor value that violates admission shape. */

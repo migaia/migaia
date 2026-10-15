@@ -240,6 +240,23 @@ export function containAsyncRejection(value: unknown, onRejected: (error: unknow
   })
 }
 
+/**
+ * Hands `error` to a caller-supplied reporter, the last error boundary of a lifecycle operation.
+ * The reporter's own synchronous throw and async rejection are contained here because no lower
+ * layer exists to receive them (L-T26, L-T35). An absent reporter makes this a no-op.
+ */
+export function safeReport(report: ((error: unknown) => void) | undefined, error: unknown): void {
+  if (!report) return
+  try {
+    const result: unknown = report(error)
+    containAsyncRejection(result, () => {
+      // The reporter's own async failure has no lower layer to report to; it terminates here.
+    })
+  } catch {
+    // The reporter is the last error boundary for its own failures too (L-T35).
+  }
+}
+
 /** Collects errors under one of the four policies (D-4) and produces the correct finalize behavior. */
 export type IErrorCollector = {
   readonly policy: IErrorPolicy
@@ -261,17 +278,8 @@ export function createErrorCollector(
   let firstError: unknown
   let hasFirstError = false
 
-  const invokeReport = (error: unknown): void => {
-    if (!report) return
-    try {
-      const result: unknown = report(error)
-      containAsyncRejection(result, () => {
-        // The reporter's own async failure has no lower layer to report to; it terminates here.
-      })
-    } catch {
-      // The reporter is the last error boundary for its own failures too (L-T35).
-    }
-  }
+  /** Hands one failure to the configured reporter under the shared containment rules. */
+  const invokeReport = (error: unknown): void => safeReport(report, error)
 
   return {
     policy,

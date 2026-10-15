@@ -5,6 +5,7 @@ import {
   createLifecycleError,
   createLifecycleFailure,
   createLifecycleTypeError,
+  safeReport,
   tagLifecycleError,
   type ILifecycleError
 } from './errors.js'
@@ -47,6 +48,13 @@ export type IGenerationControllerOptions = {
    * `systemScheduler`.
    */
   readonly scheduler?: IScheduler
+  /**
+   * Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release
+   * failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by
+   * an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained.
+   * Without it those failures are dropped.
+   */
+  readonly report?: (error: unknown) => void
 }
 
 export type IGenerationController = {
@@ -72,8 +80,9 @@ export type IGenerationController = {
   /**
    * Adopts `value` under `token`'s generation. Returns `true` and keeps `value` with the caller if
    * that generation is still current. Otherwise releases `value` via `release` and returns `false`
-   * (L-T6) — a release failure is funneled to `onReleaseError` and never mutates controller state,
-   * so it cannot poison whichever generation is current now (L-T30).
+   * (L-T6) — a release failure is funneled to `onReleaseError` (or the controller `report` when
+   * omitted) and never mutates controller state, so it cannot poison whichever generation is
+   * current now (L-T30).
    */
   adopt<T>(
     token: IGenerationToken,
@@ -134,6 +143,8 @@ export function createGenerationController(
   const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
   const createController = captureAbortControllerFactory()
   const parentSignal = options.parentSignal
+  /** Controller-level last-boundary reporter; see `IGenerationControllerOptions.report`. */
+  const report = options.report
   let generation = 0
   let currentToken: IGenerationToken | undefined
   let currentController: IAbortController | undefined
@@ -230,18 +241,15 @@ export function createGenerationController(
     throw createAdmissionFailure(primary, cleanupErrors)
   }
 
+  /**
+   * Routes an `adopt()` release failure to the per-call `onReleaseError`, else to the controller's
+   * `report`. Either callback is the last boundary; its own failures are contained by
+   * `safeReport`.
+   */
   const reportReleaseError = (
     onReleaseError: ((error: unknown) => void) | undefined,
     error: unknown
-  ): void => {
-    if (!onReleaseError) return
-    try {
-      onReleaseError(error)
-    } catch {
-      // The release-error callback is itself the last boundary; it must not manufacture a new
-      // unhandled failure by throwing back out.
-    }
-  }
+  ): void => safeReport(onReleaseError ?? report, error)
 
   return {
     get generation() {
@@ -320,9 +328,9 @@ export function createGenerationController(
                 callbackFailed = true
                 callbackFailure = error
                 if (!scheduling) {
-                  // A host timer has no caller stack to receive cleanup failures. Observe the
-                  // rejection on a detached diagnostic chain rather than throwing through setTimeout.
-                  containAsyncRejection(Promise.reject(error), () => undefined)
+                  // A host timer has no caller stack to receive cleanup failures; hand them to the
+                  // controller's reporter rather than throwing through setTimeout.
+                  safeReport(report, error)
                 }
               }
             }, timeoutMs)
