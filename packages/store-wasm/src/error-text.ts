@@ -26,6 +26,8 @@ export const StoreWasmErrorText = {
   arrayLengthLimit: 'wasm.array: length exceeds the Wasm32 allocation limit',
   granularityInvalid: 'wasm.array: granularity must be a positive safe integer',
   recordShapeInvalid: 'wasm.record: shape must be an object of field builders',
+  /** Stable diagnostic for allocation on the shared WASM instance after it trapped. */
+  instancePoisoned: '[store] WASM instance trapped earlier and is permanently unusable',
   /** Stable aggregate message used when more than one WASM-owned resource fails cleanup. */
   cleanupFailed: '[store] WASM cleanup failed',
   reservedField: (key: string): string => `[store] wasm.record field name is reserved: ${key}`

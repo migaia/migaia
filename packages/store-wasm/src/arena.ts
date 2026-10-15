@@ -27,11 +27,43 @@ export function ensureWasm(): Promise<WebAssembly.Memory> {
 }
 const MAX_WASM32_ALLOCATION = 0xffff_ffff
 
+/**
+ * First `WebAssembly.RuntimeError` raised by an arena export of the shared `@migaia/wasm` instance,
+ * or `undefined` while the instance is healthy. A trap can leave the Rust arena borrow held, so
+ * every later export would trap again; wasm-bindgen keeps one instance per module, so it cannot be
+ * rebuilt either. Once set, allocation fails with `INSTANCE_POISONED` (cause: this trap) and
+ * release becomes a no-op.
+ */
+let poisonedBy: WebAssembly.RuntimeError | undefined
+
+/**
+ * Runs one arena export and poisons the shared instance when it traps. The trap itself is rethrown
+ * unchanged so the first caller still sees the native error.
+ */
+function callArena<T>(call: () => T): T {
+  try {
+    return call()
+  } catch (error) {
+    if (error instanceof WebAssembly.RuntimeError) poisonedBy ??= error
+    throw error
+  }
+}
+
+/** Rejects allocation on a poisoned instance before any export is called. */
+function assertNotPoisoned(): void {
+  if (poisonedBy === undefined) return
+  throw createStoreWasmError(
+    StoreWasmErrorCode.instancePoisoned,
+    StoreWasmErrorText.instancePoisoned,
+    { cause: poisonedBy }
+  )
+}
+
 // GC 兜底：字段对象没人引用且未显式 dispose 时，自动释放对应分配。
 // 显式 dispose 是主路径（确定性、可预期时机）；此 registry 仅兜底。dispose 时会 unregister，避免重复释放。
 const finalizer =
   typeof FinalizationRegistry === 'function'
-    ? new FinalizationRegistry<number>((id) => dealloc_bytes(id))
+    ? new FinalizationRegistry<number>((id) => deallocate(id))
     : undefined
 
 /** GC fallback is optional; explicit field disposal remains the portable path. */
@@ -44,9 +76,14 @@ export const registry = {
   }
 }
 
-// Explicitly frees an allocation during field disposal. `dealloc_bytes` ignores unknown IDs, so repeated release is safe.
+/**
+ * Explicitly frees an allocation during field disposal. `dealloc_bytes` ignores unknown IDs, so
+ * repeated release is safe. On a poisoned instance the arena can no longer free anything, so
+ * release is a no-op instead of a second trap; allocation keeps reporting the poisoning.
+ */
 export function deallocate(id: number): void {
-  dealloc_bytes(id)
+  if (poisonedBy !== undefined) return
+  callArena(() => dealloc_bytes(id))
 }
 
 /** Runs every cleanup action and preserves all failures for the caller. */
@@ -154,7 +191,7 @@ function completeAllocation(
 } {
   let ptr: number
   try {
-    ptr = ptr_of(id)
+    ptr = callArena(() => ptr_of(id))
   } catch (primary) {
     try {
       if (id !== 0) deallocate(id)
@@ -191,7 +228,8 @@ export async function allocate(byteLen: number) {
     )
   }
   const memory = await ensureWasm()
-  const id = alloc_bytes(byteLen)
+  assertNotPoisoned()
+  const id = callArena(() => alloc_bytes(byteLen))
   return completeAllocation(memory, id)
 }
 
@@ -206,6 +244,7 @@ export function allocateSync(byteLen: number) {
   const memory = wasmMemory
   if (!memory)
     throw createStoreWasmError(StoreWasmErrorCode.notInitialized, StoreWasmErrorText.notInitialized)
-  const id = alloc_bytes(byteLen)
+  assertNotPoisoned()
+  const id = callArena(() => alloc_bytes(byteLen))
   return completeAllocation(memory, id)
 }
