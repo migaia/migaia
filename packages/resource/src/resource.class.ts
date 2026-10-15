@@ -793,39 +793,59 @@ export class Resource<T> implements IObserver, IDisposable {
     return request
   }
 
+  /** Reuses one completion Promise across Suspense wakeups instead of retaining a recursive chain. */
   #executeFetcher(controller: { signal: IAbortSignal }, failureCount: number): Promise<T> {
-    if (controller.signal.aborted) return Promise.reject(abortError())
-    let fetched: T | PromiseLike<T>
-    try {
-      fetched = internalsOf(this.runtime).tracker.runTracked(this, () =>
-        this.#fetcher({ signal: controller.signal })
-      )
-    } catch (error) {
-      const probe = probeThenable(error)
-      if (probe.kind === ThenableProbeKind.failed) {
-        // Getter failed while probing a Suspense throw: surface the getter error and keep the
-        // original thrown value reachable — never rewrite it into a plain fetch failure (AF-08).
-        return Promise.reject(
-          tagResourceError(
-            new AggregateError(
-              [error, probe.error],
-              'resource fetcher threw a value whose then getter failed'
-            ),
-            ResourceErrorCode.suspenseProbeFailed
+    return new Promise<T>((resolve, reject) => {
+      /** Ordinary failures retain the existing retry policy and exact final rejection. */
+      const failed = (error: unknown): void => {
+        void this.#retryFailure(error, controller, failureCount).then(resolve, reject)
+      }
+      /** Each wakeup runs synchronously, then relinquishes the event loop before a Suspense retry. */
+      const attempt = (): void => {
+        if (controller.signal.aborted) {
+          reject(abortError())
+          return
+        }
+        /** The fetcher's synchronous reads participate in the same dependency frame. */
+        let fetched: T | PromiseLike<T>
+        try {
+          fetched = internalsOf(this.runtime).tracker.runTracked(this, () =>
+            this.#fetcher({ signal: controller.signal })
           )
-        )
+        } catch (error) {
+          /** Capture a thrown thenable once, preserving getter failures and the original value. */
+          const probe = probeThenable(error)
+          if (probe.kind === ThenableProbeKind.failed) {
+            reject(
+              tagResourceError(
+                new AggregateError(
+                  [error, probe.error],
+                  'resource fetcher threw a value whose then getter failed'
+                ),
+                ResourceErrorCode.suspenseProbeFailed
+              )
+            )
+            return
+          }
+          if (probe.kind === ThenableProbeKind.notThenable) {
+            failed(error)
+            return
+          }
+          if (controller.signal.aborted) {
+            reject(abortError())
+            return
+          }
+          // A void callback starts the next attempt on this same completion Promise. Settled
+          // wakeup chains can be collected, and the scheduler admits cancellation between them.
+          void assimilateCapturedThen<void>(probe.thenFn, error)
+            .then(() => this.#waitForAttempt(controller, 0))
+            .then(attempt, reject)
+          return
+        }
+        void Promise.resolve(fetched).then(resolve, failed)
       }
-      if (probe.kind === 'not-thenable') {
-        return this.#retryFailure(error, controller, failureCount)
-      }
-      // Captured `then` is applied exactly once — no second `.then` read via Promise.resolve.
-      return assimilateCapturedThen<void>(probe.thenFn, error).then(() =>
-        this.#executeFetcher(controller, failureCount)
-      )
-    }
-    return Promise.resolve(fetched).catch((error: unknown) =>
-      this.#retryFailure(error, controller, failureCount)
-    )
+      attempt()
+    })
   }
 
   #retryFailure(
@@ -888,6 +908,13 @@ export class Resource<T> implements IObserver, IDisposable {
         )
       )
     }
+    return this.#waitForAttempt(controller, delay).then(() =>
+      this.#executeFetcher(controller, nextFailureCount)
+    )
+  }
+
+  /** Shares scheduler cancellation and error policy between retries and Suspense wakeups. */
+  #waitForAttempt(controller: { signal: IAbortSignal }, delay: number): Promise<void> {
     /** Resource cancellation keeps its AbortError while wait cleanup stays diagnostic-only. */
     const reportCleanupFailure = (cleanupError: unknown): void => {
       this.runtime.reportError(createCancellationFailure(cleanupError), {
@@ -897,7 +924,6 @@ export class Resource<T> implements IObserver, IDisposable {
     return abortableDelay(this.#scheduler, delay, controller.signal, reportCleanupFailure).then(
       (elapsed) => {
         if (!elapsed || controller.signal.aborted) throw abortError()
-        return this.#executeFetcher(controller, nextFailureCount)
       },
       (error: unknown) => {
         if (controller.signal.aborted) {
