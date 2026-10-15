@@ -93,11 +93,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "托管卸载分两步。第一步先让新请求看不到待卸载插件，这叫“逻辑撤销”；排空期间发起的新 pipeline 运行不含该插件 stage，仍可正常完成。第二步等待已经拿到旧插件的请求和正在执行的 pipeline 全部结束，再真正调用插件与资源的 `dispose()`，这叫“物理完成”。如果等待时间达到调用方设置的上限，接口会先返回 `cleanupComplete: false`；这不代表资源已经释放，调用方仍须等待返回的 `physicalCompletion` Promise。超时只允许调用方先拿回控制权，不会跳过或打乱清理顺序。 managed cleanup 的物理链不设强制截止时间，`execution."
+                "text": "托管卸载分两步。第一步先让新请求看不到待卸载插件，这叫“逻辑撤销”；排空期间发起的新 pipeline 运行不含该插件 stage，仍可正常完成。第二步等待已经拿到旧插件的请求和正在执行的 pipeline 全部结束，再真正调用插件与资源的 `dispose()`，这叫“物理完成”。如果等待时间达到调用方设置的上限，接口会先返回 `cleanupComplete: false`；这不代表资源已经释放，调用方仍须等待返回的 `physicalCompletion` Promise。`execution.pipelineDrainTimeoutMs` 必填、无默认值：数值为 managed cleanup 各项共享的排空预算，耗尽后继续后续清理；显式 `false` 才逐项等待真实完成，且不受普通步骤预算截断。`beforeCleanup` fence 始终先完成。"
               },
               {
                 "type": "paragraph",
-                "text": "pipelineDrainTimeoutMs` 仅限制本次观察等待（`false` 为无限等待）；普通 `unUse()`/`dispose()` 仍按 `disposeStepTimeoutMs` 对每项清理作有界退化。"
+                "text": "数值预算不会取消仍执行的 lease 或 disposer，它们及迟到错误继续由 `physicalCompletion` 观察。普通 `unUse()`/`dispose()` 使用 `disposeStepTimeoutMs`（默认 5000ms）。"
               }
             ]
           },
@@ -184,7 +184,7 @@
                   "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                   "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                   "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                  "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                  "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                 ]
               },
               {
@@ -1191,11 +1191,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "managed cleanup 的物理链不设强制截止时间；`execution.pipelineDrainTimeoutMs` 是观察上限，`false` 代表无限等待。普通 `unUse()`/`dispose()` 的逐项 `disposeStepTimeoutMs` 不会截断这条 managed 物理链。"
+                "text": "managed cleanup 使用必填的 `execution.pipelineDrainTimeoutMs`，没有隐式默认值。数值预算由本批次所有 lease 与清理步骤共享；到期后继续后续清理，即使普通 `disposeStepTimeoutMs` 为 `false`。显式 `pipelineDrainTimeoutMs: false` 才逐项等待真实完成，并绕过普通步骤预算。`beforeCleanup` fence 始终先完成。"
               },
               {
                 "type": "paragraph",
-                "text": "managed cleanup 的 `physicalCompletion` 是全批次共享的严格链：前一 provider/resource 未真实 settle 时， 后一项不会开始。`pipelineDrainTimeoutMs` 只决定何时向调用方返回逻辑 incomplete，不取消 lease 或 disposer。排空开始时先解除旧代的 stage 可见性，再封存租约 key；此后新运行不含该 stage，也不会因 `QUIESCENCE_SEALED` 失败。 因此不要把 `cleanupComplete: false` 当成已释放；应 await `physicalCompletion`，或由 realm owner 在更外层执行 可证明的强制终止。"
+                "text": "预算不会取消已经执行的 lease 或 disposer。`cleanupErrors` 是当前错误快照，`physicalCompletion` 只含之后新增错误，可能继续携带下一层 continuation。需要完整最终错误时使用 `@migaia/lifecycle` 的 `mergeCleanupResults([result])`；不要只读取第一层物理结果。排空开始时先解除旧代 stage 可见性，再封存租约 key；新运行不含该 stage。 不要把 `cleanupComplete: false` 当成已释放；需要真实释放时观察全部 `physicalCompletion`，或由 realm owner 执行可证明的强制终止。"
               }
             ]
           },
@@ -3031,7 +3031,7 @@
           "name": "IDefinedPluginConstraint",
           "kind": "type",
           "signature": "export type IDefinedPluginConstraint<TCore extends object = object, TValue = never, TExtension extends Record<string, unknown> = Record<string, unknown>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TName extends string = string, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>, TSetup = never> = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose, TSetup> & Readonly<{ readonly name: TName; getFeature<TKey extends Extract<keyof TFeatures, string>>(name: TKey): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, false, TName>; getFeature<TKey extends Extract<keyof TFeatures, string>>(name: TKey, options: Readonly<{ readonly optional: true; }>): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, true, TName>; /** Required only in declarations; runtime authority remains the private WeakMap. */ readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue; }; }>;",
-          "declarationLine": 261,
+          "declarationLine": 262,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IDefinedPluginConstraint is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDefinedPluginConstraint.",
@@ -3159,7 +3159,7 @@
           "name": "IExcludePluginByName",
           "kind": "type",
           "signature": "export type IExcludePluginByName<TPlugins extends readonly IPluginConstraint<any>[], TName extends string> = TPlugins extends readonly [infer THead, ...infer TTail] ? TTail extends readonly IPluginConstraint<any>[] ? THead extends { readonly name: TName; } ? IExcludePluginByName<TTail, TName> : THead extends IPluginConstraint<any> ? readonly [THead, ...IExcludePluginByName<TTail, TName>] : IExcludePluginByName<TTail, TName> : readonly [] : readonly [];",
-          "declarationLine": 281,
+          "declarationLine": 282,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Removes every plugin with one name from a compile-time installed tuple.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IExcludePluginByName.",
@@ -3223,7 +3223,7 @@
           "name": "IExtractPluginConfig",
           "kind": "type",
           "signature": "export type IExtractPluginConfig<TPlugin> = TPlugin extends { readonly config?: infer TConfig; } ? TConfig extends IPluginConfig ? TConfig : IPluginConfig : IPluginConfig;",
-          "declarationLine": 274,
+          "declarationLine": 275,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IExtractPluginConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IExtractPluginConfig.",
@@ -3287,7 +3287,7 @@
           "name": "IExtractPluginExt",
           "kind": "type",
           "signature": "export type IExtractPluginExt<TPlugin> = TPlugin extends IPlugin<infer _TCore, infer TExt, infer _TConfig, infer _TShared, infer _TFeatures extends IFeatureRecord, infer _TExpose extends object, any> ? TExt : Record<string, never>;",
-          "declarationLine": 273,
+          "declarationLine": 274,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IExtractPluginExt is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IExtractPluginExt.",
@@ -4311,7 +4311,7 @@
           "name": "IMergePluginExts",
           "kind": "type",
           "signature": "export type IMergePluginExts<TPlugins extends readonly unknown[]> = IUnionToIntersection<IExtractPluginExt<TPlugins[number]>>;",
-          "declarationLine": 311,
+          "declarationLine": 312,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Combines the instance extensions supplied by a plugin group into an intersection.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMergePluginExts.",
@@ -4441,7 +4441,7 @@
           "name": "IPipelineConfig",
           "kind": "type",
           "signature": "export type IPipelineConfig = { mode?: IMiddlewarePipelineMode; };",
-          "declarationLine": 91,
+          "declarationLine": 92,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPipelineConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPipelineConfig.",
@@ -4505,7 +4505,7 @@
           "name": "IPlugin",
           "kind": "type",
           "signature": "export type IPlugin<TCore, TExt extends Record<string, unknown> = Record<string, never>, TConfig extends IPluginConfig = IPluginConfig, TShared extends object = Record<string, never>, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>, TSetup = never> = IPluginCommon<TCore, TConfig, TFeatures, TExpose> & IPluginHooks<TCore, TExt, TConfig, TFeatures, TExpose, TSetup> & (TShared extends object ? unknown : never);",
-          "declarationLine": 144,
+          "declarationLine": 145,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Plugin contract; the seventh axis exists only for a declared setup output.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPlugin.",
@@ -4749,7 +4749,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -4895,7 +4895,7 @@
           "name": "IPluginAdmission",
           "kind": "type",
           "signature": "export type IPluginAdmission<TPlugin extends IPluginConstraint<any>> = Readonly<{ readonly [pluginAdmissionBrand]?: TPlugin; }>;",
-          "declarationLine": 392,
+          "declarationLine": 389,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginAdmission is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginAdmission.",
@@ -4959,7 +4959,7 @@
           "name": "IPluginAdmissionRequest",
           "kind": "type",
           "signature": "export type IPluginAdmissionRequest = Readonly<{ readonly admission: IPluginAdmission<IPluginConstraint<any>>; readonly slot: IPluginDataOrderSlot; }>;",
-          "declarationLine": 396,
+          "declarationLine": 393,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "One admission request for the composition integration boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginAdmissionRequest.",
@@ -5023,7 +5023,7 @@
           "name": "IPluginAwaitable",
           "kind": "type",
           "signature": "export type IPluginAwaitable<T> = T | PromiseLike<T>;",
-          "declarationLine": 6,
+          "declarationLine": 7,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Values accepted at every asynchronous plugin lifecycle boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginAwaitable.",
@@ -5084,8 +5084,8 @@
         {
           "name": "IPluginBatchRemovalLeaf",
           "kind": "type",
-          "signature": "export type IPluginBatchRemovalLeaf = Readonly<{ readonly receipt: IPluginRegistrationReceipt; readonly name: string; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
-          "declarationLine": 419,
+          "signature": "export type IPluginBatchRemovalLeaf = ICleanupResult & Readonly<{ readonly receipt: IPluginRegistrationReceipt; readonly name: string; readonly cleanupComplete: boolean; }>;",
+          "declarationLine": 416,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Result of one prepared batch removal, preserving the Host dynamic-view contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBatchRemovalLeaf.",
@@ -5100,7 +5100,7 @@
           "aliasOf": "IPluginBatchRemovalLeaf",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPluginBatchRemovalLeaf = Readonly<{ readonly receipt: IPluginRegistrationReceipt; readonly name: string; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;"
+            "export type IPluginBatchRemovalLeaf = ICleanupResult & Readonly<{ readonly receipt: IPluginRegistrationReceipt; readonly name: string; readonly cleanupComplete: boolean; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5139,7 +5139,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginBatchRemovalLeaf:export type IPluginBatchRemovalLeaf = Readonly<{ readonly receipt: IPluginRegistrationReceipt; readonly name: string; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginBatchRemovalLeaf:export type IPluginBatchRemovalLeaf = ICleanupResult & Readonly<{ readonly receipt: IPluginRegistrationReceipt; readonly name: string; readonly cleanupComplete: boolean; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5149,7 +5149,7 @@
           "name": "IPluginBatchRemovalOptions",
           "kind": "type",
           "signature": "export type IPluginBatchRemovalOptions = Readonly<{ readonly beforeCleanup?: PromiseLike<void>; }>;",
-          "declarationLine": 415,
+          "declarationLine": 412,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Canonical fence supplied by Graph before Host physical cleanup begins.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBatchRemovalOptions.",
@@ -5212,8 +5212,8 @@
         {
           "name": "IPluginBatchRemovalResult",
           "kind": "type",
-          "signature": "export type IPluginBatchRemovalResult<TSnapshot> = Readonly<{ readonly ok: boolean; readonly committed: true; readonly snapshot: TSnapshot; readonly leaves: readonly IPluginBatchRemovalLeaf[]; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
-          "declarationLine": 427,
+          "signature": "export type IPluginBatchRemovalResult<TSnapshot> = ICleanupResult & Readonly<{ readonly ok: boolean; readonly committed: true; readonly snapshot: TSnapshot; readonly leaves: readonly IPluginBatchRemovalLeaf[]; readonly cleanupComplete: boolean; }>;",
+          "declarationLine": 422,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Aggregate result for one all-or-nothing prepared removal commit.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBatchRemovalResult.",
@@ -5228,7 +5228,7 @@
           "aliasOf": "IPluginBatchRemovalResult",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPluginBatchRemovalResult<TSnapshot> = Readonly<{ readonly ok: boolean; readonly committed: true; readonly snapshot: TSnapshot; readonly leaves: readonly IPluginBatchRemovalLeaf[]; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;"
+            "export type IPluginBatchRemovalResult<TSnapshot> = ICleanupResult & Readonly<{ readonly ok: boolean; readonly committed: true; readonly snapshot: TSnapshot; readonly leaves: readonly IPluginBatchRemovalLeaf[]; readonly cleanupComplete: boolean; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5267,7 +5267,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginBatchRemovalResult:export type IPluginBatchRemovalResult<TSnapshot> = Readonly<{ readonly ok: boolean; readonly committed: true; readonly snapshot: TSnapshot; readonly leaves: readonly IPluginBatchRemovalLeaf[]; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginBatchRemovalResult:export type IPluginBatchRemovalResult<TSnapshot> = ICleanupResult & Readonly<{ readonly ok: boolean; readonly committed: true; readonly snapshot: TSnapshot; readonly leaves: readonly IPluginBatchRemovalLeaf[]; readonly cleanupComplete: boolean; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5277,7 +5277,7 @@
           "name": "IPluginBeforeReleaseContext",
           "kind": "type",
           "signature": "export type IPluginBeforeReleaseContext = Readonly<IPluginDisposalContext & { remainingMs(): number | undefined; }>;",
-          "declarationLine": 56,
+          "declarationLine": 57,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Gives a pre-release hook the Host clock's remaining relative cleanup budget.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginBeforeReleaseContext.",
@@ -5341,7 +5341,7 @@
           "name": "IPluginConfig",
           "kind": "type",
           "signature": "export type IPluginConfig = Record<string, unknown>;",
-          "declarationLine": 31,
+          "declarationLine": 32,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginConfig.",
@@ -5405,7 +5405,7 @@
           "name": "IPluginConstraint",
           "kind": "type",
           "signature": "export type IPluginConstraint<TCore, TFeatures extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>> = { readonly name: string; readonly config?: unknown; readonly features?: TFeatures; readonly activation?: 'eager' | 'lazy'; update?: (next: never, core: TCore & IPluginLifecycleCore<any> & Readonly<{ features: IFeatureOutputs<TFeatures>; featureExpose: TExpose; }>) => IPluginAwaitable<void>; onEnable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDisable?: (context: IPluginRegistrationContext) => IPluginAwaitable<void>; onDependencyReplaced?: (name: string, outputs: Readonly<Record<string, object>>) => IPluginAwaitable<void>; dispose?: (context?: IPluginDisposalContext) => IPluginAwaitable<void>; /** Captured before the registration enters its bounded release step. */ beforeRelease?: (context: IPluginBeforeReleaseContext) => IPluginAwaitable<void>; [asyncDisposeKey]?: () => IPluginAwaitable<void>; [disposeKey]?: () => void; } & (IPluginPlainHooks<TCore, Record<string, unknown>, any, TFeatures, TExpose> | { readonly setup: (context: IPluginSetupContext<any>) => unknown; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<any>, setupOutput?: any) => TExpose); install: (core: IPluginHookCore<TCore, any, TFeatures, TExpose>, setupOutput?: any) => IPluginAwaitable<Record<string, unknown>>; });",
-          "declarationLine": 146,
+          "declarationLine": 147,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Constrains a plugin tuple while preserving each plugin's precise generic arguments.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginConstraint.",
@@ -5469,7 +5469,7 @@
           "name": "IPluginDataOrderSlot",
           "kind": "type",
           "signature": "export type IPluginDataOrderSlot = Readonly<{ readonly __pluginDataOrderSlot: unique symbol; }>;",
-          "declarationLine": 387,
+          "declarationLine": 384,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Opaque Host-owned ordering slot; callers may retain it but cannot inspect its ordinal.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginDataOrderSlot.",
@@ -5619,7 +5619,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -5724,7 +5724,7 @@
           "name": "IPluginDependencyMutationOptions",
           "kind": "type",
           "signature": "export type IPluginDependencyMutationOptions = Readonly<{ readonly policy?: import('@migaia/capability/graph/dependency').DependencyPolicy; readonly dryRun?: boolean; }>;",
-          "declarationLine": 212,
+          "declarationLine": 213,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Dependency-aware removal/disable behavior.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginDependencyMutationOptions.",
@@ -5788,7 +5788,7 @@
           "name": "IPluginDependencyPlan",
           "kind": "type",
           "signature": "export type IPluginDependencyPlan = Readonly<{ readonly policy: import('@migaia/capability/graph/dependency').DependencyPolicy; readonly order: readonly string[]; readonly steps: readonly IPluginDependencyPlanStep[]; readonly edges: readonly Readonly<{ readonly provider: string; readonly consumer: string; readonly optional: boolean; readonly status?: 'optional-absent'; }>[]; }>;",
-          "declarationLine": 222,
+          "declarationLine": 223,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Immutable dependency mutation plan returned by dry-run operations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginDependencyPlan.",
@@ -5872,7 +5872,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -5977,7 +5977,7 @@
           "name": "IPluginDisableToken",
           "kind": "type",
           "signature": "export type IPluginDisableToken<_THost, TPlugin extends IPluginConstraint<any>, _TInstalled extends readonly IPluginConstraint<any>[], _TDomainCore extends object, _TValue> = Readonly<{ readonly name: TPlugin['name']; enable(): Promise<void>; }>;",
-          "declarationLine": 285,
+          "declarationLine": 286,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Exact-registration token returned by disable; enabling restores the original tuple type.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginDisableToken.",
@@ -6041,7 +6041,7 @@
           "name": "IPluginDisposalContext",
           "kind": "type",
           "signature": "export type IPluginDisposalContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; }>;",
-          "declarationLine": 51,
+          "declarationLine": 52,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Disposal context passed to a V2 plugin dispose hook.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginDisposalContext.",
@@ -6105,7 +6105,7 @@
           "name": "IPluginDisposer",
           "kind": "type",
           "signature": "export type IPluginDisposer = () => IPluginAwaitable<void>;",
-          "declarationLine": 8,
+          "declarationLine": 9,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Plugin resource cleanup callback; a thenable is assimilated by the owning lifecycle scope.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginDisposer.",
@@ -6169,7 +6169,7 @@
           "name": "IPluginEnablement",
           "kind": "type",
           "signature": "export type IPluginEnablement<THost, TInstalled extends readonly IPluginConstraint<any>[], TDomainCore extends object, TValue> = Readonly<{ disable(name: string, options: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true; }>): Promise<IPluginDependencyPlan>; disable(name: string, options?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false; }>): Promise<Readonly<{ readonly token: IPluginDisableToken<THost, any, TInstalled, TDomainCore, TValue>; }>>; enable(name: string): Promise<void>; disabled(): readonly string[]; }>;",
-          "declarationLine": 290,
+          "declarationLine": 291,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Host-side enablement surface; string enablement keeps a dynamic view type.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginEnablement.",
@@ -6233,7 +6233,7 @@
           "name": "IPluginFeatureCore",
           "kind": "type",
           "signature": "export type IPluginFeatureCore<TFeatures extends IFeatureRecord, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>> = Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose; }>;",
-          "declarationLine": 250,
+          "declarationLine": 251,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Feature fields injected into Plugin hooks from selected roots and one registration expose.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginFeatureCore.",
@@ -6297,7 +6297,7 @@
           "name": "IPluginFeatureName",
           "kind": "type",
           "signature": "export type IPluginFeatureName<TPlugin> = Extract<keyof IPluginConstraintFeatures<TPlugin>, string>;",
-          "declarationLine": 177,
+          "declarationLine": 178,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Declared feature names for one concrete plugin definition.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginFeatureName.",
@@ -6363,7 +6363,7 @@
           "name": "IPluginFeatureOptions",
           "kind": "type",
           "signature": "export type IPluginFeatureOptions<TCore extends object, TConfig extends IPluginConfig, TFeatures extends IFeatureRecord, TExpose extends object & IFeatureRecordRequiredExpose<TFeatures>> = Readonly<{ readonly features?: TFeatures; readonly featureExpose?: TExpose | ((core: TCore & IPluginLifecycleCore<TConfig>) => TExpose); }>;",
-          "declarationLine": 255,
+          "declarationLine": 256,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Definition-time Feature options shared by functional and object Plugin declarations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginFeatureOptions.",
@@ -6427,7 +6427,7 @@
           "name": "IPluginFeatureOutput",
           "kind": "type",
           "signature": "export type IPluginFeatureOutput<TPlugin, TName extends IPluginFeatureName<TPlugin>> = IFeatureOutput<IPluginConstraintFeatures<TPlugin>[TName]>;",
-          "declarationLine": 179,
+          "declarationLine": 180,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Output produced by one named feature in a concrete plugin definition.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginFeatureOutput.",
@@ -6493,7 +6493,7 @@
           "name": "IPluginHandle",
           "kind": "type",
           "signature": "export type IPluginHandle<TPlugin extends IPluginConstraint<any>> = Readonly<{ readonly name: TPlugin['name']; readonly extensions: Readonly<IExtractPluginExt<TPlugin>>; getFeature<TKey extends IPluginFeatureName<TPlugin>>(name: TKey): IPluginFeatureOutput<TPlugin, TKey>; readonly config: IPluginHandleConfig<TPlugin>; }>;",
-          "declarationLine": 186,
+          "declarationLine": 187,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Public name-addressed plugin handle.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHandle.",
@@ -6577,7 +6577,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -6682,7 +6682,7 @@
           "name": "IPluginHandleConfig",
           "kind": "type",
           "signature": "export type IPluginHandleConfig<TPlugin> = Readonly<{ get(): IReadonlyConfig<IExtractPluginConfig<TPlugin>>; update(recipe: (previous: IReadonlyConfig<IExtractPluginConfig<TPlugin>>) => Partial<IExtractPluginConfig<TPlugin>>): Promise<void>; }>;",
-          "declarationLine": 181,
+          "declarationLine": 182,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Plugin-scoped config surface exposed by a name-addressed handle.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHandleConfig.",
@@ -6746,7 +6746,7 @@
           "name": "IPluginHandleTuple",
           "kind": "type",
           "signature": "export type IPluginHandleTuple<TPlugins extends readonly IPluginConstraint<any>[]> = { readonly [K in keyof TPlugins]: TPlugins[K] extends IPluginConstraint<any> ? IPluginHandle<TPlugins[K]> : never; };",
-          "declarationLine": 193,
+          "declarationLine": 194,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Input-order-preserving handles returned from one install batch.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHandleTuple.",
@@ -6830,7 +6830,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -6935,7 +6935,7 @@
           "name": "IPluginHostConfigFor",
           "kind": "type",
           "signature": "export type IPluginHostConfigFor<TPlugins extends readonly unknown[]> = { get(path: string): unknown | undefined; update<TName extends Extract<TPlugins[number], { readonly name: string; }>['name']>(name: TName, recipe: (previous: IReadonlyConfig<IExtractPluginConfig<IPluginByName<TPlugins, TName>>>) => Partial<IExtractPluginConfig<IPluginByName<TPlugins, TName>>>): Promise<void>; update(name: string, recipe: (previous: IReadonlyConfig<IPluginConfig>) => Partial<IPluginConfig>): Promise<void>; };",
-          "declarationLine": 302,
+          "declarationLine": 303,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginHostConfigFor is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostConfigFor.",
@@ -6999,7 +6999,7 @@
           "name": "IPluginHostCore",
           "kind": "interface",
           "signature": "export interface IPluginHostCore<TValue = never, _TLegacyShared extends object = Record<PropertyKey, unknown>, TConfig extends IPluginConfig = IPluginConfig> { readonly config: IPluginLifecycleConfig<TConfig>; readonly operation: IPluginOperationContext; readonly lifecycle: IPluginRegistrationContext; onDispose(resource: IPluginResource): void; usePipeline(stage: ISyncMiddlewareStage<TValue>): this; useAsyncPipeline(stage: IAsyncMiddlewareStage<TValue>): this; useGeneratorPipeline(stage: IGeneratorMiddlewareStage<TValue>): this; useAsyncGeneratorPipeline(stage: IAsyncGeneratorMiddlewareStage<TValue>): this; }",
-          "declarationLine": 318,
+          "declarationLine": 319,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Interface semantics allow fluent capabilities to return polymorphic `this`. Common capabilities that PluginHost supplies to plugins and domain hosts. Intersect domain fields with this interface to reuse resource cleanup, configuration, and pipeline contracts.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostCore.",
@@ -7063,7 +7063,7 @@
           "name": "IPluginHostDiagnostic",
           "kind": "type",
           "signature": "export type IPluginHostDiagnostic = (message: string, code?: IPluginHostErrorCode, error?: unknown) => void;",
-          "declarationLine": 210,
+          "declarationLine": 211,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Host diagnostic outlet. `message` stays the human-readable line; `error`, when present, is the exact contained error object so reporters can walk its `cause`/`errors` chain instead of parsing text. Reporter failures are contained by the Host and never replace the reported primary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostDiagnostic.",
@@ -7303,7 +7303,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -7408,7 +7408,7 @@
           "name": "IPluginHostDisposalNodeKind",
           "kind": "type",
           "signature": "export type IPluginHostDisposalNodeKind = (typeof PluginHostDisposalNodeKind)[keyof typeof PluginHostDisposalNodeKind];",
-          "declarationLine": 14,
+          "declarationLine": 16,
           "source": "packages/plugin-host/dist/cleanup-runtime.d.ts",
           "purpose": "IPluginHostDisposalNodeKind is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostDisposalNodeKind.",
@@ -7472,7 +7472,7 @@
           "name": "IPluginHostDisposalProvenance",
           "kind": "type",
           "signature": "export type IPluginHostDisposalProvenance = Readonly<{ readonly kind: IPluginHostDisposalNodeKind; readonly phase?: string; }>;",
-          "declarationLine": 16,
+          "declarationLine": 18,
           "source": "packages/plugin-host/dist/cleanup-runtime.d.ts",
           "purpose": "Frozen provenance detail stored only in the private producer registry.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostDisposalProvenance.",
@@ -7535,8 +7535,8 @@
         {
           "name": "IPluginHostDisposalResult",
           "kind": "type",
-          "signature": "export type IPluginHostDisposalResult = Readonly<{ readonly logicalTerminal: true; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
-          "declarationLine": 380,
+          "signature": "export type IPluginHostDisposalResult = ICleanupResult & Readonly<{ readonly logicalTerminal: true; readonly cleanupComplete: boolean; }>;",
+          "declarationLine": 379,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Structured logical terminal result; cleanup failures never reopen or reject the Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostDisposalResult.",
@@ -7551,7 +7551,7 @@
           "aliasOf": "IPluginHostDisposalResult",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPluginHostDisposalResult = Readonly<{ readonly logicalTerminal: true; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;"
+            "export type IPluginHostDisposalResult = ICleanupResult & Readonly<{ readonly logicalTerminal: true; readonly cleanupComplete: boolean; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7590,7 +7590,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginHostDisposalResult:export type IPluginHostDisposalResult = Readonly<{ readonly logicalTerminal: true; readonly cleanupComplete: boolean; readonly cleanupErrors: readonly unknown[]; readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginHostDisposalResult:export type IPluginHostDisposalResult = ICleanupResult & Readonly<{ readonly logicalTerminal: true; readonly cleanupComplete: boolean; }>;",
           "guidance": [
             {
               "id": "host-构造与生命周期-api",
@@ -7620,7 +7620,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -7970,7 +7970,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -8116,7 +8116,7 @@
           "name": "IPluginHostErrorDetail",
           "kind": "type",
           "signature": "export type IPluginHostErrorDetail = Readonly<Record<string, unknown>>;",
-          "declarationLine": 15,
+          "declarationLine": 16,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Generic structured detail carried by a PluginHost boundary error.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostErrorDetail.",
@@ -8308,7 +8308,7 @@
           "name": "IPluginHostOptions",
           "kind": "type",
           "signature": "export type IPluginHostOptions = { /** Optional human-readable Host identity label; uniqueness is supplied by the runtime id. */ readonly identity?: Readonly<{ readonly name?: string; }>; /** Explicit operation and pipeline drain budgets; `false` opts into unbounded waiting. */ readonly execution: { /** * Maximum time for one admitted install, update, or removal hook; `false` waits without a * deadline. */ readonly mutationTimeoutMs: number | false; /** * Maximum time to drain active pipeline leases before logical removal continues; `false` waits * until zero. */ readonly pipelineDrainTimeoutMs: number | false; }; pipeline?: IPipelineConfig; diagnostic?: IPluginHostDiagnostic; /** * Terminal sink for failures of `diagnostic` itself (it threw or rejected). Receives the exact * failure object; when absent, or when it throws too, the failure goes to the runtime's * `globalThis.reportError` if one exists. Never affects Host control flow. */ onDiagnosticFailure?: (error: unknown) => void; /** * Clock and scheduling source shared by the queue watchdog and disposal timeouts. Defaults to * lifecycle `systemScheduler`. */ scheduler?: IScheduler; /** * Admission wait limit. `undefined` reports without rejecting; `false` disables timers, reports, * and rejection; a number rejects and removes timed-out work. */ queueAdmissionTimeoutMs?: number | false; /** * Diagnostic wait threshold when `queueAdmissionTimeoutMs` is omitted. `false` disables its * timer. */ queueAdmissionDiagnosticMs?: number | false; /** * Maximum wait for one disposal step. `false` waits indefinitely without triggering forced * release. */ disposeStepTimeoutMs?: number | false; };",
-          "declarationLine": 328,
+          "declarationLine": 329,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginHostOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostOptions.",
@@ -8392,7 +8392,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -8496,8 +8496,8 @@
         {
           "name": "IPluginHostPhysicalCleanupResult",
           "kind": "type",
-          "signature": "export type IPluginHostPhysicalCleanupResult = Readonly<{ readonly cleanupErrors: readonly unknown[]; }>;",
-          "declarationLine": 376,
+          "signature": "export type IPluginHostPhysicalCleanupResult = ICleanupResult;",
+          "declarationLine": 377,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Physical completion detail for work that outlives bounded logical disposal.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostPhysicalCleanupResult.",
@@ -8511,9 +8511,7 @@
           "members": [],
           "aliasOf": "IPluginHostPhysicalCleanupResult",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export type IPluginHostPhysicalCleanupResult = Readonly<{ readonly cleanupErrors: readonly unknown[]; }>;"
-          ],
+          "overloadSignatures": ["export type IPluginHostPhysicalCleanupResult = ICleanupResult;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use IPluginHostPhysicalCleanupResult when its type contract and declared inputs match the result you need.",
@@ -8551,7 +8549,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginHostPhysicalCleanupResult:export type IPluginHostPhysicalCleanupResult = Readonly<{ readonly cleanupErrors: readonly unknown[]; }>;",
+          "identity": "packages/plugin-host/dist/typing.d.ts:IPluginHostPhysicalCleanupResult:export type IPluginHostPhysicalCleanupResult = ICleanupResult;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8561,7 +8559,7 @@
           "name": "IPluginHostRegistrationLifecycle",
           "kind": "type",
           "signature": "export type IPluginHostRegistrationLifecycle = (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle];",
-          "declarationLine": 20,
+          "declarationLine": 23,
           "source": "packages/plugin-host/dist/state-constants.d.ts",
           "purpose": "IPluginHostRegistrationLifecycle is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostRegistrationLifecycle.",
@@ -8625,7 +8623,7 @@
           "name": "IPluginHostRuntimeExtensions",
           "kind": "interface",
           "signature": "export interface IPluginHostRuntimeExtensions<TInstalled extends readonly IPluginConstraint<any>[] = readonly [], _TCandidate = unknown> { /** Type-only installed inventory; the canonical runtime state remains the authority. */ readonly __installedPlugins?: TInstalled; }",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Interface semantics are required only for adapter-owned module augmentation of Host outlets.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostRuntimeExtensions.",
@@ -8689,7 +8687,7 @@
           "name": "IPluginHostStatus",
           "kind": "type",
           "signature": "export type IPluginHostStatus = (typeof PluginHostStatus)[keyof typeof PluginHostStatus];",
-          "declarationLine": 19,
+          "declarationLine": 22,
           "source": "packages/plugin-host/dist/state-constants.d.ts",
           "purpose": "IPluginHostStatus is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostStatus.",
@@ -8753,7 +8751,7 @@
           "name": "IPluginInstaller",
           "kind": "type",
           "signature": "export type IPluginInstaller<TCore extends object, TExtension extends Record<string, unknown>, TValue = never, TConfig extends IPluginConfig = IPluginConfig> = (core: TCore & IPluginHostCore<TValue, Record<PropertyKey, unknown>, TConfig>) => IPluginAwaitable<TExtension>;",
-          "declarationLine": 33,
+          "declarationLine": 34,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Functional installer signature carrying the Host pipeline payload axis.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginInstaller.",
@@ -8817,7 +8815,7 @@
           "name": "IPluginInstallFailureDetail",
           "kind": "type",
           "signature": "export type IPluginInstallFailureDetail = { readonly failedName: string; readonly rollbackErrors: readonly unknown[]; readonly completion?: Promise<IPluginInstallFailureDetail>; };",
-          "declarationLine": 26,
+          "declarationLine": 27,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Structured install-failure detail. Synchronous installation publishes an immutable snapshot; its completion resolves to the final immutable rollback detail without mutating the published error, so a translator can await cleanup deterministically.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginInstallFailureDetail.",
@@ -8881,7 +8879,7 @@
           "name": "IPluginLifecycleConfig",
           "kind": "type",
           "signature": "export type IPluginLifecycleConfig<TConfig extends IPluginConfig = IPluginConfig> = { get(): IReadonlyConfig<TConfig>; };",
-          "declarationLine": 38,
+          "declarationLine": 39,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginLifecycleConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginLifecycleConfig.",
@@ -8945,7 +8943,7 @@
           "name": "IPluginLifecycleCore",
           "kind": "type",
           "signature": "export type IPluginLifecycleCore<TConfig extends IPluginConfig = IPluginConfig> = { readonly config: IPluginLifecycleConfig<TConfig>; readonly operation: IPluginOperationContext; readonly lifecycle: IPluginRegistrationContext; };",
-          "declarationLine": 60,
+          "declarationLine": 61,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Plugin-facing config capability; TConfig is fixed by the plugin declaration.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginLifecycleCore.",
@@ -9009,7 +9007,7 @@
           "name": "IPluginOperationContext",
           "kind": "type",
           "signature": "export type IPluginOperationContext = { readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; };",
-          "declarationLine": 42,
+          "declarationLine": 43,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Operation-scoped cancellation and deadline exposed to one plugin hook invocation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginOperationContext.",
@@ -9073,7 +9071,7 @@
           "name": "IPluginPreparedAdmissions",
           "kind": "type",
           "signature": "export type IPluginPreparedAdmissions = object;",
-          "declarationLine": 401,
+          "declarationLine": 398,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Opaque prepared candidate admission owned by one concrete PluginHost.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginPreparedAdmissions.",
@@ -9135,7 +9133,7 @@
           "name": "IPluginPreparedRemovalBatch",
           "kind": "type",
           "signature": "export type IPluginPreparedRemovalBatch = object;",
-          "declarationLine": 413,
+          "declarationLine": 410,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Opaque exact registration batch prepared for logical removal.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginPreparedRemovalBatch.",
@@ -9197,7 +9195,7 @@
           "name": "IPluginRegistrationContext",
           "kind": "type",
           "signature": "export type IPluginRegistrationContext = { readonly signal: IAbortSignal; };",
-          "declarationLine": 47,
+          "declarationLine": 48,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Registration-scoped lifetime signal that remains valid until logical revocation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginRegistrationContext.",
@@ -9261,7 +9259,7 @@
           "name": "IPluginRegistrationReceipt",
           "kind": "type",
           "signature": "export type IPluginRegistrationReceipt<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = IRegistrationToken<TPlugin>;",
-          "declarationLine": 407,
+          "declarationLine": 404,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "@deprecated Use IRegistrationToken from `@migaia/plugin-host/composition`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginRegistrationReceipt.",
@@ -9325,7 +9323,7 @@
           "name": "IPluginRemoval",
           "kind": "type",
           "signature": "export type IPluginRemoval = Readonly<{ readonly ok: true; readonly affected: IPluginDependencyPlan; }> | Readonly<{ readonly ok: false; readonly errors: readonly unknown[]; readonly affected: IPluginDependencyPlan; }>;",
-          "declarationLine": 197,
+          "declarationLine": 198,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Structured logical removal result; cleanup failures remain observable.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginRemoval.",
@@ -9409,7 +9407,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -9514,7 +9512,7 @@
           "name": "IPluginResource",
           "kind": "type",
           "signature": "export type IPluginResource = IPluginDisposer | { [asyncDisposeKey](): IPluginAwaitable<void>; } | { [disposeKey](): void; };",
-          "declarationLine": 9,
+          "declarationLine": 10,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "IPluginResource is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginResource.",
@@ -9772,7 +9770,7 @@
           "name": "IPluginSetup",
           "kind": "type",
           "signature": "export type IPluginSetup<TConfig extends IPluginConfig, TSetup> = (context: IPluginSetupContext<TConfig>) => TSetup | PromiseLike<TSetup>;",
-          "declarationLine": 81,
+          "declarationLine": 82,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Produces one registration's setup output before Feature construction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginSetup.",
@@ -9836,7 +9834,7 @@
           "name": "IPluginSetupContext",
           "kind": "type",
           "signature": "export type IPluginSetupContext<TConfig extends IPluginConfig = IPluginConfig> = Readonly<{ readonly config: IPluginLifecycleConfig<TConfig>; readonly operation: IPluginSetupOperation; readonly lifecycle: IPluginRegistrationContext; onDispose(resource: IPluginResource): void; }>;",
-          "declarationLine": 74,
+          "declarationLine": 75,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Setup sees lifecycle capabilities but no Feature or pipeline output.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginSetupContext.",
@@ -9900,7 +9898,7 @@
           "name": "IPluginSetupOperation",
           "kind": "type",
           "signature": "export type IPluginSetupOperation = Readonly<{ readonly signal: IAbortSignal; /** Absolute deadline in the Host scheduler clock, or undefined without a mutation timeout. */ readonly deadlineAt: number | undefined; /** Reads the Host scheduler clock used for the deadline. */ now(): number; }>;",
-          "declarationLine": 66,
+          "declarationLine": 67,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Attempt-scoped cancellation and deadline for setup, independent of later Host mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginSetupOperation.",
@@ -10510,7 +10508,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -10697,9 +10695,9 @@
               "name": "execution.pipelineDrainTimeoutMs",
               "type": "number | false",
               "optional": false,
-              "description": "managed cleanup 的物理链不设强制截止时间；`execution.pipelineDrainTimeoutMs` 是观察上限，`false` 代表无限等待。普通 `unUse()`/`dispose()` 的逐项 `disposeStepTimeoutMs` 不会截断这条 managed 物理链。",
+              "description": "managed cleanup 使用必填的 `execution.pipelineDrainTimeoutMs`，没有隐式默认值。数值预算由本批次所有 lease 与清理步骤共享；到期后继续后续清理，即使普通 `disposeStepTimeoutMs` 为 `false`。显式 `pipelineDrainTimeoutMs: false` 才逐项等待真实完成，并绕过普通步骤预算。`beforeCleanup` fence 始终先完成。",
               "descriptionEn": "Maximum time to drain active pipeline leases before logical removal continues; `false` waits * until zero.",
-              "descriptionZh": "managed cleanup 的物理链不设强制截止时间；`execution.pipelineDrainTimeoutMs` 是观察上限，`false` 代表无限等待。普通 `unUse()`/`dispose()` 的逐项 `disposeStepTimeoutMs` 不会截断这条 managed 物理链。"
+              "descriptionZh": "managed cleanup 使用必填的 `execution.pipelineDrainTimeoutMs`，没有隐式默认值。数值预算由本批次所有 lease 与清理步骤共享；到期后继续后续清理，即使普通 `disposeStepTimeoutMs` 为 `false`。显式 `pipelineDrainTimeoutMs: false` 才逐项等待真实完成，并绕过普通步骤预算。`beforeCleanup` fence 始终先完成。"
             },
             {
               "name": "pipeline",
@@ -10772,7 +10770,7 @@
           "name": "PluginHostDisposalNodeKind",
           "kind": "const",
           "signature": "export declare const PluginHostDisposalNodeKind: Readonly<{ readonly hostError: \"host-error\"; readonly aggregate: \"aggregate\"; readonly disposerWrapper: \"disposer-wrapper\"; }>;",
-          "declarationLine": 9,
+          "declarationLine": 11,
           "source": "packages/plugin-host/dist/cleanup-runtime.d.ts",
           "purpose": "Stable kinds for structured nodes emitted by PluginHost disposal producers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for PluginHostDisposalNodeKind.",
@@ -11177,7 +11175,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -11566,7 +11564,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -12292,7 +12290,7 @@
           "name": "IPluginHostCompositionIntegration",
           "kind": "type",
           "signature": "export type IPluginHostCompositionIntegration<_THost> = Readonly<{ readonly revision: number; getCurrentSnapshot(): IPluginHostCompositionSnapshot; createPluginAdmission<TPlugin extends IPluginConstraint<any>>(plugin: TPlugin): IPluginAdmission<TPlugin>; createDataOrderSlot(name: string): IPluginDataOrderSlot; prepareAdmissions(requestsInPublicationOrder: readonly IPluginAdmissionRequest[]): Promise<IPluginPreparedAdmissions>; commitPreparedAdmissions(prepared: IPluginPreparedAdmissions): readonly IPluginRegistrationReceipt[]; discardPreparedAdmissions(prepared: IPluginPreparedAdmissions): Promise<IPluginHostPhysicalCleanupResult>; retireDataOrderSlot(slot: IPluginDataOrderSlot): void; prepareUnUseBatch(receiptsInCleanupOrder: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch; commitPreparedUnUseBatch<TView>(prepared: IPluginPreparedRemovalBatch, options: IPluginBatchRemovalOptions): Promise<IPluginBatchRemovalResult<TView>>; }>;",
-          "declarationLine": 442,
+          "declarationLine": 435,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Host-owned integration used by a composition owner to perform total batch publication.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostCompositionIntegration.",
@@ -12356,7 +12354,7 @@
           "name": "IPluginHostCompositionSnapshot",
           "kind": "type",
           "signature": "export type IPluginHostCompositionSnapshot = Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>>; readonly config: IPluginHostConfigFor<readonly IPluginConstraint<any>[]>; }>;",
-          "declarationLine": 437,
+          "declarationLine": 430,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Internal composition snapshot; ordinary Host consumers receive name-addressed handles.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginHostCompositionSnapshot.",
@@ -12420,7 +12418,7 @@
           "name": "IRegistrationToken",
           "kind": "type",
           "signature": "export type IRegistrationToken<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = object & Readonly<{ readonly __plugin?: TPlugin; }>;",
-          "declarationLine": 403,
+          "declarationLine": 400,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Canonical name for the opaque token accepted by composition publication.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRegistrationToken.",
@@ -12486,7 +12484,7 @@
           "name": "IRegistrationView",
           "kind": "type",
           "signature": "export type IRegistrationView<TPlugin extends IPluginConstraint<any> = IPluginConstraint<any>> = Readonly<{ readonly extensions: Readonly<IExtractPluginExt<TPlugin>>; }>;",
-          "declarationLine": 409,
+          "declarationLine": 406,
           "source": "packages/plugin-host/dist/typing.d.ts",
           "purpose": "Narrow extension-only view for one live registration token.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRegistrationView.",

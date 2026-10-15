@@ -99,6 +99,7 @@
         "createSyncStartedDisposalLedger",
         "createTerminalController",
         "executeReleaseDescriptor",
+        "mergeCleanupResults",
         "snapshotScheduler"
       ],
       "./abort": [
@@ -126,7 +127,8 @@
       "./disposal": [
         "createDisposeTransaction",
         "createSyncStartedDisposalLedger",
-        "executeReleaseDescriptor"
+        "executeReleaseDescriptor",
+        "mergeCleanupResults"
       ],
       "./errors": [
         "LIFECYCLE_SOURCE",
