@@ -29,6 +29,12 @@ describe('L-T7 QuiescenceTracker: unsealed whenZero()', () => {
 })
 
 describe('L-T8 QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnce()', () => {
+  it('LC-B7 does not retain an idle string key after a loose wait', async () => {
+    const tracker = createStringQuiescenceTracker()
+    await tracker.whenZeroOnce('never-retained')
+    expect(tracker.forget('never-retained')).toBe(false)
+  })
+
   it('strict whenZero() resolves once the sealed key reaches zero, and rejects further retain()', async () => {
     const tracker = createStringQuiescenceTracker()
     const release = tracker.retain('k')
