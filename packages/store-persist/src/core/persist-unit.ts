@@ -1,3 +1,4 @@
+import { createAbortController, type IAbortController } from '@migaia/lifecycle'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import type { IAbortSignal } from '@migaia/utils/promise'
@@ -288,7 +289,7 @@ export function persistUnit<TState>(
   let writeDeadline: number | undefined
   let disposed = false
   let generationEpoch = 0
-  const activeOperations = new Set<AbortController>()
+  const activeOperations = new Set<IAbortController>()
   let hydrationSettled = false
   let hydrationFailed = false
   let hydrating = false
@@ -309,7 +310,7 @@ export function persistUnit<TState>(
     operation: (signal: IAbortSignal) => T | Promise<T>
   ): Promise<T> {
     assertActive()
-    const controller = new AbortController()
+    const controller = createAbortController()
     activeOperations.add(controller)
     try {
       const result = await operation(controller.signal)
