@@ -1179,6 +1179,12 @@
       "library": "lifecycle"
     },
     {
+      "path": "/en/docs/lifecycle/api/abortableDelay",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
       "path": "/en/docs/lifecycle/api/boundedWait",
       "locale": "en",
       "domain": "docs",
@@ -16756,6 +16762,12 @@
     },
     {
       "path": "/zh/docs/lifecycle/api/abort/observeAbortSubscription",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/api/abortableDelay",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"

@@ -2689,7 +2689,7 @@
                     "静默追踪与租约：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`",
                     "事务性所有权：`createProvisionalScope`",
                     "变更队列：`createMutationQueue`",
-                    "调度器、中止与有界等待：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`",
+                    "调度器、中止与有界等待：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`",
                     "错误基础设施：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`",
                     "状态常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                     "按需导入与 tree-shaking",
@@ -3231,7 +3231,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -3240,15 +3240,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -3373,6 +3373,29 @@
                   "text": "验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在 `test/` 下检索到对应用例。"
                 }
               ]
+            },
+            {
+              "id": "可中止的相对延时",
+              "heading": "可中止的相对延时",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`abortableDelay(scheduler, ms, signal, reportCleanup?)` 从 `@migaia/lifecycle` 根入口导入。 `scheduler` 负责计时，`ms` 必须有限且非负；`signal` 可以传 `undefined`。 返回 `Promise<boolean>`：到期为 `true`，abort 事件先到为 `false`；调用方决定取消是否应变成领域 AbortError。 监听器注册与 scheduler 接纳结束前不提交同步 callback 的结果；接纳失败保持 primary，原始错误实例或 cause 链可追溯。 任务句柄最多 cancel 一次，abort 监听由 canonical observed-subscription 管理。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "清理失败默认使 wait 拒绝；提供 `reportCleanup(error)` 后，清理失败走该观察渠道，不替换已完成或已取消的结果。 注册或调度失败仍拒绝，`DELAY_FAILED` 保留 native Error 的身份与 stack，不能附加身份时用 cause 保留原值。 无效时长或 cleanup reporter 在接纳前以 `INVALID_OPTION` 拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`boundedWait(task, deadlineAt, { scheduler, reportCleanup? })` 仍负责绝对截止时间与任务竞争，不会取消 task。 它的默认清理失败行为不变；可选 `reportCleanup` 允许 logger flush 把 timer 清理失败作为诊断，保留任务或 deadline winner。 批处理 debounce、health 周期调度与预算授予定时器不等同于一次性相对延时，不强行转换其 owner 语义。"
+                }
+              ]
             }
           ]
         },
@@ -3401,11 +3424,11 @@
                     "静默追踪与租约模块：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`",
                     "事务性所有权模块：`createProvisionalScope`",
                     "变更队列模块：`createMutationQueue`",
-                    "调度器、中止与有界等待模块：`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`",
+                    "调度器、中止与有界等待模块：`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`",
                     "错误基础设施模块：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`createLifecycleTypeError`、`createLifecycleFailure`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`",
                     "状态常量模块：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                     "按需导入与 tree-shaking",
-                    "错误码：`LifecycleErrorCode`（20 个码）逐条语义",
+                    "错误码：`LifecycleErrorCode`（22 个码）逐条语义",
                     "诊断消息：`LifecycleErrorText`",
                     "高阶组合示例",
                     "全部公开 API 索引",
@@ -3947,7 +3970,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
+                  "text": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
                 },
                 {
                   "type": "paragraph",
@@ -4424,7 +4447,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，20 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "稳定错误码表，22 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -4435,6 +4458,11 @@
                   "type": "table",
                   "headers": ["`LifecycleErrorCode` 键", "码值", "触发条件"],
                   "rows": [
+                    [
+                      "`delayFailed`",
+                      "`DELAY_FAILED`",
+                      "相对延时无法注册、调度或清理；原错误保持可追溯，取消本身返回 false 而非错误"
+                    ],
                     [
                       "`scopeClosed`",
                       "`SCOPE_CLOSED`",
@@ -4484,6 +4512,11 @@
                       "`generationDisposed`",
                       "`GENERATION_DISPOSED`",
                       "在已 `dispose()` 的 `GenerationController` 上调用 `begin()`"
+                    ],
+                    [
+                      "`generationTimedOut`",
+                      "`GENERATION_TIMED_OUT`",
+                      "当前 generation 的 timeoutMs 预算到期；signal.reason 为带码 Error"
                     ],
                     ["`quiescenceSealed`", "`QUIESCENCE_SEALED`", "`seal()` 之后又调用 `retain()`"],
                     [
@@ -4667,7 +4700,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
+                    "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`abortableDelay`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
                     "常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。",
                     "类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。"
                   ]
@@ -4704,6 +4737,29 @@
                 {
                   "type": "paragraph",
                   "text": "验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在 `test/` 下检索到对应用例。"
+                }
+              ]
+            },
+            {
+              "id": "可中止的相对延时",
+              "heading": "可中止的相对延时",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`abortableDelay(scheduler, ms, signal, reportCleanup?)` 从 `@migaia/lifecycle` 根入口导入。 `scheduler` 负责计时，`ms` 必须有限且非负；`signal` 可以传 `undefined`。 返回 `Promise<boolean>`：到期为 `true`，abort 事件先到为 `false`；调用方决定取消是否应变成领域 AbortError。 监听器注册与 scheduler 接纳结束前不提交同步 callback 的结果；接纳失败保持 primary，原始错误实例或 cause 链可追溯。 任务句柄最多 cancel 一次，abort 监听由 canonical observed-subscription 管理。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "清理失败默认使 wait 拒绝；提供 `reportCleanup(error)` 后，清理失败走该观察渠道，不替换已完成或已取消的结果。 注册或调度失败仍拒绝，`DELAY_FAILED` 保留 native Error 的身份与 stack，不能附加身份时用 cause 保留原值。 无效时长或 cleanup reporter 在接纳前以 `INVALID_OPTION` 拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`boundedWait(task, deadlineAt, { scheduler, reportCleanup? })` 仍负责绝对截止时间与任务竞争，不会取消 task。 它的默认清理失败行为不变；可选 `reportCleanup` 允许 logger flush 把 timer 清理失败作为诊断，保留任务或 deadline winner。 批处理 debounce、health 周期调度与预算授予定时器不等同于一次性相对延时，不强行转换其 owner 语义。"
                 }
               ]
             }

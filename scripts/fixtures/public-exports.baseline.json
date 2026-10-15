@@ -79,6 +79,7 @@
         "LifecycleErrorText",
         "LifecycleState",
         "LifecycleUnitState",
+        "abortableDelay",
         "boundedWait",
         "containAsyncRejection",
         "createAbortController",
