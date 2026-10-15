@@ -22,13 +22,31 @@ export const createRawSubscriptionOwner = <T extends ISubscriptionHandle<unknown
 ): T => {
   const disposers: Array<() => void> = [first]
   let closed = false
+  /**
+   * Closes the chain once and runs every disposer in reverse registration order. A failing disposer
+   * does not stop later ones: one failure is rethrown unchanged, several are collected into an
+   * AggregateError whose `errors` keep the original failures in run order.
+   */
   const handle = (() => {
     if (closed) return
     closed = true
+    /** Disposer failures collected so every registration is released before reporting. */
+    let failures: unknown[] | undefined
     for (let index = disposers.length - 1; index >= 0; index -= 1) {
-      disposers[index]()
+      try {
+        disposers[index]()
+      } catch (error) {
+        ;(failures ??= []).push(error)
+      }
     }
     disposers.length = 0
+    if (!failures) return
+    if (failures.length === 1) throw failures[0]
+    throw createEventAggregateError(
+      EventSubscriberErrorCode.subscriptionDisposeFailed,
+      failures,
+      eventErrorText(EventSubscriberErrorCode.subscriptionDisposeFailed)
+    )
   }) as T
   try {
     const subscribe = (...args: never[]): ISubscriptionHandle<T> => {
