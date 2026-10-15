@@ -1,3 +1,4 @@
+import { subscribeOnce, subscribeSubscriber, subscribeUntil } from '../src/subscriber.js'
 import { describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
@@ -8,10 +9,7 @@ import {
   defineEventApiStyle,
   EventApiStyle,
   EventSubscriberErrorCode,
-  invokeParallelSettled,
-  subscribeOnce,
-  subscribeSubscriber,
-  subscribeUntil
+  invokeParallelSettled
 } from '../src/index.js'
 import type { IEventContext } from '../src/index.js'
 import { createRawSubscriptionOwner } from '../src/internal/subscription.js'
@@ -341,15 +339,7 @@ describe('event API style projection', () => {
     const omitted = createEventChannel<number>()
     const explicit = createEventChannel<number>({ style: 'subscribe-publish' })
 
-    expect(Object.keys(omitted)).toEqual([
-      'subscribe',
-      'subscribeOnce',
-      'subscribeUntil',
-      'publish',
-      'filterTaskId',
-      'clear',
-      'size'
-    ])
+    expect(Object.keys(omitted)).toEqual(['subscribe', 'publish', 'filterTaskId', 'clear', 'size'])
     expect(Object.keys(explicit)).toEqual(Object.keys(omitted))
     expect(Object.getOwnPropertyDescriptor(explicit, 'publish')).toMatchObject({
       configurable: true,

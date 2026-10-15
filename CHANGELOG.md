@@ -4,6 +4,14 @@
 
 ### Breaking changes
 
+- `@migaia/event-subscriber` subscription helpers now have one public owner:
+  import `subscribeOnce`, `subscribeUntil` and `subscribeSubscriber` from
+  `@migaia/event-subscriber/subscriber`. Their root aliases and channel
+  `subscribeOnce()` / `subscribeUntil()` methods are removed. Replace
+  `channel.subscribeUntil(signal, listener)` with
+  `subscribeUntil(channel, signal, listener)`; cancellation and listener behavior
+  are unchanged. No production consumer used the removed surface.
+
 - `@migaia/lifecycle` no longer re-exports `probeThenable`,
   `assimilateCapturedThen`, `IThenableProbe`, `ThenableProbeKind`, or
   `IThenableProbeKind` from its root or errors entry. Import these helpers and

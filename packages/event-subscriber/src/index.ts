@@ -1,4 +1,3 @@
-export { subscribeOnce, subscribeSubscriber, subscribeUntil } from './channel.js'
 export { invokeEachLive, withSnapshotEntries } from './channel.js'
 export { createCanonicalChannel as createEventChannel } from './channel.js'
 export { createEventHub } from './hub.js'
@@ -19,7 +18,11 @@ export {
 } from './state-constants.js'
 export { defineEventApiStyle, EventApiStyle } from './style.js'
 export type { IEventSubscriberErrorCode } from './error-code.js'
-export type { IEventAdmissionPolicy, IEventDispatchPolicy, IEventRemovalPolicy } from './state-constants.js'
+export type {
+  IEventAdmissionPolicy,
+  IEventDispatchPolicy,
+  IEventRemovalPolicy
+} from './state-constants.js'
 export type { IEventChannelSubscription, IEventHubSubscription } from './types.js'
 export type { IEventApiStyle, IEventApiStyleNames } from './style.js'
 export type { IStyledEventChannel, IStyledEventHub } from './types.js'

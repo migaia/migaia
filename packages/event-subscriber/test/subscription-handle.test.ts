@@ -1,3 +1,4 @@
+import { subscribeUntil } from '../src/subscriber.js'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createEventChannel,
@@ -20,7 +21,7 @@ describe('callable subscription handles', () => {
     }
     const channel = createEventChannel<number>({ throwOnAborted: true })
 
-    expect(() => channel.subscribeUntil(signal, () => undefined)).toThrowError(
+    expect(() => subscribeUntil(channel, signal, () => undefined)).toThrowError(
       expect.objectContaining({ code: EventSubscriberErrorCode.aborted })
     )
     expect(lifecycle).toEqual(['add', 'remove'])

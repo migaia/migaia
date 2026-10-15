@@ -26907,11 +26907,11 @@ try {
       options: []
     }
   },
-  'event-subscriber:index:subscribeOnce': {
+  'event-subscriber:subscriber:subscribeOnce': {
     zh: {
       purpose:
         '在任意兼容 Event Channel 上登记一个最多执行一次的 listener。首次交付前先完成退订，因此 listener 内重入 publish 也不会触发第二次调用；返回的退订函数可提前取消且幂等。',
-      quickStart: `import { createEventChannel, subscribeOnce } from '@migaia/event-subscriber'\n\ntype User = { id: string }\nconst events = createEventChannel<User>()\nconst showWelcome = (user: User) => console.log('welcome:', user.id)\nconst stop = subscribeOnce(events, ({ value }) => showWelcome(value), { taskId: 'first-login' })\nevents.publish({ id: 'u-1' })\n// 只处理第一次登录；后续 publish 不会再次触发。提前结束时取消也安全且幂等。\nstop()\nstop()`,
+      quickStart: `import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeOnce } from '@migaia/event-subscriber/subscriber'\n\ntype User = { id: string }\nconst events = createEventChannel<User>()\nconst showWelcome = (user: User) => console.log('welcome:', user.id)\nconst stop = subscribeOnce(events, ({ value }) => showWelcome(value), { taskId: 'first-login' })\nevents.publish({ id: 'u-1' })\n// 只处理第一次登录；后续 publish 不会再次触发。提前结束时取消也安全且幂等。\nstop()\nstop()`,
       scenarios: [
         '只关心下一次事件，例如首次就绪、一次性确认或首个状态变化。',
         '输入是结构兼容 Channel，不一定由 createEventChannel 创建。'
@@ -26931,7 +26931,7 @@ try {
     en: {
       purpose:
         'Registers a listener that runs at most once on any compatible event channel. It unsubscribes before the first delivery, so a reentrant publish inside the listener cannot invoke it again; the returned cancellation function is early-safe and idempotent.',
-      quickStart: `import { createEventChannel, subscribeOnce } from '@migaia/event-subscriber'\n\ntype User = { id: string }\nconst events = createEventChannel<User>()\nconst showWelcome = (user: User) => console.log('welcome:', user.id)\nconst stop = subscribeOnce(events, ({ value }) => showWelcome(value), { taskId: 'first-login' })\nevents.publish({ id: 'u-1' })\n// Only the first login is handled; later publishes do not call the listener again.\nstop()\nstop()`,
+      quickStart: `import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeOnce } from '@migaia/event-subscriber/subscriber'\n\ntype User = { id: string }\nconst events = createEventChannel<User>()\nconst showWelcome = (user: User) => console.log('welcome:', user.id)\nconst stop = subscribeOnce(events, ({ value }) => showWelcome(value), { taskId: 'first-login' })\nevents.publish({ id: 'u-1' })\n// Only the first login is handled; later publishes do not call the listener again.\nstop()\nstop()`,
       scenarios: [
         'Only the next event matters, such as first-ready, one-time confirmation, or the first state change.',
         'The source is a structurally compatible channel, not necessarily one created by createEventChannel.'
@@ -26951,11 +26951,11 @@ try {
       ]
     }
   },
-  'event-subscriber:index:subscribeSubscriber': {
+  'event-subscriber:subscriber:subscribeSubscriber': {
     zh: {
       purpose:
         '把具有 handle(event) 方法的对象适配为 Channel 订阅，不引入基类或新的生命周期层。返回的退订函数直接拥有这次登记，并保持幂等。',
-      quickStart: `import { createEventChannel, subscribeSubscriber } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst audit = { write: (job: Job) => console.log('audit:', job.id) }\nclass AuditSubscriber {\n  handle({ value }: { value: Job }) { audit.write(value) }\n}\nconst stop = subscribeSubscriber(events, new AuditSubscriber())\nevents.publish({ id: 'job-1' })\nstop()`,
+      quickStart: `import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst audit = { write: (job: Job) => console.log('audit:', job.id) }\nclass AuditSubscriber {\n  handle({ value }: { value: Job }) { audit.write(value) }\n}\nconst stop = subscribeSubscriber(events, new AuditSubscriber())\nevents.publish({ id: 'job-1' })\nstop()`,
       scenarios: [
         '现有领域对象以 handle 方法承载事件行为。',
         '需要结构化适配对象，但不希望对象继承框架类。'
@@ -26969,7 +26969,7 @@ try {
     en: {
       purpose:
         'Adapts an object with a handle(event) method to a channel subscription without introducing a base class or another lifecycle layer. The returned unsubscribe function owns this registration and remains idempotent.',
-      quickStart: `import { createEventChannel, subscribeSubscriber } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst audit = { write: (job: Job) => console.log('audit:', job.id) }\nclass AuditSubscriber {\n  handle({ value }: { value: Job }) { audit.write(value) }\n}\nconst stop = subscribeSubscriber(events, new AuditSubscriber())\nevents.publish({ id: 'job-1' })\nstop()`,
+      quickStart: `import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst audit = { write: (job: Job) => console.log('audit:', job.id) }\nclass AuditSubscriber {\n  handle({ value }: { value: Job }) { audit.write(value) }\n}\nconst stop = subscribeSubscriber(events, new AuditSubscriber())\nevents.publish({ id: 'job-1' })\nstop()`,
       scenarios: [
         'An existing domain object exposes event behavior through a handle method.',
         'Object-shaped subscribers are useful but framework inheritance is not.'
@@ -26981,11 +26981,11 @@ try {
       options: []
     }
   },
-  'event-subscriber:index:subscribeUntil': {
+  'event-subscriber:subscriber:subscribeUntil': {
     zh: {
       purpose:
         '把订阅生命周期绑定到 AbortSignal。signal 已中止时不会登记；之后中止会移除 source 订阅，并让同一交付竞争中的 event context 观察到 aborted 与原始 reason。返回的退订函数也可提前结束绑定。',
-      quickStart: `import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst controller = new AbortController()\nconst render = (job: Job) => console.log('render:', job.id)\nconst stop = subscribeUntil(events, controller.signal, ({ value, aborted, abortReason }) => {\n  if (!aborted) render(value)\n  else console.debug('stopped:', abortReason)\n})\nevents.publish({ id: 'job-1' })\ncontroller.abort('screen closed')\nstop()`,
+      quickStart: `import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst controller = new AbortController()\nconst render = (job: Job) => console.log('render:', job.id)\nconst stop = subscribeUntil(events, controller.signal, ({ value, aborted, abortReason }) => {\n  if (!aborted) render(value)\n  else console.debug('stopped:', abortReason)\n})\nevents.publish({ id: 'job-1' })\ncontroller.abort('screen closed')\nstop()`,
       scenarios: [
         '订阅应与页面、请求、任务或 lifecycle scope 的取消同步结束。',
         '竞争发生时 listener 需要从 event context 观察准确的中止原因。'
@@ -27005,7 +27005,7 @@ try {
     en: {
       purpose:
         'Binds a subscription lifetime to an AbortSignal. A pre-aborted signal creates no registration; a later abort removes the source subscription and lets an event context in the same delivery race observe aborted plus the original reason. The returned unsubscribe function may end the binding early.',
-      quickStart: `import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst controller = new AbortController()\nconst render = (job: Job) => console.log('render:', job.id)\nconst stop = subscribeUntil(events, controller.signal, ({ value, aborted, abortReason }) => {\n  if (!aborted) render(value)\n  else console.debug('stopped:', abortReason)\n})\nevents.publish({ id: 'job-1' })\ncontroller.abort('screen closed')\nstop()`,
+      quickStart: `import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\ntype Job = { id: string }\nconst events = createEventChannel<Job>()\nconst controller = new AbortController()\nconst render = (job: Job) => console.log('render:', job.id)\nconst stop = subscribeUntil(events, controller.signal, ({ value, aborted, abortReason }) => {\n  if (!aborted) render(value)\n  else console.debug('stopped:', abortReason)\n})\nevents.publish({ id: 'job-1' })\ncontroller.abort('screen closed')\nstop()`,
       scenarios: [
         'A subscription must end with a screen, request, task, or lifecycle-scope cancellation.',
         'A listener racing with abort must observe the exact cancellation reason through its event context.'
@@ -28931,10 +28931,7 @@ export function findApiGuide(
     library === 'plugin-host' && guideModuleName === 'index' && symbolName === 'PluginHost'
       ? 'plugin-host:index:PluginHost'
       : `${library}:${guideModuleName}:${symbolName}`
-  const storedGuide = (apiGuides[guideKey] ??
-    (library === 'event-subscriber' && moduleName === 'subscriber'
-      ? apiGuides[`event-subscriber:index:${symbolName}`]
-      : undefined))?.[locale]
+  const storedGuide = apiGuides[guideKey]?.[locale]
   /** Option translations belong to the same canonical guide, not a second rendered description. */
   /** Existing extracted RPC fields keep their exact names and gain only maintained localized prose. */
   const rpcFields = rpcReferences[library]

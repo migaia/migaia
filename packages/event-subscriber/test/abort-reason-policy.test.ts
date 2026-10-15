@@ -1,5 +1,6 @@
+import { subscribeUntil } from '../src/subscriber.js'
 import { describe, expect, it, vi } from 'vitest'
-import { subscribeUntil } from '../src/index.js'
+
 import { EventSubscriberErrorCode } from '../src/error-code.js'
 
 describe('A6 event subscriber reason capture', () => {

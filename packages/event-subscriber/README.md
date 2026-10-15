@@ -14,7 +14,7 @@
 pnpm add @migaia/event-subscriber
 ```
 
-提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。
+提供两个入口：root `@migaia/event-subscriber`（channel/Hub 与 invoke helper），以及唯一的订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。
 
 ## 目录
 
@@ -64,7 +64,7 @@ unsubscribe()
 返回的 `channel` 上的方法与字段：
 
 - `subscribe(listener, options?: { taskId?: string }): subscription` —— 返回可直接调用的 handle；handle 同时提供 `unsubscribe` 自身别名与链式 `subscribe`。styled handle 还提供对应的 subscribe/cancellation aliases（如 `on`/`off`）。解除会按逆序释放整条 chain；关闭后再扩展抛 `SUBSCRIPTION_CLOSED`。显式 `unique` 只改变 listener admission，不改变同步失败的 `PUBLISH_FAILED` 聚合。
-- `subscribeOnce` / `subscribeUntil`（见下方 Helper 模块，channel 上也直接暴露同名方法）
+- 一次性与 signal 订阅使用 `@migaia/event-subscriber/subscriber` 的独立 helper（见下方）。
 - `publish(value: T): void` —— 按快照顺序同步调用全部 listener，不等待 Promise；默认同步重入 publish 递归交付，`dispatchPolicy: 'queued'` 才会排队到当前快照完成后再交付；同步失败以 `PUBLISH_FAILED` 的 `AggregateError` 抛出
 - `filterTaskId(taskId: string): IFilteredEventChannel<T, R>` —— 创建只读 task 选择 view，交给异步发布 helper
 - `clear(): void` —— 清空全部 registration，不执行 listener 自身的 cleanup
@@ -120,7 +120,7 @@ import {
 } from '@migaia/event-subscriber/subscriber'
 ```
 
-这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel；但它们**不读取 style 配置**，函数名固定为 `subscribeOnce` / `subscribeUntil` / `subscribeSubscriber`，返回值固定为 canonical `IUnsubscribe`，不会带上 `off`、`dispose`、`unlisten` 等 style alias。需要 styled handle 时，请直接调用 channel 自己的 `subscribeOnce()` / `subscribeUntil()` 方法。
+这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel；但它们**不读取 style 配置**，函数名固定为 `subscribeOnce` / `subscribeUntil` / `subscribeSubscriber`，返回值固定为 canonical `IUnsubscribe`，不会带上 `off`、`dispose`、`unlisten` 等 style alias。需要 styled 链式 handle 时，使用 channel.subscribe()；这些独立 helper 统一返回 canonical IUnsubscribe。
 
 **`subscribeOnce`｜5 秒上手** —— 只执行一次，调用 listener **之前**先退订：
 
@@ -362,7 +362,8 @@ const results = await invokeParallelSettled(checks, 'usr_42')
 ### 3. `subscribeUntil` + `AbortController` 管理订阅生命周期
 
 ```ts
-import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'
+import { createEventChannel } from '@migaia/event-subscriber'
+import { subscribeUntil } from '@migaia/event-subscriber/subscriber'
 
 const controller = new AbortController()
 const channel = createEventChannel<number>()
@@ -389,7 +390,8 @@ events.publish('warning', { message: 'cache is stale' })
 ### 5. 对象订阅者 + 串行结算，保证副作用按序执行
 
 ```ts
-import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'
+import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'
+import { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'
 
 const pipeline = createEventChannel<string, void>()
 subscribeSubscriber(pipeline, {
