@@ -546,13 +546,14 @@ export function createSupervisor<
     }
     request.signal.addEventListener('abort', aborted, { once: true })
     if (request.signal.aborted) aborted()
-    const timeoutError = createSupervisionError(
-      Error,
-      SupervisionErrorCode.startupTimeout,
-      SupervisionErrorText.startupTimeout,
-      { detail: { kind: options.profile.kind } }
-    )
     const timer = scheduler.schedule(() => {
+      /** Successful attempts never allocate the timeout error or capture its stack. */
+      const timeoutError = createSupervisionError(
+        Error,
+        SupervisionErrorCode.startupTimeout,
+        SupervisionErrorText.startupTimeout,
+        { detail: { kind: options.profile.kind } }
+      )
       slot.failureReason = ExitReason.startupTimeout
       slot.failureError = timeoutError
       attempts.supersede(timeoutError)
@@ -687,7 +688,7 @@ export function createSupervisor<
       const timeout = slot.failureReason === ExitReason.startupTimeout
       const superseded = request.signal.aborted && !timeout
       const error = timeout
-        ? timeoutError
+        ? slot.failureError
         : superseded
           ? caught
           : createSupervisionError(
