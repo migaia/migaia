@@ -1,13 +1,8 @@
+import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { ResourceCachePolicy } from './store-resource-cache-policy.js'
 import { ResourceOwnershipRegistry, type IVersionToken } from './store-resource-ownership.js'
 import type { IStoreResourceLoadContext } from './store-resource-request.js'
-import {
-  assimilateCapturedThen,
-  createGenerationController,
-  createSyncStartedDisposalLedger,
-  probeThenable,
-  ThenableProbeKind
-} from '@migaia/lifecycle'
+import { createGenerationController, createSyncStartedDisposalLedger } from '@migaia/lifecycle'
 import type { ISyncStartedDisposalLedger } from '@migaia/lifecycle'
 import { ResourceStateController } from './store-resource-state.js'
 import { StoreResourceKind } from './resource-state-constants.js'
