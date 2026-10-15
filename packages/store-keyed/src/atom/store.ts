@@ -235,6 +235,8 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
   /** 按 override 栈递归解析；循环在入口暴露为可读错误，而不是递归爆栈。 */
   const resolve = <T>(definition: IAtomDefinition<T>): IAtomDefinition<T> => {
     assertDefinition(definition)
+    // Ordinary reads and unrelated overrides need no cycle ledger.
+    if (!overrides.get(definition as IAtomDefinition<unknown>)?.length) return definition
     const seen = new Set<IAtomDefinition<unknown>>()
     let current = definition as IAtomDefinition<unknown>
     while (true) {
@@ -399,10 +401,10 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     })
   }
 
-  const instanceOf = <T>(definition: IAtomDefinition<T>): IInstance<T> => {
+  /** Materializes one already-resolved definition; public callers own override resolution. */
+  const instanceOf = <T>(target: IAtomDefinition<T>): IInstance<T> => {
     assertUsable()
-    assertDefinition(definition)
-    const target = resolve(definition)
+    assertDefinition(target)
     const key = target as IAtomDefinition<unknown>
     const existing = instances.get(key)
     if (existing) return existing as IInstance<T>
@@ -455,7 +457,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     },
     peek: (definition) => {
       assertUsable()
-      const instance = instanceOf(definition)
+      const instance = instanceOf(resolve(definition))
       return instance.peek()
     },
     preview: (definition) => {
@@ -477,7 +479,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
       // 用 Effect 订阅而不是把节点交出去：所有权校验、observed 生命周期、
       // trace 都留在内核手里，实例化策略也保持可替换
       const effect = runtime.effect(() => {
-        void instanceOf(definition).read()
+        void instanceOf(resolve(definition)).read()
         if (first) {
           first = false
           return
