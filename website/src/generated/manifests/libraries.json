@@ -619,7 +619,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/capability/graph/dynamic` 为运行期 definition 增删提供唯一 Graph authority。composition owner 通过 `startBatch(entries)` 收到 exact binding；消费者用 `acquireBinding(id)` 取得 generation lease，并在停止 使用后调用幂等 `release()`。remove/replace/dispose 会先 seal 旧 generation，再把同一个 non-rejecting fence 交给 `releaseBatch(entries, fence)`；物理 provider 清理不得越过该 fence。"
+                  "text": "`@migaia/capability/graph/dynamic` 为运行期 definition 增删提供唯一 Graph authority。composition owner 通过必填的 `startBatch(entries)` 收到 exact binding（`startBatch`/`releaseBatch` 缺一即 `GRAPH_INVALID_OPTION`）；消费者用 `acquireBinding(id)` 取得 generation lease，并在停止 使用后调用幂等 `release()`。remove/replace/dispose 会先 seal 旧 generation，再把同一个 non-rejecting fence 交给 `releaseBatch(entries, fence)`；物理 provider 清理不得越过该 fence。"
                 },
                 {
                   "type": "paragraph",
@@ -1285,6 +1285,14 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\n\nconst graph = createDynamicCapabilityGraph<{ readonly version: number }>({\n  startBatch: (entries) =>\n    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),\n  releaseBatch: async (entries, fence) => {\n    await fence\n    // 这里只释放 entries 对应的 exact old generation。\n  }\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`startBatch` 与 `releaseBatch` 都是必填项：Graph 只负责排序、协调与 binding custody，不再自带节点级的 start/release 默认路径。缺少任一回调时，`createDynamicCapabilityGraph()` 在创建时抛 `GRAPH_INVALID_OPTION`。 `startBatch` 失败时，单节点批次把该节点标为 `failed`；多节点批次中 Graph 无法判断是哪一个节点出错，因此本批 所有节点都标为 `blocked`（`reason: 'failed'`）。两种情况下 `nodeState().error` 都保留原始错误；抛出的 `GRAPH_START_FAILED` 在 `detail.nodes` 中列出本批节点。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "对没有处于 suspended 状态的节点调用 `resume()` 抛 `GRAPH_NODE_NOT_SUSPENDED`；排在卡住的 mutation 之后、等待超过 `mutationAdmissionMs` 的 mutation 以 `GRAPH_MUTATION_ADMISSION_TIMEOUT` 拒绝。"
                 },
                 {
                   "type": "paragraph",

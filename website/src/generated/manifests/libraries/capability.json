@@ -618,7 +618,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`@migaia/capability/graph/dynamic` 为运行期 definition 增删提供唯一 Graph authority。composition owner 通过 `startBatch(entries)` 收到 exact binding；消费者用 `acquireBinding(id)` 取得 generation lease，并在停止 使用后调用幂等 `release()`。remove/replace/dispose 会先 seal 旧 generation，再把同一个 non-rejecting fence 交给 `releaseBatch(entries, fence)`；物理 provider 清理不得越过该 fence。"
+                "text": "`@migaia/capability/graph/dynamic` 为运行期 definition 增删提供唯一 Graph authority。composition owner 通过必填的 `startBatch(entries)` 收到 exact binding（`startBatch`/`releaseBatch` 缺一即 `GRAPH_INVALID_OPTION`）；消费者用 `acquireBinding(id)` 取得 generation lease，并在停止 使用后调用幂等 `release()`。remove/replace/dispose 会先 seal 旧 generation，再把同一个 non-rejecting fence 交给 `releaseBatch(entries, fence)`；物理 provider 清理不得越过该 fence。"
               },
               {
                 "type": "paragraph",
@@ -1284,6 +1284,14 @@
                 "type": "code",
                 "language": "ts",
                 "code": "import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\n\nconst graph = createDynamicCapabilityGraph<{ readonly version: number }>({\n  startBatch: (entries) =>\n    entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),\n  releaseBatch: async (entries, fence) => {\n    await fence\n    // 这里只释放 entries 对应的 exact old generation。\n  }\n})"
+              },
+              {
+                "type": "paragraph",
+                "text": "`startBatch` 与 `releaseBatch` 都是必填项：Graph 只负责排序、协调与 binding custody，不再自带节点级的 start/release 默认路径。缺少任一回调时，`createDynamicCapabilityGraph()` 在创建时抛 `GRAPH_INVALID_OPTION`。 `startBatch` 失败时，单节点批次把该节点标为 `failed`；多节点批次中 Graph 无法判断是哪一个节点出错，因此本批 所有节点都标为 `blocked`（`reason: 'failed'`）。两种情况下 `nodeState().error` 都保留原始错误；抛出的 `GRAPH_START_FAILED` 在 `detail.nodes` 中列出本批节点。"
+              },
+              {
+                "type": "paragraph",
+                "text": "对没有处于 suspended 状态的节点调用 `resume()` 抛 `GRAPH_NODE_NOT_SUSPENDED`；排在卡住的 mutation 之后、等待超过 `mutationAdmissionMs` 的 mutation 以 `GRAPH_MUTATION_ADMISSION_TIMEOUT` 拒绝。"
               },
               {
                 "type": "paragraph",
@@ -5239,7 +5247,7 @@
         {
           "name": "CapabilityGraphErrorCode",
           "kind": "const",
-          "signature": "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** Factory options or their accessors fail admission. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; };",
+          "signature": "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** Factory options or their accessors fail admission. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
           "declarationLine": 4,
           "source": "packages/capability/dist/graph/error-code.d.ts",
           "purpose": "Stable error codes owned by `@migaia/capability/graph`.",
@@ -5257,7 +5265,7 @@
           "aliasOf": "CapabilityGraphErrorCode",
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** Factory options or their accessors fail admission. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; };"
+            "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** Factory options or their accessors fail admission. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5296,7 +5304,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/error-code.d.ts:CapabilityGraphErrorCode:export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** Factory options or their accessors fail admission. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; };",
+          "identity": "packages/capability/dist/graph/error-code.d.ts:CapabilityGraphErrorCode:export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** Factory options or their accessors fail admission. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -5656,7 +5664,7 @@
           "name": "ICapabilityGraphErrorCode",
           "kind": "type",
           "signature": "export type ICapabilityGraphErrorCode = (typeof CapabilityGraphErrorCode)[keyof typeof CapabilityGraphErrorCode];",
-          "declarationLine": 42,
+          "declarationLine": 47,
           "source": "packages/capability/dist/graph/error-code.d.ts",
           "purpose": "ICapabilityGraphErrorCode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICapabilityGraphErrorCode.",
@@ -8063,18 +8071,18 @@
         {
           "name": "createDynamicCapabilityGraph",
           "kind": "function",
-          "signature": "export declare function createDynamicCapabilityGraph<TBinding = unknown>(options?: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;",
-          "declarationLine": 100,
+          "signature": "export declare function createDynamicCapabilityGraph<TBinding = unknown>(options: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;",
+          "declarationLine": 103,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Creates a serialized dynamic graph with fail-closed required-edge reconciliation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDynamicCapabilityGraph.",
           "advanced": "No additional advanced behavior is declared for createDynamicCapabilityGraph.",
-          "parameters": ["options: IDynamicCapabilityGraphOptions<TBinding> (optional)"],
+          "parameters": ["options: IDynamicCapabilityGraphOptions<TBinding>"],
           "parameterDetails": [
             {
               "name": "options",
               "type": "IDynamicCapabilityGraphOptions<TBinding>",
-              "optional": true
+              "optional": false
             }
           ],
           "returns": "IDynamicCapabilityGraph<TBinding>",
@@ -8086,14 +8094,14 @@
           "members": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
-            "export declare function createDynamicCapabilityGraph<TBinding = unknown>(options?: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;"
+            "export declare function createDynamicCapabilityGraph<TBinding = unknown>(options: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "options",
                 "type": "IDynamicCapabilityGraphOptions<TBinding>",
-                "optional": true
+                "optional": false
               }
             ]
           ],
@@ -8148,14 +8156,14 @@
             {
               "name": "startBatch",
               "type": "(entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>",
-              "optional": true,
-              "description": "Composition-owned startup for one topologically ordered affected frontier."
+              "optional": false,
+              "description": "Composition-owned startup for one topologically ordered affected frontier. Required."
             },
             {
               "name": "releaseBatch",
               "type": "(entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>",
-              "optional": true,
-              "description": "Composition-owned physical release for one sealed cascade."
+              "optional": false,
+              "description": "Composition-owned physical release for one sealed cascade. Required."
             },
             {
               "name": "releaseBinding",
@@ -8164,9 +8172,9 @@
               "description": "Releases custody for an exact binding generation after its instance cleanup fence."
             }
           ],
-          "identity": "packages/capability/dist/graph/dynamic.d.ts:createDynamicCapabilityGraph:export declare function createDynamicCapabilityGraph<TBinding = unknown>(options?: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;",
+          "identity": "packages/capability/dist/graph/dynamic.d.ts:createDynamicCapabilityGraph:export declare function createDynamicCapabilityGraph<TBinding = unknown>(options: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;",
           "guidance": [],
-          "usageScore": 14,
+          "usageScore": 18,
           "configuration": [
             {
               "name": "report",
@@ -8180,25 +8188,25 @@
               "name": "mutationAdmissionMs",
               "type": "number",
               "optional": true,
-              "description": "Maximum time an accepted mutation may wait behind an older serialized mutation.",
+              "description": "对没有处于 suspended 状态的节点调用 `resume()` 抛 `GRAPH_NODE_NOT_SUSPENDED`；排在卡住的 mutation 之后、等待超过 `mutationAdmissionMs` 的 mutation 以 `GRAPH_MUTATION_ADMISSION_TIMEOUT` 拒绝。",
               "descriptionEn": "Maximum time an accepted mutation may wait behind an older serialized mutation.",
-              "descriptionZh": ""
+              "descriptionZh": "对没有处于 suspended 状态的节点调用 `resume()` 抛 `GRAPH_NODE_NOT_SUSPENDED`；排在卡住的 mutation 之后、等待超过 `mutationAdmissionMs` 的 mutation 以 `GRAPH_MUTATION_ADMISSION_TIMEOUT` 拒绝。"
             },
             {
               "name": "startBatch",
               "type": "(entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>",
-              "optional": true,
-              "description": "Composition-owned startup for one topologically ordered affected frontier.",
-              "descriptionEn": "Composition-owned startup for one topologically ordered affected frontier.",
-              "descriptionZh": ""
+              "optional": false,
+              "description": "`startBatch` 与 `releaseBatch` 都是必填项：Graph 只负责排序、协调与 binding custody，不再自带节点级的 start/release 默认路径。缺少任一回调时，`createDynamicCapabilityGraph()` 在创建时抛 `GRAPH_INVALID_OPTION`。 `startBatch` 失败时，单节点批次把该节点标为 `failed`；多节点批次中 Graph 无法判断是哪一个节点出错，因此本批 所有节点都标为 `blocked`（`reason: 'failed'`）。两种情况下 `nodeState().error` 都保留原始错误；抛出的 `GRAPH_START_FAILED` 在 `detail.nodes` 中列出本批节点。",
+              "descriptionEn": "Composition-owned startup for one topologically ordered affected frontier. Required.",
+              "descriptionZh": "`startBatch` 与 `releaseBatch` 都是必填项：Graph 只负责排序、协调与 binding custody，不再自带节点级的 start/release 默认路径。缺少任一回调时，`createDynamicCapabilityGraph()` 在创建时抛 `GRAPH_INVALID_OPTION`。 `startBatch` 失败时，单节点批次把该节点标为 `failed`；多节点批次中 Graph 无法判断是哪一个节点出错，因此本批 所有节点都标为 `blocked`（`reason: 'failed'`）。两种情况下 `nodeState().error` 都保留原始错误；抛出的 `GRAPH_START_FAILED` 在 `detail.nodes` 中列出本批节点。"
             },
             {
               "name": "releaseBatch",
               "type": "(entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>",
-              "optional": true,
-              "description": "`releaseBatch` 收到的 `fence` 只在所有 exact leases 归零后 resolve。owner 可以先提交逻辑撤销并返回 incomplete observation，但不能在 fence 之前启动物理 disposer。`metrics.queueTimeMs` 只计算 mutation 在 Graph FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，二者不可相互替代。",
-              "descriptionEn": "Composition-owned physical release for one sealed cascade.",
-              "descriptionZh": "`releaseBatch` 收到的 `fence` 只在所有 exact leases 归零后 resolve。owner 可以先提交逻辑撤销并返回 incomplete observation，但不能在 fence 之前启动物理 disposer。`metrics.queueTimeMs` 只计算 mutation 在 Graph FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，二者不可相互替代。"
+              "optional": false,
+              "description": "`startBatch` 与 `releaseBatch` 都是必填项：Graph 只负责排序、协调与 binding custody，不再自带节点级的 start/release 默认路径。缺少任一回调时，`createDynamicCapabilityGraph()` 在创建时抛 `GRAPH_INVALID_OPTION`。 `startBatch` 失败时，单节点批次把该节点标为 `failed`；多节点批次中 Graph 无法判断是哪一个节点出错，因此本批 所有节点都标为 `blocked`（`reason: 'failed'`）。两种情况下 `nodeState().error` 都保留原始错误；抛出的 `GRAPH_START_FAILED` 在 `detail.nodes` 中列出本批节点。",
+              "descriptionEn": "Composition-owned physical release for one sealed cascade. Required.",
+              "descriptionZh": "`startBatch` 与 `releaseBatch` 都是必填项：Graph 只负责排序、协调与 binding custody，不再自带节点级的 start/release 默认路径。缺少任一回调时，`createDynamicCapabilityGraph()` 在创建时抛 `GRAPH_INVALID_OPTION`。 `startBatch` 失败时，单节点批次把该节点标为 `failed`；多节点批次中 Graph 无法判断是哪一个节点出错，因此本批 所有节点都标为 `blocked`（`reason: 'failed'`）。两种情况下 `nodeState().error` 都保留原始错误；抛出的 `GRAPH_START_FAILED` 在 `detail.nodes` 中列出本批节点。"
             },
             {
               "name": "releaseBinding",
@@ -8215,7 +8223,7 @@
           "name": "IDynamicCapabilityGraph",
           "kind": "type",
           "signature": "export type IDynamicCapabilityGraph<TBinding = unknown> = Readonly<{ readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly generation: number; register<T>(node: IDynamicGraphNodeDefinition<T>, binding?: TBinding): Promise<IGraphMutationResult>; remove(id: IGraphNodeId, options?: IGraphDependencyMutationOptions): Promise<IGraphMutationResult>; suspend(id: IGraphNodeId, options?: IGraphDependencyMutationOptions): Promise<IGraphMutationResult>; resume(id: IGraphNodeId): Promise<IGraphMutationResult>; dependentsOf(id: IGraphNodeId): IGraphDependents; replace<T>(node: IDynamicGraphNodeDefinition<T>, binding?: TBinding, options?: IGraphReplaceOptions<TBinding>): Promise<IGraphMutationResult>; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; getBinding<T = TBinding>(id: IGraphNodeId): T | undefined; acquireBinding(id: IGraphNodeId): IGraphBindingLease<TBinding>; dispose(): Promise<void>; }>;",
-          "declarationLine": 83,
+          "declarationLine": 86,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Dynamic required-edge graph used by composition owners.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicCapabilityGraph.",
@@ -8277,10 +8285,10 @@
         {
           "name": "IDynamicCapabilityGraphOptions",
           "kind": "type",
-          "signature": "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. */ readonly startBatch?: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. */ readonly releaseBatch?: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;",
-          "declarationLine": 42,
+          "signature": "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. Required. */ readonly startBatch: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. Required. */ readonly releaseBatch: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;",
+          "declarationLine": 45,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
-          "purpose": "Runtime-neutral dynamic graph options.",
+          "purpose": "Runtime-neutral dynamic graph options. The composition owner supplies `startBatch` and `releaseBatch`; the graph owns ordering, reconciliation and binding custody only.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicCapabilityGraphOptions.",
           "advanced": "No additional advanced behavior is declared for IDynamicCapabilityGraphOptions.",
           "parameters": ["This type declaration has no parameters."],
@@ -8292,7 +8300,7 @@
           "members": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
-            "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. */ readonly startBatch?: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. */ readonly releaseBatch?: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;"
+            "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. Required. */ readonly startBatch: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. Required. */ readonly releaseBatch: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8302,7 +8310,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Runtime-neutral dynamic graph options."
+              "content": "Runtime-neutral dynamic graph options. The composition owner supplies `startBatch` and `releaseBatch`; the graph owns ordering, reconciliation and binding custody only."
             },
             {
               "id": "getting-started",
@@ -8331,7 +8339,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dynamic.d.ts:IDynamicCapabilityGraphOptions:export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. */ readonly startBatch?: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. */ readonly releaseBatch?: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;",
+          "identity": "packages/capability/dist/graph/dynamic.d.ts:IDynamicCapabilityGraphOptions:export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. Required. */ readonly startBatch: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. Required. */ readonly releaseBatch: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8467,7 +8475,7 @@
           "name": "IGraphBindingLease",
           "kind": "type",
           "signature": "export type IGraphBindingLease<TBinding> = Readonly<{ readonly value: TBinding; readonly release: () => void; }>;",
-          "declarationLine": 66,
+          "declarationLine": 69,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Exact binding-generation lease retained by a consumer until it no longer observes the value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingLease.",
@@ -8530,7 +8538,7 @@
           "name": "IGraphBindingReleaseEntry",
           "kind": "type",
           "signature": "export type IGraphBindingReleaseEntry<TBinding> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding; readonly reason: IGraphBindingReleaseReason; }>;",
-          "declarationLine": 60,
+          "declarationLine": 63,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Exact binding custody released after graph-owned instance cleanup.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseEntry.",
@@ -8593,7 +8601,7 @@
           "name": "IGraphBindingReleaseReason",
           "kind": "type",
           "signature": "export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose';",
-          "declarationLine": 58,
+          "declarationLine": 61,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Identifies why one exact graph binding generation left the graph.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseReason.",
@@ -8909,7 +8917,7 @@
           "name": "IGraphReleaseEntry",
           "kind": "type",
           "signature": "export type IGraphReleaseEntry<TBinding = unknown> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding | undefined; readonly instance: IGraphNodeInstance<unknown>; }>;",
-          "declarationLine": 77,
+          "declarationLine": 80,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Immutable view of one graph node supplied to a composition release owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReleaseEntry.",
@@ -9035,7 +9043,7 @@
           "name": "IGraphStartEntry",
           "kind": "type",
           "signature": "export type IGraphStartEntry<TBinding = unknown> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding | undefined; readonly definition: IDynamicGraphNodeDefinition<unknown>; }>;",
-          "declarationLine": 71,
+          "declarationLine": 74,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Immutable node information supplied to a composition startup owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphStartEntry.",
