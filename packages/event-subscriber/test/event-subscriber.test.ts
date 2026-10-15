@@ -1,3 +1,4 @@
+import { subscribeOnce, subscribeSubscriber, subscribeUntil } from '../src/subscriber.js'
 import { describe, expect, it, vi } from 'vitest'
 import {
   EventSubscriberErrorCode,
@@ -6,9 +7,7 @@ import {
   invokeParallelSettled,
   invokeSerialSettled,
   invokeTask,
-  invokeTaskSettled,
-  subscribeSubscriber,
-  subscribeUntil
+  invokeTaskSettled
 } from '../src/index.js'
 
 describe('event channel', () => {
@@ -132,7 +131,7 @@ describe('event channel', () => {
   it('ES-T08 once is removed before invocation and resists synchronous reentry', () => {
     const channel = createEventChannel<number>()
     let calls = 0
-    channel.subscribeOnce((event) => {
+    subscribeOnce(channel, (event) => {
       calls += 1
       channel.publish(event.value)
     })
@@ -316,7 +315,7 @@ describe('abort overlay', () => {
     })
     const channel = createEventChannel<number>()
 
-    expect(() => channel.subscribeUntil(signal as never, () => undefined)).toThrowError(
+    expect(() => subscribeUntil(channel, signal as never, () => undefined)).toThrowError(
       expect.objectContaining({ code: EventSubscriberErrorCode.invalidSignal })
     )
     expect(reads).toBe(0)
@@ -329,7 +328,7 @@ describe('abort overlay', () => {
         return false
       }
     })
-    expect(() => channel.subscribeUntil(arraySignal as never, () => undefined)).toThrowError(
+    expect(() => subscribeUntil(channel, arraySignal as never, () => undefined)).toThrowError(
       expect.objectContaining({ code: EventSubscriberErrorCode.invalidSignal })
     )
     expect(arrayReads).toBe(0)
@@ -341,7 +340,7 @@ describe('abort overlay', () => {
     revoke()
     let revokedFailure: unknown
     try {
-      channel.subscribeUntil(revokedSignal as never, () => undefined)
+      subscribeUntil(channel, revokedSignal as never, () => undefined)
     } catch (error) {
       revokedFailure = error
     }
@@ -356,10 +355,10 @@ describe('abort overlay', () => {
       removeEventListener: () => undefined
     }
     const silentChannel = createEventChannel<number>()
-    expect(silentChannel.subscribeUntil(signal, () => undefined)).toBeTypeOf('function')
+    expect(subscribeUntil(silentChannel, signal, () => undefined)).toBeTypeOf('function')
 
     const strictChannel = createEventChannel<number>({ throwOnAborted: true })
-    expect(() => strictChannel.subscribeUntil(signal, () => undefined)).toThrowError(
+    expect(() => subscribeUntil(strictChannel, signal, () => undefined)).toThrowError(
       expect.objectContaining({ code: EventSubscriberErrorCode.aborted })
     )
   })
@@ -383,7 +382,7 @@ describe('abort overlay', () => {
     }
     const channel = createEventChannel<number>({ throwOnAborted: true })
 
-    expect(() => channel.subscribeUntil(signal, () => undefined)).toThrowError(
+    expect(() => subscribeUntil(channel, signal, () => undefined)).toThrowError(
       expect.objectContaining({ code: EventSubscriberErrorCode.aborted })
     )
     expect(remove).toHaveBeenCalledOnce()

@@ -1,3 +1,4 @@
+import { subscribeUntil } from '../src/subscriber.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import * as EventSubscriber from '../src/index.js'
 import { readFileSync } from 'node:fs'
@@ -7,9 +8,12 @@ import * as SubscriberEntry from '../src/subscriber.js'
 
 describe('public exports', () => {
   it('ES-T182 exposes subscription helpers through the focused subscriber entry', () => {
-    expect(SubscriberEntry.subscribeOnce).toBe(EventSubscriber.subscribeOnce)
-    expect(SubscriberEntry.subscribeUntil).toBe(EventSubscriber.subscribeUntil)
-    expect(SubscriberEntry.subscribeSubscriber).toBe(EventSubscriber.subscribeSubscriber)
+    expect(SubscriberEntry.subscribeOnce).toBeTypeOf('function')
+    expect('subscribeOnce' in EventSubscriber).toBe(false)
+    expect(SubscriberEntry.subscribeUntil).toBeTypeOf('function')
+    expect('subscribeUntil' in EventSubscriber).toBe(false)
+    expect(SubscriberEntry.subscribeSubscriber).toBeTypeOf('function')
+    expect('subscribeSubscriber' in EventSubscriber).toBe(false)
   })
 
   it('ES-T16 exposes one root with all runtime helpers', () => {
@@ -29,8 +33,6 @@ describe('public exports', () => {
     expect('publishSerial' in EventSubscriber).toBe(false)
     expect('publishTaskSettled' in EventSubscriber).toBe(false)
     expect('publishTask' in EventSubscriber).toBe(false)
-    expect(EventSubscriber.subscribeOnce).toBeTypeOf('function')
-    expect(EventSubscriber.subscribeUntil).toBeTypeOf('function')
     expect('createCanonicalChannel' in EventSubscriber).toBe(false)
     expect('getCapability' in EventSubscriber).toBe(false)
   })
@@ -54,7 +56,7 @@ describe('public exports', () => {
       addEventListener: () => undefined,
       removeEventListener: () => undefined
     }
-    channel.subscribeUntil(signal, () => 'ok')
+    subscribeUntil(channel, signal, () => 'ok')
     expect(channel.size).toBe(2)
 
     const typeNegativeCases = (): void => {
@@ -83,7 +85,7 @@ describe('public exports', () => {
   it('ES-T48 accepts the host AbortSignal structure without lifecycle runtime import', () => {
     const channel = createEventChannel<number>()
     const nativeSignal: IAbortSignal = new AbortController().signal
-    const stop = channel.subscribeUntil(nativeSignal, () => undefined)
+    const stop = subscribeUntil(channel, nativeSignal, () => undefined)
     expect(nativeSignal.aborted).toBe(false)
     stop()
   })

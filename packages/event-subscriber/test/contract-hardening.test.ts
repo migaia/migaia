@@ -1,3 +1,4 @@
+import { subscribeOnce, subscribeSubscriber, subscribeUntil } from '../src/subscriber.js'
 import { describe, expect, it, vi } from 'vitest'
 import vm from 'node:vm'
 import {
@@ -9,10 +10,7 @@ import {
   invokeSerial,
   invokeTaskSettled,
   invokeSerialSettled,
-  invokeTask,
-  subscribeOnce,
-  subscribeSubscriber,
-  subscribeUntil
+  invokeTask
 } from '../src/index.js'
 import { attachEventErrorCode, codeExistingError } from '../src/errors.js'
 import { createSystemTerminalRuntime } from '../src/internal/terminal-runtime.js'

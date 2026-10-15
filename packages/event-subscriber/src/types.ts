@@ -1,7 +1,10 @@
 import type { IObjectPath, IObjectPathValue } from '@migaia/utils/object-path'
-import type { IAbortSignal } from '@migaia/utils/promise'
 import { EventSubscriberState } from './state-constants.js'
-import type { IEventAdmissionPolicy, IEventDispatchPolicy, IEventRemovalPolicy } from './state-constants.js'
+import type {
+  IEventAdmissionPolicy,
+  IEventDispatchPolicy,
+  IEventRemovalPolicy
+} from './state-constants.js'
 import type { IEventApiStyle, IEventApiStyleMethodNames, IEventApiStyleOption } from './style.js'
 
 export type IUnsubscribe = () => void
@@ -195,15 +198,6 @@ export type IEventChannel<
     listener: IEventListener<T, R, V>,
     options?: { readonly taskId?: string }
   ): IEventChannelSubscription<T, R, S, V>
-  subscribeOnce(
-    listener: IEventListener<T, R, V>,
-    options?: { readonly taskId?: string }
-  ): IUnsubscribe
-  subscribeUntil(
-    signal: IAbortSignal,
-    listener: IEventListener<T, R, V>,
-    options?: { readonly taskId?: string }
-  ): IUnsubscribe
   publish(value: T): void
   filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>
   clear(): void
@@ -244,9 +238,9 @@ export type IEventHubReport<C extends IEventMap, V = undefined> = {
 }[keyof C]
 
 /**
- * A keyed fanout hub deliberately fixes recursive dispatch, multiple admission, handle removal,
- * a 100000-invocation publish budget and non-throwing aborted admission on its private channels.
- * Use createEventChannel when dispatch/admission/budget/abort policies must be selected by the owner.
+ * A keyed fanout hub deliberately fixes recursive dispatch, multiple admission, handle removal, a
+ * 100000-invocation publish budget and non-throwing aborted admission on its private channels. Use
+ * createEventChannel when dispatch/admission/budget/abort policies must be selected by the owner.
  */
 export type IEventHubOptions<
   C extends IEventMap,

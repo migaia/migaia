@@ -196,7 +196,7 @@ import {
 } from '@migaia/event-subscriber/subscriber'
 ```
 
-这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel，不要求是 `createEventChannel()` 产出的实例。但 helper 本身**不读取 style 配置**：导出名固定，返回值固定为 canonical `IUnsubscribe`，不会投影 `off`、`dispose`、`unlisten` 等 alias。需要 styled handle 时，直接调用 channel 实例上的 `subscribeOnce()` / `subscribeUntil()`。
+这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel，不要求是 `createEventChannel()` 产出的实例。但 helper 本身**不读取 style 配置**：导出名固定，返回值固定为 canonical `IUnsubscribe`，不会投影 `off`、`dispose`、`unlisten` 等 alias。需要 styled 链式 handle 时，使用 channel.subscribe()；独立 helper 统一返回 canonical IUnsubscribe。
 
 ### `subscribeOnce`
 
@@ -617,7 +617,8 @@ const results = await invokeParallelSettled(checks, 'usr_42')
 ### 3. `subscribeUntil` + `AbortController` 管理订阅生命周期
 
 ```ts
-import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'
+import { createEventChannel } from '@migaia/event-subscriber'
+import { subscribeUntil } from '@migaia/event-subscriber/subscriber'
 
 const controller = new AbortController()
 const channel = createEventChannel<number>()
@@ -644,7 +645,8 @@ events.publish('warning', { message: 'cache is stale' })
 ### 5. 对象订阅者 + 串行结算，保证副作用按序执行
 
 ```ts
-import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'
+import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'
+import { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'
 
 const pipeline = createEventChannel<string, void>()
 subscribeSubscriber(pipeline, {

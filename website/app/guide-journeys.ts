@@ -26250,7 +26250,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst ready = createEventChannel<string>()\n\nready.subscribeOnce((event) => console.log('只执行一次:', event.value))\n\nconst controller = new AbortController()\nready.subscribeUntil(controller.signal, (event) => console.log('页面打开期间:', event.value))\n\nready.subscribe((event) => {\n  console.log('收到后退订自己:', event.value)\n  event.abort()\n})\n\nready.publish('第 1 次')\ncontroller.abort() // 例如组件卸载\nready.publish('第 2 次') // 三个 listener 都已退订，没有输出\nconsole.log('当前订阅数:', ready.size)"
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeOnce, subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst ready = createEventChannel<string>()\n\nsubscribeOnce(ready, (event) => console.log('只执行一次:', event.value))\n\nconst controller = new AbortController()\nsubscribeUntil(ready, controller.signal, (event) => console.log('页面打开期间:', event.value))\n\nready.subscribe((event) => {\n  console.log('收到后退订自己:', event.value)\n  event.abort()\n})\n\nready.publish('第 1 次')\ncontroller.abort() // 例如组件卸载\nready.publish('第 2 次') // 三个 listener 都已退订，没有输出\nconsole.log('当前订阅数:', ready.size)"
               },
               {
                 type: 'paragraph',
@@ -26346,7 +26346,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createEventChannel } from '@migaia/event-subscriber'\n\nconst ready = createEventChannel<string>()\n\nready.subscribeOnce((event) => console.log('once only:', event.value))\n\nconst controller = new AbortController()\nready.subscribeUntil(controller.signal, (event) => console.log('while the page is open:', event.value))\n\nready.subscribe((event) => {\n  console.log('unsubscribes itself after:', event.value)\n  event.abort()\n})\n\nready.publish('first')\ncontroller.abort() // for example, the component unmounts\nready.publish('second') // all three listeners are gone, prints nothing\nconsole.log('subscriptions:', ready.size)"
+                code: "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeOnce, subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst ready = createEventChannel<string>()\n\nsubscribeOnce(ready, (event) => console.log('once only:', event.value))\n\nconst controller = new AbortController()\nsubscribeUntil(ready, controller.signal, (event) => console.log('while the page is open:', event.value))\n\nready.subscribe((event) => {\n  console.log('unsubscribes itself after:', event.value)\n  event.abort()\n})\n\nready.publish('first')\ncontroller.abort() // for example, the component unmounts\nready.publish('second') // all three listeners are gone, prints nothing\nconsole.log('subscriptions:', ready.size)"
               },
               {
                 type: 'paragraph',

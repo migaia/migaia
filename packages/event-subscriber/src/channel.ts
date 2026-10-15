@@ -507,7 +507,8 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     (admissionPolicy !== undefined &&
       admissionPolicy !== EventAdmissionPolicy.multiple &&
       admissionPolicy !== EventAdmissionPolicy.unique) ||
-    (removalPolicy !== EventRemovalPolicy.handle && removalPolicy !== EventRemovalPolicy.listenerAll)
+    (removalPolicy !== EventRemovalPolicy.handle &&
+      removalPolicy !== EventRemovalPolicy.listenerAll)
   ) {
     throw createEventTypeError(
       EventSubscriberErrorCode.invalidOptions,
@@ -766,12 +767,6 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         admission?.release()
         throw error
       }
-    },
-    subscribeOnce(listener, listenerOptions) {
-      return subscribeOnce(channel, listener, listenerOptions)
-    },
-    subscribeUntil(signal, listener, listenerOptions) {
-      return subscribeUntil(channel, signal, listener, listenerOptions)
     },
     publish(value) {
       publishValue(value)
