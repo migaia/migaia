@@ -782,6 +782,8 @@ import {
 或已撤销 token 会 fail closed；view 不包含 Host、config、shared 或 mutation 能力。历史
 `IPluginRegistrationReceipt` 仍是 deprecated 的 `IRegistrationToken` 类型别名，保持编译兼容。
 
+反复 `createView(token)` 取得的扩展函数保持同一引用，receiver 是 concrete Host。token view 随注册生命周期撤销，禁用期间仍可使用。完整 Host view 检查当前启用状态；重新启用会恢复原函数引用。卸载后两类视图均拒绝调用。
+
 
 ### Lazy activation failure and retry
 

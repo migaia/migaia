@@ -29,14 +29,18 @@ type IExtensionCacheNode = {
 /** Per-host cache root; exact registration objects distinguish later reinstall generations. */
 const extensionCache = new WeakMap<object, IExtensionCacheNode>()
 
+/** Token capabilities survive disable(), unlike full Host views; never share their guards. */
+const tokenExtensionCache = new WeakMap<object, IExtensionCacheNode>()
+
 /** Returns the cache node for one exact ordered registration set. */
 const readExtensionCache = (
+  cacheRoot: WeakMap<object, IExtensionCacheNode>,
   host: object,
   registrations: readonly object[]
 ): IExtensionCacheNode => {
-  const existing = extensionCache.get(host)
+  const existing = cacheRoot.get(host)
   const root: IExtensionCacheNode = existing ?? { next: new WeakMap(), functions: new Map() }
-  if (!existing) extensionCache.set(host, root)
+  if (!existing) cacheRoot.set(host, root)
   let node: IExtensionCacheNode = root
   for (const registration of registrations) {
     let child: IExtensionCacheNode | undefined = node.next.get(registration)
@@ -49,18 +53,15 @@ const readExtensionCache = (
   return node
 }
 
-/**
- * Materializes one immutable publication snapshot. All liveness and mutation decisions remain in
- * PluginHost; this module owns only descriptor-safe view construction.
- */
-export const createPluginHostPublication = <THost, TDomainCore extends object, TValue>(
-  registrations: readonly IRegistration<TDomainCore, TValue>[],
-  port: IPluginHostPublicationPort<THost, TDomainCore, TValue>
-): IPluginHostCompositionSnapshot => {
-  /** Frozen registration identities defining this exact publication generation. */
-  const captured = Object.freeze([...registrations])
+/** Copies admitted descriptors once, with stable callable identity under one liveness policy. */
+const materializeExtensions = <TDomainCore extends object, TValue>(
+  captured: readonly IRegistration<TDomainCore, TValue>[],
+  host: unknown,
+  assertLive: (registrations: readonly IRegistration<TDomainCore, TValue>[]) => void,
+  cacheRoot: WeakMap<object, IExtensionCacheNode>
+): Record<PropertyKey, unknown> => {
   /** Exact-set cache keeps restored callable references stable without sharing stale generations. */
-  const cached = readExtensionCache(port.host as object, captured)
+  const cached = readExtensionCache(cacheRoot, host as object, captured)
   /** Null-prototype extension record excluding Host and Object prototype capabilities. */
   const extensions = Object.create(null) as Record<PropertyKey, unknown>
   for (const registration of captured)
@@ -73,8 +74,8 @@ export const createPluginHostPublication = <THost, TDomainCore extends object, T
         published = cached.functions.get(key)
         if (!published) {
           published = (...args: unknown[]) => {
-            port.assertLive(captured)
-            return invokeCaptured(value, port.host, args)
+            assertLive(captured)
+            return invokeCaptured(value, host, args)
           }
           cached.functions.set(key, published as Function)
         }
@@ -86,6 +87,20 @@ export const createPluginHostPublication = <THost, TDomainCore extends object, T
         writable: false
       })
     }
+  return extensions
+}
+
+/**
+ * Materializes one immutable publication snapshot. All liveness and mutation decisions remain in
+ * PluginHost; this module owns only descriptor-safe view construction.
+ */
+export const createPluginHostPublication = <THost, TDomainCore extends object, TValue>(
+  registrations: readonly IRegistration<TDomainCore, TValue>[],
+  port: IPluginHostPublicationPort<THost, TDomainCore, TValue>
+): IPluginHostCompositionSnapshot => {
+  /** Frozen registration identities defining this exact publication generation. */
+  const captured = Object.freeze([...registrations])
+  const extensions = materializeExtensions(captured, port.host, port.assertLive, extensionCache)
   for (const [key, facade] of port.readSharedExtensions())
     Object.defineProperty(extensions, key, {
       value: facade,
@@ -137,24 +152,7 @@ export const createPluginHostExtensionPublication = <THost, TDomainCore extends 
   assertLive: (registrations: readonly IRegistration<TDomainCore, TValue>[]) => void
 ): Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>> }> => {
   const captured = Object.freeze([...registrations])
-  const extensions = Object.create(null) as Record<PropertyKey, unknown>
-  for (const registration of captured)
-    for (const { key, descriptor } of registration.extensions) {
-      const value = descriptor.value
-      const published =
-        typeof value === 'function'
-          ? (...args: unknown[]) => {
-              assertLive(captured)
-              return invokeCaptured(value, host, args)
-            }
-          : value
-      Object.defineProperty(extensions, key, {
-        value: published,
-        enumerable: true,
-        configurable: false,
-        writable: false
-      })
-    }
+  const extensions = materializeExtensions(captured, host, assertLive, tokenExtensionCache)
   Object.freeze(extensions)
   return Object.freeze({
     get extensions() {
