@@ -9130,7 +9130,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\n\ntype IUser = { id: string; name: string };\n\nclass UserRequestError extends Error {\n  readonly code = 'USER_REQUEST_FAILED';\n\n  constructor(readonly status: number) {\n    super(`GET /api/user failed: ${status}`);\n  }\n}\n\nconst runtime = createRuntime();\n\nconst user = new Resource<IUser>(\n  async ({ signal }) => {\n    const response = await fetch('/api/user', { signal });\n    if (!response.ok) throw new UserRequestError(response.status);\n    return (await response.json()) as IUser;\n  },\n  runtime\n);\n\nswitch (user.state.status) {\n  case ResourceStatus.idle:\n  case ResourceStatus.pending:\n    console.log('loading...');\n    break;\n  case ResourceStatus.success:\n    console.log(user.state.data);\n    break;\n  case ResourceStatus.error:\n  case ResourceStatus.cancelled:\n    console.error(user.state.error);\n    break;\n}\n\ntry {\n  const freshUser = await user.refetch();\n  console.log('refetched user', freshUser);\n} finally {\n  user.dispose();\n}"
+                  "code": "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\n\ntype IUser = { id: string; name: string }\n\nclass UserRequestError extends Error {\n  readonly code = 'USER_REQUEST_FAILED'\n\n  constructor(readonly status: number) {\n    super(`GET /api/user failed: ${status}`)\n  }\n}\n\nconst runtime = createRuntime()\n\nconst user = new Resource<IUser>(async ({ signal }) => {\n  const response = await fetch('/api/user', { signal })\n  if (!response.ok) throw new UserRequestError(response.status)\n  return (await response.json()) as IUser\n}, runtime)\n\nswitch (user.state.status) {\n  case ResourceStatus.idle:\n  case ResourceStatus.pending:\n    console.log('loading...')\n    break\n  case ResourceStatus.success:\n    console.log(user.state.data)\n    break\n  case ResourceStatus.error:\n  case ResourceStatus.cancelled:\n    console.error(user.state.error)\n    break\n}\n\ntry {\n  const freshUser = await user.refetch()\n  console.log('refetched user', freshUser)\n} finally {\n  user.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -9151,7 +9151,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value; // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state; // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n  if (state.status === ResourceStatus.error) console.error(state.error);\n});\n\nexport function selectUser(id: string): void {\n  userId.value = id;\n}\n\nselectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose();\n  user.dispose();\n  userId.dispose();\n}"
+                  "code": "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\nimport { fetchUser } from './user-api.js'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal })\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user')\n  if (state.status === ResourceStatus.success) console.log('render', state.data)\n  if (state.status === ResourceStatus.error) console.error(state.error)\n})\n\nexport function selectUser(id: string): void {\n  userId.value = id\n}\n\nselectUser('2') // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose()\n  user.dispose()\n  userId.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -9244,6 +9244,20 @@
                   "text": "状态类型迁移：`ResourceStatus.fetching` 改为 `ResourceFetchStatus.fetching`；旧 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` key union。运行时的状态字符串与 SWR 数据/传输语义保持不变。"
                 }
               ]
+            },
+            {
+              "id": "canonical-request-owner-for-adapters",
+              "heading": "Canonical request owner for adapters",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`peekState()` inspects the state union without starting work or tracking. `reset()` cancels the current request and clears the cache to reusable idle state; the old shared Promise immediately rejects with Resource `REQUEST_ABORTED`/native `AbortError`. `IResourceFetchContext` carries readonly signal/generation/token from lifecycle; retries share identity, resets/replacements advance generation."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Loaded-value disposal and rendered-version leases remain adapter responsibilities. See USEGUIDE for the complete reset example."
+                }
+              ]
             }
           ]
         },
@@ -9286,7 +9300,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Resource, type IResourceOptions } from '@migaia/resource';\nimport type { IRuntime } from '@migaia/reactive';\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>);\n\n  readonly runtime: IRuntime;\n  debugName?: string;\n  readonly deps: ReadonlySet<IObservable>;\n  readonly depVersions: ReadonlyMap<IObservable, number>;\n\n  readonly state: IResourceState<T>;\n  readonly promise: Promise<T>;\n  readonly disposed: boolean;\n  readonly refreshing: boolean;\n  readonly fetchStatus: ResourceFetchStatus;\n  readonly isStale: boolean;\n  readonly observed: boolean;\n\n  read(): T;\n  peek(): T;\n  refetch(): Promise<T>;\n  invalidate(): Promise<T>;\n  cancel(): void;\n  dehydrate(): IResourceCacheSnapshot<T> | undefined;\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void;\n  dispose(): void;\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void;\n  onDependencyDisconnected(): void;\n}"
+                  "code": "import { Resource, type IResourceOptions } from '@migaia/resource'\nimport type { IRuntime } from '@migaia/reactive'\n\nclass Resource<T> implements IObserver, IDisposable {\n  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)\n\n  readonly runtime: IRuntime\n  debugName?: string\n  readonly deps: ReadonlySet<IObservable>\n  readonly depVersions: ReadonlyMap<IObservable, number>\n\n  readonly state: IResourceState<T>\n  readonly promise: Promise<T>\n  readonly disposed: boolean\n  readonly refreshing: boolean\n  readonly fetchStatus: ResourceFetchStatus\n  readonly isStale: boolean\n  readonly observed: boolean\n\n  read(): T\n  peek(): T\n  peekState(): IResourceState<T>\n  reset(): void\n  refetch(): Promise<T>\n  invalidate(): Promise<T>\n  cancel(): void\n  dehydrate(): IResourceCacheSnapshot<T> | undefined\n  hydrate(snapshot: IResourceCacheSnapshot<T>): void\n  dispose(): void\n\n  // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用\n  markDirty(): void\n  onDependencyDisconnected(): void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -9295,7 +9309,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value;\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state;\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n});\n\nuserId.value = '2';\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose();\n  user.dispose();\n  userId.dispose();\n}"
+                  "code": "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\nimport { fetchUser } from './user-api.js'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value\n    return fetchUser(id, { signal })\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading user')\n  if (state.status === ResourceStatus.success) console.log('render', state.data)\n})\n\nuserId.value = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose()\n  user.dispose()\n  userId.dispose()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -9382,7 +9396,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "只中止当前活跃的一代请求，资源本身仍可复用（下次读取/`refetch()` 会正常发起新请求）。`pending` 状态下取消会把状态落到 `cancelled`（携带 `name === 'AbortError'` 的 `DOMException`，贴 `REQUEST_CANCELLED` 码）；`staleWhileRevalidate` 后台刷新被取消时会回退展示原有的 `success` 数据（清除 `refreshing` 标记，不会遗留\"正在刷新但没有实际请求\"的不一致状态）。取消期间的清理（timer/listener）若失败，会以贴 `CANCELLATION_CLEANUP_FAILED` 码的错误抛出（不影响状态已经收敛这一事实）。"
+                  "text": "只中止当前活跃的一代请求，资源本身仍可复用；取消后被动读取保持 cancelled，显式 `refetch()` 可重启。`pending` 状态下取消会把状态落到 `cancelled`（携带 `name === 'AbortError'` 的 `DOMException`，贴 `REQUEST_CANCELLED` 码）；`staleWhileRevalidate` 后台刷新被取消时会回退展示原有的 `success` 数据（清除 `refreshing` 标记，不会遗留\"正在刷新但没有实际请求\"的不一致状态）。取消期间的清理（timer/listener）若失败，会以贴 `CANCELLATION_CLEANUP_FAILED` 码的错误抛出（不影响状态已经收敛这一事实）。"
                 }
               ]
             },
@@ -9427,7 +9441,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string;\n  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean; // 默认 true\n  staleWhileRevalidate?: boolean; // 默认 false\n  retry?: IResourceRetryPolicy; // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0\n  keepAlive?: boolean; // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>;\n  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler\n};\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);"
+                  "code": "type IResourceOptions<T = unknown> = {\n  debugName?: string\n  ttl?: number // 默认 Infinity（永不过期，除非依赖变化/手动刷新）\n  autoStart?: boolean // 默认 true\n  staleWhileRevalidate?: boolean // 默认 false\n  retry?: IResourceRetryPolicy // 默认 0（不重试）\n  retryDelay?: number | ((failureCount: number, error: unknown) => number) // 默认 0\n  keepAlive?: boolean // 默认 false\n  initialSnapshot?: IResourceCacheSnapshot<T>\n  scheduler?: IScheduler // 默认 @migaia/utils/scheduler 的 systemScheduler\n}\n\ntype IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)"
                 },
                 {
                   "type": "paragraph",
@@ -9455,7 +9469,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException };\n\nconst ResourceStatus: {\n  idle: 'idle';\n  pending: 'pending';\n  success: 'success';\n  error: 'error';\n  cancelled: 'cancelled';\n  fetching: 'fetching';\n};\n\ntype ResourceFetchStatus = 'idle' | 'fetching';"
+                  "code": "type IResourceState<T> =\n  | { status: 'idle' }\n  | { status: 'pending' }\n  | { status: 'success'; data: T; refreshing?: boolean }\n  | { status: 'error'; error: unknown }\n  | { status: 'cancelled'; error: DOMException }\n\nconst ResourceStatus: {\n  idle: 'idle'\n  pending: 'pending'\n  success: 'success'\n  error: 'error'\n  cancelled: 'cancelled'\n  fetching: 'fetching'\n}\n\ntype ResourceFetchStatus = 'idle' | 'fetching'"
                 },
                 {
                   "type": "paragraph",
@@ -9470,7 +9484,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IResourceFetcher<T> = (ctx: { signal: IAbortSignal }) => T | PromiseLike<T>;"
+                  "code": "type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>"
                 },
                 {
                   "type": "paragraph",
@@ -9493,7 +9507,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IResourceCacheSnapshot<T> = {\n  readonly version: 1;\n  readonly data: T;\n  readonly updatedAt: number;\n  readonly expiresAt: number | null; // null 表示无限生命周期的 JSON 安全形式\n};"
+                  "code": "type IResourceCacheSnapshot<T> = {\n  readonly version: 1\n  readonly data: T\n  readonly updatedAt: number\n  readonly expiresAt: number | null // null 表示无限生命周期的 JSON 安全形式\n}"
                 },
                 {
                   "type": "paragraph",
@@ -9528,7 +9542,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource';"
+                  "code": "import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'"
                 },
                 {
                   "type": "paragraph",
@@ -9593,7 +9607,7 @@
                 {
                   "type": "code",
                   "language": "tsx",
-                  "code": "function UserProfile({ resource }: { resource: Resource<User> }) {\n  const user = resource.read(); // pending 抛 Promise（被 Suspense 捕获），error 抛错误（被 Error Boundary 捕获）\n  return <div>{user.name}</div>;\n}"
+                  "code": "function UserProfile({ resource }: { resource: Resource<User> }) {\n  const user = resource.read() // pending 抛 Promise（被 Suspense 捕获），error 抛错误（被 Error Boundary 捕获）\n  return <div>{user.name}</div>\n}"
                 }
               ]
             },
@@ -9604,7 +9618,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// 服务端：\nconst snapshot = userResource.dehydrate(); // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n});"
+                  "code": "// 服务端：\nconst snapshot = userResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})"
                 }
               ]
             },
@@ -9615,7 +9629,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const list = new Resource(fetchList, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true\n});\n\n// list.state.status === 'success' 时，即使正在后台刷新，\n// list.state.data 仍是旧数据，list.refreshing === true 可用来展示\"刷新中\"角标"
+                  "code": "const list = new Resource(fetchList, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true\n})\n\n// list.state.status === 'success' 时，即使正在后台刷新，\n// list.state.data 仍是旧数据，list.refreshing === true 可用来展示\"刷新中\"角标"
                 }
               ]
             },
@@ -9626,7 +9640,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const resource = new Resource(fetchWithFlakyBackend, runtime, {\n  retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),\n  retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s\n});"
+                  "code": "const resource = new Resource(fetchWithFlakyBackend, runtime, {\n  retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),\n  retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s\n})"
                 }
               ]
             },
@@ -9637,7 +9651,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "await resource.invalidate(); // 立即视为过期并重新请求\nresource.cancel(); // 只中止当前请求，资源仍可复用；下次读取会重新发起"
+                  "code": "await resource.invalidate() // 立即视为过期并重新请求\nresource.cancel() // 只中止当前请求，资源仍可复用；下次读取会重新发起"
                 }
               ]
             },
@@ -9670,6 +9684,33 @@
                 {
                   "type": "paragraph",
                   "text": "状态类型迁移：`ResourceStatus.fetching` 改为 `ResourceFetchStatus.fetching`；旧 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` key union。运行时的状态字符串与 SWR 数据/传输语义保持不变。"
+                }
+              ]
+            },
+            {
+              "id": "ownership-adapters-canonical-inspection-and-reset",
+              "heading": "Ownership adapters: canonical inspection and reset",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`peekState()` returns the current `IResourceState<T>` without tracking, loading or TTL revalidation. Unlike `peek()`, it returns the state union rather than materializing/throwing the value. `reset()` cancels any pending generation, clears dependency edges and cached data, and leaves this same instance idle and reusable."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "The old pending Promise rejects immediately with native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`; reset never reuses a prior generation/token."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`IResourceFetchContext` is the readonly lifecycle request identity (`signal`, monotonic `generation`, opaque `token`). Retries retain that identity; replacement requests receive a new one. Keep request identity separate from observation/suspension generations. Loaded-value ownership and render/version leases belong to adapters, not Resource's dependency graph."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "StoreLight uses these capabilities with one Resource instance, preserving the original T and shared request Promise."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst value = new Resource(({ generation }) => generation, createRuntime(), { autoStart: false })\nconsole.log(value.peekState().status) // idle: no loader was invoked\nconsole.log(await value.promise)\nvalue.reset()\nconsole.log(value.peekState().status) // idle: same owner, no cached data\nconsole.log(await value.promise) // a later generation\nvalue.dispose()"
                 }
               ]
             }
@@ -24944,6 +24985,20 @@
                   "text": "No host console or global reportError fallback is used."
                 }
               ]
+            },
+            {
+              "id": "canonical-async-resource-ownership",
+              "heading": "Canonical async resource ownership",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreResource` is a value-ownership adapter over `@migaia/resource`: one owner for requests/data/Promise/cancellation, with StoreLight render captures, version leases and exactly-once disposal layered above it. Pending reads share the original canonical Promise<T>."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Retry immediately rejects a superseded Promise with Resource REQUEST_ABORTED/native AbortError, including ignored-abort loaders; their eventual owned values still get cleaned. Failed refresh retains stale data. StoreResourceDataKind is removed along with the duplicate controller. See USEGUIDE for migration and lease behavior. Runtime defaults stay lazy on import."
+                }
+              ]
             }
           ]
         },
@@ -25317,9 +25372,13 @@
               ]
             },
             {
-              "id": "8-1-状态机",
-              "heading": "8.1 状态机",
+              "id": "8-1-状态投影",
+              "heading": "8.1 状态投影",
               "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "请求、数据、取消和共享 Promise 由 `@migaia/resource` 唯一拥有；下图是 StoreLight 结合版本租约派生的视图。"
+                },
                 {
                   "type": "code",
                   "language": "text",
@@ -25547,13 +25606,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -25802,6 +25860,32 @@
                 {
                   "type": "paragraph",
                   "text": "No host console or global reportError fallback is used."
+                }
+              ]
+            },
+            {
+              "id": "resource-convergence-migration",
+              "heading": "Resource convergence migration",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "StoreLight now adapts one `@migaia/resource` instance. It retains actual value identity, render captures, resource/version leases and physical disposal, while deleting its duplicate request/data controller and request coordinator. `StoreResourceDataKind` and its type are removed; use ResourceStatus/ResourceFetchStatus for native Resource state."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "StoreResourceKind remains the facade vocabulary; readSnapshot still returns value/version/token, not a public kind property."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Repeated pending reads throw the exact canonical Promise, which resolves the original value. `retry()` or forced cancellation immediately rejects the superseded Promise with native AbortError, source `@migaia/resource`, code `REQUEST_ABORTED`; previously an ignored-abort loader could keep that Promise pending until its own completion. Observe old Promise rejection when manually driving retries."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Late returned values are released once. Failed refresh restores stale data; old version leases delay its disposer until release. Loaded values awaiting canonical clock settlement remain owned and are released if that settlement fails."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A provisional-capture timer admission failure releases partial captures/timers and is reported as disposal housekeeping; a successfully loaded value remains readable and notifies subscribers. No async-context mechanism is introduced."
                 }
               ]
             }

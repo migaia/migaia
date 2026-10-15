@@ -1222,7 +1222,6 @@
         "STORE_LIGHT_SOURCE",
         "StoreFieldMode",
         "StoreLightErrorCode",
-        "StoreResourceDataKind",
         "StoreResourceKind",
         "createAsyncStore",
         "createStore",

@@ -471,6 +471,20 @@
                 "text": "No host console or global reportError fallback is used."
               }
             ]
+          },
+          {
+            "id": "canonical-async-resource-ownership",
+            "heading": "Canonical async resource ownership",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`createStoreResource` is a value-ownership adapter over `@migaia/resource`: one owner for requests/data/Promise/cancellation, with StoreLight render captures, version leases and exactly-once disposal layered above it. Pending reads share the original canonical Promise<T>."
+              },
+              {
+                "type": "paragraph",
+                "text": "Retry immediately rejects a superseded Promise with Resource REQUEST_ABORTED/native AbortError, including ignored-abort loaders; their eventual owned values still get cleaned. Failed refresh retains stale data. StoreResourceDataKind is removed along with the duplicate controller. See USEGUIDE for migration and lease behavior. Runtime defaults stay lazy on import."
+              }
+            ]
           }
         ]
       },
@@ -844,9 +858,13 @@
             ]
           },
           {
-            "id": "8-1-状态机",
-            "heading": "8.1 状态机",
+            "id": "8-1-状态投影",
+            "heading": "8.1 状态投影",
             "blocks": [
+              {
+                "type": "paragraph",
+                "text": "请求、数据、取消和共享 Promise 由 `@migaia/resource` 唯一拥有；下图是 StoreLight 结合版本租约派生的视图。"
+              },
               {
                 "type": "code",
                 "language": "text",
@@ -1074,13 +1092,12 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
               },
               {
                 "type": "list",
                 "items": [
-                  "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                  "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                  "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                   "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                 ]
               },
@@ -1329,6 +1346,32 @@
               {
                 "type": "paragraph",
                 "text": "No host console or global reportError fallback is used."
+              }
+            ]
+          },
+          {
+            "id": "resource-convergence-migration",
+            "heading": "Resource convergence migration",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "StoreLight now adapts one `@migaia/resource` instance. It retains actual value identity, render captures, resource/version leases and physical disposal, while deleting its duplicate request/data controller and request coordinator. `StoreResourceDataKind` and its type are removed; use ResourceStatus/ResourceFetchStatus for native Resource state."
+              },
+              {
+                "type": "paragraph",
+                "text": "StoreResourceKind remains the facade vocabulary; readSnapshot still returns value/version/token, not a public kind property."
+              },
+              {
+                "type": "paragraph",
+                "text": "Repeated pending reads throw the exact canonical Promise, which resolves the original value. `retry()` or forced cancellation immediately rejects the superseded Promise with native AbortError, source `@migaia/resource`, code `REQUEST_ABORTED`; previously an ignored-abort loader could keep that Promise pending until its own completion. Observe old Promise rejection when manually driving retries."
+              },
+              {
+                "type": "paragraph",
+                "text": "Late returned values are released once. Failed refresh restores stale data; old version leases delay its disposer until release. Loaded values awaiting canonical clock settlement remain owned and are released if that settlement fails."
+              },
+              {
+                "type": "paragraph",
+                "text": "A provisional-capture timer admission failure releases partial captures/timers and is reported as disposal housekeeping; a successfully loaded value remains readable and notifies subscribers. No async-context mechanism is introduced."
               }
             ]
           }
@@ -1729,13 +1772,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -2014,13 +2056,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -2158,13 +2199,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -2288,13 +2328,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -2432,13 +2471,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -2557,7 +2595,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/store-resource.d.ts:createStoreResource:export declare function createStoreResource<T>(factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>, options?: IStoreResourceOptions<T>): IStoreResource<T>;",
           "guidance": [],
-          "usageScore": 46,
+          "usageScore": 48,
           "configuration": [],
           "fragment": "store-light-index--createStoreResource"
         },
@@ -3865,7 +3903,7 @@
           "errors": ["No documented errors are declared for IStoreFieldMode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreFieldMode.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "IStoreFieldMode",
@@ -3923,13 +3961,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -4030,13 +4067,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -4129,115 +4165,6 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "store-light-index--IStoreResourceConfig"
-        },
-        {
-          "name": "IStoreResourceDataKind",
-          "kind": "type",
-          "signature": "export type IStoreResourceDataKind = (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];",
-          "declarationLine": 23,
-          "source": "packages/store-light/dist/resource-state-constants.d.ts",
-          "purpose": "IStoreResourceDataKind is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceDataKind.",
-          "advanced": "No additional advanced behavior is declared for IStoreResourceDataKind.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IStoreResourceDataKind."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceDataKind.",
-          "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
-          ],
-          "members": [],
-          "aliasOf": "IStoreResourceDataKind",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type IStoreResourceDataKind = (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IStoreResourceDataKind when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IStoreResourceDataKind does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "IStoreResourceDataKind is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IStoreResourceDataKind from @migaia/store-light, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IStoreResourceDataKind when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreResourceDataKind does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceDataKind."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IStoreResourceDataKind."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/resource-state-constants.d.ts:IStoreResourceDataKind:export type IStoreResourceDataKind = (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];",
-          "guidance": [
-            {
-              "id": "9-状态常量与错误构造工具",
-              "heading": "9. 状态常量与错误构造工具",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "除上述创建入口、`$`-API、FieldBuilder 协议之外，包根还导出以下常量与错误构造工具："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
-                    "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
-                  ]
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`STORE_LIGHT_SOURCE`：本包所有错误 `error.source` 的固定值 `'@migaia/store-light'`，用于按来源过滤/断言错误。",
-                    "`createStoreLightError(code, message, options?)`：构造一个携带 `(source, code)` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）的普通 `Error`；`options.cause` 可选，设置了才会传给 `Error` 构造器的 `cause`。",
-                    "`createStoreLightRangeError(code, message)`：同上，但构造 `RangeError`；无 `cause` 选项。",
-                    "`createStoreLightTypeError(code, message, options?)`：同上，但构造 `TypeError`；`options.cause` 可选。",
-                    "`createStoreLightAggregateError(code, errors, message)`：构造 `AggregateError(errors, message)` 并打上 `(source, code)` 身份；`errors: unknown[]`（必填）在结果的 `.errors` 上保持可达。"
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "这四个工厂函数是本包内部构造所有错误时使用的同一套工具，导出给需要\"以 `@migaia/store-light` 身份抛出自定义诊断错误\"的高级集成方（例如自定义 `FieldBuilder` 实现想复用同一套错误身份约定）；日常业务代码通常不需要直接调用它们，直接 `catch` 本包抛出的错误、按 `error.code` 分支即可（见下表）。"
-                }
-              ]
-            }
-          ],
-          "usageScore": 10,
-          "configuration": [],
-          "fragment": "store-light-index--IStoreResourceDataKind"
         },
         {
           "name": "IStoreResourceErrorPhase",
@@ -4369,7 +4296,7 @@
           "name": "IStoreResourceKind",
           "kind": "type",
           "signature": "export type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];",
-          "declarationLine": 22,
+          "declarationLine": 16,
           "source": "packages/store-light/dist/resource-state-constants.d.ts",
           "purpose": "IStoreResourceKind is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceKind.",
@@ -4380,7 +4307,7 @@
           "errors": ["No documented errors are declared for IStoreResourceKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceKind.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "IStoreResourceKind",
@@ -4438,13 +4365,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -4477,10 +4403,10 @@
         {
           "name": "IStoreResourceLoadContext",
           "kind": "type",
-          "signature": "export type IStoreResourceLoadContext = { signal: IAbortSignal; generation: number; token: IGenerationToken; };",
+          "signature": "export type IStoreResourceLoadContext = IResourceFetchContext;",
           "declarationLine": 3,
           "source": "packages/store-light/dist/store-resource-request.d.ts",
-          "purpose": "IStoreResourceLoadContext is part of this module's public type contract.",
+          "purpose": "Request identity belongs to Resource; StoreLight adds only value ownership.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceLoadContext.",
           "advanced": "No additional advanced behavior is declared for IStoreResourceLoadContext.",
           "parameters": ["This type declaration has no parameters."],
@@ -4492,9 +4418,7 @@
           "members": [],
           "aliasOf": "IStoreResourceLoadContext",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export type IStoreResourceLoadContext = { signal: IAbortSignal; generation: number; token: IGenerationToken; };"
-          ],
+          "overloadSignatures": ["export type IStoreResourceLoadContext = IResourceFetchContext;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use IStoreResourceLoadContext when its type contract and declared inputs match the result you need.",
@@ -4503,7 +4427,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IStoreResourceLoadContext is part of this module's public type contract."
+              "content": "Request identity belongs to Resource; StoreLight adds only value ownership."
             },
             {
               "id": "getting-started",
@@ -4532,7 +4456,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/store-resource-request.d.ts:IStoreResourceLoadContext:export type IStoreResourceLoadContext = { signal: IAbortSignal; generation: number; token: IGenerationToken; };",
+          "identity": "packages/store-light/dist/store-resource-request.d.ts:IStoreResourceLoadContext:export type IStoreResourceLoadContext = IResourceFetchContext;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5068,13 +4992,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -5119,7 +5042,7 @@
           "errors": ["No documented errors are declared for StoreFieldMode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreFieldMode.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "StoreFieldMode",
@@ -5177,13 +5100,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -5448,115 +5370,6 @@
           "fragment": "store-light-index--storeReady"
         },
         {
-          "name": "StoreResourceDataKind",
-          "kind": "const",
-          "signature": "export declare const StoreResourceDataKind: { readonly empty: \"empty\"; readonly value: \"value\"; readonly error: \"error\"; };",
-          "declarationLine": 11,
-          "source": "packages/store-light/dist/resource-state-constants.d.ts",
-          "purpose": "Visible resource data states, separate from request lifecycle.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreResourceDataKind.",
-          "advanced": "No additional advanced behavior is declared for StoreResourceDataKind.",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for StoreResourceDataKind."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreResourceDataKind.",
-          "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
-          ],
-          "members": [],
-          "aliasOf": "StoreResourceDataKind",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const StoreResourceDataKind: { readonly empty: \"empty\"; readonly value: \"value\"; readonly error: \"error\"; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use StoreResourceDataKind when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when StoreResourceDataKind does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Visible resource data states, separate from request lifecycle."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import StoreResourceDataKind from @migaia/store-light, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use StoreResourceDataKind when its const contract and declared inputs match the result you need. Choose a different public symbol when StoreResourceDataKind does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreResourceDataKind."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for StoreResourceDataKind."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/resource-state-constants.d.ts:StoreResourceDataKind:export declare const StoreResourceDataKind: { readonly empty: \"empty\"; readonly value: \"value\"; readonly error: \"error\"; };",
-          "guidance": [
-            {
-              "id": "9-状态常量与错误构造工具",
-              "heading": "9. 状态常量与错误构造工具",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "除上述创建入口、`$`-API、FieldBuilder 协议之外，包根还导出以下常量与错误构造工具："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
-                    "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
-                  ]
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`STORE_LIGHT_SOURCE`：本包所有错误 `error.source` 的固定值 `'@migaia/store-light'`，用于按来源过滤/断言错误。",
-                    "`createStoreLightError(code, message, options?)`：构造一个携带 `(source, code)` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）的普通 `Error`；`options.cause` 可选，设置了才会传给 `Error` 构造器的 `cause`。",
-                    "`createStoreLightRangeError(code, message)`：同上，但构造 `RangeError`；无 `cause` 选项。",
-                    "`createStoreLightTypeError(code, message, options?)`：同上，但构造 `TypeError`；`options.cause` 可选。",
-                    "`createStoreLightAggregateError(code, errors, message)`：构造 `AggregateError(errors, message)` 并打上 `(source, code)` 身份；`errors: unknown[]`（必填）在结果的 `.errors` 上保持可达。"
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "这四个工厂函数是本包内部构造所有错误时使用的同一套工具，导出给需要\"以 `@migaia/store-light` 身份抛出自定义诊断错误\"的高级集成方（例如自定义 `FieldBuilder` 实现想复用同一套错误身份约定）；日常业务代码通常不需要直接调用它们，直接 `catch` 本包抛出的错误、按 `error.code` 分支即可（见下表）。"
-                }
-              ]
-            }
-          ],
-          "usageScore": 22,
-          "configuration": [],
-          "fragment": "store-light-index--StoreResourceDataKind"
-        },
-        {
           "name": "StoreResourceKind",
           "kind": "const",
           "signature": "export declare const StoreResourceKind: { readonly idle: \"idle\"; readonly loading: \"loading\"; readonly ready: \"ready\"; readonly failed: \"failed\"; readonly closing: \"closing\"; readonly disposed: \"disposed\"; };",
@@ -5571,7 +5384,7 @@
           "errors": ["No documented errors are declared for StoreResourceKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreResourceKind.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "StoreResourceKind",
@@ -5629,13 +5442,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
                   "items": [
-                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。",
-                    "`StoreResourceDataKind`：与请求生命周期分离的\"可见数据\"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。",
+                    "`StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 §8.1），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。",
                     "`StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 §6。"
                   ]
                 },
@@ -5661,7 +5473,7 @@
               ]
             }
           ],
-          "usageScore": 30,
+          "usageScore": 26,
           "configuration": [],
           "fragment": "store-light-index--StoreResourceKind"
         }
