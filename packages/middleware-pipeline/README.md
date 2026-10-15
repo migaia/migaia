@@ -25,7 +25,7 @@ pipeline.run(
 )
 ```
 
-同步 stage 不调用 `next()` 时短路。异步模式保留洋葱模型：`next()` 立即启动下游并返回同一个下游 Promise。
+同步 stage 不调用 `next()` 时短路。同步模式是线性 reduce：`next()` 只提交值，stage 返回后才执行下游。异步模式保留洋葱模型：`next()` 立即启动下游并返回同一个下游 Promise。
 
 ## 选择模式
 
@@ -38,12 +38,12 @@ const asyncGenerator = createPipeline<string>({
 })
 ```
 
-| `mode` | stage | `run()` 返回值 |
-| --- | --- | --- |
-| `sync` | `(value, next, context?) => void` | `void` |
-| `async` | `(value, next, context?) => void \| Promise<void>` | `Promise<void>` |
-| `generator` | generator function | `void` |
-| `async-generator` | async generator function | `Promise<void>` |
+| `mode` | stage | `run()` 返回值 | 下游何时开始 |
+| --- | --- | --- | --- |
+| `sync` | `(value, next, context?) => void` | `void` | stage 返回后；`next()` 只提交值 |
+| `async` | `(value, next, context?) => void \| Promise<void>` | `Promise<void>` | 调用 `next()` 时（洋葱模型） |
+| `generator` | generator function | `void` | stage 结束后 |
+| `async-generator` | async generator function | `Promise<void>` | stage 结束后 |
 
 `mode` 是只读属性，调用方可用它记录或检查当前代数。每次 `run()` 相互隔离。
 
@@ -66,6 +66,8 @@ await pipeline.run([trim], '  ready  ', async (result) => {
   console.log(result) // ready
 })
 ```
+
+提升不改变 sync stage 的线性 reduce 语义：在任何目标模式中，sync stage 里写在 `next()` 之后的代码总是先于下游执行；stage 抛错时下游不启动。
 
 不支持的方向在运行时抛出带 `source` 与 `code` 的原生 `TypeError`，同时也会被类型系统拒绝。
 
