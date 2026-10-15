@@ -1,3 +1,4 @@
+import { trimTimestampWindow } from './timestamp-window.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createAbortController,
@@ -71,8 +72,7 @@ export function createUnitBudget<TKind extends string>(
   /** Drops timestamps that no longer consume launch rate. */
   const trim = (): void => {
     if (rate === false) return
-    const now = scheduler.now()
-    while (grants.length > 0 && now - grants[0]! >= rate.windowMs) grants.shift()
+    trimTimestampWindow(grants, scheduler.now(), rate.windowMs)
   }
   /** Takes a local lease and, optionally, composes it with an upstream lease. */
   const granted = (parent?: IUnitLease): IBudgetOutcome => {
