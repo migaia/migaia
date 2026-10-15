@@ -126,6 +126,8 @@ describe('A3 supervisor startup', () => {
     const failed = createSupervisor({
       id: 'launch',
       report: () => undefined,
+      // Without restart, start() settles on the failed attempt instead of waiting out a backoff.
+      restart: { mode: 'never' },
       spec: 'a',
       launcher: { capabilities: memory.capabilities, launch: () => Promise.reject(launchFailure) },
       profile,
@@ -145,6 +147,7 @@ describe('A3 supervisor startup', () => {
     const attached = createSupervisor({
       id: 'attach',
       report: () => undefined,
+      restart: { mode: 'never' },
       spec: 'a',
       launcher: memory,
       profile,
