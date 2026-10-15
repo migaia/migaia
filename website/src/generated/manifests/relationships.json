@@ -29383,6 +29383,66 @@
     },
     {
       "from": "/en/docs/reactive/api/extension",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "to": "/en/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "to": "/en/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/reactive/getting-started",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "to": "/en/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/reactive",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "to": "/en/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "to": "/en/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/reactive/getting-started",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "to": "/en/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/reactive",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension",
       "to": "/en/docs/reactive/api/extension#reactive-extension--currentRuntimeVersion",
       "type": "api-symbol"
     },
@@ -29499,6 +29559,36 @@
     {
       "from": "/en/docs/reactive",
       "to": "/en/docs/reactive/api/extension#reactive-extension--internalRuntimeOf",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "to": "/en/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "to": "/en/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/reactive/getting-started",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "to": "/en/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/reactive",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--invalidateObservable",
       "type": "architecture-symbol"
     },
     {
@@ -29683,6 +29773,36 @@
     },
     {
       "from": "/en/docs/reactive/api/extension",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "to": "/en/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "to": "/en/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/reactive/getting-started",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "to": "/en/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/reactive",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension",
       "to": "/en/docs/reactive/api/extension#reactive-extension--isAnyRuntimeTracking",
       "type": "api-symbol"
     },
@@ -29739,6 +29859,36 @@
     {
       "from": "/en/docs/reactive",
       "to": "/en/docs/reactive/api/extension#reactive-extension--isRuntimeTracking",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "to": "/en/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "to": "/en/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/reactive/getting-started",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "to": "/en/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/reactive",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
       "type": "architecture-symbol"
     },
     {
@@ -29943,6 +30093,66 @@
     },
     {
       "from": "/zh/docs/reactive/api/extension",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "to": "/zh/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "to": "/zh/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/reactive/getting-started",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "to": "/zh/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/reactive",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--createSourceBinding",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "to": "/zh/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "to": "/zh/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/reactive/getting-started",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "to": "/zh/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/reactive",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--createTrackedObserver",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension",
       "to": "/zh/docs/reactive/api/extension#reactive-extension--currentRuntimeVersion",
       "type": "api-symbol"
     },
@@ -30059,6 +30269,36 @@
     {
       "from": "/zh/docs/reactive",
       "to": "/zh/docs/reactive/api/extension#reactive-extension--internalRuntimeOf",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "to": "/zh/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "to": "/zh/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/reactive/getting-started",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--invalidateObservable",
+      "to": "/zh/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/reactive",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--invalidateObservable",
       "type": "architecture-symbol"
     },
     {
@@ -30243,6 +30483,36 @@
     },
     {
       "from": "/zh/docs/reactive/api/extension",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "to": "/zh/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "to": "/zh/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/reactive/getting-started",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "to": "/zh/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/reactive",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--IRuntimeSourceBinding",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension",
       "to": "/zh/docs/reactive/api/extension#reactive-extension--isAnyRuntimeTracking",
       "type": "api-symbol"
     },
@@ -30303,6 +30573,36 @@
     },
     {
       "from": "/zh/docs/reactive/api/extension",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "to": "/zh/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "to": "/zh/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/reactive/getting-started",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "to": "/zh/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/reactive",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--ITrackedObserverBinding",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension",
       "to": "/zh/docs/reactive/api/extension#reactive-extension--ownerOf",
       "type": "api-symbol"
     },
@@ -30329,826 +30629,6 @@
     {
       "from": "/zh/docs/reactive",
       "to": "/zh/docs/reactive/api/extension#reactive-extension--ownerOf",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--readVersion",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--readVersion",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--readVersion",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--readVersion",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--readVersion",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--readVersion",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--setVersion",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--setVersion",
-      "to": "/en/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--setVersion",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--setVersion",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api/internals#reactive-internals--setVersion",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api/internals#reactive-internals--setVersion",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--internalsOf",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--IRuntimeInternals",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--isRuntime",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--mutableDeps",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--mutableDepVersions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--mutableSubs",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--readVersion",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--readVersion",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--readVersion",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--readVersion",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--readVersion",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--readVersion",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerDeps",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerDepVersions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerInternals",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerSubs",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--registerVersion",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--setVersion",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--setVersion",
-      "to": "/zh/docs/reactive/api/internals",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--setVersion",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--setVersion",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api/internals#reactive-internals--setVersion",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api/internals#reactive-internals--setVersion",
       "type": "architecture-symbol"
     },
     {

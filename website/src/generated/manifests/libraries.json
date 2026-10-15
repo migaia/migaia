@@ -8165,7 +8165,7 @@
       "slug": "reactive",
       "description": "Store-neutral reactive runtime, signals, computed values, and effects.",
       "version": "0.0.7",
-      "exports": [".", "./extension", "./internals"],
+      "exports": [".", "./extension"],
       "documentation": {
         "readme": {
           "sections": [
@@ -8262,10 +8262,6 @@
                     [
                       "`@migaia/reactive/extension`",
                       "所有权、受控 source、observer binding、图协议类型与只读版本查询。"
-                    ],
-                    [
-                      "`@migaia/reactive/internals`",
-                      "tracker/scheduler/clock 与可变依赖边；供需要危险能力的节点实现层使用。"
                     ]
                   ]
                 }
@@ -8331,7 +8327,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "应用作者从根入口使用工厂和窄节点类型。Store、集合、资源及框架适配层作者从 `/extension` 取得受控扩展能力；需要直接操作内部服务或可变图边时使用 `/internals`。三个节点类保持内部实现，不作为值导出。"
+                  "text": "应用作者从根入口使用工厂和窄节点类型。Store、集合、资源及框架适配层作者从 `/extension` 取得受控扩展能力；自定义source/observer也只取得绑定到自身节点的能力，不取得内部服务或可变图边。三个节点类保持内部实现，不作为值导出。"
                 },
                 {
                   "type": "paragraph",
@@ -8371,7 +8367,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "本指南列出三个已发布入口的 API、边界行为与错误码。节点统一经 Runtime 工厂创建；`Signal`、`Computed`、`Effect` 类保留为内部实现。包的定位与五分钟上手见 README。"
+                  "text": "本指南列出两个已发布入口的 API、边界行为与错误码。节点统一经 Runtime 工厂创建；`Signal`、`Computed`、`Effect` 类保留为内部实现。包的定位与五分钟上手见 README。"
                 }
               ]
             },
@@ -8384,7 +8380,6 @@
                   "items": [
                     "主入口 `@migaia/reactive`：Runtime 工厂、窄节点类型、诊断常量与错误码",
                     "`/extension` 入口：所有权、受控 source、observer binding、图类型与只读版本查询",
-                    "`/internals` 入口：内部服务、节点版本与可变边集",
                     "错误码",
                     "Trace 事件与常量",
                     "高阶组合示例",
@@ -8697,7 +8692,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`internalRuntimeOf(runtime: IRuntime): IInternalRuntime` —— 校验本库 Runtime 登记，未登记抛 `NOT_RUNTIME_OWNED`。`signal()` 返回 `IReactiveSignal<T> & IObservable`，`computed()` 返回 `IReactiveComputed<T> & IObservable & IObserver`。关系只读；observer 操作与所有权登记属于扩展能力，内部服务对象和可变边集仍在危险面。公开节点本身已经具有 `dispose()`。",
+                    "`internalRuntimeOf(runtime: IRuntime): IInternalRuntime` —— 校验本库 Runtime 登记，未登记抛 `NOT_RUNTIME_OWNED`。`signal()` 返回 `IReactiveSignal<T> & IObservable`，`computed()` 返回 `IReactiveComputed<T> & IObservable & IObserver`。关系只读；observer 操作与所有权登记属于扩展能力，内部服务对象和可变边集不再公开。公开节点本身已经具有 `dispose()`。",
                     "`isRuntimeTracking(runtime: IRuntime): boolean` —— 只读查询：该 `Runtime` 当前是否正在收集依赖帧。",
                     "`isAnyRuntimeTracking(): boolean` —— 只读查询：进程内任意 `Runtime` 当前是否有依赖帧处于活跃状态。"
                   ]
@@ -8711,56 +8706,24 @@
               ]
             },
             {
-              "id": "internals-入口",
-              "heading": "/internals 入口",
+              "id": "自定义-source-与-observer",
+              "heading": "自定义 source 与 observer",
               "blocks": [
                 {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  registerInternals,\n  internalsOf,\n  isRuntime,\n  type IRuntimeInternals\n} from '@migaia/reactive/internals';"
+                  "type": "paragraph",
+                  "text": "`createSourceBinding(node)` 为实现 `IObservable` 的新节点登记canonical版本与订阅者集合，返回只读 `version/subs` 和绑定原节点的 `source` 操作。构造时把只读元数据接入节点，再公开实例；保留SAB节点原身份。一般外部字段仍直接用 `createFieldSource(runtime)`。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "内核内部面（`clock`/`tracker`/`scheduler`/`notify`/`commitSource`/`deferIdle` 等），只供内核自身与被明确授权的高级入口使用（`architecture.test.ts` 约束哪些模块允许 import 它）。"
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`registerInternals(runtime, internals): void` —— `Runtime` 构造时自报内部面；重复登记（同一 `runtime` 对象二次调用）抛 `INTERNALS_REGISTERED`。",
-                    "`internalsOf(runtime): IRuntimeInternals` —— 取内部面；拿不到时不是返回 `undefined` 而是抛 `NOT_RUNTIME_OWNED`（一个没登记内部面的对象冒充 `Runtime`，静默放行会在后续每一步产生难以追溯的错误）。",
-                    "`isRuntime(candidate): candidate is IRuntime` —— 判断是否是本库创建的 `Runtime`，不泄漏内部面本身。"
-                  ]
+                  "text": "`createTrackedObserver(observer)` 为实现 `IObserver` 的新节点创建只读 `deps/depVersions`，提供绑定自身的 `runTracked/clear/suspend/isSuspended/revalidate/hasStaleDependencies/deferIdle`。`clear` 只断图依赖，资源请求与取消仍由调用方管理；它不创建另一个Effect或tracker。框架render/commit适配继续用 `createObserverBinding(runtime)`。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "一般应用代码不需要这个入口；实现自定义节点类型或框架适配层时才会用到。"
-                }
-              ]
-            },
-            {
-              "id": "节点版本与可变边集",
-              "heading": "节点版本与可变边集",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  registerVersion,\n  setVersion,\n  readVersion,\n  registerSubs,\n  mutableSubs,\n  registerDeps,\n  mutableDeps,\n  registerDepVersions,\n  mutableDepVersions\n} from '@migaia/reactive/internals';"
+                  "text": "这两个factory不能重绑已登记图节点（包括内置节点）：抛 `GRAPH_NODE_REGISTERED`，不会替换仍有活跃边的集合。`invalidateObservable(runtime, node)` 只摘节点下游、保留上游与缓存，供Atom routing切换；真正释放节点仍调用其dispose。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "可变依赖边的登记与访问，供实现新的响应式基础设施（自定义 `IObservable`/`IObserver`）时手工接入依赖图使用："
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`registerVersion(node, initial): void` / `setVersion(node, value): void` / `readVersion(node, fallback): number` —— 节点版本号的登记、写入、读取（版本状态存在私有 `WeakMap`，不是节点自身字段）。",
-                    "`registerSubs(node, subs): ReadonlySet<IObserver>` —— 登记一个内置节点的可变下游边集合，返回一份只读视图供节点对外暴露；`mutableSubs(node, fallback)` 取回可变的原始 `Set`（未登记过时回落到 `fallback`）。",
-                    "`registerDeps`/`mutableDeps`、`registerDepVersions`/`mutableDepVersions` —— 对应上游依赖集合/依赖版本映射的登记与可变访问，语义与 `subs` 对称。"
-                  ]
-                },
-                {
-                  "type": "paragraph",
-                  "text": "一般应用代码不需要这个入口；只有需要自己实现 `IObservable`/`IObserver` 协议、并让其反向边受同一套只读视图保护的节点实现层才会用到。"
+                  "text": "迁移：`@migaia/reactive/internals` 已删除。旧 `internalsOf/registerSubs/registerVersion/registerDeps` 等不能通过换名导入整个tracker；按上述角色迁移到 `/extension` 的绑定能力。`tracker/scheduler/clock` 和可写集合始终仅在kernel内部。"
                 }
               ]
             },
@@ -8846,6 +8809,11 @@
                       "`bindingDuplicate`",
                       "`BINDING_DUPLICATE`",
                       "同一个 `IObserverBinding` 被重复调用 `observe()`（已处于 observed 状态）"
+                    ],
+                    [
+                      "`graphNodeRegistered`",
+                      "`GRAPH_NODE_REGISTERED`",
+                      "source/observer binding尝试替换已有graph node的集合，须创建新节点"
                     ],
                     [
                       "`internalsRegistered`",
@@ -9472,7 +9440,7 @@
                     "`createTerminalController()`（来自 `@migaia/lifecycle`）——驱动 `Resource` 自身的容器存活轴（`open → closing → terminal`）；`disposed` getter 直接读它的 `lifecycle === 'terminal'`。",
                     "`probeThenable()` / `assimilateCapturedThen()`（来自 `@migaia/utils/function`）——用于安全探测 `fetcher` 同步抛出的值是否是 thenable（Suspense 抛 Promise 模式），只读一次 `.then`，避免 hostile getter 被读取两次或异常被吞掉。",
                     "`systemScheduler`（来自 `@migaia/utils/scheduler`）/ `snapshotScheduler()`（来自 `@migaia/lifecycle`）——`scheduler` 选项的默认值与校验函数；TTL 到期判定、重试延迟计时都通过它，不直接使用宿主 `setTimeout`/`Date.now`。",
-                    "`internalRuntimeOf()` / `internalsOf()` / `claimOwnership()` / `registerDeps()` / `registerDepVersions()`（来自 `@migaia/reactive` 的 `/node-factories`、`/internals`、`/ownership`、`/node-internals` 子路径）——`Resource` 把自己注册为 `@migaia/reactive` 依赖图里的一个 `IObserver`（实现 `markDirty()`/`onDependencyDisconnected()`），复用其依赖追踪、所有权登记与 `deferIdle` 挂起通道，语义与 `Computed` 的自动挂起完全对称。"
+                    "`internalRuntimeOf()` / `createTrackedObserver()`（来自 `@migaia/reactive/extension`）——Resource作为IObserver接入图，仅获得绑定自身的追踪、挂起、重验证与idle能力；依赖集合由reactive内部维护，请求、取消与资源释放仍由Resource负责。"
                   ]
                 }
               ]
@@ -29640,7 +29608,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "两者都是 `IObservable`：内部通过 `@migaia/reactive/internals` 的 `internalsOf`/`registerSubs`/`registerVersion` 与 `@migaia/reactive/extension` 的 `claimOwnership` 接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。",
+                    "两者都是 `IObservable`：通过 `@migaia/reactive/extension` 的 `createSourceBinding` 绑定原节点身份与只读版本/订阅者元数据，用受控source操作接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。",
                     "单一归属：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。",
                     "`SharedInt32Array` 的按需物化：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。",
                     "cell 的自动回收：`Effect`/`Computed` 可能在提交观察之前就放弃一次\"投机读\"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。",
