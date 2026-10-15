@@ -14,6 +14,8 @@ vi.mock('@migaia/wasm', () => ({
     const ptr = nextPtr
     nextPtr += Math.max(8, (byteLength + 7) & ~7)
     allocations.set(id, ptr)
+    // Native alloc_bytes returns zeroed owned storage, including when an address is reused.
+    new Uint8Array(memory.buffer, ptr, byteLength).fill(0)
     return id
   },
   dealloc_bytes: (id: number) => allocations.delete(id),
@@ -60,6 +62,61 @@ describe('Round 7 transactional correction', () => {
     nextPtr = 8
     failNextPointer = false
     await ensureWasm()
+  })
+
+  it('refreshes scalar and array views after growth while keeping snapshot copies isolated', async () => {
+    const ctx = context(() => source())
+    const numeric = await number().create(ctx)
+    const flag = await boolean().create(ctx)
+    const text = await string(32).create(ctx)
+    const position = await record({ x: number() }).create(ctx)
+    const items = await array(number(), 2).create(ctx)
+    numeric.value = 11
+    flag.value = true
+    text.value = 'before'
+    position.x = 13
+    items.setAt(0, 17)
+    const snapshot = items.view()
+    snapshot[0] = 999
+    memory.grow(1)
+    expect([numeric.value, flag.value, text.value, position.x, items.at(0)]).toEqual([
+      11,
+      true,
+      'before',
+      13,
+      17
+    ])
+    numeric.value = 19
+    flag.value = false
+    text.value = 'after'
+    position.x = 23
+    items.setAt(0, 29)
+    expect([numeric.value, flag.value, text.value, position.x, items.at(0)]).toEqual([
+      19,
+      false,
+      'after',
+      23,
+      29
+    ])
+    for (const field of [numeric, flag, text, position, items]) field.dispose()
+  })
+
+  it('refreshes a scalar view when the commit owner grows memory before writing', async () => {
+    const ctx = context(() => ({
+      ...source(),
+      commit: <T>(write: () => T): T => {
+        memory.grow(1)
+        return write()
+      }
+    }))
+    const numeric = await number().create(ctx)
+    const flag = await boolean().create(ctx)
+    const position = await record({ x: number() }).create(ctx)
+    numeric.value = 19
+    flag.value = true
+    position.x = 23
+    expect([numeric.value, flag.value, position.x]).toEqual([19, true, 23])
+    for (const field of [numeric, flag, position]) field.dispose()
   })
 
   it('rolls back a newly allocated id when ptr_of returns no pointer', () => {

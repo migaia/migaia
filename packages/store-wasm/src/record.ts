@@ -1,3 +1,4 @@
+import { memoryView } from './memory-view.js'
 import type { IDisposable } from '@migaia/reactive'
 import type { IFieldSource } from '@migaia/store-light'
 import {
@@ -86,7 +87,6 @@ export function record<Shape extends IRecordShape>(
       try {
         if (signal.aborted)
           throw createStoreWasmError(StoreWasmErrorCode.initAborted, StoreWasmErrorText.initAborted)
-        const view = () => new DataView(memory.buffer)
         let disposed = false
         let disposing = false
 
@@ -104,7 +104,7 @@ export function record<Shape extends IRecordShape>(
                   StoreWasmErrorText.fieldDisposed
                 )
               source.track()
-              return view().getFloat64(offset, true)
+              return memoryView(memory).getFloat64(offset, true)
             },
             set(v: number) {
               if (disposed)
@@ -117,9 +117,9 @@ export function record<Shape extends IRecordShape>(
                   StoreWasmErrorCode.invalidOption,
                   StoreWasmErrorText.valueType('record', 'number')
                 )
-              const memoryView = view()
-              if (Object.is(memoryView.getFloat64(offset, true), v)) return
-              source.commit(() => memoryView.setFloat64(offset, v, true))
+              const currentView = memoryView(memory)
+              if (Object.is(currentView.getFloat64(offset, true), v)) return
+              source.commit(() => memoryView(memory).setFloat64(offset, v, true))
             }
           })
         })

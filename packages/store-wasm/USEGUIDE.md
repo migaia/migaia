@@ -24,9 +24,9 @@
 ## 1. 初始化：`ensureWasm()`
 
 ```ts
-import { ensureWasm } from '@migaia/store-wasm';
+import { ensureWasm } from '@migaia/store-wasm'
 
-await ensureWasm(); // 之后所有字段构造器的 create() 才能同步工作
+await ensureWasm() // 之后所有字段构造器的 create() 才能同步工作
 ```
 
 | 签名           | 参数 | 返回值                        | 同步/异步 | 作用                                                     |
@@ -35,7 +35,7 @@ await ensureWasm(); // 之后所有字段构造器的 create() 才能同步工�
 
 `ensureWasm()` 在模块作用域内缓存加载结果：
 
-- 已经就绪时，立即返回 `Promise.resolve(memory)`。
+- 已经就绪时，继续返回原来已完成的同一个 Promise，保留 readiness identity。
 - 正在加载中时，重复调用拿到**同一个** in-flight promise 引用——不会重复触发底层的 fetch/instantiate，也不会因为父组件无关重渲染或 React StrictMode 的双重调用而重复初始化。
 - 加载失败时，内部缓存会被清空，下一次调用 `ensureWasm()` 会发起新的加载尝试（不会永久卡在失败状态）。
 
@@ -48,10 +48,10 @@ await ensureWasm(); // 之后所有字段构造器的 create() 才能同步工�
 字段构造器实现的是 `@migaia/store-light` 的 `SyncFieldBuilder` 协议（`mode: 'sync'`），可以直接放进 `createStore()` 的字段声明：
 
 ```ts
-import { createStore } from '@migaia/store-light';
-import { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm';
+import { createStore } from '@migaia/store-light'
+import { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'
 
-await ensureWasm();
+await ensureWasm()
 
 const store = createStore({
   hp: number(),
@@ -59,15 +59,15 @@ const store = createStore({
   name: string(64),
   hits: array(number(), 1000),
   pos: record({ x: number(), y: number() })
-});
+})
 
-store.hp.value = 100;
-store.alive.value = true;
-store.name.value = 'boss';
-store.hits.setAt(0, 1);
-store.pos.x = 10;
+store.hp.value = 100
+store.alive.value = true
+store.name.value = 'boss'
+store.hits.setAt(0, 1)
+store.pos.x = 10
 
-store.$dispose(); // 递归释放上面五个字段各自持有的 WASM 分配
+store.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配
 ```
 
 要点：
@@ -84,15 +84,15 @@ store.$dispose(); // 递归释放上面五个字段各自持有的 WASM 分配
 `@migaia/store-wasm` 本身不依赖 `@migaia/store-react`，但设计上专门为配合 `StoreProvider` 的就绪屏障而准备：
 
 ```tsx
-import { StoreProvider } from '@migaia/store-react';
-import { ensureWasm } from '@migaia/store-wasm';
+import { StoreProvider } from '@migaia/store-react'
+import { ensureWasm } from '@migaia/store-wasm'
 
 function App() {
   return (
     <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>
       <Game />
     </StoreProvider>
-  );
+  )
 }
 ```
 
@@ -105,18 +105,18 @@ function App() {
 ## 4. `number()`
 
 ```ts
-const field = number(); // FieldBuilder<IWasmNumberField>
+const field = number() // FieldBuilder<IWasmNumberField>
 ```
 
 无参数。产出字段类型：
 
 ```ts
 type IWasmNumberField = {
-  value: number;
-  readonly observed: boolean;
-  readonly disposed: boolean;
-  dispose(): void;
-};
+  value: number
+  readonly observed: boolean
+  readonly disposed: boolean
+  dispose(): void
+}
 ```
 
 | 成员                   | 参数类型       | 同步/异步 | 说明                                                                                         |
@@ -133,7 +133,7 @@ type IWasmNumberField = {
 ## 5. `boolean()`
 
 ```ts
-const field = boolean(); // FieldBuilder<IWasmBooleanField>
+const field = boolean() // FieldBuilder<IWasmBooleanField>
 ```
 
 无参数，形状和行为与 `number()` 完全对称（`value: boolean`、`observed`、`disposed`、`dispose()`），唯一区别是底层布局：**1 字节**分配，`true`/`false` 分别映射成 `1`/`0` 存进单个字节，通过 `DataView.getUint8`/`setUint8` 读写。
@@ -143,8 +143,8 @@ const field = boolean(); // FieldBuilder<IWasmBooleanField>
 ## 6. `string(maxBytes?)`
 
 ```ts
-const field = string(); // maxBytes 默认 256
-const field2 = string(64); // 自定义最大字节数
+const field = string() // maxBytes 默认 256
+const field2 = string(64) // 自定义最大字节数
 ```
 
 | 参数       | 类型     | 必填性 | 默认值 | 约束                                                                      |
@@ -167,8 +167,8 @@ const field2 = string(64); // 自定义最大字节数
 ## 7. `array(item, length, granularity?)`
 
 ```ts
-const field = array(number(), 1000); // granularity 默认 64
-const field2 = array(number(), 1000, 1); // 每个 index 独立追踪
+const field = array(number(), 1000) // granularity 默认 64
+const field2 = array(number(), 1000, 1) // 每个 index 独立追踪
 ```
 
 | 参数          | 类型                        | 必填性 | 默认值 | 约束                                                                                        |
@@ -181,14 +181,14 @@ const field2 = array(number(), 1000, 1); // 每个 index 独立追踪
 
 ```ts
 type IWasmArrayField = {
-  readonly length: number;
-  at(index: number): number;
-  setAt(index: number, value: number): void;
-  setRange(lo: number, hi: number, values: ArrayLike<number>): void;
-  view(): Float64Array;
-  readonly disposed: boolean;
-  dispose(): void;
-};
+  readonly length: number
+  at(index: number): number
+  setAt(index: number, value: number): void
+  setRange(lo: number, hi: number, values: ArrayLike<number>): void
+  view(): Float64Array
+  readonly disposed: boolean
+  dispose(): void
+}
 ```
 
 | 成员                       | 参数类型                                                | 同步/异步 | 说明                                                                                                                                                                 |
@@ -197,6 +197,8 @@ type IWasmArrayField = {
 | `setAt(index, value)`      | `index: number`, `value: number`                        | 同步      | 写入单个元素；`Object.is` 比较无变化时跳过提交；越界抛 `RangeError`                                                                                                  |
 | `setRange(lo, hi, values)` | `lo: number`, `hi: number`, `values: ArrayLike<number>` | 同步      | 批量写入 `[lo, hi)` 区间；`values.length` 必须等于 `hi - lo`；同一批次里落进同一个分桶的写入会合并到一次 `commit`，跨分桶的写入包在一次 `runtime.batch()` 里一起提交 |
 | `view()`                   | 无                                                      | 同步      | 返回**当前内容的独立拷贝**（新分配的 `Float64Array`），不是线性内存的实时视图；直接修改这个返回值既不会触发响应式通知，也不会写回字段                                |
+
+线性内存增长会替换 `memory.buffer`：内部 DataView 与数组 typed view 按 buffer identity 刷新；旧快照仍是独立拷贝。标量写入在 commit 内重新取当前 DataView，支持 owner 在写入边界增长内存。字符串 getter 读取并解码当前 bytes，未用本地 setter 版本缓存 decoded value；共享 Memory 的原生写入没有该版本保证。
 
 **分桶（granularity）**：数组底层是一整块连续的 `Float64Array`，但响应式追踪不是逐元素的——`granularity` 个连续 index 共享一个响应式 Source（"桶"），默认 64。粒度越粗，Source 数量越少（内存/管理开销小），但一次写入会让整个桶内所有订阅者都收到通知；`granularity: 1` 退化成逐元素独立追踪，精度最高但 Source 数量等于 `length`。分桶按需惰性创建——只有实际被 `at()`/`setAt()`/`setRange()` 触碰过的桶才会创建对应的 Source。
 
@@ -207,7 +209,7 @@ type IWasmArrayField = {
 ## 8. `record(shape)`
 
 ```ts
-const field = record({ x: number(), y: number(), z: number() });
+const field = record({ x: number(), y: number(), z: number() })
 ```
 
 | 参数    | 类型                                        | 必填性 | 约束                                                                                    |
@@ -218,9 +220,9 @@ const field = record({ x: number(), y: number(), z: number() });
 
 ```ts
 type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
-  readonly disposed: boolean;
-  dispose(): void;
-};
+  readonly disposed: boolean
+  dispose(): void
+}
 ```
 
 - **每个 key 是独立的响应式 Source**（调试名 `WasmRecord.<key>`），读写某一个 key 只影响订阅了那个 key 的观察者，不会波及其他 key。
@@ -289,7 +291,7 @@ import {
   type IWasmFieldMode,
   WasmReservedKey,
   type IWasmReservedKey
-} from '@migaia/store-wasm';
+} from '@migaia/store-wasm'
 ```
 
 ```ts
@@ -301,8 +303,8 @@ const StoreWasmErrorCode = {
   allocationFailed: 'ALLOCATION_FAILED',
   invalidOption: 'INVALID_OPTION',
   cleanupFailed: 'CLEANUP_FAILED'
-} as const;
-type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];
+} as const
+type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]
 ```
 
 稳定错误码表，是公开 API 的一部分——改名视为破坏性变更。每条码值的触发条件：
@@ -318,7 +320,7 @@ type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErr
 | `cleanupFailed`     | 字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`） |
 
 ```ts
-const STORE_WASM_SOURCE: '@migaia/store-wasm';
+const STORE_WASM_SOURCE: '@migaia/store-wasm'
 ```
 
 本包每个抛出的错误上 `source` 字段的固定值，用于结合 `code` 做双重识别，避免和其他包同名的 `code` 混淆。
@@ -328,27 +330,27 @@ function createStoreWasmError(
   code: IStoreWasmErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): Error;
-function createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;
+): Error
+function createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError
 function createStoreWasmTypeError(
   code: IStoreWasmErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): TypeError;
+): TypeError
 function createStoreWasmAggregateError(
   code: IStoreWasmErrorCode,
   errors: readonly unknown[],
   message: string
-): AggregateError;
+): AggregateError
 ```
 
 四个错误构造函数，均通过 `attachErrorIdentity`（`@migaia/utils/error`）把 `source: STORE_WASM_SOURCE` 与传入的 `code` 挂到对应类型的原生错误对象上，不修改 `stack`。包内部构造字段错误时统一走这四个函数；扩展自定义字段类型（见 [§12](#12-扩展基于-arena-自定义-wasm-字段)）时可以复用它们保持错误身份风格一致。`createStoreWasmError`/`createStoreWasmTypeError` 的 `options.cause` 若提供会传给底层 `Error`/`TypeError` 构造函数的 `{ cause }`。
 
 ```ts
 try {
-  field.value = 123;
+  field.value = 123
 } catch (error) {
-  const e = error as { source?: string; code?: string };
+  const e = error as { source?: string; code?: string }
   if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {
     // 字段已释放
   }
@@ -356,15 +358,15 @@ try {
 ```
 
 ```ts
-const WasmFieldMode = { sync: 'sync' } as const;
-type IWasmFieldMode = 'sync';
+const WasmFieldMode = { sync: 'sync' } as const
+type IWasmFieldMode = 'sync'
 ```
 
 字段构造器 `mode` 字段的取值集合，目前只有 `'sync'`——本包全部字段构造器都同步产出字段，`create()` 中不发起任何异步操作（异步初始化已经被 `ensureWasm()` 提前完成）。`createStore()` 依据这个字段判断某个 `FieldBuilder` 能否被同步调用。
 
 ```ts
-const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;
-type IWasmReservedKey = 'dispose' | 'disposed';
+const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const
+type IWasmReservedKey = 'dispose' | 'disposed'
 ```
 
 `record()` 的 `shape` 禁止使用的 key 集合——这两个名字被字段实例自身的 `dispose()`/`disposed` 占用。`record()` 内部在构造时用这个常量做校验（见 [§8](#8-recordshape)）。

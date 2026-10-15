@@ -67,9 +67,15 @@ export function array(
         // A zero-length view has no elements and must not depend on the
         // allocator's alignment for a zero-byte block. Some Wasm allocators
         // legally return a non-aligned sentinel for such blocks.
-        const raw = () =>
+        /** Keep the field-local view until native growth replaces the underlying buffer. */
+        let currentView =
           length === 0 ? new Float64Array(0) : new Float64Array(memory.buffer, ptr, length)
-        raw() // 立即构造一次以在 try 内暴露对齐/长度错误，触发 dealloc 而非泄漏
+        /** Refresh only the private live view; callers of view() still receive an independent copy. */
+        const raw = () => {
+          if (length > 0 && currentView.buffer !== memory.buffer)
+            currentView = new Float64Array(memory.buffer, ptr, length)
+          return currentView
+        }
         let disposed = false
         let disposing = false
         const checkAlive = () => {
