@@ -1,5 +1,6 @@
 import { isManagedHost, openComposition } from '../src/composition-entry.js'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { mergeCleanupResults } from '@migaia/lifecycle'
 import { runInNewContext } from 'node:vm'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import {
@@ -159,14 +160,14 @@ describe('PluginHost managed stage publication', () => {
     await host.dispose()
   })
 
-  it('PHD-T1 bounds observation while strict cleanup waits for leases and every disposer', async () => {
+  it('PHD-T1 keeps explicitly unbounded cleanup waiting for leases and every disposer', async () => {
     /** One clock distinguishes the caller's observation budget from physical disposal. */
     const scheduler = createManualScheduler()
     const host = new ManagedStageHost({
       scheduler,
       pipeline: { mode: MiddlewarePipelineMode.async },
       disposeStepTimeoutMs: 10,
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5 }
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     /** Records plugin-first and resource-LIFO order, including duplicate function ownership. */
     const events: string[] = []
@@ -232,8 +233,12 @@ describe('PluginHost managed stage publication', () => {
       beforeCleanup: fence
     })
     scheduler.advance(5)
-    const observed = await removal
-    expect(observed).toMatchObject({ cleanupComplete: false, cleanupErrors: [] })
+    let returned = false
+    void removal.then(() => {
+      returned = true
+    })
+    await Promise.resolve()
+    expect(returned).toBe(false)
     expect(events).toEqual([])
     releaseFence()
     expect(await host.run('new')).toBe('new')
@@ -244,10 +249,68 @@ describe('PluginHost managed stage publication', () => {
     scheduler.advance(100)
     expect(events).toEqual(['plugin'])
     releaseDispose()
-    const physical = await observed.physicalCompletion!
+    const physical = await removal
     expect(physical.cleanupErrors).toEqual([failure])
     expect(physical.cleanupErrors[0]).toBe(failure)
     expect(events).toEqual(['plugin', 'repeat', 'failure', 'repeat'])
+    await host.dispose()
+  })
+
+  it('PCC-T4 bounds managed cleanup even when normal step timeouts are disabled', async () => {
+    /** The managed drain budget, rather than a normal step timeout, drives degradation. */
+    const scheduler = createManualScheduler()
+    const host = new ManagedStageHost({
+      scheduler,
+      disposeStepTimeoutMs: false,
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5 }
+    })
+    /** The plugin remains physically active after the logical cleanup budget expires. */
+    let rejectDispose!: (error: unknown) => void
+    const held = new Promise<void>((_, reject) => {
+      rejectDispose = reject
+    })
+    let entered = false
+    let resourceReleased = false
+    const failure = new Error('late managed disposal failure')
+    const composition = openComposition(host)
+    const admission = composition.createPluginAdmission({
+      name: 'budgeted',
+      install: (core: IPluginHostCore<string>) => {
+        core.onDispose(() => {
+          resourceReleased = true
+        })
+        return {}
+      },
+      dispose: () => {
+        entered = true
+        return held
+      }
+    })
+    const prepared = await composition.prepareAdmissions([
+      { admission, slot: composition.createDataOrderSlot('budgeted') }
+    ])
+    const [receipt] = composition.commitPreparedAdmissions(prepared)
+    const removal = composition.commitPreparedUnUseBatch(composition.prepareUnUseBatch([receipt]), {
+      beforeCleanup: Promise.resolve()
+    })
+    await vi.waitFor(() => expect(entered).toBe(true))
+    scheduler.advance(5)
+    const observed = await removal
+    try {
+      await vi.waitFor(() => expect(resourceReleased).toBe(true))
+      expect(observed.cleanupComplete).toBe(false)
+      expect(observed.physicalCompletion).toBeDefined()
+    } finally {
+      rejectDispose(failure)
+    }
+    const physical = await mergeCleanupResults([observed])
+    expect(physical.cleanupErrors).toContain(failure)
+    expect(physical.cleanupErrors.filter((error) => error === failure)).toHaveLength(1)
+    expect(physical.cleanupErrors).toContainEqual(
+      expect.objectContaining({
+        code: PluginHostErrorCode.disposeStepTimeout
+      })
+    )
     await host.dispose()
   })
 

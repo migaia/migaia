@@ -331,9 +331,11 @@ duplicate/cycle/replacement candidate 不会成为以后 restart 的隐式来源
 - `dispose()`：终止 Graph、移除内部 anchor、关闭 concrete Host；并发调用复用同一 Promise。
 
 `cleanupComplete: false` 表示逻辑 mutation 已提交、物理清理仍在进行。此时必须保留并观察同一个
-`physicalCompletion`。Graph 在释放 exact generation 前 seal binding lease；PluginHost 严格等待该 fence
-与正在执行的 pipeline snapshot，然后按 consumer/provider、plugin/resource 的既定顺序清理。bounded
-只缩短调用方等待，不授权提前启动 disposer，也不取消仍在运行的 Promise。
+`physicalCompletion`。Graph 在释放 exact generation 前 seal binding lease；PluginHost 先等待该 fence，
+然后按 consumer/provider、plugin/resource 顺序清理。必填 `execution.pipelineDrainTimeoutMs` 为数值时，
+本批共享预算到期后推进后续清理；显式 `false` 才逐项等待真实完成。预算不取消仍在运行的 Promise。
+共同结果 `ICleanupResult` 的 `cleanupErrors` 是当前快照，`physicalCompletion` 仅包含后续增量；
+使用 `@migaia/lifecycle` 的 `mergeCleanupResults([result])` 可保留所有当前及迟到错误，包括跨 realm Promise。
 
 类型策略以稳定性优先：有限、literal、最多 128 个 definition 时，`ITrayResolvedHost` 推导 exact ready
 closure；widened name、任意 widened Feature provider 或超过预算时返回 `ITrayHostDynamic`。dynamic view 仍保留 concrete

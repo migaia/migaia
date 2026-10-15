@@ -1,4 +1,4 @@
-import { boundedWait } from '@migaia/lifecycle'
+import { boundedWait, mergeCleanupResults, type ICleanupResult } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   DependencyMutationKind,
@@ -43,10 +43,10 @@ import type {
   IPluginHostDiagnostic
 } from './typing.js'
 
-type ICompositionStrictCleanupResult<TRegistration> = Readonly<{
-  readonly cleanupErrors: readonly unknown[]
-  readonly leafErrorsByRegistration: ReadonlyMap<TRegistration, readonly unknown[]>
-}>
+type ICompositionStrictCleanupResult<TRegistration> = ICleanupResult &
+  Readonly<{
+    readonly leafErrorsByRegistration: ReadonlyMap<TRegistration, ICleanupResult>
+  }>
 
 type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   readonly host: object
@@ -82,8 +82,9 @@ type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue> = Rea
   readonly disposeRegistration: (
     registration: IRegistration<TDomainCore, TValue>,
     preserveErrorIdentity: boolean,
-    mode?: PluginHostCleanupMode
-  ) => Promise<unknown[]>
+    mode?: PluginHostCleanupMode,
+    deadlineAt?: number
+  ) => Promise<ICleanupResult>
   readonly revokeRegistration: (registration: IRegistration<TDomainCore, TValue>) => unknown[]
   readonly createView: () => unknown
   /** Records a name removed through the managed protocol; see `PREREQUISITE_REMOVED`. */
@@ -214,9 +215,16 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
         return emptyPhysicalCleanupResult()
       state.discarded = true
       const errors: unknown[] = []
-      for (const registration of [...state.installed].reverse())
-        errors.push(...(await this.#port.disposeRegistration(registration, true)))
-      return Object.freeze({ cleanupErrors: Object.freeze(errors) })
+      const physical: Promise<ICleanupResult>[] = []
+      for (const registration of [...state.installed].reverse()) {
+        const result = await this.#port.disposeRegistration(registration, true)
+        errors.push(...result.cleanupErrors)
+        if (result.physicalCompletion) physical.push(result.physicalCompletion)
+      }
+      return Object.freeze({
+        cleanupErrors: Object.freeze(errors),
+        ...(physical.length ? { physicalCompletion: mergeCleanupResults(physical) } : {})
+      })
     })
   }
 
@@ -275,7 +283,12 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     }
     this.#port.commitRevision()
     const snapshot = this.#port.createView() as TView
-    const physicalTask = this.#runStrictCleanup(state.registrations, beforeCleanup)
+    /** One deadline covers all registrations and their release steps. False is explicitly unbounded. */
+    const deadlineAt =
+      this.#port.pipelineDrainTimeoutMs === false
+        ? undefined
+        : this.#port.scheduler.now() + this.#port.pipelineDrainTimeoutMs
+    const physicalTask = this.#runStrictCleanup(state.registrations, beforeCleanup, deadlineAt)
     let detail: ICompositionStrictCleanupResult<IRegistration<TDomainCore, TValue>> | undefined
     const completed =
       this.#port.pipelineDrainTimeoutMs === false
@@ -287,31 +300,31 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
             physicalTask.then((value) => {
               detail = value
             }),
-            this.#port.scheduler.now() + this.#port.pipelineDrainTimeoutMs,
+            deadlineAt!,
             { scheduler: this.#port.scheduler }
           )
     if (completed && detail) {
       const leaves = state.registrations.map((registration) => {
-        const leafErrors = detail!.leafErrorsByRegistration.get(registration) ?? Object.freeze([])
+        const leaf = detail!.leafErrorsByRegistration.get(registration)!
+        const leafErrors = leaf.cleanupErrors
         return Object.freeze({
           receipt: readRegistrationReceipt(registration)!,
           name: registration.name,
-          cleanupComplete: leafErrors.length === 0,
-          cleanupErrors: leafErrors
+          cleanupComplete: leafErrors.length === 0 && !leaf.physicalCompletion,
+          ...leaf
         })
       })
       return Object.freeze({
-        ok: detail.cleanupErrors.length === 0,
+        ok: detail.cleanupErrors.length === 0 && !detail.physicalCompletion,
         committed: true,
         snapshot,
         leaves: Object.freeze(leaves),
-        cleanupComplete: detail.cleanupErrors.length === 0,
-        cleanupErrors: detail.cleanupErrors
+        cleanupComplete: detail.cleanupErrors.length === 0 && !detail.physicalCompletion,
+        cleanupErrors: detail.cleanupErrors,
+        ...(detail.physicalCompletion ? { physicalCompletion: detail.physicalCompletion } : {})
       })
     }
-    const physicalCompletion = physicalTask.then((value) =>
-      Object.freeze({ cleanupErrors: value.cleanupErrors })
-    )
+    const physicalCompletion = mergeCleanupResults([physicalTask])
     return Object.freeze({
       ok: false,
       committed: true,
@@ -359,16 +372,15 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     )
   }
 
-  /** Executes the fence and leaf cleanup chain without a deadline; callers bound observation. */
+  /** Preserves the caller fence, then releases each leaf under the selected shared budget. */
   async #runStrictCleanup(
     registrations: readonly IRegistration<TDomainCore, TValue>[],
-    fence: Promise<void>
+    fence: Promise<void>,
+    deadlineAt?: number
   ): Promise<ICompositionStrictCleanupResult<IRegistration<TDomainCore, TValue>>> {
     const errors: unknown[] = []
-    const leafErrorsByRegistration = new Map<
-      IRegistration<TDomainCore, TValue>,
-      readonly unknown[]
-    >()
+    const leafErrorsByRegistration = new Map<IRegistration<TDomainCore, TValue>, ICleanupResult>()
+    const physical: Promise<ICleanupResult>[] = []
     try {
       await fence
     } catch (error) {
@@ -381,17 +393,20 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       )
     }
     for (const registration of registrations) {
-      const leafErrors = await this.#port.disposeRegistration(
+      const leaf = await this.#port.disposeRegistration(
         registration,
         true,
-        PluginHostCleanupMode.unbounded
+        deadlineAt === undefined ? PluginHostCleanupMode.unbounded : PluginHostCleanupMode.bounded,
+        deadlineAt
       )
-      leafErrorsByRegistration.set(registration, Object.freeze([...leafErrors]))
-      errors.push(...leafErrors)
+      leafErrorsByRegistration.set(registration, leaf)
+      errors.push(...leaf.cleanupErrors)
+      if (leaf.physicalCompletion) physical.push(leaf.physicalCompletion)
     }
     return Object.freeze({
       cleanupErrors: Object.freeze([...errors]),
-      leafErrorsByRegistration
+      leafErrorsByRegistration,
+      ...(physical.length ? { physicalCompletion: mergeCleanupResults(physical) } : {})
     })
   }
 }

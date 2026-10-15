@@ -133,6 +133,8 @@ const ERROR_TEXT = {
   PLUGIN_BEFORE_RELEASE_FUNCTION: prefixed('plugin beforeRelease must be a function'),
   /** Names the bounded pre-release cleanup step in errors and diagnostics. */
   BEFORE_RELEASE_PHASE: prefixed('plugin beforeRelease hook'),
+  /** Identifies outstanding generation work in the cleanup completion ledger. */
+  PIPELINE_LEASE_PHASE: 'pipeline lease',
   /** Stable config-domain failure text; config.ts appends the rejected path and grammar reason. */
   INVALID_CONFIG_VALUE: (path: string, reason: string) =>
     prefixed(`invalid config value: ${path} (${reason})`),

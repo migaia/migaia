@@ -1,3 +1,4 @@
+import type { ICleanupResult } from '@migaia/lifecycle'
 import {
   DependencyAction,
   planResume,
@@ -18,8 +19,10 @@ type IPluginHostResumeRuntimePort<TDomainCore extends object, TValue> = Readonly
   readonly state: PluginHostState<TDomainCore, TValue>
   drainLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void>
   /** Runs the captured hook before a suspended generation is restarted. */
-  runBeforeRelease(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]> | undefined
-  disposeRegistration(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]>
+  runBeforeRelease(
+    registration: IRegistration<TDomainCore, TValue>
+  ): Promise<ICleanupResult> | undefined
+  disposeRegistration(registration: IRegistration<TDomainCore, TValue>): Promise<ICleanupResult>
   installBatch(entries: readonly IInstallEntry<TDomainCore, TValue>[]): Promise<{
     readonly installed: readonly IRegistration<TDomainCore, TValue>[]
     readonly batch: IInstallBatchContext<TDomainCore, TValue>
@@ -131,9 +134,9 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
       .filter((registration): registration is IRegistration<TDomainCore, TValue> => !!registration)
     for (const registration of [...restarting].reverse()) {
       const beforeRelease = this.#port.runBeforeRelease(registration)
-      if (beforeRelease) cleanupErrors.push(...(await beforeRelease))
+      if (beforeRelease) cleanupErrors.push(...(await beforeRelease).cleanupErrors)
       await this.#port.drainLeases(registration)
-      cleanupErrors.push(...(await this.#port.disposeRegistration(registration)))
+      cleanupErrors.push(...(await this.#port.disposeRegistration(registration)).cleanupErrors)
     }
 
     /** Original reinstall failure, unwrapped from the host install wrapper when present. */

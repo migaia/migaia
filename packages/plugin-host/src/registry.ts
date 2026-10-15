@@ -68,6 +68,10 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   readonly pipelineOwnerKey: object
   /** Selected once physical cleanup starts; scope descriptors read it at release admission. */
   cleanupMode?: PluginHostCleanupMode
+  /** Absolute shared deadline selected by managed removal, in the Host scheduler's clock. */
+  cleanupDeadlineAt?: number
+  /** Observes actual callback settlement for this cleanup attempt without owning resources. */
+  cleanupLedger?: import('@migaia/lifecycle').ISyncStartedDisposalLedger
   installed: boolean
   /** Prevents a published registration from running its release hook twice. */
   beforeReleaseRan?: boolean
