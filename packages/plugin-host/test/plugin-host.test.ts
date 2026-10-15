@@ -1081,8 +1081,7 @@ describe('PluginHost', () => {
       pipelineOwnerKey: {},
       installed: true,
       lifecycle: 'install',
-      featureExposeValid: true,
-      featurePending: { drain: () => new Promise<void>(() => undefined) }
+      featureExposeValid: true
     }
     const runtime = new PluginHostRemovalRuntime({
       invokeHook: (invoke) => invoke(),

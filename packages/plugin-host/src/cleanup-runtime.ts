@@ -6,6 +6,10 @@ import {
 import type { IScheduler } from '@migaia/utils/scheduler'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
+import { PluginHostCleanupMode } from './state-constants.js'
+
+/** Registration-owned cleanup choice, read only when lifecycle admits a release descriptor. */
+type IPluginHostCleanupPolicy = Readonly<{ readonly cleanupMode?: PluginHostCleanupMode }>
 
 /** Stable kinds for structured nodes emitted by PluginHost disposal producers. */
 export const PluginHostDisposalNodeKind = Object.freeze({
@@ -31,7 +35,7 @@ type IPluginHostCleanupRuntimeOptions = Readonly<{
   readonly wrapDisposalError: (error: unknown, phase: string) => unknown
 }>
 
-/** Owns bounded disposer execution independently from Host mutation and publication state. */
+/** Owns disposer policy independently from Host mutation, publication, and resource ownership. */
 export class PluginHostCleanupRuntime {
   /** Immutable scheduler, tracker, and timeout policy installed by the owning Host. */
   readonly #options: IPluginHostCleanupRuntimeOptions
@@ -44,26 +48,25 @@ export class PluginHostCleanupRuntime {
   createStepDescriptor(
     phase: string,
     run: () => void | PromiseLike<void>,
-    observer?: IPendingTracker
+    policy?: IPluginHostCleanupPolicy
   ): IReleaseDescriptor {
     const timeoutMs = this.#options.disposeStepTimeoutMs
     if (timeoutMs === false)
       return {
-        graceful: () => {
-          const result = run()
-          if (result && typeof (result as PromiseLike<void>).then === 'function')
-            void observer?.track(Promise.resolve(result))
-          return result
-        },
+        graceful: run,
         force: () => {}
       }
     let settled = false
     return {
+      // own() validates without retaining the snapshot. At disposal the canonical scope reads
+      // the registration's selected mode; custom bypasses the bounded graceful/force chain.
+      get custom() {
+        return policy?.cleanupMode === PluginHostCleanupMode.unbounded ? run : undefined
+      },
       graceful: async () => {
         const pending = Promise.resolve().then(async () => {
           await run()
         })
-        void observer?.track(pending)
         try {
           await this.#options.pending.track(pending)
         } finally {
@@ -87,7 +90,7 @@ export class PluginHostCleanupRuntime {
     disposers: readonly (() => void | PromiseLike<void>)[],
     phase: string,
     preserveErrorIdentity = false,
-    observer?: IPendingTracker
+    policy?: IPluginHostCleanupPolicy
   ): Promise<unknown[]> {
     if (disposers.length === 0) return []
     const scope = createLifecycleScope({
@@ -95,7 +98,7 @@ export class PluginHostCleanupRuntime {
       scheduler: this.#options.scheduler
     })
     for (const dispose of disposers)
-      scope.own(dispose, this.createStepDescriptor(phase, dispose, observer))
+      scope.own(dispose, this.createStepDescriptor(phase, dispose, policy))
     return this.#wrapCollected(await scope.dispose(), phase, preserveErrorIdentity)
   }
 

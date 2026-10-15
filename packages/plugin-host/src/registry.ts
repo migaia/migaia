@@ -10,7 +10,7 @@ import type {
   ILifecycleScope,
   IProvisionalScope
 } from '@migaia/lifecycle'
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
+import { PluginHostRegistrationLifecycle, type PluginHostCleanupMode } from './state-constants.js'
 import type { IStageEntry, IStageOwnerSegment } from './stage-lanes.js'
 import type { IPluginSetupAttempt } from './setup-runtime.js'
 
@@ -66,10 +66,8 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   segment?: IStageOwnerSegment
   /** Exact generation lease key; replacement generations never share a physical drain fence. */
   readonly pipelineOwnerKey: object
-  /** Captured resource/disposer pairs used by composition's strict physical cleanup chain. */
-  resourceDisposers: Array<
-    Readonly<{ readonly resource: unknown; readonly dispose: IPluginDisposer }>
-  >
+  /** Selected once physical cleanup starts; scope descriptors read it at release admission. */
+  cleanupMode?: PluginHostCleanupMode
   installed: boolean
   /** Prevents a published registration from running its release hook twice. */
   beforeReleaseRan?: boolean
@@ -97,7 +95,6 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   featureOutputs?: Readonly<Record<string, object>>
   featureExpose?: object
   featureExposeValid?: boolean
-  featurePending?: import('@migaia/lifecycle').IPendingTracker
   /** Whether lazy/eager installation has completed for this registration. */
   activated: boolean
   /** Shared activation Promise returned to concurrent callers. */

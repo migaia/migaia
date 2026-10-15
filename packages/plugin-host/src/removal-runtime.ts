@@ -6,7 +6,7 @@ import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { invokeCaptured } from './invocation.js'
 import type { IRegistration } from './registry.js'
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
+import { PluginHostCleanupMode, PluginHostRegistrationLifecycle } from './state-constants.js'
 import { markRegistrationRevoked } from './composition.js'
 import type { IPluginBeforeReleaseContext, IPluginDisposalContext } from './typing.js'
 
@@ -100,58 +100,28 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     return errors
   }
 
-  /** Runs strict sequential physical cleanup after synchronous logical revocation. */
-  async disposeRegistrationStrict(
-    registration: IRegistration<TDomainCore, TValue>
-  ): Promise<unknown[]> {
-    const errors = this.revokeRegistration(registration)
-    await this.#port.pipelineLeases.whenZero(registration.pipelineOwnerKey)
-    const pluginDispose = this.#resolvePluginDispose(registration)
-    if (registration.installed && pluginDispose) {
-      this.#port.setHookRegistration(registration)
-      try {
-        await pluginDispose()
-      } catch (error) {
-        errors.push(error)
-      } finally {
-        this.#port.setHookRegistration(undefined)
-      }
-    }
-    for (const entry of [...registration.resourceDisposers].reverse()) {
-      registration.scope?.release(entry.resource)
-      try {
-        await entry.dispose()
-      } catch (error) {
-        errors.push(error)
-      }
-    }
-    registration.resourceDisposers = []
-    registration.scope?.close()
-    this.#removeOwnedPublication(registration)
-    registration.lifecycle = PluginHostRegistrationLifecycle.idle
-    void registration.featurePending?.drain()
-    return errors
-  }
-
-  /** Runs bounded normal cleanup and optionally preserves raw rollback error identities. */
+  /** Uses the canonical resource owner with bounded steps or strict sequential completion. */
   disposeRegistration(
     registration: IRegistration<TDomainCore, TValue>,
-    preserveErrorIdentity = false
+    preserveErrorIdentity = false,
+    mode: PluginHostCleanupMode = PluginHostCleanupMode.bounded
   ): Promise<unknown[]> {
-    return this.#disposeRegistration(registration, preserveErrorIdentity, false)
+    return this.#disposeRegistration(registration, preserveErrorIdentity, mode, false)
   }
 
   /** Resets failed lazy installation without permanently revoking its registration identity. */
   resetRegistration(registration: IRegistration<TDomainCore, TValue>): Promise<unknown[]> {
-    return this.#disposeRegistration(registration, true, true)
+    return this.#disposeRegistration(registration, true, PluginHostCleanupMode.bounded, true)
   }
 
   /** Runs the same physical cleanup for permanent removal and retryable installation rollback. */
   async #disposeRegistration(
     registration: IRegistration<TDomainCore, TValue>,
     preserveErrorIdentity: boolean,
+    mode: PluginHostCleanupMode,
     reset: boolean
   ): Promise<unknown[]> {
+    registration.cleanupMode = mode
     /** Reset withdraws attempt visibility while permanent removal also revokes lifetime authority. */
     const errors: unknown[] = []
     if (reset) {
@@ -161,6 +131,8 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
       this.#port.clearRegistrationPublication(registration)
       registration.extensions = []
     } else errors.push(...this.revokeRegistration(registration))
+    if (mode === PluginHostCleanupMode.unbounded)
+      await this.#port.pipelineLeases.whenZero(registration.pipelineOwnerKey)
     const pluginDispose = this.#resolvePluginDispose(registration)
     if (registration.installed && pluginDispose)
       errors.push(
@@ -176,7 +148,8 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
             }
           ],
           'plugin dispose hook',
-          preserveErrorIdentity
+          preserveErrorIdentity,
+          registration
         ))
       )
     if (registration.provisional) {
@@ -196,7 +169,6 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
         preserveErrorIdentity
       ))
     )
-    registration.resourceDisposers = []
     if (reset) {
       registration.scope = undefined
       registration.core = undefined

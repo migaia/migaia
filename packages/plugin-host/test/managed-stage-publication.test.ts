@@ -1,6 +1,7 @@
 import { isManagedHost, openComposition } from '../src/composition-entry.js'
 import { describe, expect, it } from 'vitest'
 import { runInNewContext } from 'node:vm'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import {
   defineHost,
   PluginHost,
@@ -155,6 +156,98 @@ describe('PluginHost managed stage publication', () => {
       }
     )
     expect(removal).toMatchObject({ ok: true, committed: true, cleanupComplete: true })
+    await host.dispose()
+  })
+
+  it('PHD-T1 bounds observation while strict cleanup waits for leases and every disposer', async () => {
+    /** One clock distinguishes the caller's observation budget from physical disposal. */
+    const scheduler = createManualScheduler()
+    const host = new ManagedStageHost({
+      scheduler,
+      pipeline: { mode: MiddlewarePipelineMode.async },
+      disposeStepTimeoutMs: 10,
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5 }
+    })
+    /** Records plugin-first and resource-LIFO order, including duplicate function ownership. */
+    const events: string[] = []
+    /** Holds the genuine pipeline owner lease across logical revocation. */
+    let releaseStage!: () => void
+    const stageGate = new Promise<void>((resolve) => {
+      releaseStage = resolve
+    })
+    let enterStage!: () => void
+    const stageEntered = new Promise<void>((resolve) => {
+      enterStage = resolve
+    })
+    /** A strict plugin disposer must remain awaited beyond the normal per-step timeout. */
+    let releaseDispose!: () => void
+    const disposeGate = new Promise<void>((resolve) => {
+      releaseDispose = resolve
+    })
+    let enterDispose!: () => void
+    const disposeEntered = new Promise<void>((resolve) => {
+      enterDispose = resolve
+    })
+    /** The caller's cleanup fence must finish before the registration lease is drained. */
+    let releaseFence!: () => void
+    const fence = new Promise<void>((resolve) => {
+      releaseFence = resolve
+    })
+    /** Exact raw resource failure must survive the shared physical cleanup path. */
+    const failure = new Error('strict resource failure')
+    const composition = openComposition(host)
+    const admission = composition.createPluginAdmission({
+      name: 'strict',
+      install: (core: IPluginHostCore<string>) => {
+        /** Registering one disposer twice owns two distinct release entries. */
+        const repeat = () => {
+          events.push('repeat')
+        }
+        core.onDispose(repeat)
+        core.onDispose(() => {
+          events.push('failure')
+          throw failure
+        })
+        core.onDispose(repeat)
+        core.useAsyncPipeline(async (value, next) => {
+          enterStage()
+          await stageGate
+          await next(value)
+        })
+        return {}
+      },
+      dispose: () => {
+        events.push('plugin')
+        enterDispose()
+        return disposeGate
+      }
+    })
+    const prepared = await composition.prepareAdmissions([
+      { admission, slot: composition.createDataOrderSlot('strict') }
+    ])
+    const [receipt] = composition.commitPreparedAdmissions(prepared)
+    const running = host.run('old')
+    await stageEntered
+    const removal = composition.commitPreparedUnUseBatch(composition.prepareUnUseBatch([receipt]), {
+      beforeCleanup: fence
+    })
+    scheduler.advance(5)
+    const observed = await removal
+    expect(observed).toMatchObject({ cleanupComplete: false, cleanupErrors: [] })
+    expect(events).toEqual([])
+    releaseFence()
+    expect(await host.run('new')).toBe('new')
+    expect(events).toEqual([])
+    releaseStage()
+    expect(await running).toBe('old')
+    await disposeEntered
+    scheduler.advance(100)
+    expect(events).toEqual(['plugin'])
+    releaseDispose()
+    const physical = await observed.physicalCompletion!
+    expect(physical.cleanupErrors).toEqual([failure])
+    expect(physical.cleanupErrors[0]).toBe(failure)
+    expect(events).toEqual(['plugin', 'repeat', 'failure', 'repeat'])
     await host.dispose()
   })
 

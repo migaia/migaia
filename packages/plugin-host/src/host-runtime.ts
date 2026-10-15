@@ -699,11 +699,9 @@ export class PluginHost<
       commitRevision: () => {
         this.#state.commit()
       },
-      disposeRegistration: (registration, preserveErrorIdentity) =>
-        this.#removalRuntime.disposeRegistration(registration, preserveErrorIdentity),
+      disposeRegistration: (registration, preserveErrorIdentity, mode) =>
+        this.#removalRuntime.disposeRegistration(registration, preserveErrorIdentity, mode),
       revokeRegistration: (registration) => this.#removalRuntime.revokeRegistration(registration),
-      disposeRegistrationStrict: (registration) =>
-        this.#removalRuntime.disposeRegistrationStrict(registration),
       createView: () => this.#createView(),
       markRemoved: (name) => {
         this.#state.removedNames.add(name)
