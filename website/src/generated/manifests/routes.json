@@ -3297,6 +3297,12 @@
       "library": "resource"
     },
     {
+      "path": "/en/docs/resource/api/IResourceFetchContext",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
       "path": "/en/docs/resource/api/IResourceFetcher",
       "locale": "en",
       "domain": "docs",
@@ -11193,12 +11199,6 @@
       "library": "store-light"
     },
     {
-      "path": "/en/docs/store-light/api/IStoreResourceDataKind",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
       "path": "/en/docs/store-light/api/IStoreResourceErrorPhase",
       "locale": "en",
       "domain": "docs",
@@ -11266,12 +11266,6 @@
     },
     {
       "path": "/en/docs/store-light/api/StoreFieldMode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
-      "path": "/en/docs/store-light/api/StoreResourceDataKind",
       "locale": "en",
       "domain": "docs",
       "library": "store-light"
@@ -18796,6 +18790,12 @@
     },
     {
       "path": "/zh/docs/resource/api/IResourceErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/IResourceFetchContext",
       "locale": "zh",
       "domain": "docs",
       "library": "resource"
@@ -26697,12 +26697,6 @@
       "library": "store-light"
     },
     {
-      "path": "/zh/docs/store-light/api/IStoreResourceDataKind",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
       "path": "/zh/docs/store-light/api/IStoreResourceErrorPhase",
       "locale": "zh",
       "domain": "docs",
@@ -26770,12 +26764,6 @@
     },
     {
       "path": "/zh/docs/store-light/api/StoreFieldMode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
-      "path": "/zh/docs/store-light/api/StoreResourceDataKind",
       "locale": "zh",
       "domain": "docs",
       "library": "store-light"
