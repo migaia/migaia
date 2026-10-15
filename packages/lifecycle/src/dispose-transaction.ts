@@ -171,7 +171,7 @@ async function awaitGraceful(
     context.report(
       createLifecycleError(
         LifecycleErrorCode.deadlineExceeded,
-        '[lifecycle] shared deadline already passed before this graceful phase could start'
+        LifecycleErrorText.sharedDeadlinePassed
       )
     )
     return { ok: false, timedOut: true }
@@ -259,9 +259,13 @@ function finishForce(
     // only, carrying `(source, code)` for callers that want that without losing the raw error's own
     // identity/type.
     context.report(
-      createLifecycleError(LifecycleErrorCode.releaseForceFailed, '[lifecycle] force() failed', {
-        cause: forceOutcome.error
-      })
+      createLifecycleError(
+        LifecycleErrorCode.releaseForceFailed,
+        LifecycleErrorText.releaseForceFailed,
+        {
+          cause: forceOutcome.error
+        }
+      )
     )
     errors.push(forceOutcome.error)
   }

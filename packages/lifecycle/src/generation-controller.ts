@@ -266,7 +266,7 @@ export function createGenerationController(
       if (disposed) {
         throw createLifecycleError(
           LifecycleErrorCode.generationDisposed,
-          '[lifecycle] cannot begin a new generation on a disposed GenerationController'
+          LifecycleErrorText.generationDisposed
         )
       }
       let timeoutMs: number | undefined
@@ -405,7 +405,7 @@ export function createGenerationController(
           options.onSuperseded(
             createLifecycleError(
               LifecycleErrorCode.generationSuperseded,
-              '[lifecycle] generation superseded before its result could be adopted'
+              LifecycleErrorText.generationSupersededBeforeAdopt
             )
           )
         } catch {

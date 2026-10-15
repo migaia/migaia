@@ -64,7 +64,7 @@ function runSyncCallback(
       ok: false,
       error: createLifecycleError(
         LifecycleErrorCode.scopeSyncViolation,
-        '[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits'
+        LifecycleErrorText.syncCallbackReturnedThenable
       )
     }
   }
@@ -118,10 +118,10 @@ export function createSyncLifecycleScope(
 
   const assertOpen = (): void => {
     if (terminal.lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, '[lifecycle] scope is terminal')
+      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
     }
     if (terminal.lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')
+      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
     }
   }
 
@@ -129,14 +129,14 @@ export function createSyncLifecycleScope(
     if (currentlyReleasing) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeReentrantOwn,
-        '[lifecycle] cannot call own() from within this scope’s own dispose()'
+        LifecycleErrorText.scopeReentrantOwn
       )
     }
     assertOpen()
     if (descriptor?.syncSafe !== true) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeSyncViolation,
-        '[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor'
+        LifecycleErrorText.syncScopeRequiresSyncSafe
       )
     }
     // Validation only, shared with the async path so a bad `order` or missing `force` gets the same
@@ -149,7 +149,7 @@ export function createSyncLifecycleScope(
     if (brand === true) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeSyncViolation,
-        '[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance'
+        LifecycleErrorText.syncScopeOwnsAsyncOwner
       )
     }
     entries.push({ resource, source: String(nextId++), descriptor })
@@ -237,7 +237,7 @@ export function createSyncLifecycleScope(
       currentlyReleasing = false
       terminal.forceTerminal()
     }
-    return collector.finalize('[lifecycle] sync lifecycle scope disposal failed')
+    return collector.finalize(LifecycleErrorText.syncScopeDisposalFailed)
   }
 
   const scope: ISyncLifecycleScope = {
