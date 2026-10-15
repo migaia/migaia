@@ -74,7 +74,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed';"
+                "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'"
               },
               {
                 "type": "paragraph",
@@ -83,7 +83,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const user = new ObservableObject({ name: 'Ada', age: 30 });\nuser.get('name'); // 追踪读：处在 effect/computed 内时只订阅 'name' 这个 cell\nuser.set('age', 31); // 值变化：触发修订信号，已建 cell 的 'age' 同步更新\nuser.snapshot(); // 冻结的、Object.create(null) 起始的浅拷贝快照\nuser.dispose(); // 用完必须释放，级联 dispose 全部内部 Signal"
+                "code": "const user = new ObservableObject({ name: 'Ada', age: 30 })\nuser.get('name') // 追踪读：处在 effect/computed 内时只订阅 'name' 这个 cell\nuser.set('age', 31) // 值变化：触发修订信号，已建 cell 的 'age' 同步更新\nuser.snapshot() // 冻结的、Object.create(null) 起始的浅拷贝快照\nuser.dispose() // 用完必须释放，级联 dispose 全部内部 Signal"
               },
               {
                 "type": "paragraph",
@@ -99,12 +99,12 @@
               },
               {
                 "type": "paragraph",
-                "text": "`ObservableArray`｜10 秒上手 —— 索引数组，`at`/`length`/`peek`/`snapshot`/`set`/`push`/`pop`/`splice`/`replace`/`clear`/`prune`/`dispose`："
+                "text": "`ObservableArray`｜10 秒上手 —— 索引数组，`at`/`length`/`peek`/`snapshot`/`set`/`push`/`pop`/`splice`/`replace`/`clear`/`dispose`："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);\nrows.at(1); // 只读了索引 1，只订阅索引 1\nrows.set(1, { id: 'b2' }); // 触发依赖索引 1 的订阅者\nrows.push({ id: 'd' }); // 改变 length，触发依赖 length/结构 的订阅者\nrows.dispose();"
+                "code": "const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }])\nrows.at(1) // 只读了索引 1，只订阅索引 1\nrows.set(1, { id: 'b2' }) // 触发依赖索引 1 的订阅者\nrows.push({ id: 'd' }) // 改变 length，触发依赖 length/结构 的订阅者\nrows.dispose()"
               },
               {
                 "type": "paragraph",
@@ -125,7 +125,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const users = new ObservableMap<string, { name: string }>();\nusers.set('u1', { name: 'Ann' }); // 键不存在，触发结构信号 + 迭代信号\nusers.get('u1'); // 追踪读，惰性建 'u1' 的 cell\nusers.dispose();"
+                "code": "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' }) // 键不存在，触发结构信号 + 迭代信号\nusers.get('u1') // 追踪读，惰性建 'u1' 的 cell\nusers.dispose()"
               },
               {
                 "type": "paragraph",
@@ -146,7 +146,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const tags = new ObservableSet(['a', 'b']);\ntags.has('a'); // 追踪读，惰性建 'a' 的 membership cell\ntags.add('c'); // 触发结构信号\ntags.dispose();"
+                "code": "const tags = new ObservableSet(['a', 'b'])\ntags.has('a') // 追踪读，惰性建 'a' 的 membership cell\ntags.add('c') // 触发结构信号\ntags.dispose()"
               },
               {
                 "type": "paragraph",
@@ -178,7 +178,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { observableArray } from '@migaia/store-indexed';\n\nconst rows = observableArray([{ id: 'a' }], {}, myRuntime);"
+                "code": "import { observableArray } from '@migaia/store-indexed'\n\nconst rows = observableArray([{ id: 'a' }], {}, myRuntime)"
               },
               {
                 "type": "paragraph",
@@ -205,7 +205,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed';"
+                "code": "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'"
               },
               {
                 "type": "paragraph",
@@ -214,7 +214,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "if (event.operation === IndexedOperation.write) reportMutation(event);"
+                "code": "if (event.operation === IndexedOperation.write) reportMutation(event)"
               },
               {
                 "type": "paragraph",
@@ -229,7 +229,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
               },
               {
                 "type": "paragraph",
@@ -238,7 +238,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "try {\n  collection.at(-1);\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
+                "code": "try {\n  collection.at(-1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
               },
               {
                 "type": "paragraph",
@@ -251,7 +251,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "STORE_INDEXED_SOURCE; // '@migaia/store-indexed'"
+                "code": "STORE_INDEXED_SOURCE // '@migaia/store-indexed'"
               },
               {
                 "type": "paragraph",
@@ -260,7 +260,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n);"
+                "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n)"
               },
               {
                 "type": "paragraph",
@@ -281,13 +281,13 @@
             ]
           },
           {
-            "id": "高阶组合示例-1-表格行细粒度订阅-定期-prune",
-            "heading": "高阶组合示例 · 1. 表格行细粒度订阅 + 定期 prune()",
+            "id": "高阶组合示例-1-表格行细粒度订阅与自动回收",
+            "heading": "高阶组合示例 · 1. 表格行细粒度订阅与自动回收",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { ObservableArray } from '@migaia/store-indexed';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => rows.runtime.effect(() => render(index, rows.at(index)))\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
+                "code": "import { ObservableArray } from '@migaia/store-indexed'\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n)\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map((index) =>\n  rows.runtime.effect(() => render(index, rows.at(index)))\n)\n\nrows.splice(0, 1) // 索引语义整体后移一位\n// 释放订阅后，索引 cell 会通过 onUnobserved 自动回收。\n\nfor (const effect of watched) effect.dispose()\nrows.dispose()"
               }
             ]
           },
@@ -298,7 +298,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { ObservableMap } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n);\n\ntry {\n  users.set('u1', { name: 'Ann' }); // 抛错：不在 action 内\n} catch {\n  guard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功\n}"
+                "code": "import { ObservableMap } from '@migaia/store-indexed'\nimport { MutationPolicy } from '@migaia/store-middleware'\n\nconst guard = new MutationPolicy('actions-only')\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n)\n\ntry {\n  users.set('u1', { name: 'Ann' }) // 抛错：不在 action 内\n} catch {\n  guard.runInAction(() => users.set('u1', { name: 'Ann' })) // 成功\n}"
               }
             ]
           },
@@ -309,7 +309,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRuntime } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n});"
+                "code": "import { createRuntime } from '@migaia/reactive'\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nconst runtimeA = createRuntime()\nconst runtimeB = createRuntime()\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA)\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a') // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n})"
               }
             ]
           },
@@ -320,7 +320,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    );\n  }\n}"
+                "code": "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    )\n  }\n}"
               }
             ]
           },
@@ -331,7 +331,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { ObservableObject } from '@migaia/store-indexed';\n\nconst bigTable = new ObservableObject(\n  Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`k${i}`, i]))\n);\n\n// peek() 不建 cell，适合一次性批量导出\nlet sum = 0;\nfor (const key of bigTable.keys()) sum += bigTable.peek(key);\nbigTable.dispose();"
+                "code": "import { ObservableObject } from '@migaia/store-indexed'\n\nconst bigTable = new ObservableObject(\n  Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`k${i}`, i]))\n)\n\n// peek() 不建 cell，适合一次性批量导出\nlet sum = 0\nfor (const key of bigTable.keys()) sum += bigTable.peek(key)\nbigTable.dispose()"
               }
             ]
           },
@@ -410,7 +410,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const users = new ObservableMap<string, { name: string }>();\nusers.set('u1', { name: 'Ann' });\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1'); // 现在为 'u1' 创建了 cell"
+                "code": "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' })\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1') // 现在为 'u1' 创建了 cell"
               },
               {
                 "type": "paragraph",
@@ -495,7 +495,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed';"
+                "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'"
               }
             ]
           },
@@ -515,7 +515,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IObservableCollectionOptions = {\n  readonly mutationGuard?: IMutationGuard; // 来自 @migaia/store-light\n  readonly debugName?: string;\n};"
+                "code": "type IObservableCollectionOptions = {\n  readonly mutationGuard?: IMutationGuard // 来自 @migaia/store-light\n  readonly debugName?: string\n}"
               },
               {
                 "type": "table",
@@ -568,7 +568,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "class ObservableObject<T extends Record<string, unknown>> implements IDisposable {\n  readonly runtime: IRuntime;\n  get disposed(): boolean;\n  get<K extends keyof T & string>(key: K): T[K];\n  peek<K extends keyof T & string>(key: K): T[K];\n  has(key: keyof T & string): boolean;\n  set<K extends keyof T & string>(key: K, value: T[K]): void;\n  update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void;\n  delete(key: keyof T & string): boolean;\n  keys(): readonly (keyof T & string)[];\n  snapshot(): Readonly<T>;\n  replace(next: T): void;\n  prune(): number;\n  dispose(): void;\n}"
+                "code": "class ObservableObject<T extends Record<string, unknown>> implements IDisposable {\n  readonly runtime: IRuntime\n  get disposed(): boolean\n  get<K extends keyof T & string>(key: K): T[K]\n  peek<K extends keyof T & string>(key: K): T[K]\n  has(key: keyof T & string): boolean\n  set<K extends keyof T & string>(key: K, value: T[K]): void\n  update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void\n  delete(key: keyof T & string): boolean\n  keys(): readonly (keyof T & string)[]\n  snapshot(): Readonly<T>\n  replace(next: T): void\n  prune(): number\n  dispose(): void\n}"
               },
               {
                 "type": "table",
@@ -648,7 +648,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "class ObservableArray<T> implements IDisposable {\n  readonly runtime: IRuntime;\n  get disposed(): boolean;\n  get length(): number;\n  at(index: number): T | undefined;\n  snapshot(): readonly T[];\n  peek(): readonly T[];\n  set(index: number, value: T): void;\n  push(...values: readonly T[]): number;\n  pop(): T | undefined;\n  splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[];\n  replace(values: Iterable<T>): void;\n  clear(): void;\n  prune(): number;\n  dispose(): void;\n}"
+                "code": "class ObservableArray<T> implements IDisposable {\n  readonly runtime: IRuntime\n  get disposed(): boolean\n  get length(): number\n  at(index: number): T | undefined\n  snapshot(): readonly T[]\n  peek(): readonly T[]\n  set(index: number, value: T): void\n  push(...values: readonly T[]): number\n  pop(): T | undefined\n  splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]\n  replace(values: Iterable<T>): void\n  clear(): void\n  dispose(): void\n}"
               },
               {
                 "type": "table",
@@ -701,13 +701,6 @@
                     "见下方 `#replaceInternal` 说明"
                   ],
                   ["`clear()`", "无", "`void`", "写", "等价于 `replace([])`"],
-                  [
-                    "`prune()`",
-                    "无",
-                    "本次回收的 cell 数",
-                    "—",
-                    "对全部已物化 cell 无条件尝试 tombstone，不只是越界的 cell——`splice`/`pop` 之后\"索引\"这个身份本身就不再稳定，任何一个既存 cell 都可能对应错的位置，因此凡是无订阅者的都值得回收"
-                  ],
                   ["`dispose()`", "无", "`void`", "—", "释放全部拥有的 Signal"]
                 ]
               },
@@ -724,7 +717,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "class ObservableMap<K, V> implements IDisposable {\n  readonly runtime: IRuntime;\n  get disposed(): boolean;\n  get size(): number;\n  get(key: K): V | undefined;\n  peek(key: K): V | undefined;\n  has(key: K): boolean;\n  set(key: K, value: V): this;\n  delete(key: K): boolean;\n  clear(): void;\n  replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void;\n  keys(): readonly K[];\n  valuesArray(): readonly V[];\n  entries(): readonly (readonly [K, V])[];\n  snapshot(): ReadonlyMap<K, V>;\n  prune(): number;\n  dispose(): void;\n}"
+                "code": "class ObservableMap<K, V> implements IDisposable {\n  readonly runtime: IRuntime\n  get disposed(): boolean\n  get size(): number\n  get(key: K): V | undefined\n  peek(key: K): V | undefined\n  has(key: K): boolean\n  set(key: K, value: V): this\n  delete(key: K): boolean\n  clear(): void\n  replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void\n  keys(): readonly K[]\n  valuesArray(): readonly V[]\n  entries(): readonly (readonly [K, V])[]\n  snapshot(): ReadonlyMap<K, V>\n  prune(): number\n  dispose(): void\n}"
               },
               {
                 "type": "table",
@@ -802,7 +795,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "class ObservableSet<T> implements IDisposable {\n  readonly runtime: IRuntime;\n  get disposed(): boolean;\n  get size(): number;\n  has(value: T): boolean;\n  add(value: T): this;\n  delete(value: T): boolean;\n  clear(): void;\n  replace(next: Iterable<T>): void;\n  valuesArray(): readonly T[];\n  snapshot(): ReadonlySet<T>;\n  prune(): number;\n  dispose(): void;\n}"
+                "code": "class ObservableSet<T> implements IDisposable {\n  readonly runtime: IRuntime\n  get disposed(): boolean\n  get size(): number\n  has(value: T): boolean\n  add(value: T): this\n  delete(value: T): boolean\n  clear(): void\n  replace(next: Iterable<T>): void\n  valuesArray(): readonly T[]\n  snapshot(): ReadonlySet<T>\n  prune(): number\n  dispose(): void\n}"
               },
               {
                 "type": "table",
@@ -869,7 +862,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function observableObject<T extends Record<string, unknown>>(\n  initial: T,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableObject<T>;\n\nfunction observableArray<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableArray<T>;\n\nfunction observableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableMap<K, V>;\n\nfunction observableSet<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableSet<T>;"
+                "code": "function observableObject<T extends Record<string, unknown>>(\n  initial: T,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableObject<T>\n\nfunction observableArray<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableArray<T>\n\nfunction observableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableMap<K, V>\n\nfunction observableSet<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableSet<T>"
               },
               {
                 "type": "paragraph",
@@ -878,7 +871,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime); // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime);\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime);"
+                "code": "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime) // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime)\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime)"
               },
               {
                 "type": "paragraph",
@@ -893,12 +886,12 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed';"
+                "code": "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const;\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];"
+                "code": "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]"
               },
               {
                 "type": "paragraph",
@@ -913,12 +906,12 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const;\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed';"
+                "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
               },
               {
                 "type": "paragraph",
@@ -927,7 +920,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;"
+                "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError"
               },
               {
                 "type": "paragraph",
@@ -1028,11 +1021,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "多数场景下这个自动路径已经够用。但高频增删的场景（比如一个数组频繁 `splice`），如果想在某个明确的时间点（例如一轮渲染结束后）主动确保\"已经不在集合里、也没有订阅者\"的 cell 被清空，而不是继续依赖不确定何时触发的 `onUnobserved`，就调用 `prune()`。它返回本次实际回收的 cell 数，可用于监控/调试内存占用。"
+                "text": "Object/Map/Set 的 `prune()` 是按已删除 key/member 进行显式整理与计数的 owner API，保留该领域谓词；它不会释放仍有订阅者的 cell。数组仅使用自动路径。"
               },
               {
                 "type": "paragraph",
-                "text": "`ObservableArray.prune()` 是个特例：它对全部已物化 cell 无条件尝试回收，而不只是\"索引越界\"的那些——`splice`/`pop` 之后，一个 cell 挂着的索引位置和它最初对应的语义实体之间的关系已经不再可靠，继续保留一个恰好落在新长度以内、但语义已经对不上的 cell 没有意义。"
+                "text": "`ObservableArray` 仅使用既有观察者生命周期自动回收无观察 cell，不再提供手动 `prune()`。Object/Map/Set 的 `prune()` 保留各自已删除 key/member 的整理规则。"
               }
             ]
           },
@@ -1047,7 +1040,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { MutationPolicy } from '@migaia/store-middleware';\nimport { ObservableMap } from '@migaia/store-indexed';\n\nconst guard = new MutationPolicy('actions-only');\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n);\n\nusers.set('u1', { name: 'Ann' }); // 抛错：不在 action 内\nguard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功"
+                "code": "import { MutationPolicy } from '@migaia/store-middleware'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst guard = new MutationPolicy('actions-only')\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n)\n\nusers.set('u1', { name: 'Ann' }) // 抛错：不在 action 内\nguard.runInAction(() => users.set('u1', { name: 'Ann' })) // 成功"
               },
               {
                 "type": "paragraph",
@@ -1066,7 +1059,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRuntime } from '@migaia/reactive';\nimport { ObservableArray } from '@migaia/store-indexed';\n\nconst runtime = createRuntime();\nconst rows = new ObservableArray([1, 2, 3], runtime);"
+                "code": "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst rows = new ObservableArray([1, 2, 3], runtime)"
               },
               {
                 "type": "paragraph",
@@ -1075,17 +1068,17 @@
             ]
           },
           {
-            "id": "组合工作流示例-细粒度订阅-prune-mutationguard",
-            "heading": "组合工作流示例：细粒度订阅 + prune() + mutationGuard",
+            "id": "组合工作流示例-细粒度订阅与-mutationguard",
+            "heading": "组合工作流示例：细粒度订阅与 mutationGuard",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)));\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();"
+                "code": "import { ObservableArray } from '@migaia/store-indexed'\nimport { MutationPolicy } from '@migaia/store-middleware'\n\nconst guard = new MutationPolicy('actions-only')\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n)\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)))\n\nguard.runInAction(() => {\n  rows.splice(0, 1) // 删除首行，触发结构信号与修订信号\n})\n// 释放订阅后，索引 cell 会通过 onUnobserved 自动回收。\n\neffect.dispose()\nrows.dispose()"
               },
               {
                 "type": "paragraph",
-                "text": "`mutationGuard` 把\"只能在 `runInAction` 内写\"这条策略下沉到集合层，写方法在真正生效前统一调用一次 `assertMutationAllowed`；`prune()` 在高频结构变更（如 `splice`）后主动回收\"索引身份已经对不上\"的僵尸 cell，避免依赖不确定何时触发的 `onUnobserved`。"
+                "text": "`mutationGuard` 把\"只能在 `runInAction` 内写\"这条策略下沉到集合层，写方法在真正生效前统一调用一次 `assertMutationAllowed`；索引 cell 在最后一个观察者退订后通过 `onUnobserved` 自动回收。"
               }
             ]
           },
@@ -1193,7 +1186,7 @@
           "errors": ["No documented errors are declared for createStoreIndexedError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreIndexedError.",
           "examples": [
-            "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    );\n  }\n}"
+            "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    )\n  }\n}"
           ],
           "members": [],
           "exportPath": ".",
@@ -1264,12 +1257,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const;\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed';"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -1278,7 +1271,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;"
+                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError"
                 },
                 {
                   "type": "paragraph",
@@ -1297,7 +1290,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -1306,7 +1299,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  collection.at(-1);\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
+                  "code": "try {\n  collection.at(-1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1319,7 +1312,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "STORE_INDEXED_SOURCE; // '@migaia/store-indexed'"
+                  "code": "STORE_INDEXED_SOURCE // '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -1328,7 +1321,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n);"
+                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -1355,7 +1348,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    );\n  }\n}"
+                  "code": "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    )\n  }\n}"
                 }
               ]
             }
@@ -1454,12 +1447,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const;\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed';"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -1468,7 +1461,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;"
+                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError"
                 },
                 {
                   "type": "paragraph",
@@ -1487,7 +1480,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -1496,7 +1489,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  collection.at(-1);\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
+                  "code": "try {\n  collection.at(-1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1509,7 +1502,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "STORE_INDEXED_SOURCE; // '@migaia/store-indexed'"
+                  "code": "STORE_INDEXED_SOURCE // '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -1518,7 +1511,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n);"
+                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -1578,7 +1571,7 @@
           "errors": ["No documented errors are declared for createStoreIndexedTypeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreIndexedTypeError.",
           "examples": [
-            "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n);"
+            "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n)"
           ],
           "members": [],
           "exportPath": ".",
@@ -1649,12 +1642,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const;\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed';"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -1663,7 +1656,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;"
+                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError"
                 },
                 {
                   "type": "paragraph",
@@ -1682,7 +1675,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -1691,7 +1684,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  collection.at(-1);\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
+                  "code": "try {\n  collection.at(-1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -1704,7 +1697,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "STORE_INDEXED_SOURCE; // '@migaia/store-indexed'"
+                  "code": "STORE_INDEXED_SOURCE // '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -1713,7 +1706,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n);"
+                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -1753,8 +1746,8 @@
           "errors": ["No documented errors are declared for IIndexedOperation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IIndexedOperation.",
           "examples": [
-            "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed';",
-            "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const;\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];"
+            "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'",
+            "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]"
           ],
           "members": [],
           "aliasOf": "IIndexedOperation",
@@ -1820,9 +1813,9 @@
           "errors": ["No documented errors are declared for IndexedOperation."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IndexedOperation.",
           "examples": [
-            "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed';",
-            "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const;\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];",
-            "if (event.operation === IndexedOperation.write) reportMutation(event);"
+            "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'",
+            "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]",
+            "if (event.operation === IndexedOperation.write) reportMutation(event)"
           ],
           "members": [],
           "aliasOf": "IndexedOperation",
@@ -1888,10 +1881,10 @@
           "errors": ["No documented errors are declared for IObservableCollectionOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IObservableCollectionOptions.",
           "examples": [
-            "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed';",
+            "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'",
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
-            "type IObservableCollectionOptions = {\n  readonly mutationGuard?: IMutationGuard; // 来自 @migaia/store-light\n  readonly debugName?: string;\n};",
-            "function observableObject<T extends Record<string, unknown>>(\n  initial: T,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableObject<T>;\n\nfunction observableArray<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableArray<T>;\n\nfunction observableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableMap<K, V>;\n\nfunction observableSet<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableSet<T>;"
+            "type IObservableCollectionOptions = {\n  readonly mutationGuard?: IMutationGuard // 来自 @migaia/store-light\n  readonly debugName?: string\n}",
+            "function observableObject<T extends Record<string, unknown>>(\n  initial: T,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableObject<T>\n\nfunction observableArray<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableArray<T>\n\nfunction observableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableMap<K, V>\n\nfunction observableSet<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableSet<T>"
           ],
           "members": [],
           "exportPath": ".",
@@ -1945,7 +1938,7 @@
           "name": "observableArray",
           "kind": "function",
           "signature": "export declare function observableArray<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableArray<T>;",
-          "declarationLine": 104,
+          "declarationLine": 102,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "observableArray is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableArray.",
@@ -1976,8 +1969,8 @@
           "errors": ["No documented errors are declared for observableArray."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for observableArray.",
           "examples": [
-            "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime); // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime);\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime);",
-            "import { observableArray } from '@migaia/store-indexed';\n\nconst rows = observableArray([{ id: 'a' }], {}, myRuntime);"
+            "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime) // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime)\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime)",
+            "import { observableArray } from '@migaia/store-indexed'\n\nconst rows = observableArray([{ id: 'a' }], {}, myRuntime)"
           ],
           "members": [],
           "exportPath": ".",
@@ -2078,7 +2071,7 @@
         {
           "name": "ObservableArray",
           "kind": "class",
-          "signature": "export declare class ObservableArray<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get length(): number; at(index: number): T | undefined; snapshot(): readonly T[]; peek(): readonly T[]; set(index: number, value: T): void; push(...values: readonly T[]): number; pop(): T | undefined; splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; replace(values: Iterable<T>): void; clear(): void; /** Release unobserved cells left behind by removals/high churn. */ prune(): number; }",
+          "signature": "export declare class ObservableArray<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get length(): number; at(index: number): T | undefined; snapshot(): readonly T[]; peek(): readonly T[]; set(index: number, value: T): void; push(...values: readonly T[]): number; pop(): T | undefined; splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; replace(values: Iterable<T>): void; clear(): void; }",
           "declarationLine": 43,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "Explicit array with index-level dependencies and separate length tracking.",
@@ -2111,11 +2104,11 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ObservableArray.",
           "examples": [
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
-            "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime); // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime);\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime);",
-            "import { createRuntime } from '@migaia/reactive';\nimport { ObservableArray } from '@migaia/store-indexed';\n\nconst runtime = createRuntime();\nconst rows = new ObservableArray([1, 2, 3], runtime);",
-            "import { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)));\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();",
-            "const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);\nrows.at(1); // 只读了索引 1，只订阅索引 1\nrows.set(1, { id: 'b2' }); // 触发依赖索引 1 的订阅者\nrows.push({ id: 'd' }); // 改变 length，触发依赖 length/结构 的订阅者\nrows.dispose();",
-            "import { ObservableArray } from '@migaia/store-indexed';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => rows.runtime.effect(() => render(index, rows.at(index)))\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
+            "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime) // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime)\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime)",
+            "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst rows = new ObservableArray([1, 2, 3], runtime)",
+            "import { ObservableArray } from '@migaia/store-indexed'\nimport { MutationPolicy } from '@migaia/store-middleware'\n\nconst guard = new MutationPolicy('actions-only')\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n)\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)))\n\nguard.runInAction(() => {\n  rows.splice(0, 1) // 删除首行，触发结构信号与修订信号\n})\n// 释放订阅后，索引 cell 会通过 onUnobserved 自动回收。\n\neffect.dispose()\nrows.dispose()",
+            "const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }])\nrows.at(1) // 只读了索引 1，只订阅索引 1\nrows.set(1, { id: 'b2' }) // 触发依赖索引 1 的订阅者\nrows.push({ id: 'd' }) // 改变 length，触发依赖 length/结构 的订阅者\nrows.dispose()",
+            "import { ObservableArray } from '@migaia/store-indexed'\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n)\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map((index) =>\n  rows.runtime.effect(() => render(index, rows.at(index)))\n)\n\nrows.splice(0, 1) // 索引语义整体后移一位\n// 释放订阅后，索引 cell 会通过 onUnobserved 自动回收。\n\nfor (const effect of watched) effect.dispose()\nrows.dispose()"
           ],
           "members": [
             {
@@ -2242,19 +2235,11 @@
               "description": null,
               "parameterDetails": [],
               "returns": "void"
-            },
-            {
-              "name": "prune",
-              "kind": "method",
-              "signature": "prune(): number;",
-              "description": "Release unobserved cells left behind by removals/high churn.",
-              "parameterDetails": [],
-              "returns": "number"
             }
           ],
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare class ObservableArray<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get length(): number; at(index: number): T | undefined; snapshot(): readonly T[]; peek(): readonly T[]; set(index: number, value: T): void; push(...values: readonly T[]): number; pop(): T | undefined; splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; replace(values: Iterable<T>): void; clear(): void; /** Release unobserved cells left behind by removals/high churn. */ prune(): number; }"
+            "export declare class ObservableArray<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get length(): number; at(index: number): T | undefined; snapshot(): readonly T[]; peek(): readonly T[]; set(index: number, value: T): void; push(...values: readonly T[]): number; pop(): T | undefined; splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; replace(values: Iterable<T>): void; clear(): void; }"
           ],
           "overloadParameterDetails": [
             [
@@ -2324,7 +2309,7 @@
               "description": ""
             }
           ],
-          "identity": "packages/store-indexed/dist/collections.d.ts:ObservableArray:export declare class ObservableArray<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get length(): number; at(index: number): T | undefined; snapshot(): readonly T[]; peek(): readonly T[]; set(index: number, value: T): void; push(...values: readonly T[]): number; pop(): T | undefined; splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; replace(values: Iterable<T>): void; clear(): void; /** Release unobserved cells left behind by removals/high churn. */ prune(): number; }",
+          "identity": "packages/store-indexed/dist/collections.d.ts:ObservableArray:export declare class ObservableArray<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get length(): number; at(index: number): T | undefined; snapshot(): readonly T[]; peek(): readonly T[]; set(index: number, value: T): void; push(...values: readonly T[]): number; pop(): T | undefined; splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; replace(values: Iterable<T>): void; clear(): void; }",
           "guidance": [
             {
               "id": "错误信息全表",
@@ -2417,7 +2402,7 @@
           "name": "observableMap",
           "kind": "function",
           "signature": "export declare function observableMap<K, V>(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableMap<K, V>;",
-          "declarationLine": 105,
+          "declarationLine": 103,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "observableMap is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableMap.",
@@ -2548,7 +2533,7 @@
           "name": "ObservableMap",
           "kind": "class",
           "signature": "export declare class ObservableMap<K, V> extends ObservableCollectionBase { #private; constructor(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, runtime?: IRuntime, options?: IObservableCollectionOptions); get size(): number; get(key: K): V | undefined; peek(key: K): V | undefined; has(key: K): boolean; set(key: K, value: V): this; delete(key: K): boolean; clear(): void; /** * Atomically swap the whole map for `next`. Fires at most one structural (`#structure`) and one * iteration (`#iteration`) notification for the entire swap, unlike `clear()` + per-entry `set()` * which would fire one per key. */ replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void; keys(): readonly K[]; valuesArray(): readonly V[]; entries(): readonly (readonly [K, V])[]; snapshot(): ReadonlyMap<K, V>; /** Release cells for deleted keys that no observer still references. */ prune(): number; }",
-          "declarationLine": 60,
+          "declarationLine": 58,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "Per-key lookup tracking plus a separate dependency for iteration and size.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableMap.",
@@ -2579,11 +2564,11 @@
           "errors": ["No documented errors are declared for ObservableMap."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ObservableMap.",
           "examples": [
-            "const users = new ObservableMap<string, { name: string }>();\nusers.set('u1', { name: 'Ann' });\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1'); // 现在为 'u1' 创建了 cell",
+            "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' })\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1') // 现在为 'u1' 创建了 cell",
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
-            "import { MutationPolicy } from '@migaia/store-middleware';\nimport { ObservableMap } from '@migaia/store-indexed';\n\nconst guard = new MutationPolicy('actions-only');\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n);\n\nusers.set('u1', { name: 'Ann' }); // 抛错：不在 action 内\nguard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功",
-            "const users = new ObservableMap<string, { name: string }>();\nusers.set('u1', { name: 'Ann' }); // 键不存在，触发结构信号 + 迭代信号\nusers.get('u1'); // 追踪读，惰性建 'u1' 的 cell\nusers.dispose();",
-            "import { ObservableMap } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n);\n\ntry {\n  users.set('u1', { name: 'Ann' }); // 抛错：不在 action 内\n} catch {\n  guard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功\n}"
+            "import { MutationPolicy } from '@migaia/store-middleware'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst guard = new MutationPolicy('actions-only')\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n)\n\nusers.set('u1', { name: 'Ann' }) // 抛错：不在 action 内\nguard.runInAction(() => users.set('u1', { name: 'Ann' })) // 成功",
+            "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' }) // 键不存在，触发结构信号 + 迭代信号\nusers.get('u1') // 追踪读，惰性建 'u1' 的 cell\nusers.dispose()",
+            "import { ObservableMap } from '@migaia/store-indexed'\nimport { MutationPolicy } from '@migaia/store-middleware'\n\nconst guard = new MutationPolicy('actions-only')\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n)\n\ntry {\n  users.set('u1', { name: 'Ann' }) // 抛错：不在 action 内\n} catch {\n  guard.runInAction(() => users.set('u1', { name: 'Ann' })) // 成功\n}"
           ],
           "members": [
             {
@@ -2897,7 +2882,7 @@
           "name": "observableObject",
           "kind": "function",
           "signature": "export declare function observableObject<T extends Record<string, unknown>>(initial: T, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableObject<T>;",
-          "declarationLine": 103,
+          "declarationLine": 101,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "observableObject is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableObject.",
@@ -3060,8 +3045,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ObservableObject.",
           "examples": [
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
-            "const user = new ObservableObject({ name: 'Ada', age: 30 });\nuser.get('name'); // 追踪读：处在 effect/computed 内时只订阅 'name' 这个 cell\nuser.set('age', 31); // 值变化：触发修订信号，已建 cell 的 'age' 同步更新\nuser.snapshot(); // 冻结的、Object.create(null) 起始的浅拷贝快照\nuser.dispose(); // 用完必须释放，级联 dispose 全部内部 Signal",
-            "import { ObservableObject } from '@migaia/store-indexed';\n\nconst bigTable = new ObservableObject(\n  Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`k${i}`, i]))\n);\n\n// peek() 不建 cell，适合一次性批量导出\nlet sum = 0;\nfor (const key of bigTable.keys()) sum += bigTable.peek(key);\nbigTable.dispose();"
+            "const user = new ObservableObject({ name: 'Ada', age: 30 })\nuser.get('name') // 追踪读：处在 effect/computed 内时只订阅 'name' 这个 cell\nuser.set('age', 31) // 值变化：触发修订信号，已建 cell 的 'age' 同步更新\nuser.snapshot() // 冻结的、Object.create(null) 起始的浅拷贝快照\nuser.dispose() // 用完必须释放，级联 dispose 全部内部 Signal",
+            "import { ObservableObject } from '@migaia/store-indexed'\n\nconst bigTable = new ObservableObject(\n  Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`k${i}`, i]))\n)\n\n// peek() 不建 cell，适合一次性批量导出\nlet sum = 0\nfor (const key of bigTable.keys()) sum += bigTable.peek(key)\nbigTable.dispose()"
           ],
           "members": [
             {
@@ -3362,7 +3347,7 @@
           "name": "observableSet",
           "kind": "function",
           "signature": "export declare function observableSet<T>(initial?: Iterable<T>, options?: IObservableCollectionOptions, runtime?: IRuntime): ObservableSet<T>;",
-          "declarationLine": 106,
+          "declarationLine": 104,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "observableSet is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for observableSet.",
@@ -3493,7 +3478,7 @@
           "name": "ObservableSet",
           "kind": "class",
           "signature": "export declare class ObservableSet<T> extends ObservableCollectionBase { #private; constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); get size(): number; has(value: T): boolean; add(value: T): this; delete(value: T): boolean; clear(): void; /** * Atomically swap the whole set for `next`. Fires at most one structural (`#structure`) * notification for the entire swap, unlike `clear()` + per-value `add()` which would fire one per * value. */ replace(next: Iterable<T>): void; valuesArray(): readonly T[]; snapshot(): ReadonlySet<T>; /** Release cells for deleted values that no observer still references. */ prune(): number; }",
-          "declarationLine": 84,
+          "declarationLine": 82,
           "source": "packages/store-indexed/dist/collections.d.ts",
           "purpose": "Set counterpart of ObservableMap with per-value membership tracking.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ObservableSet.",
@@ -3525,8 +3510,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ObservableSet.",
           "examples": [
             "new ObservableObject<T extends Record<string, unknown>>(\n  initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableArray<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  runtime?: IRuntime, options?: IObservableCollectionOptions\n);\nnew ObservableSet<T>(\n  initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions\n);",
-            "const tags = new ObservableSet(['a', 'b']);\ntags.has('a'); // 追踪读，惰性建 'a' 的 membership cell\ntags.add('c'); // 触发结构信号\ntags.dispose();",
-            "import { createRuntime } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n});"
+            "const tags = new ObservableSet(['a', 'b'])\ntags.has('a') // 追踪读，惰性建 'a' 的 membership cell\ntags.add('c') // 触发结构信号\ntags.dispose()",
+            "import { createRuntime } from '@migaia/reactive'\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nconst runtimeA = createRuntime()\nconst runtimeB = createRuntime()\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA)\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a') // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n})"
           ],
           "members": [
             {
@@ -3802,9 +3787,9 @@
           "errors": ["No documented errors are declared for STORE_INDEXED_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_INDEXED_SOURCE.",
           "examples": [
-            "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';",
-            "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const;\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed';",
-            "STORE_INDEXED_SOURCE; // '@migaia/store-indexed'"
+            "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'",
+            "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'",
+            "STORE_INDEXED_SOURCE // '@migaia/store-indexed'"
           ],
           "members": [],
           "exportPath": ".",
@@ -3857,12 +3842,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const;\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed';"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -3871,7 +3856,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;"
+                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError"
                 },
                 {
                   "type": "paragraph",
@@ -3890,7 +3875,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -3899,7 +3884,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  collection.at(-1);\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
+                  "code": "try {\n  collection.at(-1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -3912,7 +3897,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "STORE_INDEXED_SOURCE; // '@migaia/store-indexed'"
+                  "code": "STORE_INDEXED_SOURCE // '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -3921,7 +3906,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n);"
+                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n)"
                 },
                 {
                   "type": "paragraph",
