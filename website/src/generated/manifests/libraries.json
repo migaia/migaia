@@ -584,7 +584,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "mutation metrics 同时报告 affected-frontier 的 `visitedNodes`、`visitedEdges`、`queueOperations`、 `queueTimeMs`、`wallTimeMs` 与 `fullScan`。Dynamic Graph 复用增量拓扑索引和依赖规划器，所有 frontier 按 `(level, ordinal)` 的规范顺序执行；无依赖关系但层级不同的节点不再沿用旧的最小 ordinal 堆顺序。"
+                  "text": "mutation result 返回 `affected`、`topologyChanged` 和 `generation`。测试专用 metrics 已移除。Dynamic Graph 复用增量拓扑索引和依赖规划器，所有 frontier 按 `(level, ordinal)` 的规范顺序执行；无依赖关系但层级不同的节点不再沿用旧的最小 ordinal 堆顺序。"
                 },
                 {
                   "type": "paragraph",
@@ -718,7 +718,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`createTopologyIndex(adapter)` 从 `@migaia/capability/graph/topology` 导入。索引支持 `add`、`remove`、`setDependencies`、`dependencies`、`dependents`、`missing`、`closure`、`order`、`snapshot`、`metrics` 与 `begin`。required 与当前存在的 optional 边都参与层级和环检测；optional provider 缺席时保留悬空事实，但不阻塞节点。"
+                  "text": "`createTopologyIndex(adapter)` 从 `@migaia/capability/graph/topology` 导入。索引支持 `add`、`remove`、`setDependencies`、`dependencies`、`dependents`、`missing`、`closure`、`order`、`snapshot` 与 `begin`。required 与当前存在的 optional 边都参与层级和环检测；optional provider 缺席时保留悬空事实，但不阻塞节点。"
                 },
                 {
                   "type": "paragraph",
@@ -1263,7 +1263,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`releaseBatch` 收到的 `fence` 只在所有 exact leases 归零后 resolve。owner 可以先提交逻辑撤销并返回 incomplete observation，但不能在 fence 之前启动物理 disposer。`metrics.queueTimeMs` 只计算 mutation 在 Graph FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，二者不可相互替代。"
+                  "text": "`releaseBatch` 收到的 `fence` 只在所有 exact leases 归零后 resolve。owner 可以先提交逻辑撤销并返回 incomplete observation，但不能在 fence 之前启动物理 disposer。mutation result 只返回业务事实 `affected`、`topologyChanged` 和 `generation`；公开测试计数器和计时字段已移除。"
                 },
                 {
                   "type": "paragraph",

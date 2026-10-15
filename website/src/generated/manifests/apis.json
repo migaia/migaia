@@ -6453,7 +6453,7 @@
           "name": "createDynamicCapabilityGraph",
           "kind": "function",
           "signature": "export declare function createDynamicCapabilityGraph<TBinding = unknown>(\n  options: IDynamicCapabilityGraphOptions<TBinding>,\n): IDynamicCapabilityGraph<TBinding>;",
-          "declarationLine": 103,
+          "declarationLine": 93,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Creates a serialized dynamic graph with fail-closed required-edge reconciliation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDynamicCapabilityGraph.",
@@ -6604,7 +6604,7 @@
           "name": "IDynamicCapabilityGraph",
           "kind": "type",
           "signature": "export type IDynamicCapabilityGraph<TBinding = unknown> = Readonly<{\n  readonly nodes: readonly IGraphNodeId[];\n  readonly state: ICapabilityGraphState;\n  readonly generation: number;\n  register<T>(\n    node: IDynamicGraphNodeDefinition<T>,\n    binding?: TBinding,\n  ): Promise<IGraphMutationResult>;\n  remove(\n    id: IGraphNodeId,\n    options?: IGraphDependencyMutationOptions,\n  ): Promise<IGraphMutationResult>;\n  suspend(\n    id: IGraphNodeId,\n    options?: IGraphDependencyMutationOptions,\n  ): Promise<IGraphMutationResult>;\n  resume(id: IGraphNodeId): Promise<IGraphMutationResult>;\n  dependentsOf(id: IGraphNodeId): IGraphDependents;\n  replace<T>(\n    node: IDynamicGraphNodeDefinition<T>,\n    binding?: TBinding,\n    options?: IGraphReplaceOptions<TBinding>,\n  ): Promise<IGraphMutationResult>;\n  ready(): Promise<void>;\n  nodeState(id: IGraphNodeId): IGraphNodeDiagnostic;\n  getBinding<T = TBinding>(id: IGraphNodeId): T | undefined;\n  acquireBinding(id: IGraphNodeId): IGraphBindingLease<TBinding>;\n  dispose(): Promise<void>;\n}>;",
-          "declarationLine": 86,
+          "declarationLine": 76,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Dynamic required-edge graph used by composition owners.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicCapabilityGraph.",
@@ -6667,7 +6667,7 @@
           "name": "IDynamicCapabilityGraphOptions",
           "kind": "type",
           "signature": "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{\n  /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (\n    error: unknown,\n  ) => void;\n  /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number;\n  /** Composition-owned startup for one topologically ordered affected frontier. Required. */ readonly startBatch: (\n    entries: readonly IGraphStartEntry<TBinding>[],\n  ) =>\n    | readonly IGraphNodeInstance<unknown>[]\n    | PromiseLike<readonly IGraphNodeInstance<unknown>[]>;\n  /** Composition-owned physical release for one sealed cascade. Required. */ readonly releaseBatch: (\n    entries: readonly IGraphReleaseEntry<TBinding>[],\n    fence: Promise<void>,\n  ) => void | PromiseLike<void>;\n  /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (\n    entry: IGraphBindingReleaseEntry<TBinding>,\n  ) => void | PromiseLike<void>;\n}>;",
-          "declarationLine": 45,
+          "declarationLine": 35,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Runtime-neutral dynamic graph options. The composition owner supplies `startBatch` and `releaseBatch`; the graph owns ordering, reconciliation and binding custody only.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicCapabilityGraphOptions.",
@@ -6730,7 +6730,7 @@
           "name": "IDynamicGraphDependency",
           "kind": "type",
           "signature": "export type IDynamicGraphDependency = Readonly<{\n  readonly provider: IGraphNodeId;\n  readonly required: boolean;\n}>;",
-          "declarationLine": 33,
+          "declarationLine": 23,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Dynamic graph dependency edge; optional edges do not block or cascade.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicGraphDependency.",
@@ -6793,7 +6793,7 @@
           "name": "IDynamicGraphNodeDefinition",
           "kind": "type",
           "signature": "export type IDynamicGraphNodeDefinition<T> = Omit<\n  IGraphNodeDefinition<T>,\n  'dependencies'\n> &\n  Readonly<{ readonly dependencies: readonly IDynamicGraphDependency[] }>;",
-          "declarationLine": 38,
+          "declarationLine": 28,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Dynamic node definition supporting required and optional provider edges.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicGraphNodeDefinition.",
@@ -6856,7 +6856,7 @@
           "name": "IGraphBindingLease",
           "kind": "type",
           "signature": "export type IGraphBindingLease<TBinding> = Readonly<{\n  readonly value: TBinding;\n  readonly release: () => void;\n}>;",
-          "declarationLine": 69,
+          "declarationLine": 59,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Exact binding-generation lease retained by a consumer until it no longer observes the value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingLease.",
@@ -6919,7 +6919,7 @@
           "name": "IGraphBindingReleaseEntry",
           "kind": "type",
           "signature": "export type IGraphBindingReleaseEntry<TBinding> = Readonly<{\n  readonly id: IGraphNodeId;\n  readonly binding: TBinding;\n  readonly reason: IGraphBindingReleaseReason;\n}>;",
-          "declarationLine": 63,
+          "declarationLine": 53,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Exact binding custody released after graph-owned instance cleanup.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseEntry.",
@@ -6982,7 +6982,7 @@
           "name": "IGraphBindingReleaseReason",
           "kind": "type",
           "signature": "export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose';",
-          "declarationLine": 61,
+          "declarationLine": 51,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Identifies why one exact graph binding generation left the graph.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseReason.",
@@ -7045,7 +7045,7 @@
           "name": "IGraphDependencyMutationOptions",
           "kind": "type",
           "signature": "export type IGraphDependencyMutationOptions = Readonly<{\n  readonly policy?: IGraphDependencyMutationPolicy;\n}>;",
-          "declarationLine": 24,
+          "declarationLine": 14,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Options for removal and suspension.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphDependencyMutationOptions.",
@@ -7108,7 +7108,7 @@
           "name": "IGraphDependencyMutationPolicy",
           "kind": "type",
           "signature": "export type IGraphDependencyMutationPolicy = 'reject' | 'cascade';",
-          "declarationLine": 21,
+          "declarationLine": 11,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Policy used when a node still has required dependents.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphDependencyMutationPolicy.",
@@ -7234,8 +7234,8 @@
         {
           "name": "IGraphMutationResult",
           "kind": "type",
-          "signature": "export type IGraphMutationResult = Readonly<{\n  readonly affected: readonly IGraphNodeId[];\n  readonly topologyChanged: boolean;\n  readonly generation: number;\n  readonly metrics: IGraphTraversalMetrics;\n}>;",
-          "declarationLine": 14,
+          "signature": "export type IGraphMutationResult = Readonly<{\n  readonly affected: readonly IGraphNodeId[];\n  readonly topologyChanged: boolean;\n  readonly generation: number;\n}>;",
+          "declarationLine": 5,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Result returned after one dynamic graph mutation commits.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphMutationResult.",
@@ -7249,7 +7249,7 @@
           "members": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
-            "export type IGraphMutationResult = Readonly<{ readonly affected: readonly IGraphNodeId[]; readonly topologyChanged: boolean; readonly generation: number; readonly metrics: IGraphTraversalMetrics; }>;"
+            "export type IGraphMutationResult = Readonly<{ readonly affected: readonly IGraphNodeId[]; readonly topologyChanged: boolean; readonly generation: number; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7288,7 +7288,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dynamic.d.ts:IGraphMutationResult:export type IGraphMutationResult = Readonly<{ readonly affected: readonly IGraphNodeId[]; readonly topologyChanged: boolean; readonly generation: number; readonly metrics: IGraphTraversalMetrics; }>;",
+          "identity": "packages/capability/dist/graph/dynamic.d.ts:IGraphMutationResult:export type IGraphMutationResult = Readonly<{ readonly affected: readonly IGraphNodeId[]; readonly topologyChanged: boolean; readonly generation: number; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7298,7 +7298,7 @@
           "name": "IGraphReleaseEntry",
           "kind": "type",
           "signature": "export type IGraphReleaseEntry<TBinding = unknown> = Readonly<{\n  readonly id: IGraphNodeId;\n  readonly binding: TBinding | undefined;\n  readonly instance: IGraphNodeInstance<unknown>;\n}>;",
-          "declarationLine": 80,
+          "declarationLine": 70,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Immutable view of one graph node supplied to a composition release owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReleaseEntry.",
@@ -7361,7 +7361,7 @@
           "name": "IGraphReplaceOptions",
           "kind": "type",
           "signature": "export type IGraphReplaceOptions<TBinding> = Readonly<{\n  readonly restartDependents?: boolean;\n  readonly onReplaced?: (\n    dependent: IGraphNodeId,\n    nextBinding: TBinding | undefined,\n  ) => void | PromiseLike<void>;\n}>;",
-          "declarationLine": 28,
+          "declarationLine": 18,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Controls whether replacement restarts or notifies dependent nodes.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReplaceOptions.",
@@ -7424,7 +7424,7 @@
           "name": "IGraphStartEntry",
           "kind": "type",
           "signature": "export type IGraphStartEntry<TBinding = unknown> = Readonly<{\n  readonly id: IGraphNodeId;\n  readonly binding: TBinding | undefined;\n  readonly definition: IDynamicGraphNodeDefinition<unknown>;\n}>;",
-          "declarationLine": 74,
+          "declarationLine": 64,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Immutable node information supplied to a composition startup owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphStartEntry.",
@@ -7482,69 +7482,6 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "capability-graph/dynamic--IGraphStartEntry"
-        },
-        {
-          "name": "IGraphTraversalMetrics",
-          "kind": "type",
-          "signature": "export type IGraphTraversalMetrics = Readonly<{\n  readonly visitedNodes: number;\n  readonly visitedEdges: number;\n  readonly queueOperations: number;\n  readonly queueTimeMs: number;\n  readonly fullScan: boolean;\n  readonly wallTimeMs: number;\n}>;",
-          "declarationLine": 5,
-          "source": "packages/capability/dist/graph/dynamic.d.ts",
-          "purpose": "Deterministic traversal counters for one dynamic mutation.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphTraversalMetrics.",
-          "advanced": "No additional advanced behavior is declared for IGraphTraversalMetrics.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for IGraphTraversalMetrics."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGraphTraversalMetrics.",
-          "examples": [],
-          "members": [],
-          "exportPath": "./graph/dynamic",
-          "overloadSignatures": [
-            "export type IGraphTraversalMetrics = Readonly<{ readonly visitedNodes: number; readonly visitedEdges: number; readonly queueOperations: number; readonly queueTimeMs: number; readonly fullScan: boolean; readonly wallTimeMs: number; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use IGraphTraversalMetrics when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when IGraphTraversalMetrics does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Deterministic traversal counters for one dynamic mutation."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import IGraphTraversalMetrics from @migaia/capability/graph/dynamic, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use IGraphTraversalMetrics when its type contract and declared inputs match the result you need. Choose a different public symbol when IGraphTraversalMetrics does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphTraversalMetrics."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for IGraphTraversalMetrics."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dynamic.d.ts:IGraphTraversalMetrics:export type IGraphTraversalMetrics = Readonly<{ readonly visitedNodes: number; readonly visitedEdges: number; readonly queueOperations: number; readonly queueTimeMs: number; readonly fullScan: boolean; readonly wallTimeMs: number; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "capability-graph/dynamic--IGraphTraversalMetrics"
         }
       ],
       "aliases": []
@@ -7681,7 +7618,7 @@
           "name": "createTopologyIndex",
           "kind": "function",
           "signature": "export declare function createTopologyIndex(\n  adapter: ITopologyIndexAdapter,\n): ITopologyIndex;",
-          "declarationLine": 42,
+          "declarationLine": 37,
           "source": "packages/capability/dist/graph/topology-index.d.ts",
           "purpose": "Creates an empty mutable topology index with caller-owned error construction.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createTopologyIndex.",
@@ -7887,7 +7824,7 @@
           "name": "ITopologyIndex",
           "kind": "type",
           "signature": "export type ITopologyIndex = ITopologyIndexReader &\n  ITopologyIndexWriter &\n  Readonly<{ begin(): ITopologyTransaction }>;",
-          "declarationLine": 38,
+          "declarationLine": 33,
           "source": "packages/capability/dist/graph/topology-index.d.ts",
           "purpose": "ITopologyIndex is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITopologyIndex.",
@@ -8012,70 +7949,6 @@
           "fragment": "capability-graph/topology--ITopologyIndexAdapter"
         },
         {
-          "name": "ITopologyIndexMetrics",
-          "kind": "type",
-          "signature": "export type ITopologyIndexMetrics = Readonly<{\n  readonly visitedNodes: number;\n  readonly visitedEdges: number;\n}>;",
-          "declarationLine": 14,
-          "source": "packages/capability/dist/graph/topology-index.d.ts",
-          "purpose": "ITopologyIndexMetrics is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITopologyIndexMetrics.",
-          "advanced": "No additional advanced behavior is declared for ITopologyIndexMetrics.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for ITopologyIndexMetrics."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITopologyIndexMetrics.",
-          "examples": [],
-          "members": [],
-          "aliasOf": "ITopologyIndexMetrics",
-          "exportPath": "./graph/topology",
-          "overloadSignatures": [
-            "export type ITopologyIndexMetrics = Readonly<{ readonly visitedNodes: number; readonly visitedEdges: number; }>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use ITopologyIndexMetrics when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ITopologyIndexMetrics does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "ITopologyIndexMetrics is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import ITopologyIndexMetrics from @migaia/capability/graph/topology, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use ITopologyIndexMetrics when its type contract and declared inputs match the result you need. Choose a different public symbol when ITopologyIndexMetrics does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITopologyIndexMetrics."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ITopologyIndexMetrics."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/topology-index.d.ts:ITopologyIndexMetrics:export type ITopologyIndexMetrics = Readonly<{ readonly visitedNodes: number; readonly visitedEdges: number; }>;",
-          "guidance": [],
-          "usageScore": 0,
-          "configuration": [],
-          "fragment": "capability-graph/topology--ITopologyIndexMetrics"
-        },
-        {
           "name": "ITopologyIndexNode",
           "kind": "type",
           "signature": "export type ITopologyIndexNode = Readonly<{\n  readonly id: string;\n  readonly dependencies: readonly ITopologyDependency[];\n}>;",
@@ -8142,8 +8015,8 @@
         {
           "name": "ITopologyIndexReader",
           "kind": "type",
-          "signature": "export type ITopologyIndexReader = Readonly<{\n  readonly size: number;\n  has(id: string): boolean;\n  dependencies(id: string): readonly ITopologyDependency[];\n  dependents(id: string): IGraphDependents;\n  missing(id: string): readonly ITopologyDependency[];\n  closure(roots: readonly string[]): readonly string[];\n  order(ids?: Iterable<string>): readonly string[];\n  snapshot(): ICapabilityTopology;\n  metrics(): ITopologyIndexMetrics;\n}>;",
-          "declarationLine": 18,
+          "signature": "export type ITopologyIndexReader = Readonly<{\n  readonly size: number;\n  has(id: string): boolean;\n  dependencies(id: string): readonly ITopologyDependency[];\n  dependents(id: string): IGraphDependents;\n  missing(id: string): readonly ITopologyDependency[];\n  closure(roots: readonly string[]): readonly string[];\n  order(ids?: Iterable<string>): readonly string[];\n  snapshot(): ICapabilityTopology;\n}>;",
+          "declarationLine": 14,
           "source": "packages/capability/dist/graph/topology-index.d.ts",
           "purpose": "ITopologyIndexReader is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITopologyIndexReader.",
@@ -8158,7 +8031,7 @@
           "aliasOf": "ITopologyIndexReader",
           "exportPath": "./graph/topology",
           "overloadSignatures": [
-            "export type ITopologyIndexReader = Readonly<{ readonly size: number; has(id: string): boolean; dependencies(id: string): readonly ITopologyDependency[]; dependents(id: string): IGraphDependents; missing(id: string): readonly ITopologyDependency[]; closure(roots: readonly string[]): readonly string[]; order(ids?: Iterable<string>): readonly string[]; snapshot(): ICapabilityTopology; metrics(): ITopologyIndexMetrics; }>;"
+            "export type ITopologyIndexReader = Readonly<{ readonly size: number; has(id: string): boolean; dependencies(id: string): readonly ITopologyDependency[]; dependents(id: string): IGraphDependents; missing(id: string): readonly ITopologyDependency[]; closure(roots: readonly string[]): readonly string[]; order(ids?: Iterable<string>): readonly string[]; snapshot(): ICapabilityTopology; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8197,7 +8070,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/topology-index.d.ts:ITopologyIndexReader:export type ITopologyIndexReader = Readonly<{ readonly size: number; has(id: string): boolean; dependencies(id: string): readonly ITopologyDependency[]; dependents(id: string): IGraphDependents; missing(id: string): readonly ITopologyDependency[]; closure(roots: readonly string[]): readonly string[]; order(ids?: Iterable<string>): readonly string[]; snapshot(): ICapabilityTopology; metrics(): ITopologyIndexMetrics; }>;",
+          "identity": "packages/capability/dist/graph/topology-index.d.ts:ITopologyIndexReader:export type ITopologyIndexReader = Readonly<{ readonly size: number; has(id: string): boolean; dependencies(id: string): readonly ITopologyDependency[]; dependents(id: string): IGraphDependents; missing(id: string): readonly ITopologyDependency[]; closure(roots: readonly string[]): readonly string[]; order(ids?: Iterable<string>): readonly string[]; snapshot(): ICapabilityTopology; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8207,7 +8080,7 @@
           "name": "ITopologyIndexWriter",
           "kind": "type",
           "signature": "export type ITopologyIndexWriter = Readonly<{\n  add(node: ITopologyIndexNode): void;\n  remove(id: string): void;\n  setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void;\n}>;",
-          "declarationLine": 29,
+          "declarationLine": 24,
           "source": "packages/capability/dist/graph/topology-index.d.ts",
           "purpose": "ITopologyIndexWriter is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITopologyIndexWriter.",
@@ -8397,7 +8270,7 @@
           "name": "ITopologyTransaction",
           "kind": "type",
           "signature": "export type ITopologyTransaction = ITopologyIndexReader &\n  ITopologyIndexWriter &\n  Readonly<{ commit(): void; rollback(): void }>;",
-          "declarationLine": 34,
+          "declarationLine": 29,
           "source": "packages/capability/dist/graph/topology-index.d.ts",
           "purpose": "ITopologyTransaction is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITopologyTransaction.",
