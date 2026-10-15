@@ -106,3 +106,5 @@ pnpm run typecheck   # 生成声明和包配置检查
 ```
 
 生成的 `src/` 由 wasm-pack 完整覆盖。发布或验证前应执行一次确定性重复构建，并通过真实 WASM host 和 packed consumer 导入/实例化测试。
+
+转码的往返保真限于 JSON 数据模型及可表示数值；任意 MessagePack 的 bin/ext、非 JSON map key 和超出 JSON 数值范围的整数不保证可逆，可能被改写或拒绝。JSON 对象直接走 map 序列化，不依赖 struct-map 配置。

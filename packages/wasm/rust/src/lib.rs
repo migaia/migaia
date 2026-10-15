@@ -189,6 +189,10 @@ impl ConversionResult {
 
     /// Exact output byte length; zero on failure.
     #[wasm_bindgen(getter)]
+    #[allow(
+        clippy::len_without_is_empty,
+        reason = "Operation byte metadata is not a collection API"
+    )]
     pub fn len(&self) -> u32 {
         self.len
     }
@@ -276,37 +280,48 @@ fn allocate_output(arena: &mut Arena, byte_len: usize) -> Option<u32> {
     insert_zeroed_block(arena, byte_len.div_ceil(8))
 }
 
-/// Returns the input pointer and requested byte length without cloning input.
-fn input_range(arena: &Arena, id: u32, len: u32) -> Option<(*const u8, usize)> {
-    let block = arena.map.get(&id)?;
-    let input_len = len as usize;
-    if input_len > block.len() * 8 {
-        return None;
+/// Temporarily owns the input while reserving its handle in the arena.
+///
+/// The placeholder prevents a wrapping cursor from reusing the input id for output.
+/// Conversion borrows bytes from this independent block, so map growth and output
+/// resizing cannot invalidate that borrow. Every normal success/failure restores it.
+fn with_input(
+    arena: &mut Arena,
+    id: u32,
+    len: u32,
+    convert: impl FnOnce(&mut Arena, &[u8]) -> ConversionResult,
+) -> ConversionResult {
+    let Some(block) = arena.map.get_mut(&id) else {
+        return fail("unknown allocation id or length past capacity");
+    };
+    if len as usize > block.len() * 8 {
+        return fail("unknown allocation id or length past capacity");
     }
-    Some((block.as_ptr() as *const u8, input_len))
+    let input = std::mem::take(block);
+    // SAFETY: input owns the aligned initialized allocation independently of arena;
+    // len was checked before taking it, and convert cannot access this local owner.
+    let bytes = unsafe { std::slice::from_raw_parts(input.as_ptr().cast::<u8>(), len as usize) };
+    let result = convert(arena, bytes);
+    *arena.map.get_mut(&id).expect("reserved conversion input") = input;
+    result
 }
 
 /// Converts JSON to MessagePack while borrowing input and writing output in one arena transaction.
-fn convert_json_to_msgpack(arena: &mut Arena, id: u32, len: u32) -> ConversionResult {
-    let Some((input_ptr, input_len)) = input_range(arena, id, len) else {
-        return fail("unknown allocation id or length past capacity");
-    };
+fn convert_json_to_msgpack(arena: &mut Arena, input: &[u8]) -> ConversionResult {
     let Some(output_id) = allocate_output(arena, INITIAL_OUTPUT_BYTES) else {
         return fail("arena exhausted");
     };
     let outcome = {
-        // The source block remains heap-stable while the distinct output entry
-        // is inserted into the map, so this operation-bound pointer is valid.
-        let input = unsafe { std::slice::from_raw_parts(input_ptr, input_len) };
         let mut writer = ArenaWriter {
             arena,
             id: output_id,
             position: 0,
         };
         let mut deserializer = serde_json::Deserializer::from_slice(input);
-        let mut serializer = rmp_serde::Serializer::new(&mut writer).with_struct_map();
-        let result = serde_transcode::transcode(&mut deserializer, &mut serializer);
-        drop(serializer);
+        let result = {
+            let mut serializer = rmp_serde::Serializer::new(&mut writer);
+            serde_transcode::transcode(&mut deserializer, &mut serializer)
+        };
         match result {
             Ok(()) => match deserializer.end() {
                 Ok(()) => Ok(writer.position),
@@ -329,15 +344,11 @@ fn convert_json_to_msgpack(arena: &mut Arena, id: u32, len: u32) -> ConversionRe
 }
 
 /// Converts MessagePack to JSON while borrowing input and writing output in one arena transaction.
-fn convert_msgpack_to_json(arena: &mut Arena, id: u32, len: u32) -> ConversionResult {
-    let Some((input_ptr, input_len)) = input_range(arena, id, len) else {
-        return fail("unknown allocation id or length past capacity");
-    };
+fn convert_msgpack_to_json(arena: &mut Arena, input: &[u8]) -> ConversionResult {
     let Some(output_id) = allocate_output(arena, INITIAL_OUTPUT_BYTES) else {
         return fail("arena exhausted");
     };
     let outcome = {
-        let input = unsafe { std::slice::from_raw_parts(input_ptr, input_len) };
         let mut writer = ArenaWriter {
             arena,
             id: output_id,
@@ -345,11 +356,12 @@ fn convert_msgpack_to_json(arena: &mut Arena, id: u32, len: u32) -> ConversionRe
         };
         let mut cursor = Cursor::new(input);
         let mut deserializer = rmp_serde::Deserializer::new(&mut cursor);
-        let mut serializer = serde_json::Serializer::new(&mut writer);
-        let result = serde_transcode::transcode(&mut deserializer, &mut serializer);
-        drop(serializer);
+        let result = {
+            let mut serializer = serde_json::Serializer::new(&mut writer);
+            serde_transcode::transcode(&mut deserializer, &mut serializer)
+        };
         match result {
-            Ok(()) if cursor.position() == input_len as u64 => Ok(writer.position),
+            Ok(()) if cursor.position() == input.len() as u64 => Ok(writer.position),
             Ok(()) => Err("msgpack to json failed: trailing bytes".to_string()),
             Err(error) => Err(format!("msgpack to json failed: {error}")),
         }
@@ -374,16 +386,18 @@ fn convert_msgpack_to_json(arena: &mut Arena, id: u32, len: u32) -> ConversionRe
 /// records meant roughly four million String allocations for a tree that gets
 /// thrown away one statement later.
 ///
-/// Map keys stay strings (`with_struct_map`) so the conversion is schema-less
-/// and reversible — a compact struct encoding would need both ends to agree on
-/// a schema, which a general-purpose store cannot assume.
+/// JSON objects use string map keys without a schema. Roundtrip preservation is
+/// limited to the JSON data model and representable numbers; arbitrary MessagePack
+/// bin/ext values, non-JSON map keys, and integers outside JSON's supported numeric
+/// range are not promised a reversible JSON representation. This path serializes
+/// maps directly, so struct-map configuration would not affect object encoding.
 #[wasm_bindgen]
 pub fn json_to_msgpack(id: u32, len: u32) -> ConversionResult {
-    ARENA.with(|arena| convert_json_to_msgpack(&mut arena.borrow_mut(), id, len))
+    ARENA.with(|arena| with_input(&mut arena.borrow_mut(), id, len, convert_json_to_msgpack))
 }
 
 /// MessagePack bytes in, JSON bytes out. Returns operation-bound output metadata.
 #[wasm_bindgen]
 pub fn msgpack_to_json(id: u32, len: u32) -> ConversionResult {
-    ARENA.with(|arena| convert_msgpack_to_json(&mut arena.borrow_mut(), id, len))
+    ARENA.with(|arena| with_input(&mut arena.borrow_mut(), id, len, convert_msgpack_to_json))
 }
