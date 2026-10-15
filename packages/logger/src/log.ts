@@ -720,13 +720,19 @@ class LoggerCore {
     )
   }
 
+  /** Tracks one completion reaction; reporting still sees the work pending until it returns. */
   #track(source: ILogFailure['source'], promise: Promise<void>): void {
-    const observed = promise.catch((error) => this.#reportFailure(source, error))
-    this.#pending.add(observed)
-    void observed.then(
-      () => this.#pending.delete(observed),
-      () => this.#pending.delete(observed)
+    /** Both settlement branches remove their own registry entry without a second Promise reaction. */
+    const observed = promise.then(
+      () => {
+        this.#pending.delete(observed)
+      },
+      (error) => {
+        this.#reportFailure(source, error)
+        this.#pending.delete(observed)
+      }
     )
+    this.#pending.add(observed)
   }
 
   /**
@@ -915,7 +921,7 @@ class LoggerCore {
     return {
       id: `log_${++LoggerCore.#entrySeq}`,
       tag: input.tag,
-      time: new Date((input.time ?? new Date()).getTime()),
+      time: new Date(input.time?.getTime() ?? Date.now()),
       message: input.message,
       args,
       meta: input.meta ? { ...input.meta } : undefined,
