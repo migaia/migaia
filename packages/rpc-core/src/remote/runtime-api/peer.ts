@@ -118,6 +118,7 @@ import {
   RUNTIME_API_BASE_CAPABILITIES
 } from './constants.js'
 import { RUNTIME_PEER_DEFAULT_NAME } from './constants.js'
+import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
 
 export type { IRuntimePeerProvide, IRuntimePeerMethod } from './catalog.js'
 export type { IRuntimePeerIdentity } from './description.js'
@@ -410,7 +411,7 @@ export async function createRuntimePeer(
   /** The existing stream capability remains an independent AND requirement. */
   const supportsStream = channel.agreement.capabilities.includes(RpcCapability.stream)
   /** Default diagnostics are selected once without copying the original options. */
-  const reporter = options.report ?? console.error
+  const reporter = options.report ?? defaultRpcReporter
   /** Reports remain observable even when a user reporter itself throws. */
   const report = (error: unknown): void => {
     try {
@@ -1023,7 +1024,7 @@ export async function prepareRuntimePeerEndpoint(
   }
   try {
     /** Default diagnostics do not require copying the options that carry Host provenance. */
-    const report = options.report ?? console.error
+    const report = options.report ?? defaultRpcReporter
     if (options.endpointFactory) {
       /** Custom roots retain their original signature and must supply the actual borrowed owner. */
       const endpoint = await options.endpointFactory(channel, signal)

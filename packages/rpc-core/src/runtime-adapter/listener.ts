@@ -43,6 +43,7 @@ import { readRuntimeProviderGovernor } from './provider/governor.js'
 import { createRuntimeEventPublisher, runtimeReadyEvent } from '../remote/runtime-api/events.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from './data.js'
+import { defaultRpcReporter } from '../core/internal/diagnostic-reporter.js'
 
 /** The original session owner stores this actual callable Peer and closes its same resource. */
 export type IAdapterListenerService = IRemoteServePluginHandle & Readonly<{ peer: IRuntimePeer }>
@@ -204,7 +205,7 @@ export function createAdapterListenerPreparation(
   preparation: IRuntimePreparationContext | undefined
 ): IAdapterListenerPreparation {
   /** Listener diagnostics keep the original options while selecting one default reporter. */
-  const report = options.report ?? console.error
+  const report = options.report ?? defaultRpcReporter
   /** Accepted sessions publish through the same event subscriber owner as other Runtime Peers. */
   const events = createRuntimeEventPublisher()
   /** Local registration summaries exist before any physical listener or accepted session. */

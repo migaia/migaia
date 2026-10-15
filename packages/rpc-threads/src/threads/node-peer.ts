@@ -2,6 +2,7 @@ import { type IRuntimePeerOptions, type IRuntimePeer } from '@migaia/rpc-core/re
 import type { IThreadParentPort } from './runtime-types.js'
 import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from './runtime-peer.js'
 import { captureThreadTask, type IThreadAdapterTask } from './adapter.js'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** Discover only the actual held native parent port and its original raw launch input. */
 export function createAdapterNodeThreadPeer(
@@ -27,12 +28,12 @@ export function openNodeThreadTask(
       : preparation.peer({
           ...options,
           self: preparation.context.self,
-          report: options.report ?? console.error
+          report: options.report ?? defaultRpcReporter
         } as IRuntimePeerOptions)
   /** Core reads the same actual workerData and keeps the closed admission snapshot private. */
   /** Identity, local provider compilation, generation and actual ACK remain one Core operation. */
   return task.messagePeer(
-    (options.report ? options : { ...options, report: console.error }) as IRuntimePeerOptions,
+    (options.report ? options : { ...options, report: defaultRpcReporter }) as IRuntimePeerOptions,
     parentPort,
     { direction: 'inbound', read: () => workerData }
   )

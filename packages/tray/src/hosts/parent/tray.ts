@@ -1,5 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { defineHost } from '@migaia/plugin-host'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 import type { IRpcProbe } from '@migaia/rpc-core/probe'
 import {
   RuntimeEventName,
@@ -73,7 +74,7 @@ export function createTrayRuntime<
   for (const policy of options.routing ?? [])
     if (!readRoutingPolicy(policy)) throw createTrayError(TrayErrorCode.routingInvalid)
   /** One reporter carries native notices and contained lifecycle/relay failures. */
-  const report = options.report ?? console.error
+  const report = options.report ?? defaultRpcReporter
   /** Parent PluginHost remains separate from every instance's plain PluginHost. */
   const host = defineHost({
     host: {

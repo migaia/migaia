@@ -47,6 +47,7 @@ export type {
   IRpcCleanupError
 } from './errors.js'
 export { serializeRpcError, deserializeRpcError } from './internal/error-wire-metadata.js'
+export { defaultRpcReporter } from './internal/diagnostic-reporter.js'
 export type { IRpcTransport, IRpcSendOptions, IRpcTransportTopology } from './transport.js'
 export {
   createRpcIdempotencyStore,

@@ -7,6 +7,7 @@ import type { IThreadWebPort } from './types.js'
 import { threadChildResource } from './child.js'
 import type { IRuntimeThreadPeerOptions } from './runtime-peer.js'
 import { captureThreadTask, type IThreadAdapterTask } from './adapter.js'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** Attach Core's original bounded raw bootstrap capture before any asynchronous preparation. */
 export function createAutomaticWebThreadPeer(
@@ -23,7 +24,7 @@ export function createAutomaticWebThreadPeer(
   const resource = threadChildResource(native)
   /** The opaque preparation reads captured raw input without an adapter agreement or context DTO. */
   return captured.resourcePeer(
-    { ...options, report: options.report ?? console.error } as IRuntimePeerOptions,
+    { ...options, report: options.report ?? defaultRpcReporter } as IRuntimePeerOptions,
     resource
   )
 }

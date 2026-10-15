@@ -36,6 +36,7 @@ import { createAdapterProcessPeer } from '../peer.js'
 import type { IAdapterProcessRuntimeLoader } from '../peer.js'
 import type { IRuntimeProcessPeerOptions } from '../runtime-peer.js'
 import { getProcessByteAdapter } from '../adapter.js'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** This physical owner alone retains the stable family token for its actual Host slot operation. */
 const processRuntimeSlotFamily = Object.freeze({})
@@ -122,7 +123,7 @@ export function createAdapterProcessPlugin<THandle extends IProcessHandle>(
   if (!('deployment' in options))
     return assembleAdapterPlugin(
       getProcessByteAdapter(),
-      { ...options, report: options.report ?? console.error },
+      { ...options, report: options.report ?? defaultRpcReporter },
       {
         key: processRuntimeSlotKey,
         acquire: (integration, create) =>
