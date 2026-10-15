@@ -16243,7 +16243,7 @@
           "name": "ILifecycleErrorText",
           "kind": "type",
           "signature": "export type ILifecycleErrorText =\n  (typeof LifecycleErrorText)[keyof typeof LifecycleErrorText];",
-          "declarationLine": 129,
+          "declarationLine": 131,
           "source": "packages/lifecycle/dist/error-text.d.ts",
           "purpose": "ILifecycleErrorText is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleErrorText.",
@@ -17971,7 +17971,7 @@
         {
           "name": "LifecycleErrorText",
           "kind": "const",
-          "signature": "export declare const LifecycleErrorText: {\n  /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: '[lifecycle] abortable delay failed';\n  /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: '[lifecycle] wait cleanup reporter must be a function';\n  /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: '[lifecycle] provisional cleanup failed';\n  /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: '[lifecycle] dispose transaction failed';\n  /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: '[lifecycle] cannot join the same scope disposal from its disposer';\n  /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed';\n  /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: '[lifecycle] cleanup result must provide a cleanupErrors array';\n  /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: '[lifecycle] synchronous graceful completed after its deadline';\n  /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: '[lifecycle] mutation admission timed out';\n  /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: '[lifecycle] generation cancellation failed';\n  /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: '[lifecycle] disposal ledger is sealed';\n  /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: '[lifecycle] disposal ledger operation is reentrant';\n  /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: '[lifecycle] required host capability is unavailable';\n  /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: '[lifecycle] abort signal is invalid';\n  /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: '[lifecycle] scheduler task cancel getter failed';\n  /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: '[lifecycle] scheduler.schedule must return an object with a cancel() function';\n  /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: '[lifecycle] scheduler accessor failed';\n  /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: '[lifecycle] scheduler must provide now() and schedule() functions';\n  /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: '[lifecycle] scheduler time value must be a number';\n  /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: '[lifecycle] scheduler time value must be finite';\n  /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: '[lifecycle] scheduler delay must be non-negative';\n  /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: '[lifecycle] scheduler time arithmetic must remain finite';\n  /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: '[lifecycle] errorPolicy \"report\" and \"firstError\" require a report callback';\n  /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: '[lifecycle] superseded by a new generation';\n  /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: '[lifecycle] generation timed out';\n  /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: '[lifecycle] unit disposed';\n  /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: '[lifecycle] scope closed';\n  /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: '[lifecycle] provisional scope rolled back';\n  /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: '[lifecycle] provisional scope committed';\n  /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: '[lifecycle] cannot retain a sealed quiescence key';\n  /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: '[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait';\n  /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: '[lifecycle] provisional scope has already committed or rolled back';\n  /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: '[lifecycle] commitTo() target is already closing or terminal';\n  /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: '[lifecycle] start() failed';\n  /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: '[lifecycle] unit is terminal';\n  /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: '[lifecycle] unit is closing';\n  /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: '[lifecycle] cannot begin a new generation on a disposed GenerationController';\n  /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: '[lifecycle] generation superseded before its result could be adopted';\n  /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: '[lifecycle] shared deadline already passed before this graceful phase could start';\n  /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: '[lifecycle] force() failed';\n  /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: '[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits';\n  /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: '[lifecycle] scope is terminal';\n  /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: '[lifecycle] scope is closing';\n  /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: '[lifecycle] cannot call own() from within this scope’s own dispose()';\n  /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: '[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor';\n  /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: '[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance';\n  /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: '[lifecycle] sync lifecycle scope disposal failed';\n  /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: '[lifecycle] generation timeout option getter failed';\n};",
+          "signature": "export declare const LifecycleErrorText: {\n  /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: '[lifecycle] abortable delay failed';\n  /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: '[lifecycle] wait cleanup reporter must be a function';\n  /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: '[lifecycle] provisional cleanup failed';\n  /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: '[lifecycle] dispose transaction failed';\n  /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: '[lifecycle] cannot join the same scope disposal from its disposer';\n  /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed';\n  /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: '[lifecycle] cleanup result must provide a cleanupErrors array';\n  /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: '[lifecycle] synchronous graceful completed after its deadline';\n  /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: '[lifecycle] mutation admission timed out';\n  /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: '[lifecycle] generation cancellation failed';\n  /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: '[lifecycle] disposal ledger is sealed';\n  /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: '[lifecycle] disposal ledger operation is reentrant';\n  /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: '[lifecycle] required host capability is unavailable';\n  /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: '[lifecycle] abort signal is invalid';\n  /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: '[lifecycle] scheduler task cancel getter failed';\n  /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: '[lifecycle] scheduler.schedule must return an object with a cancel() function';\n  /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: '[lifecycle] scheduler accessor failed';\n  /** Optional deferred registration must be callable before a scheduler owns any work. */ readonly schedulerDeferInvalid: '[lifecycle] scheduler.defer must be a function when provided';\n  /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: '[lifecycle] scheduler must provide now() and schedule() functions';\n  /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: '[lifecycle] scheduler time value must be a number';\n  /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: '[lifecycle] scheduler time value must be finite';\n  /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: '[lifecycle] scheduler delay must be non-negative';\n  /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: '[lifecycle] scheduler time arithmetic must remain finite';\n  /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: '[lifecycle] errorPolicy \"report\" and \"firstError\" require a report callback';\n  /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: '[lifecycle] superseded by a new generation';\n  /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: '[lifecycle] generation timed out';\n  /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: '[lifecycle] unit disposed';\n  /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: '[lifecycle] scope closed';\n  /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: '[lifecycle] provisional scope rolled back';\n  /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: '[lifecycle] provisional scope committed';\n  /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: '[lifecycle] cannot retain a sealed quiescence key';\n  /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: '[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait';\n  /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: '[lifecycle] provisional scope has already committed or rolled back';\n  /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: '[lifecycle] commitTo() target is already closing or terminal';\n  /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: '[lifecycle] start() failed';\n  /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: '[lifecycle] unit is terminal';\n  /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: '[lifecycle] unit is closing';\n  /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: '[lifecycle] cannot begin a new generation on a disposed GenerationController';\n  /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: '[lifecycle] generation superseded before its result could be adopted';\n  /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: '[lifecycle] shared deadline already passed before this graceful phase could start';\n  /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: '[lifecycle] force() failed';\n  /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: '[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits';\n  /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: '[lifecycle] scope is terminal';\n  /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: '[lifecycle] scope is closing';\n  /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: '[lifecycle] cannot call own() from within this scope’s own dispose()';\n  /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: '[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor';\n  /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: '[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance';\n  /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: '[lifecycle] sync lifecycle scope disposal failed';\n  /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: '[lifecycle] generation timeout option getter failed';\n};",
           "declarationLine": 2,
           "source": "packages/lifecycle/dist/error-text.d.ts",
           "purpose": "Stable lifecycle diagnostics shared by scheduler and cancellation boundaries.",
@@ -17991,7 +17991,7 @@
           "aliasOf": "LifecycleErrorText",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: \"[lifecycle] cleanup result must provide a cleanupErrors array\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };"
+            "export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: \"[lifecycle] cleanup result must provide a cleanupErrors array\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Optional deferred registration must be callable before a scheduler owns any work. */ readonly schedulerDeferInvalid: \"[lifecycle] scheduler.defer must be a function when provided\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -18030,7 +18030,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/error-text.d.ts:LifecycleErrorText:export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: \"[lifecycle] cleanup result must provide a cleanupErrors array\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };",
+          "identity": "packages/lifecycle/dist/error-text.d.ts:LifecycleErrorText:export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** Shared cleanup observation admission requires the error array used by the merge helper. */ readonly cleanupResultInvalid: \"[lifecycle] cleanup result must provide a cleanupErrors array\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Optional deferred registration must be callable before a scheduler owns any work. */ readonly schedulerDeferInvalid: \"[lifecycle] scheduler.defer must be a function when provided\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };",
           "guidance": [
             {
               "id": "错误基础设施模块",
@@ -23440,7 +23440,7 @@
               ]
             }
           ],
-          "usageScore": 48,
+          "usageScore": 52,
           "configuration": [],
           "fragment": "lifecycle-scheduler--resolveScheduler"
         },
@@ -23580,7 +23580,8 @@
           "errors": ["No documented errors are declared for snapshotScheduler."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for snapshotScheduler.",
           "examples": [
-            "const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错"
+            "const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错",
+            "const snap = snapshotScheduler(candidate) // 缺少必要方法时返回 undefined；getter 或已提供的 defer 无效时抛出带码错误"
           ],
           "members": [],
           "aliasOf": "snapshotScheduler",
@@ -23679,7 +23680,7 @@
               ]
             }
           ],
-          "usageScore": 72,
+          "usageScore": 80,
           "configuration": [],
           "fragment": "lifecycle-scheduler--snapshotScheduler"
         }
@@ -72064,7 +72065,7 @@
               ]
             }
           ],
-          "usageScore": 42,
+          "usageScore": 44,
           "configuration": [
             {
               "name": "version",
@@ -81220,29 +81221,44 @@
         {
           "name": "createMemoryTransportPair",
           "kind": "function",
-          "signature": "export declare function createMemoryTransportPair(): readonly [\n  IMemoryTransport,\n  IMemoryTransport,\n];",
-          "declarationLine": 16,
+          "signature": "export declare function createMemoryTransportPair(\n  options?: IMemoryTransportOptions,\n): readonly [IMemoryTransport, IMemoryTransport];",
+          "declarationLine": 22,
           "source": "packages/rpc-core/dist/core/adapters/memory.d.ts",
           "purpose": "Same-process, no-DOM transport — mainly for tests and for wiring a client and server together without a real channel. Delivery is queued as a microtask (not synchronous) so behavior matches a real async transport: code that assumes \"the other side hasn't seen this yet\" immediately after `send()` returns stays correct.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createMemoryTransportPair.",
           "advanced": "No additional advanced behavior is declared for createMemoryTransportPair.",
-          "parameters": ["This function declaration has no parameters."],
-          "parameterDetails": [],
+          "parameters": ["options: IMemoryTransportOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IMemoryTransportOptions",
+              "optional": true
+            }
+          ],
           "returns": "readonly [IMemoryTransport, IMemoryTransport]",
           "errors": ["No documented errors are declared for createMemoryTransportPair."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createMemoryTransportPair.",
           "examples": [
             "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b) // 或 context.failed(error)\n})\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\ntry {\n  const sum = await client.send<number>('server', 'add', [20, 22])\n  console.log(sum) // 42；data 必填，没有参数时传 null\n} finally {\n  await client.dispose()\n  await server.dispose()\n}",
             "import assert from 'node:assert/strict'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { defineProbe, probePlugin } from '@migaia/rpc-core/probe'\n\n/** 在同步回调中读标量，不保留复用 view。 */\nlet events = 0\nconst probe = defineProbe({\n  stages: ['message'],\n  emit() {\n    events += 1\n  }\n})\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('echo', (context) => context.success(context.data))\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [probePlugin(probe), connect({ transport: left })]\n})\ntry {\n  assert.equal(await client.send('server', 'echo', 'ready'), 'ready')\n  assert.ok(events > 0)\n} finally {\n  await client.dispose()\n  await server.dispose()\n}",
+            "import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst clock = createManualScheduler()\nconst [sender, receiver] = createMemoryTransportPair({ scheduler: clock })\nconst messages: unknown[] = []\nconst stop = receiver.subscribe(({ data }) => { messages.push(data) })\nsender.send('payload')\nclock.advance(0)\nconsole.log(messages) // ['payload']\nstop()\nawait sender.close()",
             "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [left, right] = createMemoryTransportPair()\n\nconst server = await createEndpoint({\n  id: 'server',\n  transport: right,\n  middlewares: [connect({ transport: right })]\n})\nserver.provide('add', (context) => {\n  const [a, b] = context.data as [number, number]\n  return context.success(a + b)\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  targetIds: ['server'],\n  transport: left,\n  middlewares: [connect({ transport: left })]\n})\nconsole.log(await client.send<number>('server', 'add', [20, 22])) // 42\n\nawait client.dispose()\nawait server.dispose()",
             "import assert from 'node:assert/strict'\nimport { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { defineProbe, probePlugin } from '@migaia/rpc-core/probe'\n\n/** 在同步回调中读标量，不保留复用 view。 */\nlet events = 0\nconst probe = defineProbe({ stages: ['message'], emit() { events += 1 } })\nconst [left, right] = createMemoryTransportPair()\nconst server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })\nserver.provide('echo', (context) => context.success(context.data))\nconst client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [probePlugin(probe), connect({ transport: left })] })\ntry {\n  assert.equal(await client.send('server', 'echo', 'ready'), 'ready')\n  assert.ok(events > 0)\n} finally {\n  await client.dispose()\n  await server.dispose()\n}"
           ],
           "members": [],
           "exportPath": "./adapters/memory",
           "overloadSignatures": [
-            "export declare function createMemoryTransportPair(): readonly [IMemoryTransport, IMemoryTransport];"
+            "export declare function createMemoryTransportPair(options?: IMemoryTransportOptions): readonly [IMemoryTransport, IMemoryTransport];"
           ],
-          "overloadParameterDetails": [[]],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IMemoryTransportOptions",
+                "optional": true
+              }
+            ]
+          ],
           "overloadReturns": ["readonly [IMemoryTransport, IMemoryTransport]"],
           "whenToUse": "Use createMemoryTransportPair when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createMemoryTransportPair does not match the required inputs or return contract.",
@@ -81279,7 +81295,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/core/adapters/memory.d.ts:createMemoryTransportPair:export declare function createMemoryTransportPair(): readonly [IMemoryTransport, IMemoryTransport];",
+          "identity": "packages/rpc-core/dist/core/adapters/memory.d.ts:createMemoryTransportPair:export declare function createMemoryTransportPair(options?: IMemoryTransportOptions): readonly [IMemoryTransport, IMemoryTransport];",
           "guidance": [
             {
               "id": "13-3-endpoint-安装与生命周期",
@@ -81297,7 +81313,7 @@
               ]
             }
           ],
-          "usageScore": 54,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "rpc-core-adapters/memory--createMemoryTransportPair"
         },
@@ -81305,7 +81321,7 @@
           "name": "IMemoryTransport",
           "kind": "type",
           "signature": "export type IMemoryTransport = IRpcTransport & {\n  /** * Tears down the whole pair — closing either side closes both; after this, `send()` on either * throws. */ close(): void;\n  readonly closed: boolean;\n};",
-          "declarationLine": 2,
+          "declarationLine": 8,
           "source": "packages/rpc-core/dist/core/adapters/memory.d.ts",
           "purpose": "IMemoryTransport is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMemoryTransport.",
@@ -81363,6 +81379,69 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-core-adapters/memory--IMemoryTransport"
+        },
+        {
+          "name": "IMemoryTransportOptions",
+          "kind": "type",
+          "signature": "export type IMemoryTransportOptions = Readonly<{\n  /** Defaults to native microtask delivery; injected clocks control only this pair's queued jobs. */ scheduler?: IScheduler;\n}>;",
+          "declarationLine": 4,
+          "source": "packages/rpc-core/dist/core/adapters/memory.d.ts",
+          "purpose": "Delivery jobs belong to this pair; endpoint deadline clocks remain separately configured.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMemoryTransportOptions.",
+          "advanced": "No additional advanced behavior is declared for IMemoryTransportOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IMemoryTransportOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMemoryTransportOptions.",
+          "examples": [],
+          "members": [],
+          "exportPath": "./adapters/memory",
+          "overloadSignatures": [
+            "export type IMemoryTransportOptions = Readonly<{ /** Defaults to native microtask delivery; injected clocks control only this pair's queued jobs. */ scheduler?: IScheduler; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IMemoryTransportOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IMemoryTransportOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Delivery jobs belong to this pair; endpoint deadline clocks remain separately configured."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IMemoryTransportOptions from @migaia/rpc-core/adapters/memory, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IMemoryTransportOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IMemoryTransportOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IMemoryTransportOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IMemoryTransportOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-core/dist/core/adapters/memory.d.ts:IMemoryTransportOptions:export type IMemoryTransportOptions = Readonly<{ /** Defaults to native microtask delivery; injected clocks control only this pair's queued jobs. */ scheduler?: IScheduler; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-core-adapters/memory--IMemoryTransportOptions"
         }
       ],
       "aliases": []
@@ -97950,7 +98029,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-pool/dist/index.d.ts:createProcessPool:export declare function createProcessPool<TRemote = Record<never, never>>(options: IProcessPoolOptions): Promise<IProcessPool<TRemote>>;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "rpc-pool-index--createProcessPool"
         },
@@ -98029,7 +98108,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-pool/dist/index.d.ts:createThreadPool:export declare function createThreadPool<TRemote = Record<never, never>>(options: IThreadPoolOptions): Promise<IThreadPool<TRemote>>;",
           "guidance": [],
-          "usageScore": 34,
+          "usageScore": 38,
           "configuration": [],
           "fragment": "rpc-pool-index--createThreadPool"
         },
@@ -98037,7 +98116,7 @@
           "name": "IProcessPool",
           "kind": "type",
           "signature": "export type IProcessPool<TRemote = Record<never, never>> = Pick<\n  Awaited<ReturnType<typeof createProcessPeer<TRemote>>>,\n  'request' | 'notify' | 'stream'\n> &\n  IRpcPoolControls;",
-          "declarationLine": 21,
+          "declarationLine": 22,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Process call options retain the public owner's prohibition on native transfer lists.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessPool.",
@@ -98101,7 +98180,7 @@
           "name": "IProcessPoolOptions",
           "kind": "type",
           "signature": "export type IProcessPoolOptions = IRpcPoolOptions &\n  Readonly<{\n    spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>;\n    /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeProcessPeerOptions['probe'];\n  }>;",
-          "declarationLine": 35,
+          "declarationLine": 38,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Every Process member receives this exact original source value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessPoolOptions.",
@@ -98165,7 +98244,7 @@
           "name": "IRpcPoolControls",
           "kind": "type",
           "signature": "export type IRpcPoolControls = Readonly<{\n  stats(): IRpcPoolStats;\n  resize(size: number): Promise<void>;\n  close(): Promise<void>;\n}>;",
-          "declarationLine": 13,
+          "declarationLine": 14,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Pool controls own only the Peers created by their corresponding public factory.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolControls.",
@@ -98293,7 +98372,7 @@
           "name": "IRpcPoolStats",
           "kind": "type",
           "signature": "export type IRpcPoolStats = Readonly<{\n  targetSize: number;\n  memberCount: number;\n  inFlight: number;\n  queued: number;\n  state: RpcPoolState;\n}>;",
-          "declarationLine": 5,
+          "declarationLine": 6,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "This snapshot measures pool client slots and FIFO entries, never provider concurrency.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolStats.",
@@ -98357,7 +98436,7 @@
           "name": "IThreadPool",
           "kind": "type",
           "signature": "export type IThreadPool<TRemote = Record<never, never>> = Pick<\n  Awaited<ReturnType<typeof createThreadPeer<TRemote>>>,\n  'request' | 'notify' | 'stream'\n> &\n  IRpcPoolControls;",
-          "declarationLine": 19,
+          "declarationLine": 20,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Thread payload, method and transfer types remain exactly those of its public Peer.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPool.",
@@ -98421,7 +98500,7 @@
           "name": "IThreadPoolOptions",
           "kind": "type",
           "signature": "export type IThreadPoolOptions = IRpcPoolOptions &\n  Readonly<{\n    spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>;\n    /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeThreadPeerOptions['probe'];\n  }>;",
-          "declarationLine": 29,
+          "declarationLine": 32,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Every Thread member receives this exact original source value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPoolOptions.",
@@ -198020,6 +198099,16 @@
           "ownerFragment": "utils-promise--deferred"
         },
         {
+          "identity": "packages/utils/dist/scheduler.d.ts:deferTask:export declare function deferTask(scheduler: IScheduler, callback: () => void): void;",
+          "name": "deferTask",
+          "signature": "export declare function deferTask(scheduler: IScheduler, callback: () => void): void;",
+          "source": "packages/utils/dist/scheduler.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./scheduler",
+          "ownerModule": "scheduler",
+          "ownerFragment": "utils-scheduler--deferTask"
+        },
+        {
           "identity": "packages/utils/dist/error-chain.d.ts:deserializeErrorChain:export declare function deserializeErrorChain(value: unknown, strategy?: IErrorChainStrategy, options?: INormalizeErrorChainOptions): Error;",
           "name": "deserializeErrorChain",
           "signature": "export declare function deserializeErrorChain(value: unknown, strategy?: IErrorChainStrategy, options?: INormalizeErrorChainOptions): Error;",
@@ -198750,9 +198839,9 @@
           "ownerFragment": "utils-scheduler--IScheduledTask"
         },
         {
-          "identity": "packages/utils/dist/scheduler.d.ts:IScheduler:export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };",
+          "identity": "packages/utils/dist/scheduler.d.ts:IScheduler:export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(callback: () => void): void; };",
           "name": "IScheduler",
-          "signature": "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };",
+          "signature": "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(callback: () => void): void; };",
           "source": "packages/utils/dist/scheduler.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./scheduler",
@@ -214329,6 +214418,28 @@
               ]
             },
             {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            },
+            {
               "id": "error-模块",
               "heading": "/error 模块",
               "blocks": [
@@ -216813,9 +216924,31 @@
                   "code": "const { promise, resolve } = deferred<number>();\nsetTimeout(() => resolve(42), 0);\nawait promise; // 42"
                 }
               ]
+            },
+            {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
             }
           ],
-          "usageScore": 46,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "utils-promise--deferred"
         },
@@ -218057,6 +218190,28 @@
               ]
             },
             {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            },
+            {
               "id": "config-模块",
               "heading": "/config 模块",
               "blocks": [
@@ -218213,7 +218368,7 @@
               ]
             }
           ],
-          "usageScore": 130,
+          "usageScore": 134,
           "configuration": [],
           "fragment": "utils-promise--retry"
         },
@@ -218646,7 +218801,7 @@
           "name": "createManualScheduler",
           "kind": "function",
           "signature": "export declare function createManualScheduler(): IManualScheduler;",
-          "declarationLine": 48,
+          "declarationLine": 60,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Creates a deterministic scheduler over a virtual clock that starts at `0`. Due callbacks run in ascending due time and, for equal due times, registration order; callbacks scheduled during an `advance()` that fall due within it run in the same `advance()`. Arguments are validated and overflow is rejected before any state changes; nested `advance()` calls are rejected so `now()` never moves backwards.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createManualScheduler.",
@@ -218660,7 +218815,8 @@
             "const scheduler = createManualScheduler();\nconst task = scheduler.schedule(() => console.log('fired'), 100);\nscheduler.advance(50); // 未触发\nscheduler.advance(50); // 触发，打印 'fired'",
             "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(initial, { debug: CONFIG_DELETE });\nconst publicConfig = readonlyConfig(next);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return publicConfig.endpoint;\n      },\n      { maxAttempts: publicConfig.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\n\nscheduler.advance(100);\nawait request.catch(() => undefined);",
             "const scheduler = createManualScheduler();\nconst p = withTimeout(op, { timeoutMs: 100, scheduler });\nscheduler.advance(100); // 手动触发超时，无需真实等待",
-            "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);"
+            "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);",
+            "import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'\n\nconst clock = createManualScheduler()\nlet delivered = false\ndeferTask(clock, () => { delivered = true })\nconsole.log(delivered) // false\nclock.advance(0)\nconsole.log(delivered) // true"
           ],
           "members": [],
           "exportPath": "./scheduler",
@@ -218741,15 +218897,127 @@
               ]
             }
           ],
-          "usageScore": 60,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "utils-scheduler--createManualScheduler"
+        },
+        {
+          "name": "deferTask",
+          "kind": "function",
+          "signature": "export declare function deferTask(scheduler: IScheduler, callback: () => void): void;",
+          "declarationLine": 45,
+          "source": "packages/utils/dist/scheduler.d.ts",
+          "purpose": "Register one deferred job through its scheduler receiver. Older two-method schedulers use schedule(callback, 0); default System jobs retain native microtask order. This does not await callback results or create a cancellation owner. Registration failures propagate by identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for deferTask.",
+          "advanced": "No additional advanced behavior is declared for deferTask.",
+          "parameters": ["scheduler: IScheduler", "callback: () => void"],
+          "parameterDetails": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false
+            },
+            {
+              "name": "callback",
+              "type": "() => void",
+              "optional": false
+            }
+          ],
+          "returns": "void",
+          "errors": ["No documented errors are declared for deferTask."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for deferTask.",
+          "examples": [
+            "import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'\n\nconst clock = createManualScheduler()\nlet delivered = false\ndeferTask(clock, () => { delivered = true })\nconsole.log(delivered) // false\nclock.advance(0)\nconsole.log(delivered) // true"
+          ],
+          "members": [],
+          "exportPath": "./scheduler",
+          "overloadSignatures": [
+            "export declare function deferTask(scheduler: IScheduler, callback: () => void): void;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "scheduler",
+                "type": "IScheduler",
+                "optional": false
+              },
+              {
+                "name": "callback",
+                "type": "() => void",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["void"],
+          "whenToUse": "Use deferTask when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when deferTask does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Register one deferred job through its scheduler receiver. Older two-method schedulers use schedule(callback, 0); default System jobs retain native microtask order. This does not await callback results or create a cancellation owner. Registration failures propagate by identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import deferTask from @migaia/utils/scheduler, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use deferTask when its function contract and declared inputs match the result you need. Choose a different public symbol when deferTask does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for deferTask."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for deferTask."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/scheduler.d.ts:deferTask:export declare function deferTask(scheduler: IScheduler, callback: () => void): void;",
+          "guidance": [
+            {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            }
+          ],
+          "usageScore": 28,
+          "configuration": [],
+          "fragment": "utils-scheduler--deferTask"
         },
         {
           "name": "IManualScheduler",
           "kind": "type",
           "signature": "export type IManualScheduler = IScheduler & {\n  advance(ms: number): void;\n  readonly pendingCount: number;\n};",
-          "declarationLine": 23,
+          "declarationLine": 29,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Deterministic scheduler for tests and simulations. `advance(ms)` moves virtual time forward and synchronously flushes due callbacks; `pendingCount` counts tasks neither run nor cancelled.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IManualScheduler.",
@@ -218879,7 +219147,7 @@
         {
           "name": "IScheduler",
           "kind": "type",
-          "signature": "export type IScheduler = {\n  now(): number;\n  schedule(callback: () => void, delayMs: number): IScheduledTask;\n};",
+          "signature": "export type IScheduler = {\n  now(): number;\n  schedule(callback: () => void, delayMs: number): IScheduledTask;\n  /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(\n    callback: () => void,\n  ): void;\n};",
           "declarationLine": 15,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "The only scheduler contract. `now()` is monotonic non-decreasing milliseconds (two reads may be equal) and is only meaningful as a difference. `schedule()` accepts a finite non-negative `delayMs`, runs the callback at most once, and never runs it synchronously inside `schedule()`.",
@@ -218900,7 +219168,7 @@
           "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
-            "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };"
+            "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(callback: () => void): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -218939,9 +219207,32 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/utils/dist/scheduler.d.ts:IScheduler:export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };",
-          "guidance": [],
-          "usageScore": 72,
+          "identity": "packages/utils/dist/scheduler.d.ts:IScheduler:export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(callback: () => void): void; };",
+          "guidance": [
+            {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            }
+          ],
+          "usageScore": 76,
           "configuration": [],
           "fragment": "utils-scheduler--IScheduler"
         },
@@ -218949,7 +219240,7 @@
           "name": "IWallClock",
           "kind": "type",
           "signature": "export type IWallClock = { timestamp(): number };",
-          "declarationLine": 31,
+          "declarationLine": 37,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Wall clock for diagnostic timestamps only. `timestamp()` returns epoch milliseconds as a safe integer and must never take part in deadline, expiry, or replay-window comparisons.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWallClock.",
@@ -219013,7 +219304,7 @@
           "name": "systemScheduler",
           "kind": "const",
           "signature": "export declare const systemScheduler: IScheduler;",
-          "declarationLine": 40,
+          "declarationLine": 52,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Default scheduler: `performance.now()` as the monotonic clock and host `setTimeout` / `clearTimeout` for timers. Host capabilities are checked lazily on each call and a missing or non-finite capability fails with `ENV_UNSUPPORTED` instead of silently degrading. The object is deliberately a plain mutable object so tests can spy on its methods.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for systemScheduler.",
@@ -219070,8 +219361,31 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/scheduler.d.ts:systemScheduler:export declare const systemScheduler: IScheduler;",
-          "guidance": [],
-          "usageScore": 38,
+          "guidance": [
+            {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            }
+          ],
+          "usageScore": 44,
           "configuration": [],
           "fragment": "utils-scheduler--systemScheduler"
         },
@@ -219079,7 +219393,7 @@
           "name": "systemWallClock",
           "kind": "const",
           "signature": "export declare const systemWallClock: IWallClock;",
-          "declarationLine": 50,
+          "declarationLine": 62,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Default wall clock: `Date.now()` epoch milliseconds, for diagnostic timestamps only.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for systemWallClock.",
