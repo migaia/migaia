@@ -21,7 +21,8 @@ import {
   observeAbortSubscription,
   type IObservedAbortSubscription
 } from './observed-subscription.js'
-import { DisposeTransactionKind } from './state-constants.js'
+import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
+import type { ILifecycleState } from './types.js'
 
 type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
 
@@ -596,5 +597,202 @@ export function createDisposeTransaction(
         )
       }
     }
+  }
+}
+
+/**
+ * Current cleanup errors plus an optional continuation containing only later errors. Adapters
+ * retain domain state and success flags; lifecycle owns this common physical-completion boundary.
+ */
+export type ICleanupResult<TError = unknown> = Readonly<{
+  readonly cleanupErrors: readonly TError[]
+  readonly physicalCompletion?: Promise<ICleanupResult<TError>>
+}>
+
+/** Sync-start adapters always receive the stable terminal continuation, including empty plans. */
+export type ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> &
+  Readonly<{
+    readonly physicalCompletion: Promise<ICleanupResult<ICollectedError>>
+  }>
+
+/**
+ * Observes every input and its incremental physical continuations. PromiseLike assimilation also
+ * accepts foreign-realm promises. Source rejections are retained as raw errors, and one failure
+ * never discards another input. The returned frozen result has no outstanding continuation.
+ */
+export async function mergeCleanupResults(
+  values: readonly (ICleanupResult | PromiseLike<ICleanupResult>)[]
+): Promise<ICleanupResult> {
+  if (!Array.isArray(values))
+    throw createLifecycleTypeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.cleanupResultInvalid
+    )
+  /** Each branch owns its error order; Promise.all preserves the caller's branch order. */
+  const groups = await Promise.all(
+    values.map(async (initial) => {
+      /** Errors already seen in this branch precede errors from its physical continuation. */
+      const observed: unknown[] = []
+      /** Canonical owners produce an acyclic sequence ending at a result without a continuation. */
+      let next: ICleanupResult | PromiseLike<ICleanupResult> | undefined = initial
+      try {
+        while (next !== undefined) {
+          /** Await reads the PromiseLike protocol once and preserves rejection identity. */
+          const result: ICleanupResult = await next
+          /** Capture the error array once before waiting for any later work. */
+          const errors = result?.cleanupErrors
+          if (!Array.isArray(errors))
+            throw createLifecycleTypeError(
+              LifecycleErrorCode.invalidOption,
+              LifecycleErrorText.cleanupResultInvalid
+            )
+          observed.push(...errors)
+          next = result.physicalCompletion
+        }
+      } catch (error) {
+        observed.push(error)
+      }
+      return observed
+    })
+  )
+  return Object.freeze({ cleanupErrors: Object.freeze(groups.flat()) })
+}
+
+/**
+ * Lifecycle-owned ledger that starts every callback synchronously, then observes all async
+ * settlements until a sealed plan reaches terminal. Domain adapters own ordering and error
+ * projection; this primitive owns only admission, pending, and raw error observation.
+ */
+export type ISyncStartedDisposalLedger = {
+  readonly lifecycle: ILifecycleState
+  readonly pending: number
+  start(source: string, callback: () => unknown): void
+  seal(): ISyncStartedDisposalOutcome
+  whenTerminal(): Promise<void>
+}
+
+/** Creates one sync-start, async-completion disposal ledger. */
+export function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger {
+  let lifecycle: ILifecycleState = LifecycleState.open
+  let pending = 0
+  let activeItem = false
+  let outcome: ISyncStartedDisposalOutcome | undefined
+  let resolveCompletion: ((result: ICleanupResult<ICollectedError>) => void) | undefined
+  const errors: ICollectedError[] = []
+  /** Errors already included in the immutable seal snapshot are excluded from later results. */
+  let sealedErrorCount = 0
+  const completion = new Promise<ICleanupResult<ICollectedError>>((resolve) => {
+    resolveCompletion = resolve
+  })
+  void completion.catch(() => undefined)
+
+  /** Settles the raw completion exactly once after seal and every thenable have settled. */
+  const finishIfReady = (): void => {
+    if (lifecycle !== LifecycleState.closing || pending !== 0) return
+    lifecycle = LifecycleState.terminal
+    const snapshot = Object.freeze(errors.slice(sealedErrorCount))
+    resolveCompletion?.(Object.freeze({ cleanupErrors: snapshot }))
+    resolveCompletion = undefined
+  }
+
+  /** Records one callback failure, preserving source and settlement observation order. */
+  const record = (source: string, error: unknown): void => {
+    const item = Object.freeze({ source, error })
+    errors.push(item)
+  }
+
+  /** Throws the appropriate lifecycle boundary error before a new operation can mutate state. */
+  const assertOpen = (): void => {
+    if (activeItem) {
+      throw createLifecycleError(
+        LifecycleErrorCode.scopeReentrantOwn,
+        LifecycleErrorText.disposalLedgerReentrant
+      )
+    }
+    if (lifecycle !== LifecycleState.open) {
+      throw createLifecycleError(
+        LifecycleErrorCode.scopeClosed,
+        LifecycleErrorText.disposalLedgerClosed
+      )
+    }
+  }
+
+  /** Starts one callback on the caller's current stack and observes thenable completion once. */
+  const start = (source: string, callback: () => unknown): void => {
+    if (typeof source !== 'string' || typeof callback !== 'function') {
+      throw createLifecycleError(
+        LifecycleErrorCode.invalidOption,
+        LifecycleErrorText.disposeDescriptorInvalid
+      )
+    }
+    assertOpen()
+    activeItem = true
+    let result: unknown
+    try {
+      try {
+        result = callback()
+      } catch (error) {
+        record(source, error)
+        return
+      }
+      const probe = probeThenable(result)
+      if (probe.kind === 'failed') {
+        record(source, probe.error)
+        return
+      }
+      if (probe.kind === 'not-thenable') return
+      const promise = assimilateCapturedThen<void>(probe.thenFn, result)
+      pending++
+      void promise.then(
+        () => {
+          pending--
+          finishIfReady()
+        },
+        (error) => {
+          record(source, error)
+          pending--
+          finishIfReady()
+        }
+      )
+    } finally {
+      activeItem = false
+    }
+  }
+
+  /** Seals admission and returns one immutable outcome object for all repeated callers. */
+  const seal = (): ISyncStartedDisposalOutcome => {
+    if (activeItem) {
+      throw createLifecycleError(
+        LifecycleErrorCode.scopeReentrantOwn,
+        LifecycleErrorText.disposalLedgerReentrant
+      )
+    }
+    if (outcome) return outcome
+    if (lifecycle !== LifecycleState.open) {
+      throw createLifecycleError(
+        LifecycleErrorCode.scopeClosed,
+        LifecycleErrorText.disposalLedgerClosed
+      )
+    }
+    lifecycle = LifecycleState.closing
+    sealedErrorCount = errors.length
+    outcome = Object.freeze({
+      cleanupErrors: Object.freeze([...errors]),
+      physicalCompletion: completion
+    })
+    finishIfReady()
+    return outcome
+  }
+
+  return {
+    get lifecycle() {
+      return lifecycle
+    },
+    get pending() {
+      return pending
+    },
+    start,
+    seal,
+    whenTerminal: () => completion.then(() => undefined)
   }
 }

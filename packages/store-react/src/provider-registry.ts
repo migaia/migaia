@@ -9,6 +9,9 @@ import { claimOwnership, ownerOf } from '@migaia/reactive/extension'
 import {
   containAsyncRejection,
   createSyncStartedDisposalLedger,
+  mergeCleanupResults,
+  type ICollectedError,
+  type ISyncStartedDisposalOutcome,
   type ISyncStartedDisposalLedger,
   LifecycleState,
   type ILifecycleState
@@ -269,7 +272,7 @@ export class StoreRegistry implements IDisposable {
     this.#disposalLedger.start('atom-store', () => this.atomStore.dispose())
     const outcome = this.#disposalLedger.seal()
     this.#observeAsyncDisposalErrors(outcome)
-    this.#throwSynchronousDisposalErrors(outcome.synchronousErrors)
+    this.#throwSynchronousDisposalErrors(outcome.cleanupErrors)
   }
 
   /**
@@ -288,7 +291,9 @@ export class StoreRegistry implements IDisposable {
       }
     }
     const outcome = this.#disposalLedger.seal()
-    const completion = outcome.completion.then((errors) => {
+    const completion = mergeCleanupResults([outcome]).then(({ cleanupErrors }) => {
+      /** This private ledger never rejects and only produces source-labelled ICollectedErrors. */
+      const errors = cleanupErrors as readonly ICollectedError[]
       if (errors.length === 0) return
       throw this.#mapDisposalErrors(errors)
     })
@@ -297,13 +302,10 @@ export class StoreRegistry implements IDisposable {
   }
 
   /** Reports asynchronous raw errors once, after ledger completion, without altering their identity. */
-  #observeAsyncDisposalErrors(outcome: {
-    readonly synchronousErrors: readonly unknown[]
-    readonly completion: Promise<readonly unknown[]>
-  }): void {
-    void outcome.completion.then((errors) => {
-      for (const entry of errors.slice(outcome.synchronousErrors.length)) {
-        reportRegistryFailure(this.runtime, (entry as { readonly error: unknown }).error)
+  #observeAsyncDisposalErrors(outcome: ISyncStartedDisposalOutcome): void {
+    void outcome.physicalCompletion.then(({ cleanupErrors }) => {
+      for (const entry of cleanupErrors) {
+        reportRegistryFailure(this.runtime, entry.error)
       }
     })
   }

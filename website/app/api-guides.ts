@@ -27803,11 +27803,59 @@ console.log(await waiting) // false`,
       options: []
     }
   },
+  'lifecycle:disposal:mergeCleanupResults': {
+    zh: {
+      purpose:
+        '把多个清理结果及其 physicalCompletion 合并为一个冻结结果。当前错误先于迟到增量，每个分支的失败都保留原身份；外部 realm 的 Promise 与 thenable 不会被跳过。',
+      quickStart: `import { mergeCleanupResults } from '@migaia/lifecycle/disposal'
+
+const flushFailure = new Error('cache flush failed')
+const closeFailure = new Error('socket close failed')
+const result = await mergeCleanupResults([{
+  cleanupErrors: [flushFailure],
+  physicalCompletion: Promise.resolve({ cleanupErrors: [closeFailure] })
+}, Promise.resolve({ cleanupErrors: [] })])
+console.log(result.cleanupErrors) // [flushFailure, closeFailure]，原始身份不变
+`,
+      scenarios: [
+        '宿主已逻辑关闭，但多个资源还会异步产生迟到清理结果。',
+        '组合多个包的 cleanup result，统一观察每个分支及其物理完成链。'
+      ],
+      avoidWhen: [
+        '尚未启动资源释放；先由 scope、transaction 或领域 owner 执行释放。',
+        '只想结束有限等待；这个 helper 等待真实完成，不制造超时或取消。'
+      ],
+      options: []
+    },
+    en: {
+      purpose:
+        'Merges cleanup snapshots and their incremental physicalCompletion results into one frozen result. It preserves branch order and original error identities, including rejected, foreign-realm and PromiseLike inputs.',
+      quickStart: `import { mergeCleanupResults } from '@migaia/lifecycle/disposal'
+
+const flushFailure = new Error('cache flush failed')
+const closeFailure = new Error('socket close failed')
+const result = await mergeCleanupResults([{
+  cleanupErrors: [flushFailure],
+  physicalCompletion: Promise.resolve({ cleanupErrors: [closeFailure] })
+}, Promise.resolve({ cleanupErrors: [] })])
+console.log(result.cleanupErrors) // [flushFailure, closeFailure], with original identities
+`,
+      scenarios: [
+        'A host has logically closed while several resources still have later cleanup results.',
+        'A composition owner needs one observation of multiple packages and physical continuations.'
+      ],
+      avoidWhen: [
+        'Resource release has not started; let its scope, transaction or domain owner release it first.',
+        'Only a bounded wait is wanted; this helper awaits real completion and creates no timeout or cancellation.'
+      ],
+      options: []
+    }
+  },
   'lifecycle:disposal:createSyncStartedDisposalLedger': {
     zh: {
       purpose:
-        '为“同步启动、异步完成”的 dispose API 建立唯一账本。start() 在当前调用栈执行 callback，seal() 关闭接纳并返回同步错误快照与稳定 completion；全部 thenable settle 后才进入 terminal。',
-      quickStart: `import { createSyncStartedDisposalLedger } from '@migaia/lifecycle'\n\nconst socket = { close: async () => console.log('socket closed') }\nconst cache = { flush: async () => console.log('cache flushed') }\nconst handleSyncErrors = (errors: readonly unknown[]) => console.error('sync disposal errors:', errors)\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.synchronousErrors)\nconst allErrors = await outcome.completion\nconsole.log('async disposal errors:', allErrors)`,
+        '为“同步启动、异步完成”的 dispose API 建立唯一账本。start() 在当前调用栈执行 callback，seal() 关闭接纳并返回当前错误快照与稳定 physicalCompletion（仅含之后新增错误）；全部 thenable settle 后才进入 terminal。',
+      quickStart: `import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle'\n\nconst socket = { close: async () => console.log('socket closed') }\nconst cache = { flush: async () => console.log('cache flushed') }\nconst handleSyncErrors = (errors: readonly unknown[]) => console.error('sync disposal errors:', errors)\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.cleanupErrors)\nconst { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])\nconsole.log('async disposal errors:', allErrors)`,
       scenarios: [
         '公开 dispose() 必须同步返回，但它启动的异步清理仍需要可等待 completion。',
         '领域适配器自行决定顺序与错误投影，只需要 lifecycle 管 pending 和原始错误观察。'
@@ -27820,8 +27868,8 @@ console.log(await waiting) // false`,
     },
     en: {
       purpose:
-        'Provides one ledger for disposal that starts synchronously and completes asynchronously. start() invokes callbacks in the current stack, seal() closes admission and returns a synchronous-error snapshot plus stable completion, and terminal waits for every thenable settlement.',
-      quickStart: `import { createSyncStartedDisposalLedger } from '@migaia/lifecycle'\n\nconst socket = { close: async () => console.log('socket closed') }\nconst cache = { flush: async () => console.log('cache flushed') }\nconst handleSyncErrors = (errors: readonly unknown[]) => console.error('sync disposal errors:', errors)\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.synchronousErrors)\nconst allErrors = await outcome.completion\nconsole.log('async disposal errors:', allErrors)`,
+        'Provides one ledger for disposal that starts synchronously and completes asynchronously. start() invokes callbacks in the current stack, seal() closes admission and returns the current error snapshot plus stable physicalCompletion containing only later errors, and terminal waits for every thenable settlement.',
+      quickStart: `import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle'\n\nconst socket = { close: async () => console.log('socket closed') }\nconst cache = { flush: async () => console.log('cache flushed') }\nconst handleSyncErrors = (errors: readonly unknown[]) => console.error('sync disposal errors:', errors)\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.cleanupErrors)\nconst { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])\nconsole.log('async disposal errors:', allErrors)`,
       scenarios: [
         'A public dispose() must return synchronously while asynchronous cleanup still needs awaitable completion.',
         'A domain adapter owns ordering and error projection but needs lifecycle-owned pending and raw error observation.'

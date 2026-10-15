@@ -26,9 +26,11 @@ export { createAbortController, type IAbortController } from './abort.js'
 
 export {
   createSyncStartedDisposalLedger,
+  mergeCleanupResults,
+  type ICleanupResult,
   type ISyncStartedDisposalLedger,
   type ISyncStartedDisposalOutcome
-} from './sync-started-disposal-ledger.js'
+} from './dispose-transaction.js'
 
 export { LifecycleErrorCode, type ILifecycleErrorCode } from './error-code.js'
 export { LifecycleErrorText, type ILifecycleErrorText } from './error-text.js'

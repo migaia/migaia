@@ -12,6 +12,7 @@ import type {
 } from '@migaia/plugin-host'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import type { IEventContext } from '@migaia/event-subscriber'
+import type { ICleanupResult } from '@migaia/lifecycle'
 
 /** Constructor-installed plugins remain part of every exact and dynamic Tray view. */
 export type IHostBaselinePlugins<THost extends PluginHost<any, any, any>> =
@@ -233,19 +234,16 @@ export type ITrayHostEventMap = {
 export type IUnsubscribe = () => void
 
 /** Cleanup observation returned by managed mutations. */
-export type ITrayPluginPhysicalCleanupResult = Readonly<{
-  readonly cleanupErrors: readonly unknown[]
-}>
-export type ITrayPluginMutationObservation<TView> = Readonly<{
-  readonly operation: 'use' | 'replace'
-  readonly name: string
-  readonly affected: readonly string[]
-  readonly topologyChanged: boolean
-  readonly view: TView
-  readonly cleanupComplete: boolean
-  readonly cleanupErrors: readonly unknown[]
-  readonly physicalCompletion?: Promise<ITrayPluginPhysicalCleanupResult>
-}>
+export type ITrayPluginPhysicalCleanupResult = ICleanupResult
+export type ITrayPluginMutationObservation<TView> = ICleanupResult &
+  Readonly<{
+    readonly operation: 'use' | 'replace'
+    readonly name: string
+    readonly affected: readonly string[]
+    readonly topologyChanged: boolean
+    readonly view: TView
+    readonly cleanupComplete: boolean
+  }>
 export type ITrayPluginMutationResult<TPreviousView, TSuccessView, TCommittedFailureView> =
   | (ITrayPluginMutationObservation<TSuccessView> &
       Readonly<{ readonly ok: true; readonly committed: true }>)
@@ -253,14 +251,13 @@ export type ITrayPluginMutationResult<TPreviousView, TSuccessView, TCommittedFai
       Readonly<{ readonly ok: false; readonly committed: false; readonly error: Error }>)
   | (ITrayPluginMutationObservation<TCommittedFailureView> &
       Readonly<{ readonly ok: false; readonly committed: true; readonly error: Error }>)
-export type ITrayPluginRemovalObservation<TView> = Readonly<{
-  readonly name: string
-  readonly affected: readonly string[]
-  readonly view: TView
-  readonly cleanupComplete: boolean
-  readonly cleanupErrors: readonly unknown[]
-  readonly physicalCompletion?: Promise<ITrayPluginPhysicalCleanupResult>
-}>
+export type ITrayPluginRemovalObservation<TView> = ICleanupResult &
+  Readonly<{
+    readonly name: string
+    readonly affected: readonly string[]
+    readonly view: TView
+    readonly cleanupComplete: boolean
+  }>
 export type ITrayPluginRemovalResult<TPreviousView, TCommittedView> =
   | (ITrayPluginRemovalObservation<TPreviousView> &
       Readonly<{ readonly ok: true; readonly committed: false; readonly removed: false }>)
@@ -389,21 +386,19 @@ export type ITrayResolvedHost<
     ? ITrayHost<THost, TDefinitions>
     : ITrayHostDynamic<THost>
 
-export type ITrayHostDisposalResult = Readonly<{
-  readonly state: 'terminal'
-  readonly termination: 'managed' | 'external-host'
-  readonly cleanupComplete: boolean
-  readonly cleanupErrors: readonly unknown[]
-  readonly physicalCompletion?: Promise<ITrayPluginPhysicalCleanupResult>
-  readonly error?: Error
-}>
+export type ITrayHostDisposalResult = ICleanupResult &
+  Readonly<{
+    readonly state: 'terminal'
+    readonly termination: 'managed' | 'external-host'
+    readonly cleanupComplete: boolean
+    readonly error?: Error
+  }>
 
-export type ITrayHostCreationFailureDetail = Readonly<{
-  readonly phase: 'factory' | 'admission' | 'graph' | 'setup' | 'commit'
-  readonly cleanupComplete: boolean
-  readonly cleanupErrors: readonly unknown[]
-  readonly physicalCompletion?: Promise<ITrayPluginPhysicalCleanupResult>
-}>
+export type ITrayHostCreationFailureDetail = ICleanupResult &
+  Readonly<{
+    readonly phase: 'factory' | 'admission' | 'graph' | 'setup' | 'commit'
+    readonly cleanupComplete: boolean
+  }>
 export type ITrayHostCreationError = Error &
   Readonly<{ readonly detail: ITrayHostCreationFailureDetail }>
 

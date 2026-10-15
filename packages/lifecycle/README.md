@@ -160,21 +160,21 @@ const failures = await transaction.run([
 **`createSyncStartedDisposalLedger`｜10 秒上手** —— 为同步 `dispose()` 启动的异步 disposer 提供唯一 pending/error/completion 账本：
 
 ```ts
-import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'
+import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
 
 const ledger = createSyncStartedDisposalLedger()
 ledger.start('socket', () => socket.close()) // callback 在当前 stack 立即执行
 ledger.start('cache', () => cache.flush())
 
 const outcome = ledger.seal() // open → closing；之后不再接受 start()
-if (outcome.synchronousErrors.length > 0) {
+if (outcome.cleanupErrors.length > 0) {
   // 领域层决定 throw、report、firstError 或 AggregateError 投影。
 }
-const allErrors = await outcome.completion // 永远 resolve raw error ledger，不因 item failure reject
+const { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])
 await ledger.whenTerminal()
 ```
 
-Ledger 不决定 disposer 顺序、不拥有领域资源、也不制造领域错误。`start()` 捕获 callback 同步失败与 hostile then getter；thenable 只读一次并保持 receiver。`seal()`/`completion` identity 稳定；pending 全部 settle 后才进入 `terminal`。永不 settle 的合法 thenable 会让 ledger 保持 `closing`，本原语不自造 timeout 或 cancellation。
+Ledger 不决定 disposer 顺序、不拥有领域资源、也不制造领域错误。`start()` 捕获 callback 同步失败与 hostile then getter；thenable 只读一次并保持 receiver。`seal()`/`physicalCompletion` identity 稳定；pending 全部 settle 后才进入 `terminal`。永不 settle 的合法 thenable 会让 ledger 保持 `closing`，本原语不自造 timeout 或 cancellation。
 
 ---
 
@@ -380,7 +380,7 @@ import { snapshotScheduler } from '@migaia/lifecycle/scheduler'
 import { createPendingTracker } from '@migaia/lifecycle/quiescence'
 import { createLifecycleScope } from '@migaia/lifecycle/scope'
 import { createGenerationController } from '@migaia/lifecycle/generation'
-import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'
+import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
 import { probeThenable } from '@migaia/utils/function'
 ```
 

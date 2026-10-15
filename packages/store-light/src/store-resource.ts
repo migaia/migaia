@@ -383,13 +383,12 @@ export function createStoreResource<T>(
     const physicalLedger = createSyncStartedDisposalLedger()
     cleanupUnique(values, physicalLedger)
     const physicalOutcome = physicalLedger.seal()
-    physicalTerminal = physicalOutcome.completion.then((errors) => {
-      for (const item of errors) {
-        if (physicalOutcome.synchronousErrors.some((sync) => sync.error === item.error)) continue
+    physicalTerminal = physicalOutcome.physicalCompletion.then(({ cleanupErrors }) => {
+      for (const item of cleanupErrors) {
         report(item.error, 'dispose')
       }
     })
-    for (const item of physicalOutcome.synchronousErrors) report(item.error, 'dispose')
+    for (const item of physicalOutcome.cleanupErrors) report(item.error, 'dispose')
     versionTokens.clear()
     try {
       config.onTerminal?.()

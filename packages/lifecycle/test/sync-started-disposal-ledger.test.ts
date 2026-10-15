@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { runInNewContext } from 'node:vm'
 import {
   createSyncStartedDisposalLedger,
+  mergeCleanupResults,
+  type ICleanupResult,
   LifecycleState,
   type IAbortController
 } from '../src/index.js'
@@ -24,10 +27,10 @@ describe('sync-started disposal ledger', () => {
     })
     expect(order).toEqual(['first', 'second'])
     const outcome = ledger.seal()
-    expect(outcome.synchronousErrors).toEqual([])
+    expect(outcome.cleanupErrors).toEqual([])
     expect(ledger.lifecycle).toBe(LifecycleState.closing)
     resolve?.()
-    await expect(outcome.completion).resolves.toEqual([])
+    await expect(outcome.physicalCompletion).resolves.toEqual({ cleanupErrors: [] })
     expect(ledger.lifecycle).toBe(LifecycleState.terminal)
   })
 
@@ -40,12 +43,17 @@ describe('sync-started disposal ledger', () => {
     })
     ledger.start('async', () => Promise.reject(second))
     const outcome = ledger.seal()
-    expect(outcome.synchronousErrors).toHaveLength(1)
-    expect(outcome.synchronousErrors[0]?.error).toBe(first)
-    await expect(outcome.completion).resolves.toEqual([
-      { source: 'sync', error: first },
-      { source: 'async', error: second }
-    ])
+    expect(outcome.cleanupErrors).toHaveLength(1)
+    expect(outcome.cleanupErrors[0]?.error).toBe(first)
+    await expect(outcome.physicalCompletion).resolves.toEqual({
+      cleanupErrors: [{ source: 'async', error: second }]
+    })
+    await expect(mergeCleanupResults([outcome])).resolves.toEqual({
+      cleanupErrors: [
+        { source: 'sync', error: first },
+        { source: 'async', error: second }
+      ]
+    })
     expect(ledger.seal()).toBe(outcome)
   })
 
@@ -67,7 +75,7 @@ describe('sync-started disposal ledger', () => {
     }
     ledger.start('thenable', () => thenable)
     const outcome = ledger.seal()
-    await expect(outcome.completion).resolves.toEqual([])
+    await expect(outcome.physicalCompletion).resolves.toEqual({ cleanupErrors: [] })
     expect(reads).toBe(1)
     expect(receiver).toBe(thenable)
   })
@@ -84,7 +92,41 @@ describe('sync-started disposal ledger', () => {
     })
     expect(reentrant).toMatchObject({ code: 'SCOPE_REENTRANT_OWN' })
     const outcome = ledger.seal()
-    expect(outcome.synchronousErrors).toEqual([])
+    expect(outcome.cleanupErrors).toEqual([])
+  })
+
+  it('PCC-T1 merges foreign promises, captured thenables and rejected branches without losing errors', async () => {
+    /** Keep exact error identities across realm and physical continuation boundaries. */
+    const first = new Error('foreign logical')
+    const late = new Error('foreign physical')
+    const rejected = new Error('rejected branch')
+    const last = new Error('thenable')
+    const foreign = runInNewContext(
+      'Promise.resolve({ cleanupErrors: [first], physicalCompletion: Promise.resolve({ cleanupErrors: [late] }) })',
+      { first, late }
+    ) as Promise<ICleanupResult>
+    /** PromiseLike getters are captured by await exactly once, retaining the source receiver. */
+    let reads = 0
+    let receiver: unknown
+    const thenable = {
+      // oxlint-disable-next-line unicorn/no-thenable
+      get then() {
+        reads += 1
+        return function (this: unknown, resolve: (result: ICleanupResult) => void) {
+          // oxlint-disable-next-line typescript/no-this-alias
+          receiver = this
+          resolve({ cleanupErrors: [last] })
+        }
+      }
+    } as unknown as PromiseLike<ICleanupResult>
+    const merged = await mergeCleanupResults([foreign, Promise.reject(rejected), thenable])
+    expect(merged.cleanupErrors).toEqual([first, late, rejected, last])
+    expect(merged.cleanupErrors[0]).toBe(first)
+    expect(merged.cleanupErrors[1]).toBe(late)
+    expect(reads).toBe(1)
+    expect(receiver).toBe(thenable)
+    expect(Object.isFrozen(merged)).toBe(true)
+    expect(Object.isFrozen(merged.cleanupErrors)).toBe(true)
   })
 })
 

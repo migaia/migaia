@@ -262,6 +262,26 @@ const failures = await transaction.run([
 - descriptor 校验（`order`/`custom`/`graceful`/`gracefulTimeoutMs`/`force` 的类型与访问）逐项独立进行——一个 item 的非法 descriptor（贴 `INVALID_OPTION` 码）不阻断其余 item 的释放，会作为该 item 的失败计入错误策略。
 - `errorPolicy` 语义同 `createErrorCollector`；`throw` 策略下单错原样抛出，多错聚合为携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`。
 
+### `mergeCleanupResults`
+
+`mergeCleanupResults(values)` 接受 cleanup result 或其 PromiseLike 数组，等待每个结果的 `physicalCompletion` 链，返回冻结的 `{ cleanupErrors }`。错误按输入顺序及各输入的当前/迟到顺序归并；源 Promise 拒绝也保留为原错误，不会丢弃其它分支。不使用 realm-local `instanceof Promise`，跨 realm Promise 与 thenable 都可用。
+
+`ICleanupResult<TError>` 是 lifecycle、PluginHost 与 Tray 的共同边界：当前 `cleanupErrors` 与后续 `physicalCompletion` **不重复包含同一轮错误**。领域的 logical terminal、ok、cleanupComplete 等标志仍归各调用方。不要把全量错误列表放进 physical continuation，否则会重复计数。
+
+```ts
+import { mergeCleanupResults } from '@migaia/lifecycle/disposal'
+
+const first = new Error('flush')
+const late = new Error('socket close')
+const result = await mergeCleanupResults([{
+  cleanupErrors: [first],
+  physicalCompletion: Promise.resolve({ cleanupErrors: [late] })
+}])
+// result.cleanupErrors === [first, late]，两个 error 身份不变。
+```
+
+`mergeCleanupResults` observes current cleanup snapshots and their later physical continuations. Each continuation contains only newly observed errors. It accepts PromiseLike values across realms, retains original rejection identities, and merges branches in input order without discarding successful or failed siblings. Domain state stays with its owner.
+
 ### `createSyncStartedDisposalLedger`
 
 ```ts
@@ -275,16 +295,20 @@ type ISyncStartedDisposalLedger = {
   whenTerminal(): Promise<void>
 }
 
-type ISyncStartedDisposalOutcome = Readonly<{
-  synchronousErrors: readonly ICollectedError[]
-  completion: Promise<readonly ICollectedError[]>
+type ICleanupResult<TError = unknown> = Readonly<{
+  cleanupErrors: readonly TError[]
+  physicalCompletion?: Promise<ICleanupResult<TError>>
+}>
+
+type ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{
+  physicalCompletion: Promise<ICleanupResult<ICollectedError>>
 }>
 ```
 
 用于“同步启动全部 disposer，但异步统一等待”的领域容器。Ledger 是 pending、raw error 与 terminal 的唯一事实源；调用方仍负责生成顺序计划、清空领域 registry，以及把 raw errors 投影成自己的 throw/report/aggregate 契约。
 
 ```ts
-import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'
+import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
 
 const ledger = createSyncStartedDisposalLedger()
 
@@ -293,27 +317,27 @@ ledger.start('connection', () => connection.close())
 ledger.start('cache', () => cache.flush())
 
 const outcome = ledger.seal()
-if (outcome.synchronousErrors.length === 1) {
-  throw outcome.synchronousErrors[0].error
+if (outcome.cleanupErrors.length === 1) {
+  throw outcome.cleanupErrors[0].error
 }
 
-const finalErrors = await outcome.completion
-// completion 永远 resolve；领域层在这里决定是否 reject/aggregate/report。
+const { cleanupErrors: finalErrors } = await mergeCleanupResults([outcome])
+// 合并当前快照与迟到增量；领域层决定是否 throw/aggregate/report。
 ```
 
 状态和 identity：
 
 - 初始 `open`；`start()` 不改变 lifecycle。
-- 首次 `seal()` 同步进入 `closing`，冻结当时全部 synchronous errors，并返回唯一 outcome；重复 `seal()` 返回同一对象，`outcome.completion` 也保持同一 Promise。
+- 首次 `seal()` 同步进入 `closing`，冻结当时已经观察到的全部错误，并返回唯一 outcome；重复 `seal()` 返回同一对象，`outcome.physicalCompletion` 也保持同一 Promise。
 - 已 seal 且 `pending === 0` 时进入 `terminal`；否则最后一个 thenable settle 后进入 `terminal`。`whenTerminal()` 只表达 terminal 等待，不承诺 Promise 对象 identity。
 - 合法 thenable 永不 settle 时保持 `closing`；Ledger 不自造 timeout、abort、retry 或强制 terminal。
 
 Callback 与 thenable：
 
 - `start()` 先校验 `source` 为 string、`callback` 为 function；非法输入同步抛 `INVALID_OPTION`，且不调用 callback。
-- callback 同步 throw 或读取 `.then` getter throw：记录进 `synchronousErrors` 与最终 ledger；`start()` 不重抛 item failure，因此调用方仍能启动后续 item。
+- callback 同步 throw 或读取 `.then` getter throw：记录进 seal 时的 `cleanupErrors` 快照；`start()` 不重抛 item failure，因此调用方仍能启动后续 item。
 - thenable 的 `.then` 只读取一次，并以原 thenable 为 receiver 调用；resolve/reject first-settlement-wins。Rejection按 settlement observation order进入最终 ledger。
-- 每条错误是冻结的 `{ source, error }`；原始 `error` identity不被 Ledger替换。`completion` 因 item failure也不会 reject，避免 Ledger抢走领域错误政策。
+- 每条错误是冻结的 `{ source, error }`；原始 `error` identity不被 Ledger替换。`physicalCompletion` 因 item failure也不会 reject，避免 Ledger抢走领域错误政策。
 
 重入和关闭边界：
 
@@ -747,7 +771,7 @@ await terminal.whenTerminal()
 ```ts
 import { createAbortController } from '@migaia/lifecycle/abort'
 import { createPendingTracker } from '@migaia/lifecycle/quiescence'
-import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'
+import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
 ```
 
 Root 与 subpath 都re-export preserve-modules产物中的同一实现，同名runtime function/object保持 `===`；没有第二份module-scoped state。Package exports不开放 `dist/*` wildcard，内部文件不是公共API。
@@ -1096,7 +1120,7 @@ function withListeners() {
 `dispose()` 必须同步返回、但内部 disposer 可能返回 Promise 时，用 ledger 启动并统一观测；不要让每个 Registry 自造 pending/error 状态机：
 
 ```ts
-import { createSyncStartedDisposalLedger } from '@migaia/lifecycle'
+import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle'
 
 const ledger = createSyncStartedDisposalLedger()
 
@@ -1107,11 +1131,11 @@ function disposeRegistry(): void {
 }
 
 disposeRegistry()
-const { synchronousErrors, completion } = ledger.seal()
-const allErrors = await completion
+const outcome = ledger.seal()
+const { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])
 ```
 
-`synchronousErrors` 只含启动阶段立即失败；`completion` 归并同步与异步失败，并且永远 resolve raw errors，错误投影留给 Registry 的公开契约。
+`cleanupErrors` 是 seal 当时的错误快照；`physicalCompletion` 只返回之后新增的错误。`mergeCleanupResults([outcome])` 等待并归并两部分；原始错误投影留给 Registry 的公开契约。
 
 ### 7. 服务退出：停止接单，等待在途任务，再释放资源
 
@@ -1143,7 +1167,7 @@ async function shutdown() {
 
 - 构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`createLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`abortableDelay`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createGenerationController`、`createQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。
 - 常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。
-- 类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。
+- 类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ICleanupResult`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。
 
 Leaf entry 提供更小的按需边界；其中只有五项不在根入口：`@migaia/lifecycle/scheduler` 的 `addSchedulerTime`、`resolveScheduler`、`resolveSchedulerOption`，以及 `@migaia/lifecycle/errors` 的 `createLifecycleFailure`、`createLifecycleTypeError`。其余 leaf 符号都是根入口子集；完整入口映射见“按需导入与 tree-shaking”。
 
