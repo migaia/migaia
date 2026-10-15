@@ -2,6 +2,7 @@ import type { ICollectedError, IErrorPolicy } from './types.js'
 import { attachErrorIdentity, attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 import { assimilateCapturedThen, probeThenable, type IThenableProbe } from '@migaia/utils/function'
 import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
 export { assimilateCapturedThen, probeThenable }
 export type { IThenableProbe }
 
@@ -257,6 +258,25 @@ export function safeReport(report: ((error: unknown) => void) | undefined, error
   }
 }
 
+/**
+ * Rejects, at the creating factory, an error policy whose only observation channel is a reporter
+ * that was not supplied. `report` hands every failure to the reporter and `firstError` hands every
+ * failure after the first to it; without one those failures would vanish (X2=a, LC-B5). Throws an
+ * `INVALID_OPTION` TypeError carrying `detail.field = 'report'`.
+ */
+export function assertErrorPolicyReporter(
+  policy: IErrorPolicy,
+  report: ((error: unknown) => void) | undefined
+): void {
+  if (policy !== 'report' && policy !== 'firstError') return
+  if (typeof report === 'function') return
+  throw createLifecycleTypeError(
+    LifecycleErrorCode.invalidOption,
+    LifecycleErrorText.errorPolicyReporterMissing,
+    { detail: { field: 'report', errorPolicy: policy } }
+  )
+}
+
 /** Collects errors under one of the four policies (D-4) and produces the correct finalize behavior. */
 export type IErrorCollector = {
   readonly policy: IErrorPolicy
@@ -294,7 +314,7 @@ export function createErrorCollector(
           firstError = error
         } else {
           // L-T38：后续错误必须被观测，但不得改变「首错原样抛出」的结果。经 reporter 观测（与 `report`
-          // 策略同通道），绝不静默吞掉；无 reporter 时与 `report` 策略一致地降级为无观测通道。
+          // 策略同通道），绝不静默吞掉；reporter 由创建方经 `assertErrorPolicyReporter` 保证存在。
           invokeReport(error)
         }
         return
