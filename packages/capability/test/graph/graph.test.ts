@@ -34,6 +34,31 @@ const deferred = <T>() => {
 }
 
 describe('capability graph core', () => {
+  it('CAP-B6 rejects missing force at own admission and preserves the coded cause', async () => {
+    /** A valid sibling proves malformed ownership does not poison later cleanup. */
+    const released = vi.fn()
+    /** The public graph owns both descriptor admission and eventual release. */
+    const graph = createCapabilityGraph()
+    graph.register({
+      id: id('descriptor'),
+      kind: 'test',
+      dependencies: [],
+      start: (context) => {
+        expect(() => context.own({}, {} as never)).toThrowError(
+          expect.objectContaining({
+            code: CapabilityGraphErrorCode.invalidOption,
+            cause: expect.objectContaining({ code: 'INVALID_OPTION' })
+          })
+        )
+        context.own({}, { force: released })
+        return instance(1)
+      }
+    })
+    await graph.ready()
+    await graph.dispose()
+    expect(released).toHaveBeenCalledTimes(1)
+  })
+
   it('CG-T01 exposes the graph subpath contract and stable public nodes', () => {
     const graph = createCapabilityGraph()
     graph.register({

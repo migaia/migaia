@@ -346,8 +346,10 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
         force: {
           get: () => {
             const force = descriptor.force
-            return (context: Parameters<typeof force>[0]) =>
-              invokeLifecycleCallback(() => force(context))
+            return typeof force === 'function'
+              ? (context: Parameters<typeof force>[0]) =>
+                  invokeLifecycleCallback(() => force(context))
+              : force
           }
         },
         gcFallback: { get: () => descriptor.gcFallback },
@@ -382,7 +384,7 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
         try {
           return ownAuxiliary(resource, descriptor)
         } catch (error) {
-          throw graphFailure(CapabilityGraphErrorCode.admissionClosed, error, { nodeId: node.id })
+          throw graphFailure(CapabilityGraphErrorCode.invalidOption, error, { nodeId: node.id })
         }
       }
     }
