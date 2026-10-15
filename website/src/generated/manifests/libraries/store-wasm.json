@@ -48,7 +48,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import * as wasm from '@migaia/store-wasm';"
+                "code": "import * as wasm from '@migaia/store-wasm'"
               }
             ]
           },
@@ -79,7 +79,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { ensureWasm } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';"
+                "code": "import { ensureWasm } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'"
               },
               {
                 "type": "paragraph",
@@ -88,7 +88,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "await ensureWasm();\nconst store = createStore({ score: number() });\nstore.score.value = 100;"
+                "code": "await ensureWasm()\nconst store = createStore({ score: number() })\nstore.score.value = 100"
               },
               {
                 "type": "paragraph",
@@ -105,7 +105,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\nstore.$dispose(); // 递归释放全部五个字段各自持有的 WASM 分配"
+                "code": "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配"
               },
               {
                 "type": "paragraph",
@@ -120,7 +120,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { number, boolean, string, array, record } from '@migaia/store-wasm';"
+                "code": "import { number, boolean, string, array, record } from '@migaia/store-wasm'"
               },
               {
                 "type": "paragraph",
@@ -129,7 +129,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = number();\nfield.value = 1.5;"
+                "code": "const field = number()\nfield.value = 1.5"
               },
               {
                 "type": "paragraph",
@@ -142,7 +142,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = boolean();\nfield.value = true;"
+                "code": "const field = boolean()\nfield.value = true"
               },
               {
                 "type": "paragraph",
@@ -155,7 +155,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = string(64); // 最多 64 字节\nfield.value = 'hello';"
+                "code": "const field = string(64) // 最多 64 字节\nfield.value = 'hello'"
               },
               {
                 "type": "paragraph",
@@ -168,7 +168,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = array(number(), 1000); // length=1000, granularity 默认 64\nfield.setAt(0, 1);\nfield.setRange(1, 3, [2, 3]);"
+                "code": "const field = array(number(), 1000) // length=1000, granularity 默认 64\nfield.setAt(0, 1)\nfield.setRange(1, 3, [2, 3])"
               },
               {
                 "type": "paragraph",
@@ -188,12 +188,16 @@
               },
               {
                 "type": "paragraph",
+                "text": "内部内存视图按 `memory.buffer` 身份缓存，增长后刷新。`array().view()` 仍返回独立拷贝；字符串每次从当前 bytes 解码，避免隐藏共享内存的写入。"
+              },
+              {
+                "type": "paragraph",
                 "text": "`record`｜10 秒上手 —— 固定命名字段打包进一块连续内存，逐字段独立响应式："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = record({ x: number(), y: number() });\nfield.x = 1; // 直接属性读写，不经过 .value"
+                "code": "const field = record({ x: number(), y: number() })\nfield.x = 1 // 直接属性读写，不经过 .value"
               },
               {
                 "type": "paragraph",
@@ -208,7 +212,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
               },
               {
                 "type": "paragraph",
@@ -230,7 +234,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
               },
               {
                 "type": "paragraph",
@@ -243,7 +247,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
               },
               {
                 "type": "paragraph",
@@ -258,7 +262,7 @@
               {
                 "type": "code",
                 "language": "tsx",
-                "code": "import { StoreProvider } from '@migaia/store-react';\nimport { ensureWasm, number, array } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) });\n  return null;\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  );\n}"
+                "code": "import { StoreProvider } from '@migaia/store-react'\nimport { ensureWasm, number, array } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) })\n  return null\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  )\n}"
               }
             ]
           },
@@ -269,7 +273,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { array, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm());\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000);\nconst store = createStore({ particles });\n\nconst dx = new Float64Array(1000).fill(0.1);\nstore.particles.setRange(0, 1000, dx); // 落进同一批桶的写入合并到一次 commit"
+                "code": "import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm())\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000)\nconst store = createStore({ particles })\n\nconst dx = new Float64Array(1000).fill(0.1)\nstore.particles.setRange(0, 1000, dx) // 落进同一批桶的写入合并到一次 commit"
               }
             ]
           },
@@ -280,7 +284,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { record, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) });\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1;\nstore.pos.y = 2;"
+                "code": "import { record, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) })\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1\nstore.pos.y = 2"
               }
             ]
           },
@@ -291,7 +295,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm';\n\ntry {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error;\n  }\n}"
+                "code": "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm'\n\ntry {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error\n  }\n}"
               }
             ]
           },
@@ -337,7 +341,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { ensureWasm } from '@migaia/store-wasm';\n\nawait ensureWasm(); // 之后所有字段构造器的 create() 才能同步工作"
+                "code": "import { ensureWasm } from '@migaia/store-wasm'\n\nawait ensureWasm() // 之后所有字段构造器的 create() 才能同步工作"
               },
               {
                 "type": "table",
@@ -359,7 +363,7 @@
               {
                 "type": "list",
                 "items": [
-                  "已经就绪时，立即返回 `Promise.resolve(memory)`。",
+                  "已经就绪时，继续返回原来已完成的同一个 Promise，保留 readiness identity。",
                   "正在加载中时，重复调用拿到同一个 in-flight promise 引用——不会重复触发底层的 fetch/instantiate，也不会因为父组件无关重渲染或 React StrictMode 的双重调用而重复初始化。",
                   "加载失败时，内部缓存会被清空，下一次调用 `ensureWasm()` 会发起新的加载尝试（不会永久卡在失败状态）。"
                 ]
@@ -381,7 +385,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStore } from '@migaia/store-light';\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm';\n\nawait ensureWasm();\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\n\nstore.hp.value = 100;\nstore.alive.value = true;\nstore.name.value = 'boss';\nstore.hits.setAt(0, 1);\nstore.pos.x = 10;\n\nstore.$dispose(); // 递归释放上面五个字段各自持有的 WASM 分配"
+                "code": "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配"
               },
               {
                 "type": "paragraph",
@@ -409,7 +413,7 @@
               {
                 "type": "code",
                 "language": "tsx",
-                "code": "import { StoreProvider } from '@migaia/store-react';\nimport { ensureWasm } from '@migaia/store-wasm';\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  );\n}"
+                "code": "import { StoreProvider } from '@migaia/store-react'\nimport { ensureWasm } from '@migaia/store-wasm'\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  )\n}"
               },
               {
                 "type": "paragraph",
@@ -428,7 +432,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = number(); // FieldBuilder<IWasmNumberField>"
+                "code": "const field = number() // FieldBuilder<IWasmNumberField>"
               },
               {
                 "type": "paragraph",
@@ -437,7 +441,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IWasmNumberField = {\n  value: number;\n  readonly observed: boolean;\n  readonly disposed: boolean;\n  dispose(): void;\n};"
+                "code": "type IWasmNumberField = {\n  value: number\n  readonly observed: boolean\n  readonly disposed: boolean\n  dispose(): void\n}"
               },
               {
                 "type": "table",
@@ -467,7 +471,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = boolean(); // FieldBuilder<IWasmBooleanField>"
+                "code": "const field = boolean() // FieldBuilder<IWasmBooleanField>"
               },
               {
                 "type": "paragraph",
@@ -482,7 +486,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = string(); // maxBytes 默认 256\nconst field2 = string(64); // 自定义最大字节数"
+                "code": "const field = string() // maxBytes 默认 256\nconst field2 = string(64) // 自定义最大字节数"
               },
               {
                 "type": "table",
@@ -523,7 +527,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = array(number(), 1000); // granularity 默认 64\nconst field2 = array(number(), 1000, 1); // 每个 index 独立追踪"
+                "code": "const field = array(number(), 1000) // granularity 默认 64\nconst field2 = array(number(), 1000, 1) // 每个 index 独立追踪"
               },
               {
                 "type": "table",
@@ -559,7 +563,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IWasmArrayField = {\n  readonly length: number;\n  at(index: number): number;\n  setAt(index: number, value: number): void;\n  setRange(lo: number, hi: number, values: ArrayLike<number>): void;\n  view(): Float64Array;\n  readonly disposed: boolean;\n  dispose(): void;\n};"
+                "code": "type IWasmArrayField = {\n  readonly length: number\n  at(index: number): number\n  setAt(index: number, value: number): void\n  setRange(lo: number, hi: number, values: ArrayLike<number>): void\n  view(): Float64Array\n  readonly disposed: boolean\n  dispose(): void\n}"
               },
               {
                 "type": "table",
@@ -593,6 +597,10 @@
               },
               {
                 "type": "paragraph",
+                "text": "线性内存增长会替换 `memory.buffer`：内部 DataView 与数组 typed view 按 buffer identity 刷新；旧快照仍是独立拷贝。标量写入在 commit 内重新取当前 DataView，支持 owner 在写入边界增长内存。字符串 getter 读取并解码当前 bytes，未用本地 setter 版本缓存 decoded value；共享 Memory 的原生写入没有该版本保证。"
+              },
+              {
+                "type": "paragraph",
                 "text": "分桶（granularity）：数组底层是一整块连续的 `Float64Array`，但响应式追踪不是逐元素的——`granularity` 个连续 index 共享一个响应式 Source（\"桶\"），默认 64。粒度越粗，Source 数量越少（内存/管理开销小），但一次写入会让整个桶内所有订阅者都收到通知；`granularity: 1` 退化成逐元素独立追踪，精度最高但 Source 数量等于 `length`。分桶按需惰性创建——只有实际被 `at()`/`setAt()`/`setRange()` 触碰过的桶才会创建对应的 Source。"
               },
               {
@@ -608,7 +616,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = record({ x: number(), y: number(), z: number() });"
+                "code": "const field = record({ x: number(), y: number(), z: number() })"
               },
               {
                 "type": "table",
@@ -629,7 +637,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {\n  readonly disposed: boolean;\n  dispose(): void;\n};"
+                "code": "type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {\n  readonly disposed: boolean\n  dispose(): void\n}"
               },
               {
                 "type": "list",
@@ -777,12 +785,12 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
               },
               {
                 "type": "paragraph",
@@ -810,7 +818,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
               },
               {
                 "type": "paragraph",
@@ -819,7 +827,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
               },
               {
                 "type": "paragraph",
@@ -828,12 +836,12 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
               },
               {
                 "type": "paragraph",
@@ -842,7 +850,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
               },
               {
                 "type": "paragraph",
@@ -1011,12 +1019,12 @@
           "errors": ["No documented errors are declared for array."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for array.",
           "examples": [
-            "import { createStore } from '@migaia/store-light';\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm';\n\nawait ensureWasm();\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\n\nstore.hp.value = 100;\nstore.alive.value = true;\nstore.name.value = 'boss';\nstore.hits.setAt(0, 1);\nstore.pos.x = 10;\n\nstore.$dispose(); // 递归释放上面五个字段各自持有的 WASM 分配",
-            "const field = array(number(), 1000); // granularity 默认 64\nconst field2 = array(number(), 1000, 1); // 每个 index 独立追踪",
-            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\nstore.$dispose(); // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = array(number(), 1000); // length=1000, granularity 默认 64\nfield.setAt(0, 1);\nfield.setRange(1, 3, [2, 3]);",
-            "import { StoreProvider } from '@migaia/store-react';\nimport { ensureWasm, number, array } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) });\n  return null;\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  );\n}",
-            "import { array, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm());\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000);\nconst store = createStore({ particles });\n\nconst dx = new Float64Array(1000).fill(0.1);\nstore.particles.setRange(0, 1000, dx); // 落进同一批桶的写入合并到一次 commit"
+            "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
+            "const field = array(number(), 1000) // granularity 默认 64\nconst field2 = array(number(), 1000, 1) // 每个 index 独立追踪",
+            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
+            "const field = array(number(), 1000) // length=1000, granularity 默认 64\nfield.setAt(0, 1)\nfield.setRange(1, 3, [2, 3])",
+            "import { StoreProvider } from '@migaia/store-react'\nimport { ensureWasm, number, array } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) })\n  return null\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  )\n}",
+            "import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm())\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000)\nconst store = createStore({ particles })\n\nconst dx = new Float64Array(1000).fill(0.1)\nstore.particles.setRange(0, 1000, dx) // 落进同一批桶的写入合并到一次 commit"
           ],
           "members": [],
           "aliasOf": "array",
@@ -1201,7 +1209,7 @@
               ]
             }
           ],
-          "usageScore": 198,
+          "usageScore": 200,
           "configuration": [],
           "fragment": "store-wasm-index--array"
         },
@@ -1220,10 +1228,10 @@
           "errors": ["No documented errors are declared for boolean."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for boolean.",
           "examples": [
-            "import { createStore } from '@migaia/store-light';\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm';\n\nawait ensureWasm();\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\n\nstore.hp.value = 100;\nstore.alive.value = true;\nstore.name.value = 'boss';\nstore.hits.setAt(0, 1);\nstore.pos.x = 10;\n\nstore.$dispose(); // 递归释放上面五个字段各自持有的 WASM 分配",
-            "const field = boolean(); // FieldBuilder<IWasmBooleanField>",
-            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\nstore.$dispose(); // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = boolean();\nfield.value = true;"
+            "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
+            "const field = boolean() // FieldBuilder<IWasmBooleanField>",
+            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
+            "const field = boolean()\nfield.value = true"
           ],
           "members": [],
           "aliasOf": "boolean",
@@ -1480,12 +1488,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -1516,7 +1524,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -1525,7 +1533,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -1534,12 +1542,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -1548,7 +1556,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -1563,7 +1571,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -1585,7 +1593,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
                 },
                 {
                   "type": "paragraph",
@@ -1598,7 +1606,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
                 },
                 {
                   "type": "paragraph",
@@ -1646,7 +1654,7 @@
           "errors": ["No documented errors are declared for createStoreWasmError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreWasmError.",
           "examples": [
-            "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+            "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
           ],
           "members": [],
           "exportPath": ".",
@@ -1721,12 +1729,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -1757,7 +1765,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -1766,7 +1774,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -1775,12 +1783,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -1789,7 +1797,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -1804,7 +1812,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -1826,7 +1834,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
                 },
                 {
                   "type": "paragraph",
@@ -1839,7 +1847,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
                 },
                 {
                   "type": "paragraph",
@@ -1946,12 +1954,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -1982,7 +1990,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -1991,7 +1999,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -2000,12 +2008,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -2014,7 +2022,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -2029,7 +2037,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -2051,7 +2059,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
                 },
                 {
                   "type": "paragraph",
@@ -2064,7 +2072,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
                 },
                 {
                   "type": "paragraph",
@@ -2185,12 +2193,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -2221,7 +2229,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -2230,7 +2238,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -2239,12 +2247,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -2253,7 +2261,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -2268,7 +2276,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -2290,7 +2298,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
                 },
                 {
                   "type": "paragraph",
@@ -2303,7 +2311,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
                 },
                 {
                   "type": "paragraph",
@@ -2331,11 +2339,11 @@
           "errors": ["No documented errors are declared for ensureWasm."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ensureWasm.",
           "examples": [
-            "import { ensureWasm } from '@migaia/store-wasm';\n\nawait ensureWasm(); // 之后所有字段构造器的 create() 才能同步工作",
-            "import { createStore } from '@migaia/store-light';\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm';\n\nawait ensureWasm();\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\n\nstore.hp.value = 100;\nstore.alive.value = true;\nstore.name.value = 'boss';\nstore.hits.setAt(0, 1);\nstore.pos.x = 10;\n\nstore.$dispose(); // 递归释放上面五个字段各自持有的 WASM 分配",
-            "await ensureWasm();\nconst store = createStore({ score: number() });\nstore.score.value = 100;",
-            "import { StoreProvider } from '@migaia/store-react';\nimport { ensureWasm, number, array } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) });\n  return null;\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  );\n}",
-            "import { array, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm());\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000);\nconst store = createStore({ particles });\n\nconst dx = new Float64Array(1000).fill(0.1);\nstore.particles.setRange(0, 1000, dx); // 落进同一批桶的写入合并到一次 commit"
+            "import { ensureWasm } from '@migaia/store-wasm'\n\nawait ensureWasm() // 之后所有字段构造器的 create() 才能同步工作",
+            "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
+            "await ensureWasm()\nconst store = createStore({ score: number() })\nstore.score.value = 100",
+            "import { StoreProvider } from '@migaia/store-react'\nimport { ensureWasm, number, array } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) })\n  return null\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  )\n}",
+            "import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm())\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000)\nconst store = createStore({ particles })\n\nconst dx = new Float64Array(1000).fill(0.1)\nstore.particles.setRange(0, 1000, dx) // 落进同一批桶的写入合并到一次 commit"
           ],
           "members": [],
           "aliasOf": "ensureWasm",
@@ -2512,12 +2520,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -2548,7 +2556,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -2557,7 +2565,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -2566,12 +2574,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -2580,7 +2588,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -2608,8 +2616,8 @@
           "errors": ["No documented errors are declared for IWasmFieldMode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWasmFieldMode.",
           "examples": [
-            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';",
-            "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'",
+            "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
           ],
           "members": [],
           "aliasOf": "IWasmFieldMode",
@@ -2667,12 +2675,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -2703,7 +2711,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -2712,7 +2720,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -2721,12 +2729,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -2735,7 +2743,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -2763,8 +2771,8 @@
           "errors": ["No documented errors are declared for IWasmReservedKey."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWasmReservedKey.",
           "examples": [
-            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';",
-            "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'",
+            "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
           ],
           "members": [],
           "aliasOf": "IWasmReservedKey",
@@ -2822,12 +2830,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -2858,7 +2866,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -2867,7 +2875,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -2876,12 +2884,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -2890,7 +2898,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -2918,18 +2926,18 @@
           "errors": ["No documented errors are declared for number."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for number.",
           "examples": [
-            "import { createStore } from '@migaia/store-light';\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm';\n\nawait ensureWasm();\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\n\nstore.hp.value = 100;\nstore.alive.value = true;\nstore.name.value = 'boss';\nstore.hits.setAt(0, 1);\nstore.pos.x = 10;\n\nstore.$dispose(); // 递归释放上面五个字段各自持有的 WASM 分配",
-            "const field = number(); // FieldBuilder<IWasmNumberField>",
-            "const field = array(number(), 1000); // granularity 默认 64\nconst field2 = array(number(), 1000, 1); // 每个 index 独立追踪",
-            "const field = record({ x: number(), y: number(), z: number() });",
-            "await ensureWasm();\nconst store = createStore({ score: number() });\nstore.score.value = 100;",
-            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\nstore.$dispose(); // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = number();\nfield.value = 1.5;",
-            "const field = array(number(), 1000); // length=1000, granularity 默认 64\nfield.setAt(0, 1);\nfield.setRange(1, 3, [2, 3]);",
-            "const field = record({ x: number(), y: number() });\nfield.x = 1; // 直接属性读写，不经过 .value",
-            "import { StoreProvider } from '@migaia/store-react';\nimport { ensureWasm, number, array } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) });\n  return null;\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  );\n}",
-            "import { array, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm());\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000);\nconst store = createStore({ particles });\n\nconst dx = new Float64Array(1000).fill(0.1);\nstore.particles.setRange(0, 1000, dx); // 落进同一批桶的写入合并到一次 commit",
-            "import { record, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) });\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1;\nstore.pos.y = 2;"
+            "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
+            "const field = number() // FieldBuilder<IWasmNumberField>",
+            "const field = array(number(), 1000) // granularity 默认 64\nconst field2 = array(number(), 1000, 1) // 每个 index 独立追踪",
+            "const field = record({ x: number(), y: number(), z: number() })",
+            "await ensureWasm()\nconst store = createStore({ score: number() })\nstore.score.value = 100",
+            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
+            "const field = number()\nfield.value = 1.5",
+            "const field = array(number(), 1000) // length=1000, granularity 默认 64\nfield.setAt(0, 1)\nfield.setRange(1, 3, [2, 3])",
+            "const field = record({ x: number(), y: number() })\nfield.x = 1 // 直接属性读写，不经过 .value",
+            "import { StoreProvider } from '@migaia/store-react'\nimport { ensureWasm, number, array } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) })\n  return null\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  )\n}",
+            "import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm())\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000)\nconst store = createStore({ particles })\n\nconst dx = new Float64Array(1000).fill(0.1)\nstore.particles.setRange(0, 1000, dx) // 落进同一批桶的写入合并到一次 commit",
+            "import { record, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) })\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1\nstore.pos.y = 2"
           ],
           "members": [],
           "aliasOf": "number",
@@ -3099,12 +3107,12 @@
           "errors": ["No documented errors are declared for record."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for record.",
           "examples": [
-            "import { createStore } from '@migaia/store-light';\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm';\n\nawait ensureWasm();\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\n\nstore.hp.value = 100;\nstore.alive.value = true;\nstore.name.value = 'boss';\nstore.hits.setAt(0, 1);\nstore.pos.x = 10;\n\nstore.$dispose(); // 递归释放上面五个字段各自持有的 WASM 分配",
-            "const field = record({ x: number(), y: number(), z: number() });",
-            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\nstore.$dispose(); // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = record({ x: number(), y: number() });\nfield.x = 1; // 直接属性读写，不经过 .value",
-            "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一",
-            "import { record, number } from '@migaia/store-wasm';\nimport { createStore } from '@migaia/store-light';\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) });\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1;\nstore.pos.y = 2;"
+            "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
+            "const field = record({ x: number(), y: number(), z: number() })",
+            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
+            "const field = record({ x: number(), y: number() })\nfield.x = 1 // 直接属性读写，不经过 .value",
+            "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一",
+            "import { record, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) })\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1\nstore.pos.y = 2"
           ],
           "members": [],
           "aliasOf": "record",
@@ -3289,12 +3297,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -3325,7 +3333,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -3334,7 +3342,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -3343,12 +3351,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -3357,7 +3365,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -3372,7 +3380,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -3394,7 +3402,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
                 },
                 {
                   "type": "paragraph",
@@ -3407,7 +3415,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
                 },
                 {
                   "type": "paragraph",
@@ -3435,11 +3443,11 @@
           "errors": ["No documented errors are declared for STORE_WASM_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_WASM_SOURCE.",
           "examples": [
-            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';",
-            "const STORE_WASM_SOURCE: '@migaia/store-wasm';",
-            "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}",
-            "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';",
-            "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm';\n\ntry {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error;\n  }\n}"
+            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'",
+            "const STORE_WASM_SOURCE: '@migaia/store-wasm'",
+            "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}",
+            "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'",
+            "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm'\n\ntry {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error\n  }\n}"
           ],
           "members": [],
           "exportPath": ".",
@@ -3496,12 +3504,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -3532,7 +3540,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -3541,7 +3549,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -3550,12 +3558,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -3564,7 +3572,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -3579,7 +3587,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -3601,7 +3609,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
                 },
                 {
                   "type": "paragraph",
@@ -3614,7 +3622,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
                 },
                 {
                   "type": "paragraph",
@@ -3629,7 +3637,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm';\n\ntry {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error;\n  }\n}"
+                  "code": "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm'\n\ntry {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error\n  }\n}"
                 }
               ]
             }
@@ -3659,10 +3667,10 @@
           "errors": ["No documented errors are declared for string."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for string.",
           "examples": [
-            "import { createStore } from '@migaia/store-light';\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm';\n\nawait ensureWasm();\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\n\nstore.hp.value = 100;\nstore.alive.value = true;\nstore.name.value = 'boss';\nstore.hits.setAt(0, 1);\nstore.pos.x = 10;\n\nstore.$dispose(); // 递归释放上面五个字段各自持有的 WASM 分配",
-            "const field = string(); // maxBytes 默认 256\nconst field2 = string(64); // 自定义最大字节数",
-            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n});\nstore.$dispose(); // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = string(64); // 最多 64 字节\nfield.value = 'hello';"
+            "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
+            "const field = string() // maxBytes 默认 256\nconst field2 = string(64) // 自定义最大字节数",
+            "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
+            "const field = string(64) // 最多 64 字节\nfield.value = 'hello'"
           ],
           "members": [],
           "aliasOf": "string",
@@ -3825,12 +3833,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -3861,7 +3869,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -3870,7 +3878,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -3879,12 +3887,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -3893,7 +3901,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -3908,7 +3916,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -3930,7 +3938,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
                 },
                 {
                   "type": "paragraph",
@@ -3943,7 +3951,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
                 },
                 {
                   "type": "paragraph",
@@ -3958,7 +3966,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm';\n\ntry {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error;\n  }\n}"
+                  "code": "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm'\n\ntry {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error\n  }\n}"
                 }
               ]
             }
@@ -3982,10 +3990,10 @@
           "errors": ["No documented errors are declared for WasmFieldMode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for WasmFieldMode.",
           "examples": [
-            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';",
-            "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';",
-            "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';",
-            "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'",
+            "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'",
+            "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'",
+            "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
           ],
           "members": [],
           "aliasOf": "WasmFieldMode",
@@ -4043,12 +4051,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -4079,7 +4087,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -4088,7 +4096,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -4097,12 +4105,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -4111,7 +4119,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -4126,7 +4134,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -4148,7 +4156,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
                 },
                 {
                   "type": "paragraph",
@@ -4161,7 +4169,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
                 },
                 {
                   "type": "paragraph",
@@ -4189,10 +4197,10 @@
           "errors": ["No documented errors are declared for WasmReservedKey."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for WasmReservedKey.",
           "examples": [
-            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';",
-            "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';",
-            "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';",
-            "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'",
+            "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'",
+            "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'",
+            "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
           ],
           "members": [],
           "aliasOf": "WasmReservedKey",
@@ -4250,12 +4258,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const;\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -4286,7 +4294,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm';"
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -4295,7 +4303,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "paragraph",
@@ -4304,12 +4312,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  field.value = 123;\n} catch (error) {\n  const e = error as { source?: string; code?: string };\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmFieldMode = { sync: 'sync' } as const;\ntype IWasmFieldMode = 'sync';"
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
                 },
                 {
                   "type": "paragraph",
@@ -4318,7 +4326,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const;\ntype IWasmReservedKey = 'dispose' | 'disposed';"
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
                 },
                 {
                   "type": "paragraph",
@@ -4333,7 +4341,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm';"
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
                 },
                 {
                   "type": "paragraph",
@@ -4355,7 +4363,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value');"
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
                 },
                 {
                   "type": "paragraph",
@@ -4368,7 +4376,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "WasmFieldMode.sync; // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose; // 'dispose'，record() 禁用的 key 之一"
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
                 },
                 {
                   "type": "paragraph",
