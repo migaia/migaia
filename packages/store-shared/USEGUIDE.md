@@ -23,7 +23,7 @@
 ## 1. 导入与前置条件
 
 ```ts
-import { createRuntime } from '@migaia/reactive';
+import { createRuntime } from '@migaia/reactive'
 import {
   sharedInt32,
   SharedInt32Signal,
@@ -36,7 +36,7 @@ import {
   STORE_SHARED_SOURCE,
   createStoreSharedError,
   createStoreSharedRangeError
-} from '@migaia/store-shared';
+} from '@migaia/store-shared'
 ```
 
 包只有一个导出入口（`.`），没有子路径划分。`sharedInt32`/`sharedInt32Array` 是推荐的创建方式；`SharedInt32Signal`/`SharedInt32Array` 类本身也导出，供需要 `instanceof` 判断或类型标注的场景使用。
@@ -56,10 +56,10 @@ function sharedInt32(
   runtime: IRuntime,
   initialValue?: number,
   buffer?: SharedArrayBuffer
-): SharedInt32Signal;
+): SharedInt32Signal
 
 class SharedInt32Signal implements IObservable, IDisposable {
-  constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer);
+  constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer)
 }
 ```
 
@@ -81,20 +81,20 @@ class SharedInt32Signal implements IObservable, IDisposable {
 
 ```ts
 class SharedInt32Signal implements IObservable, IDisposable {
-  readonly runtime: IRuntime;
-  readonly buffer: SharedArrayBuffer;
-  readonly subs: ReadonlySet<IObserver>;
-  get version(): number;
-  get disposed(): boolean;
-  get value(): number;
-  set value(next: number);
-  peek(): number;
-  sync(): boolean;
-  watch(): IDisposer;
-  onObserved(): void;
-  onUnobserved(): void;
-  isStale(): boolean;
-  dispose(): void;
+  readonly runtime: IRuntime
+  readonly buffer: SharedArrayBuffer
+  readonly subs: ReadonlySet<IObserver>
+  get version(): number
+  get disposed(): boolean
+  get value(): number
+  set value(next: number)
+  peek(): number
+  sync(): boolean
+  watch(): IDisposer
+  onObserved(): void
+  onUnobserved(): void
+  isStale(): boolean
+  dispose(): void
 }
 ```
 
@@ -113,13 +113,13 @@ class SharedInt32Signal implements IObservable, IDisposable {
 - **`dispose(): void`** —— 幂等；置位 `#disposed`、停止 `watch()` 回路（若存在）、从所属 `Runtime` 的追踪器断开（`tracker.disconnectObservable(this, 'dispose')`）。释放之后再调用 `value`/`sync()`/`watch()`/`peek()` 会抛 `Error`（`signalDisposed`）；`isStale()`/`buffer`/`runtime` 字段仍可安全访问。
 
 ```ts
-const runtime = createRuntime();
-const counter = sharedInt32(runtime, 0);
-counter.value; // 0
-counter.value = 5;
-counter.peek(); // 5，不触发追踪
-counter.dispose();
-counter.value; // 抛 Error（code: 'SIGNAL_DISPOSED'）
+const runtime = createRuntime()
+const counter = sharedInt32(runtime, 0)
+counter.value // 0
+counter.value = 5
+counter.peek() // 5，不触发追踪
+counter.dispose()
+counter.value // 抛 Error（code: 'SIGNAL_DISPOSED'）
 ```
 
 ---
@@ -133,17 +133,17 @@ function sharedInt32Array(
   runtime: IRuntime,
   length: number,
   options?: {
-    readonly buffer?: SharedArrayBuffer;
-    readonly initialValues?: Iterable<number>;
+    readonly buffer?: SharedArrayBuffer
+    readonly initialValues?: Iterable<number>
   }
-): SharedInt32Array;
+): SharedInt32Array
 
 class SharedInt32Array implements IDisposable {
   constructor(
     runtime: IRuntime,
     length: number,
     options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number> }
-  );
+  )
 }
 ```
 
@@ -170,23 +170,22 @@ class SharedInt32Array implements IDisposable {
 
 ```ts
 class SharedInt32Array implements IDisposable {
-  readonly runtime: IRuntime;
-  readonly buffer: SharedArrayBuffer;
-  readonly length: number;
-  get disposed(): boolean;
-  get(index: number): number;
-  set(index: number, value: number): void;
-  update(index: number, update: (current: number) => number): number;
-  sync(index?: number): number;
-  watch(): IDisposer;
-  snapshot(): Int32Array;
-  prune(): number;
-  dispose(): void;
-  assertActive(): void;
-  readCell(index: number): { readonly value: number; readonly version: number };
-  writeCell(index: number, value: number, expected?: number): number | undefined;
-  notifyWaiters(): void;
-  recordObservedVersion(index: number, version: number): void;
+  readonly runtime: IRuntime
+  readonly buffer: SharedArrayBuffer
+  readonly length: number
+  get disposed(): boolean
+  get(index: number): number
+  set(index: number, value: number): void
+  update(index: number, update: (current: number) => number): number
+  sync(index?: number): number
+  watch(): IDisposer
+  snapshot(): Int32Array
+  dispose(): void
+  assertActive(): void
+  readCell(index: number): { readonly value: number; readonly version: number }
+  writeCell(index: number, value: number, expected?: number): number | undefined
+  notifyWaiters(): void
+  recordObservedVersion(index: number, version: number): void
 }
 ```
 
@@ -200,8 +199,7 @@ class SharedInt32Array implements IDisposable {
   - 不传：整体扫描。先比较头部 epoch 与本地记录的 `#observedEpoch`，未变直接返回 `0`（连脏页 bitmap 都不碰）；变了则在 `runtime.batch()` 内逐 word `Atomics.exchange` 读出并清零脏页 bitmap，对每个置位的页逐格重新一致读、与本地记录比较，真正变化的下标才更新记录并调用其已物化 cell 的 `sync()`，最终返回本轮实际变化的下标个数（可能为 `0`，即 epoch 变了但没有格子真正稳定下来变化，理论上不会发生但代码按此语义实现）。整个批处理包在一次 `runtime.batch()` 内，多处变化只会让下游重跑一轮而不是逐个通知。
 - **`watch(): IDisposer`** —— 语义与 `SharedInt32Signal.watch()` 一致，但监听的是头部 **epoch slot** 而不是逐格 seq（一格一个 waiter 在长数组上不可行）；唤醒后调用整体 `sync()`（不带 `index`）。已在 watch 时重复调用返回同一停止函数；环境不支持 `waitAsync` 抛 `Error`（`envUnsupported`）。
 - **`snapshot(): Int32Array`** —— `assertActive()` 后遍历 `[0, length)`，对每个下标 `readCell(i).value`，写入一个新分配的 `Int32Array(length)` 并返回。返回值是**普通、非共享**的数组，修改它不会影响共享内存。
-- **`prune(): number`** —— `assertActive()` 后遍历所有已物化的 cell，`subs.size === 0`（没有任何观察者）的从追踪器断开并从内部 `Map` 移除，返回移除个数。用于"高频轮换访问不同下标"场景下主动清理，弥补自动回收（见下）的粒度不够及时。
-- **`dispose(): void`** —— 幂等；停止 `watch()`、把所有已物化 cell 从追踪器断开。释放之后调用 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`prune` 等会抛 `Error`（`arrayDisposed`）。
+- **`dispose(): void`** —— 幂等；停止 `watch()`、把所有已物化 cell 从追踪器断开。释放之后调用 `get`/`set`/`update`/`sync`/`watch`/`snapshot` 等会抛 `Error`（`arrayDisposed`）。
 - **`assertActive(): void`** —— 已释放则抛 `Error`（`arrayDisposed`，消息 `[store] shared array is disposed`）；公开方法，正常业务代码不需要直接调用，供组合式底层用法（如包装类）复用同一校验。
 - **`readCell(index): { value; version }`** —— 一致读某一格的原始 value/version（复用 seqlock 读协议），**不做下标范围校验、不检查是否已释放**，是最底层的读原语；`get()`/`sync()` 等内部都基于它实现，调用方若直接使用需自行保证 `index` 合法。
 - **`writeCell(index, value, expected?): number | undefined`** —— 最底层的写原语（`set`/`update` 都基于它），语义见 [§6.2](#62-写占锁--写值--放锁)：`expected` 省略即无条件写；提供则是 CAS；成功返回新版本并标记对应脏页，未写入（值未变或 CAS 失败）返回 `undefined`。同样不做下标校验。
@@ -211,14 +209,14 @@ class SharedInt32Array implements IDisposable {
 `get`/`set`/`update`/`sync(index)` 的下标校验规则一致：先 `assertActive()`，再要求 `Number.isInteger(index) && index >= 0 && index < length`，否则抛 `RangeError`（`indexOutOfRange`，消息 `[store] shared array index out of range: <index>`）。
 
 ```ts
-const runtime = createRuntime();
-const grid = sharedInt32Array(runtime, 4, { initialValues: [0, 0, 0, 0] });
-grid.set(0, 10);
-grid.get(0); // 10
-grid.update(1, (v) => v + 1); // 1
-grid.snapshot(); // Int32Array [10, 1, 0, 0]
-grid.dispose();
-grid.get(0); // 抛 Error（code: 'ARRAY_DISPOSED'）
+const runtime = createRuntime()
+const grid = sharedInt32Array(runtime, 4, { initialValues: [0, 0, 0, 0] })
+grid.set(0, 10)
+grid.get(0) // 10
+grid.update(1, (v) => v + 1) // 1
+grid.snapshot() // Int32Array [10, 1, 0, 0]
+grid.dispose()
+grid.get(0) // 抛 Error（code: 'ARRAY_DISPOSED'）
 ```
 
 ---
@@ -226,16 +224,16 @@ grid.get(0); // 抛 Error（code: 'ARRAY_DISPOSED'）
 ## 4. `SharedWaitMode` 完整参考
 
 ```ts
-const SharedWaitMode: { readonly async: 'async' };
-type ISharedWaitMode = 'async';
+const SharedWaitMode: { readonly async: 'async' }
+type ISharedWaitMode = 'async'
 ```
 
 一个稳定的等待模式标识常量（当前只有 `async` 一个取值），来源注释为"Shared-state wait modes used when Atomics.waitAsync is available"。它**不是**任何导出函数/方法的参数或返回值——`watch()` 内部固定使用基于 `Atomics.waitAsync` 的唤醒策略，不需要也不接受调用方传入 `SharedWaitMode` 来选择模式。它的作用是给调用方在自己的类型标注、日志、诊断代码里提供一个稳定、不会打字错误的字符串引用，为将来可能新增的等待模式预留扩展空间。
 
 ```ts
-import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';
+import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared'
 
-const currentMode: ISharedWaitMode = SharedWaitMode.async;
+const currentMode: ISharedWaitMode = SharedWaitMode.async
 ```
 
 ---
@@ -249,22 +247,22 @@ import {
   STORE_SHARED_SOURCE,
   createStoreSharedError,
   createStoreSharedRangeError
-} from '@migaia/store-shared';
+} from '@migaia/store-shared'
 ```
 
 ### 5.1 `StoreSharedErrorCode` / `IStoreSharedErrorCode`
 
 ```ts
 const StoreSharedErrorCode: {
-  readonly arrayDisposed: 'ARRAY_DISPOSED';
-  readonly signalDisposed: 'SIGNAL_DISPOSED';
-  readonly bufferTooSmall: 'BUFFER_TOO_SMALL';
-  readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE';
-  readonly contentionLimit: 'CONTENTION_LIMIT';
-  readonly envUnsupported: 'ENV_UNSUPPORTED';
-  readonly invalidOption: 'INVALID_OPTION';
-};
-type IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode];
+  readonly arrayDisposed: 'ARRAY_DISPOSED'
+  readonly signalDisposed: 'SIGNAL_DISPOSED'
+  readonly bufferTooSmall: 'BUFFER_TOO_SMALL'
+  readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'
+  readonly contentionLimit: 'CONTENTION_LIMIT'
+  readonly envUnsupported: 'ENV_UNSUPPORTED'
+  readonly invalidOption: 'INVALID_OPTION'
+}
+type IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode]
 ```
 
 错误由 `(source, code)` 二元组唯一定位，`source` 恒为 `@migaia/store-shared`（即 `STORE_SHARED_SOURCE`）。码值是公开 API 的一部分，本包内部所有抛出点都引用这张表，不内联字面量；触发条件与调用方建议见 [README 的对应小节](./README.md#错误身份)与本文 [§10 错误一览表](#10-错误一览表)。
@@ -272,7 +270,7 @@ type IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSha
 ### 5.2 `STORE_SHARED_SOURCE`
 
 ```ts
-const STORE_SHARED_SOURCE: '@migaia/store-shared';
+const STORE_SHARED_SOURCE: '@migaia/store-shared'
 ```
 
 字符串常量，本包所有错误统一携带的 `source` 字段值。通过 `@migaia/utils` 的 `attachErrorIdentity` 挂到每个抛出的 `Error`/`RangeError` 上。
@@ -284,13 +282,13 @@ function createStoreSharedError(
   code: IStoreSharedErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): Error;
+): Error
 
 function createStoreSharedRangeError(
   code: IStoreSharedErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): RangeError;
+): RangeError
 ```
 
 两者都是本包内部构造错误时使用的工厂：先 `new Error(message, options?.cause !== undefined ? { cause } : undefined)`（或 `RangeError`），再用 `attachErrorIdentity(error, { source: STORE_SHARED_SOURCE, code })` 挂上身份字段。两者签名与行为完全一致，唯一区别是构造出的运行时错误类型（`Error` vs `RangeError`）。公开导出是为了让在 `@migaia/store-shared` 之上做薄封装的调用方（例如包装 `SharedInt32Array` 的上层库）可以抛出携带同一套 `(source, code)` 身份契约的错误，而不必自己重新实现 `attachErrorIdentity` 调用。
@@ -301,7 +299,7 @@ function createStoreSharedRangeError(
 throw createStoreSharedRangeError(
   StoreSharedErrorCode.invalidOption,
   'entityCount must be a positive integer'
-);
+)
 ```
 
 ---
@@ -381,8 +379,7 @@ seq 推进为 seq+2（committed）
 - **两者都是 `IObservable`**：通过 `@migaia/reactive/extension` 的 `createSourceBinding` 绑定原节点身份与只读版本/订阅者元数据，用受控source操作接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。
 - **单一归属**：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。**这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身**——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。
 - **`SharedInt32Array` 的按需物化**：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。
-- **cell 的自动回收**：`Effect`/`Computed` 可能在提交观察之前就放弃一次"投机读"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。
-- **手动 `prune()`**：如果访问模式是"高频轮换读取不同下标"（比如遍历式的探测），自动回收的微任务粒度可能不够及时，可以定期调用 `array.prune()` 主动清理当前没有任何订阅者的 cell，返回本次清理掉的个数。
+- **cell 的自动回收**：最后一个观察者退订时，canonical `onUnobserved` 立即回收该 cell。`Effect`/`Computed` 可能在提交观察之前就放弃一次"投机读"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。
 
 ---
 
@@ -391,10 +388,10 @@ seq 推进为 seq+2（committed）
 | `code`               | 触发条件                                                                                                                                                                                              | 抛出方式                                 |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `SIGNAL_DISPOSED`    | `SharedInt32Signal` 已 `dispose()` 后继续访问 `value`/`sync()`/`watch()`/`peek()`                                                                                                                     | `Error`                                  |
-| `ARRAY_DISPOSED`     | `SharedInt32Array` 已 `dispose()` 后继续访问 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`prune`/`assertActive`                                                                                    | `Error`                                  |
+| `ARRAY_DISPOSED`     | `SharedInt32Array` 已 `dispose()` 后继续访问 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`assertActive`                                                                                            | `Error`                                  |
 | `BUFFER_TOO_SMALL`   | 传入的 `buffer` 小于 `SharedInt32Signal`（8 字节）或按 `SharedInt32Array` 的 `length` 推算出的所需大小                                                                                                | `RangeError`，构造时                     |
 | `INDEX_OUT_OF_RANGE` | `SharedInt32Array` 的 `get`/`set`/`update`/`sync(index)` 下标越界或非整数                                                                                                                             | `RangeError`，调用时                     |
-| `CONTENTION_LIMIT`   | 一致读持续约 1 秒未 settle，或获取写锁持续约 1 秒未成功（两者均按轮自旋并退避），或 `update()` 的 CAS 重试自旋 65536 次仍未写入                                                                                           | `Error`                                  |
+| `CONTENTION_LIMIT`   | 一致读持续约 1 秒未 settle，或获取写锁持续约 1 秒未成功（两者均按轮自旋并退避），或 `update()` 的 CAS 重试自旋 65536 次仍未写入                                                                       | `Error`                                  |
 | `ENV_UNSUPPORTED`    | 当前运行环境不支持 `Atomics.waitAsync`，却调用了 `.watch()`                                                                                                                                           | `Error`，`watch()` 调用时                |
 | `INVALID_OPTION`     | 构造/写入口参非法：`buffer` 类型不对、`options` 不是对象、`options` 读取失败、`length` 非法、`initialValues` 物化失败、`length` 换算出的 slot 数超限、写入值不是合法 int32、`update()` 的回调不是函数 | `TypeError` 或 `RangeError`，构造/调用时 |
 
@@ -408,53 +405,53 @@ seq 推进为 seq+2（committed）
 
 ```ts
 // main.ts
-import { createRuntime } from '@migaia/reactive';
-import { sharedInt32Array } from '@migaia/store-shared';
+import { createRuntime } from '@migaia/reactive'
+import { sharedInt32Array } from '@migaia/store-shared'
 
-const runtime = createRuntime();
-const positions = sharedInt32Array(runtime, 1000);
+const runtime = createRuntime()
+const positions = sharedInt32Array(runtime, 1000)
 
-const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
-worker.postMessage({ buffer: positions.buffer });
+const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+worker.postMessage({ buffer: positions.buffer })
 
-const stopWatch = positions.watch(); // worker 的写入自动推送进来
+const stopWatch = positions.watch() // worker 的写入自动推送进来
 
 const render = runtime.effect(() => {
-  drawEntity(0, positions.get(0), positions.get(1));
-});
+  drawEntity(0, positions.get(0), positions.get(1))
+})
 
 window.addEventListener('beforeunload', () => {
-  render.dispose();
-  stopWatch();
-  positions.dispose();
-  worker.terminate();
-});
+  render.dispose()
+  stopWatch()
+  positions.dispose()
+  worker.terminate()
+})
 ```
 
 ```ts
 // worker.ts
-import { createRuntime } from '@migaia/reactive';
-import { sharedInt32Array } from '@migaia/store-shared';
+import { createRuntime } from '@migaia/reactive'
+import { sharedInt32Array } from '@migaia/store-shared'
 
 self.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {
-  const runtime = createRuntime();
-  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });
+  const runtime = createRuntime()
+  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer })
 
   setInterval(() => {
-    positions.update(0, (x) => x + 1); // 每帧推进实体 0 的 x 坐标
-  }, 16);
-};
+    positions.update(0, (x) => x + 1) // 每帧推进实体 0 的 x 坐标
+  }, 16)
+}
 ```
 
 不支持 `Atomics.waitAsync` 的环境（改用手动 `sync()` 轮询）：
 
 ```ts
-const positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });
+const positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer })
 
 setInterval(() => {
-  const changed = positions.sync(); // 返回本轮实际变化的下标个数
-  if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);
-}, 100);
+  const changed = positions.sync() // 返回本轮实际变化的下标个数
+  if (changed > 0) console.log(`${changed} 个下标发生了远端变化`)
+}, 100)
 ```
 
 ---

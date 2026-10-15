@@ -2248,7 +2248,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   'Effect/Computed 中 get(index) 才物化 Cell。',
                   '追踪外 get 走轻量一致读。',
                   '放弃的投机读取会在微任务检查后自动回收无订阅 Cell。',
-                  '高频轮换下标可定期 prune，返回本次释放数。'
+                  '高频轮换下标的 cell 在最后一个观察者退订后自动释放。'
                 ]
               }
             ]
@@ -2292,7 +2292,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   'get inside Effect or Computed materializes a Cell.',
                   'get outside tracking uses a lightweight consistent read.',
                   'Abandoned speculative reads auto-remove unsubscribed Cells after a microtask.',
-                  'High-churn index access may call prune and observe the released count.'
+                  'High-churn index access releases cells when their final observer leaves.'
                 ]
               }
             ]
@@ -2658,7 +2658,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'list',
                 items: [
                   '先释放 Effect/Computed，再停止 watch。',
-                  'Array 可在存活期间 prune 无订阅 Cell。',
+                  'Array 自动回收失去最后一个订阅者的 Cell。',
                   'dispose 停 watch、断开 Cells，并标记实例终态。',
                   '其他线程实例继续使用同一 buffer，不受本端 dispose 影响。'
                 ]
@@ -2699,7 +2699,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'list',
                 items: [
                   'Dispose Effect and Computed before stopping watch.',
-                  'A live Array may prune unsubscribed Cells.',
+                  'An Array automatically releases Cells after their final subscriber leaves.',
                   'dispose stops watch, disconnects Cells, and marks terminal state.',
                   'Other thread instances keep using the same buffer after local disposal.'
                 ]
@@ -8115,7 +8115,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 items: [
                   '先选择集合与构造形式，注意类和工厂的参数顺序不同。',
                   '区分追踪读取、peek、结构读取和整体快照。',
-                  '理解数组纯索引语义，再使用 splice、replace 与 prune。',
+                  '理解数组纯索引语义，再使用 splice、replace 与自动回收。',
                   '批量替换先完整验证，失败时保留旧集合。',
                   '最后接入 mutation guard、Runtime 隔离与确定性 dispose。'
                 ]
@@ -8168,7 +8168,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 items: [
                   'Choose the collection and construction form; class and factory argument order differs.',
                   'Separate tracked reads, peek, structural reads, and whole snapshots.',
-                  'Understand pure index semantics before splice, replace, and prune.',
+                  'Understand pure index semantics before splice, replace, and automatic reclamation.',
                   'Bulk replacement validates completely before preserving or replacing old state.',
                   'Finally add mutation guards, Runtime isolation, and deterministic disposal.'
                 ]
@@ -8530,7 +8530,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'at(-1) 支持从末尾读取，但越界读取还依赖结构，以便元素出现时重算。splice、pop 或整体 replace 后，旧索引 cell 的业务含义可能改变；释放订阅并调用 prune 回收无观察 cell。需要按 id 保持身份时改用 keyed split。'
+                text: 'at(-1) 支持从末尾读取，但越界读取还依赖结构，以便元素出现时重算。splice、pop 或整体 replace 后，旧索引 cell 的业务含义可能改变；释放订阅后自动回收无观察 cell。需要按 id 保持身份时改用 keyed split。'
               }
             ]
           }
@@ -8585,7 +8585,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'at(-1) reads from the end, and an out-of-range read also tracks structure so it can rerun when an element appears. After splice, pop, or replacement, an old index cell may describe another business value. Release subscriptions and prune unobserved cells; use keyed split when identity follows an id.'
+                text: 'at(-1) reads from the end, and an out-of-range read also tracks structure so it can rerun when an element appears. After splice, pop, or replacement, an old index cell may describe another business value. Release subscriptions to reclaim unobserved cells automatically; use keyed split when identity follows an id.'
               }
             ]
           }
@@ -8629,7 +8629,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Object、Map 与 Set 主要整理已删除 key/member 的 cell；Array 因为索引会在 splice、pop 和 replace 后整体移动，会对所有已物化 cell 尝试 tombstone。仍有订阅的 cell 始终保留。'
+                text: 'Object、Map 与 Set 主要整理已删除 key/member 的 cell；Array 的无观察 cell 通过观察者生命周期自动回收，不提供手动 prune。仍有订阅的 cell 始终保留。'
               }
             ]
           }
@@ -8671,7 +8671,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Object, Map, and Set primarily compact cells for removed keys or members. Because Array indexes can shift globally after splice, pop, or replace, Array attempts to tombstone every materialized cell. A cell with an active subscriber always remains.'
+                text: 'Object, Map, and Set primarily compact cells for removed keys or members. Array automatically reclaims unobserved cells through observer lifecycle and has no manual prune method. A cell with an active subscriber always remains.'
               }
             ]
           }
