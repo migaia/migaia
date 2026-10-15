@@ -107,14 +107,14 @@ export type IResourceOptions<T = unknown> = {
 
 function abortError(): DOMException {
   return tagResourceError(
-    new DOMException('resource request aborted', 'AbortError'),
+    new DOMException(ResourceErrorText.requestAborted, ResourceErrorText.abortName),
     ResourceErrorCode.requestAborted
   )
 }
 
 class ResourceCancelledError extends DOMException {
   constructor() {
-    super('resource request cancelled', 'AbortError')
+    super(ResourceErrorText.requestCancelled, ResourceErrorText.abortName)
     tagResourceError(this, ResourceErrorCode.requestCancelled)
   }
 }
@@ -483,7 +483,7 @@ export class Resource<T> implements IObserver, IDisposable {
     if (!this.#currentPromise) {
       throw createResourceError(
         ResourceErrorCode.noActivePromise,
-        'resource has no active or cached promise'
+        ResourceErrorText.noActivePromise
       )
     }
     return this.#currentPromise
@@ -656,7 +656,7 @@ export class Resource<T> implements IObserver, IDisposable {
     if (this.#terminal.lifecycle !== LifecycleState.open) {
       throw createResourceError(
         ResourceErrorCode.resourceDisposed,
-        'cannot use a disposed resource'
+        ResourceErrorText.resourceDisposed
       )
     }
   }
@@ -674,7 +674,7 @@ export class Resource<T> implements IObserver, IDisposable {
         if (!this.#currentPromise) {
           throw createResourceError(
             ResourceErrorCode.noActivePromise,
-            'resource has no active or cached promise'
+            ResourceErrorText.noActivePromise
           )
         }
         throw this.#currentPromise
@@ -804,10 +804,7 @@ export class Resource<T> implements IObserver, IDisposable {
           if (probe.kind === ThenableProbeKind.failed) {
             reject(
               tagResourceError(
-                new AggregateError(
-                  [error, probe.error],
-                  'resource fetcher threw a value whose then getter failed'
-                ),
+                new AggregateError([error, probe.error], ResourceErrorText.suspenseProbeFailed),
                 ResourceErrorCode.suspenseProbeFailed
               )
             )
@@ -889,7 +886,7 @@ export class Resource<T> implements IObserver, IDisposable {
     if (!Number.isFinite(delay) || delay < 0) {
       return Promise.reject(
         tagResourceError(
-          new RangeError('resource retry delay must be a non-negative finite number'),
+          new RangeError(ResourceErrorText.retryDelayInvalid),
           ResourceErrorCode.invalidOption
         )
       )
