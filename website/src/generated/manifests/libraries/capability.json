@@ -612,6 +612,20 @@
                 "text": "Pure topology and incremental indexes share one private structural/edge admission owner. Static topology keeps its dense ordinal contract and constructs its index from the admitted snapshots without repeating edge validation. The trusted construction helper is not a module export."
               }
             ]
+          },
+          {
+            "id": "canonical-graph-values",
+            "heading": "Canonical Graph values",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "readiness 的 `ready/blocked/failed` 使用根入口 `GraphReadinessState`；节点阻塞原因使用 `@migaia/capability/graph` 的 `GraphBlockedReason`；binding 释放原因使用 `@migaia/capability/graph/dynamic` 的 `GraphBindingReleaseReason`。现有 `IGraphReadinessState`、 `IGraphBindingReleaseReason` 与 diagnostic `reason` 的取值不变。动态 remove/suspend 的 `IGraphDependencyMutationPolicy` 复用 `@migaia/capability/graph/dependency` 的 `DependencyPolicy."
+              },
+              {
+                "type": "paragraph",
+                "text": "reject/cascade`， 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建， 既有错误文案、native TypeError 和 code 保持原契约。"
+              }
+            ]
           }
         ]
       },
@@ -1289,6 +1303,20 @@
               {
                 "type": "paragraph",
                 "text": "Pure topology and incremental indexes share one private structural/edge admission owner. Static topology keeps its dense ordinal contract and constructs its index from the admitted snapshots without repeating edge validation. The trusted construction helper is not a module export."
+              }
+            ]
+          },
+          {
+            "id": "canonical-graph-values",
+            "heading": "Canonical Graph values",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "readiness 的 `ready/blocked/failed` 使用根入口 `GraphReadinessState`；节点阻塞原因使用 `@migaia/capability/graph` 的 `GraphBlockedReason`；binding 释放原因使用 `@migaia/capability/graph/dynamic` 的 `GraphBindingReleaseReason`。现有 `IGraphReadinessState`、 `IGraphBindingReleaseReason` 与 diagnostic `reason` 的取值不变。动态 remove/suspend 的 `IGraphDependencyMutationPolicy` 复用 `@migaia/capability/graph/dependency` 的 `DependencyPolicy."
+              },
+              {
+                "type": "paragraph",
+                "text": "reject/cascade`， 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建， 既有错误文案、native TypeError 和 code 保持原契约。"
               }
             ]
           }
@@ -2518,6 +2546,71 @@
             }
           ],
           "fragment": "capability-index--createCapabilityHost"
+        },
+        {
+          "name": "GraphReadinessState",
+          "kind": "const",
+          "signature": "export declare const GraphReadinessState: { /** Admission may proceed using the current readiness snapshot. */ readonly ready: \"ready\"; /** Admission is unavailable without declaring a terminal startup failure. */ readonly blocked: \"blocked\"; /** Admission failed; the paired snapshot error explains why. */ readonly failed: \"failed\"; };\nexport type GraphReadinessState = keyof typeof GraphReadinessState;",
+          "declarationLine": 7,
+          "source": "packages/capability/dist/graph-readiness.d.ts",
+          "purpose": "Graph availability states admitted by the readiness snapshot contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GraphReadinessState.",
+          "advanced": "No additional advanced behavior is declared for GraphReadinessState.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for GraphReadinessState."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GraphReadinessState.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "GraphReadinessState",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const GraphReadinessState: { /** Admission may proceed using the current readiness snapshot. */ readonly ready: \"ready\"; /** Admission is unavailable without declaring a terminal startup failure. */ readonly blocked: \"blocked\"; /** Admission failed; the paired snapshot error explains why. */ readonly failed: \"failed\"; };",
+            "export type GraphReadinessState = keyof typeof GraphReadinessState;"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "Use GraphReadinessState when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when GraphReadinessState does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Graph availability states admitted by the readiness snapshot contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import GraphReadinessState from @migaia/capability, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use GraphReadinessState when its const contract and declared inputs match the result you need. Choose a different public symbol when GraphReadinessState does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GraphReadinessState."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for GraphReadinessState."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/capability/dist/graph-readiness.d.ts:GraphReadinessState:export declare const GraphReadinessState: { /** Admission may proceed using the current readiness snapshot. */ readonly ready: \"ready\"; /** Admission is unavailable without declaring a terminal startup failure. */ readonly blocked: \"blocked\"; /** Admission failed; the paired snapshot error explains why. */ readonly failed: \"failed\"; };\nexport type GraphReadinessState = keyof typeof GraphReadinessState;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "capability-index--GraphReadinessState"
         },
         {
           "name": "ICapabilityDefinition",
@@ -4636,7 +4729,7 @@
           "name": "IGraphReadinessSnapshot",
           "kind": "type",
           "signature": "export type IGraphReadinessSnapshot = { readonly state: IGraphReadinessState; readonly error: unknown | undefined; };",
-          "declarationLine": 9,
+          "declarationLine": 19,
           "source": "packages/capability/dist/graph-readiness.d.ts",
           "purpose": "Immutable, one-time readiness fact passed to Graph and direct consumers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReadinessSnapshot.",
@@ -4699,10 +4792,10 @@
         {
           "name": "IGraphReadinessState",
           "kind": "type",
-          "signature": "export type IGraphReadinessState = 'ready' | 'blocked' | 'failed';",
-          "declarationLine": 7,
+          "signature": "export type IGraphReadinessState = GraphReadinessState;",
+          "declarationLine": 17,
           "source": "packages/capability/dist/graph-readiness.d.ts",
-          "purpose": "Graph availability states admitted by the readiness snapshot contract.",
+          "purpose": "Existing named readiness type retains the canonical availability domain.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReadinessState.",
           "advanced": "No additional advanced behavior is declared for IGraphReadinessState.",
           "parameters": ["This type declaration has no parameters."],
@@ -4714,9 +4807,7 @@
           "members": [],
           "aliasOf": "IGraphReadinessState",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export type IGraphReadinessState = 'ready' | 'blocked' | 'failed';"
-          ],
+          "overloadSignatures": ["export type IGraphReadinessState = GraphReadinessState;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use IGraphReadinessState when its type contract and declared inputs match the result you need.",
@@ -4725,7 +4816,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Graph availability states admitted by the readiness snapshot contract."
+              "content": "Existing named readiness type retains the canonical availability domain."
             },
             {
               "id": "getting-started",
@@ -4754,9 +4845,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph-readiness.d.ts:IGraphReadinessState:export type IGraphReadinessState = 'ready' | 'blocked' | 'failed';",
+          "identity": "packages/capability/dist/graph-readiness.d.ts:IGraphReadinessState:export type IGraphReadinessState = GraphReadinessState;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "capability-index--IGraphReadinessState"
         },
@@ -4764,7 +4855,7 @@
           "name": "snapshotGraphReadiness",
           "kind": "function",
           "signature": "export declare function snapshotGraphReadiness(source: ICapabilityReadinessSource): IGraphReadinessSnapshot;",
-          "declarationLine": 17,
+          "declarationLine": 27,
           "source": "packages/capability/dist/graph-readiness.d.ts",
           "purpose": "Reads Host readiness in fixed state-then-error order and freezes the result. Error instances propagate unchanged; foreign thrown values are tagged with their original value as cause.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for snapshotGraphReadiness.",
@@ -5209,6 +5300,71 @@
             }
           ],
           "fragment": "capability-graph--createCapabilityGraph"
+        },
+        {
+          "name": "GraphBlockedReason",
+          "kind": "const",
+          "signature": "export declare const GraphBlockedReason: { /** A required provider is absent from the current graph. */ readonly missing: \"missing\"; /** A required provider or its ancestor is suspended. */ readonly suspended: \"suspended\"; /** A required provider was explicitly removed from this graph. */ readonly removed: \"removed\"; /** A required provider failed to start or belongs to an unattributable failed batch. */ readonly failed: \"failed\"; };\nexport type GraphBlockedReason = keyof typeof GraphBlockedReason;",
+          "declarationLine": 24,
+          "source": "packages/capability/dist/graph/state-constants.d.ts",
+          "purpose": "Stable provider-unavailability reasons shared by static diagnostics and dynamic propagation.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GraphBlockedReason.",
+          "advanced": "No additional advanced behavior is declared for GraphBlockedReason.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for GraphBlockedReason."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GraphBlockedReason.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "GraphBlockedReason",
+          "exportPath": "./graph",
+          "overloadSignatures": [
+            "export declare const GraphBlockedReason: { /** A required provider is absent from the current graph. */ readonly missing: \"missing\"; /** A required provider or its ancestor is suspended. */ readonly suspended: \"suspended\"; /** A required provider was explicitly removed from this graph. */ readonly removed: \"removed\"; /** A required provider failed to start or belongs to an unattributable failed batch. */ readonly failed: \"failed\"; };",
+            "export type GraphBlockedReason = keyof typeof GraphBlockedReason;"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "Use GraphBlockedReason when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when GraphBlockedReason does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable provider-unavailability reasons shared by static diagnostics and dynamic propagation."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import GraphBlockedReason from @migaia/capability/graph, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use GraphBlockedReason when its const contract and declared inputs match the result you need. Choose a different public symbol when GraphBlockedReason does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GraphBlockedReason."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for GraphBlockedReason."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/capability/dist/graph/state-constants.d.ts:GraphBlockedReason:export declare const GraphBlockedReason: { /** A required provider is absent from the current graph. */ readonly missing: \"missing\"; /** A required provider or its ancestor is suspended. */ readonly suspended: \"suspended\"; /** A required provider was explicitly removed from this graph. */ readonly removed: \"removed\"; /** A required provider failed to start or belongs to an unattributable failed batch. */ readonly failed: \"failed\"; };\nexport type GraphBlockedReason = keyof typeof GraphBlockedReason;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "capability-graph--GraphBlockedReason"
         },
         {
           "name": "ICapabilityGraph",
@@ -5725,7 +5881,7 @@
         {
           "name": "IGraphNodeDiagnostic",
           "kind": "type",
-          "signature": "export type IGraphNodeDiagnostic = { readonly id: IGraphNodeId; readonly kind: string; readonly state: ICapabilityGraphNodeState; readonly value: unknown; readonly error: unknown; /** Cause for a blocked node when dependency availability is responsible. */ readonly reason?: 'missing' | 'suspended' | 'removed' | 'failed'; /** Optional composition binding retained by the dynamic owner. */ readonly binding?: unknown; /** Monotonic lifecycle generation for this node. */ readonly generation?: number; /** Stable registration ordinal retained across same-edge replacement. */ readonly ordinal?: number; /** Deterministic schedule rank retained when topology edges do not change. */ readonly rank?: number; /** Dependency depth retained when topology edges do not change. */ readonly level?: number; };",
+          "signature": "export type IGraphNodeDiagnostic = { readonly id: IGraphNodeId; readonly kind: string; readonly state: ICapabilityGraphNodeState; readonly value: unknown; readonly error: unknown; /** Cause for a blocked node when dependency availability is responsible. */ readonly reason?: GraphBlockedReason; /** Optional composition binding retained by the dynamic owner. */ readonly binding?: unknown; /** Monotonic lifecycle generation for this node. */ readonly generation?: number; /** Stable registration ordinal retained across same-edge replacement. */ readonly ordinal?: number; /** Deterministic schedule rank retained when topology edges do not change. */ readonly rank?: number; /** Dependency depth retained when topology edges do not change. */ readonly level?: number; };",
           "declarationLine": 43,
           "source": "packages/capability/dist/graph/index.d.ts",
           "purpose": "Terminal diagnostic snapshot for one node.",
@@ -5740,7 +5896,7 @@
           "members": [],
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export type IGraphNodeDiagnostic = { readonly id: IGraphNodeId; readonly kind: string; readonly state: ICapabilityGraphNodeState; readonly value: unknown; readonly error: unknown; /** Cause for a blocked node when dependency availability is responsible. */ readonly reason?: 'missing' | 'suspended' | 'removed' | 'failed'; /** Optional composition binding retained by the dynamic owner. */ readonly binding?: unknown; /** Monotonic lifecycle generation for this node. */ readonly generation?: number; /** Stable registration ordinal retained across same-edge replacement. */ readonly ordinal?: number; /** Deterministic schedule rank retained when topology edges do not change. */ readonly rank?: number; /** Dependency depth retained when topology edges do not change. */ readonly level?: number; };"
+            "export type IGraphNodeDiagnostic = { readonly id: IGraphNodeId; readonly kind: string; readonly state: ICapabilityGraphNodeState; readonly value: unknown; readonly error: unknown; /** Cause for a blocked node when dependency availability is responsible. */ readonly reason?: GraphBlockedReason; /** Optional composition binding retained by the dynamic owner. */ readonly binding?: unknown; /** Monotonic lifecycle generation for this node. */ readonly generation?: number; /** Stable registration ordinal retained across same-edge replacement. */ readonly ordinal?: number; /** Deterministic schedule rank retained when topology edges do not change. */ readonly rank?: number; /** Dependency depth retained when topology edges do not change. */ readonly level?: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5779,7 +5935,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/index.d.ts:IGraphNodeDiagnostic:export type IGraphNodeDiagnostic = { readonly id: IGraphNodeId; readonly kind: string; readonly state: ICapabilityGraphNodeState; readonly value: unknown; readonly error: unknown; /** Cause for a blocked node when dependency availability is responsible. */ readonly reason?: 'missing' | 'suspended' | 'removed' | 'failed'; /** Optional composition binding retained by the dynamic owner. */ readonly binding?: unknown; /** Monotonic lifecycle generation for this node. */ readonly generation?: number; /** Stable registration ordinal retained across same-edge replacement. */ readonly ordinal?: number; /** Deterministic schedule rank retained when topology edges do not change. */ readonly rank?: number; /** Dependency depth retained when topology edges do not change. */ readonly level?: number; };",
+          "identity": "packages/capability/dist/graph/index.d.ts:IGraphNodeDiagnostic:export type IGraphNodeDiagnostic = { readonly id: IGraphNodeId; readonly kind: string; readonly state: ICapabilityGraphNodeState; readonly value: unknown; readonly error: unknown; /** Cause for a blocked node when dependency availability is responsible. */ readonly reason?: GraphBlockedReason; /** Optional composition binding retained by the dynamic owner. */ readonly binding?: unknown; /** Monotonic lifecycle generation for this node. */ readonly generation?: number; /** Stable registration ordinal retained across same-edge replacement. */ readonly ordinal?: number; /** Deterministic schedule rank retained when topology edges do not change. */ readonly rank?: number; /** Dependency depth retained when topology edges do not change. */ readonly level?: number; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6470,7 +6626,7 @@
           "declaredConfiguration": [],
           "identity": "packages/capability/dist/graph/dependency.d.ts:DependencyPolicy:export declare const DependencyPolicy: { readonly reject: \"reject\"; readonly cascade: \"cascade\"; readonly suspend: \"suspend\"; };\nexport type DependencyPolicy = keyof typeof DependencyPolicy;",
           "guidance": [],
-          "usageScore": 10,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "capability-graph/dependency--DependencyPolicy"
         },
@@ -7749,7 +7905,7 @@
           "name": "createDynamicCapabilityGraph",
           "kind": "function",
           "signature": "export declare function createDynamicCapabilityGraph<TBinding = unknown>(options: IDynamicCapabilityGraphOptions<TBinding>): IDynamicCapabilityGraph<TBinding>;",
-          "declarationLine": 93,
+          "declarationLine": 96,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Creates a serialized dynamic graph with fail-closed required-edge reconciliation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createDynamicCapabilityGraph.",
@@ -7897,10 +8053,75 @@
           "fragment": "capability-graph/dynamic--createDynamicCapabilityGraph"
         },
         {
+          "name": "GraphBindingReleaseReason",
+          "kind": "const",
+          "signature": "export declare const GraphBindingReleaseReason: { /** The definition and its exact binding leave the graph. */ readonly remove: \"remove\"; /** Replacement relinquishes custody of the previous binding generation. */ readonly replace: \"replace\"; /** Terminal graph teardown relinquishes every remaining binding. */ readonly dispose: \"dispose\"; };\nexport type GraphBindingReleaseReason = keyof typeof GraphBindingReleaseReason;",
+          "declarationLine": 36,
+          "source": "packages/capability/dist/graph/state-constants.d.ts",
+          "purpose": "Stable custody-release reasons delivered to the composition-owned releaseBinding callback.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GraphBindingReleaseReason.",
+          "advanced": "No additional advanced behavior is declared for GraphBindingReleaseReason.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for GraphBindingReleaseReason."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for GraphBindingReleaseReason.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "GraphBindingReleaseReason",
+          "exportPath": "./graph/dynamic",
+          "overloadSignatures": [
+            "export declare const GraphBindingReleaseReason: { /** The definition and its exact binding leave the graph. */ readonly remove: \"remove\"; /** Replacement relinquishes custody of the previous binding generation. */ readonly replace: \"replace\"; /** Terminal graph teardown relinquishes every remaining binding. */ readonly dispose: \"dispose\"; };",
+            "export type GraphBindingReleaseReason = keyof typeof GraphBindingReleaseReason;"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "Use GraphBindingReleaseReason when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when GraphBindingReleaseReason does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable custody-release reasons delivered to the composition-owned releaseBinding callback."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import GraphBindingReleaseReason from @migaia/capability/graph/dynamic, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use GraphBindingReleaseReason when its const contract and declared inputs match the result you need. Choose a different public symbol when GraphBindingReleaseReason does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for GraphBindingReleaseReason."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for GraphBindingReleaseReason."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/capability/dist/graph/state-constants.d.ts:GraphBindingReleaseReason:export declare const GraphBindingReleaseReason: { /** The definition and its exact binding leave the graph. */ readonly remove: \"remove\"; /** Replacement relinquishes custody of the previous binding generation. */ readonly replace: \"replace\"; /** Terminal graph teardown relinquishes every remaining binding. */ readonly dispose: \"dispose\"; };\nexport type GraphBindingReleaseReason = keyof typeof GraphBindingReleaseReason;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "capability-graph/dynamic--GraphBindingReleaseReason"
+        },
+        {
           "name": "IDynamicCapabilityGraph",
           "kind": "type",
           "signature": "export type IDynamicCapabilityGraph<TBinding = unknown> = Readonly<{ readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly generation: number; register<T>(node: IDynamicGraphNodeDefinition<T>, binding?: TBinding): Promise<IGraphMutationResult>; remove(id: IGraphNodeId, options?: IGraphDependencyMutationOptions): Promise<IGraphMutationResult>; suspend(id: IGraphNodeId, options?: IGraphDependencyMutationOptions): Promise<IGraphMutationResult>; resume(id: IGraphNodeId): Promise<IGraphMutationResult>; dependentsOf(id: IGraphNodeId): IGraphDependents; replace<T>(node: IDynamicGraphNodeDefinition<T>, binding?: TBinding, options?: IGraphReplaceOptions<TBinding>): Promise<IGraphMutationResult>; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; getBinding<T = TBinding>(id: IGraphNodeId): T | undefined; acquireBinding(id: IGraphNodeId): IGraphBindingLease<TBinding>; dispose(): Promise<void>; }>;",
-          "declarationLine": 76,
+          "declarationLine": 79,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Dynamic required-edge graph used by composition owners.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicCapabilityGraph.",
@@ -7963,7 +8184,7 @@
           "name": "IDynamicCapabilityGraphOptions",
           "kind": "type",
           "signature": "export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{ /** * Receives contained startup, release, and late failures without replacing the primary graph * result. */ readonly report?: (error: unknown) => void; /** Maximum time an accepted mutation may wait behind an older serialized mutation. */ readonly mutationAdmissionMs?: number; /** Composition-owned startup for one topologically ordered affected frontier. Required. */ readonly startBatch: (entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>; /** Composition-owned physical release for one sealed cascade. Required. */ readonly releaseBatch: (entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>; /** Releases custody for an exact binding generation after its instance cleanup fence. */ readonly releaseBinding?: (entry: IGraphBindingReleaseEntry<TBinding>) => void | PromiseLike<void>; }>;",
-          "declarationLine": 35,
+          "declarationLine": 38,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Runtime-neutral dynamic graph options. The composition owner supplies `startBatch` and `releaseBatch`; the graph owns ordering, reconciliation and binding custody only.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicCapabilityGraphOptions.",
@@ -8026,7 +8247,7 @@
           "name": "IDynamicGraphDependency",
           "kind": "type",
           "signature": "export type IDynamicGraphDependency = Readonly<{ readonly provider: IGraphNodeId; readonly required: boolean; }>;",
-          "declarationLine": 23,
+          "declarationLine": 26,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Dynamic graph dependency edge; optional edges do not block or cascade.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicGraphDependency.",
@@ -8089,7 +8310,7 @@
           "name": "IDynamicGraphNodeDefinition",
           "kind": "type",
           "signature": "export type IDynamicGraphNodeDefinition<T> = Omit<IGraphNodeDefinition<T>, 'dependencies'> & Readonly<{ readonly dependencies: readonly IDynamicGraphDependency[]; }>;",
-          "declarationLine": 28,
+          "declarationLine": 31,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Dynamic node definition supporting required and optional provider edges.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IDynamicGraphNodeDefinition.",
@@ -8152,7 +8373,7 @@
           "name": "IGraphBindingLease",
           "kind": "type",
           "signature": "export type IGraphBindingLease<TBinding> = Readonly<{ readonly value: TBinding; readonly release: () => void; }>;",
-          "declarationLine": 59,
+          "declarationLine": 62,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Exact binding-generation lease retained by a consumer until it no longer observes the value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingLease.",
@@ -8215,7 +8436,7 @@
           "name": "IGraphBindingReleaseEntry",
           "kind": "type",
           "signature": "export type IGraphBindingReleaseEntry<TBinding> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding; readonly reason: IGraphBindingReleaseReason; }>;",
-          "declarationLine": 53,
+          "declarationLine": 56,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Exact binding custody released after graph-owned instance cleanup.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseEntry.",
@@ -8277,8 +8498,8 @@
         {
           "name": "IGraphBindingReleaseReason",
           "kind": "type",
-          "signature": "export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose';",
-          "declarationLine": 51,
+          "signature": "export type IGraphBindingReleaseReason = GraphBindingReleaseReason;",
+          "declarationLine": 54,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Identifies why one exact graph binding generation left the graph.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphBindingReleaseReason.",
@@ -8292,7 +8513,7 @@
           "members": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
-            "export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose';"
+            "export type IGraphBindingReleaseReason = GraphBindingReleaseReason;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8331,9 +8552,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dynamic.d.ts:IGraphBindingReleaseReason:export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose';",
+          "identity": "packages/capability/dist/graph/dynamic.d.ts:IGraphBindingReleaseReason:export type IGraphBindingReleaseReason = GraphBindingReleaseReason;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "capability-graph/dynamic--IGraphBindingReleaseReason"
         },
@@ -8341,7 +8562,7 @@
           "name": "IGraphDependencyMutationOptions",
           "kind": "type",
           "signature": "export type IGraphDependencyMutationOptions = Readonly<{ readonly policy?: IGraphDependencyMutationPolicy; }>;",
-          "declarationLine": 14,
+          "declarationLine": 17,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Options for removal and suspension.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphDependencyMutationOptions.",
@@ -8403,8 +8624,8 @@
         {
           "name": "IGraphDependencyMutationPolicy",
           "kind": "type",
-          "signature": "export type IGraphDependencyMutationPolicy = 'reject' | 'cascade';",
-          "declarationLine": 11,
+          "signature": "export type IGraphDependencyMutationPolicy = Exclude<DependencyPolicy, typeof DependencyPolicy.suspend>;",
+          "declarationLine": 14,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Policy used when a node still has required dependents.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphDependencyMutationPolicy.",
@@ -8418,7 +8639,7 @@
           "members": [],
           "exportPath": "./graph/dynamic",
           "overloadSignatures": [
-            "export type IGraphDependencyMutationPolicy = 'reject' | 'cascade';"
+            "export type IGraphDependencyMutationPolicy = Exclude<DependencyPolicy, typeof DependencyPolicy.suspend>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8457,9 +8678,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/dynamic.d.ts:IGraphDependencyMutationPolicy:export type IGraphDependencyMutationPolicy = 'reject' | 'cascade';",
+          "identity": "packages/capability/dist/graph/dynamic.d.ts:IGraphDependencyMutationPolicy:export type IGraphDependencyMutationPolicy = Exclude<DependencyPolicy, typeof DependencyPolicy.suspend>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "capability-graph/dynamic--IGraphDependencyMutationPolicy"
         },
@@ -8531,7 +8752,7 @@
           "name": "IGraphMutationResult",
           "kind": "type",
           "signature": "export type IGraphMutationResult = Readonly<{ readonly affected: readonly IGraphNodeId[]; readonly topologyChanged: boolean; readonly generation: number; }>;",
-          "declarationLine": 5,
+          "declarationLine": 8,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Result returned after one dynamic graph mutation commits.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphMutationResult.",
@@ -8594,7 +8815,7 @@
           "name": "IGraphReleaseEntry",
           "kind": "type",
           "signature": "export type IGraphReleaseEntry<TBinding = unknown> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding | undefined; readonly instance: IGraphNodeInstance<unknown>; }>;",
-          "declarationLine": 70,
+          "declarationLine": 73,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Immutable view of one graph node supplied to a composition release owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReleaseEntry.",
@@ -8657,7 +8878,7 @@
           "name": "IGraphReplaceOptions",
           "kind": "type",
           "signature": "export type IGraphReplaceOptions<TBinding> = Readonly<{ readonly restartDependents?: boolean; readonly onReplaced?: (dependent: IGraphNodeId, nextBinding: TBinding | undefined) => void | PromiseLike<void>; }>;",
-          "declarationLine": 18,
+          "declarationLine": 21,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Controls whether replacement restarts or notifies dependent nodes.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphReplaceOptions.",
@@ -8720,7 +8941,7 @@
           "name": "IGraphStartEntry",
           "kind": "type",
           "signature": "export type IGraphStartEntry<TBinding = unknown> = Readonly<{ readonly id: IGraphNodeId; readonly binding: TBinding | undefined; readonly definition: IDynamicGraphNodeDefinition<unknown>; }>;",
-          "declarationLine": 64,
+          "declarationLine": 67,
           "source": "packages/capability/dist/graph/dynamic.d.ts",
           "purpose": "Immutable node information supplied to a composition startup owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IGraphStartEntry.",

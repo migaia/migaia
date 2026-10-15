@@ -6,6 +6,7 @@
         "CapabilityEnableStatus",
         "CapabilityErrorCode",
         "CapabilityState",
+        "GraphReadinessState",
         "createCapabilityHost",
         "snapshotGraphReadiness"
       ],
@@ -14,6 +15,7 @@
         "CapabilityGraphErrorCode",
         "CapabilityGraphNodeState",
         "CapabilityGraphState",
+        "GraphBlockedReason",
         "TopologyInvalidReason",
         "buildCapabilityTopology",
         "createCapabilityGraph"
@@ -38,6 +40,7 @@
         "resolveInstallSet"
       ],
       "./graph/dynamic": [
+        "GraphBindingReleaseReason",
         "createDynamicCapabilityGraph"
       ]
     },
