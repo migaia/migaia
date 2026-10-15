@@ -410,9 +410,11 @@ export class SharedInt32Signal implements IObservable, IDisposable {
 
   get value(): number {
     this.#assertActive()
-    this.sync()
+    /** Reuse a stable seqlock snapshot; publication may synchronously run a writer. */
+    const snapshot = this.#read()
+    const changed = this.#syncVersion(snapshot.version)
     this.#binding.source.track()
-    return this.#read().value
+    return changed ? this.#read().value : snapshot.value
   }
 
   set value(next: number) {
@@ -441,7 +443,11 @@ export class SharedInt32Signal implements IObservable, IDisposable {
    */
   sync(): boolean {
     this.#assertActive()
-    const { version } = this.#read()
+    return this.#syncVersion(this.#read().version)
+  }
+
+  /** Publishes one remote version; its synchronous fanout can change the underlying value. */
+  #syncVersion(version: bigint): boolean {
     if (version === this.#observedSharedVersion) return false
     this.#observedSharedVersion = version
     this.#binding.source.notify()
