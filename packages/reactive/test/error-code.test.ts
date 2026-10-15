@@ -402,7 +402,7 @@ describe('M-T41 (§3.7.5): (source, code) tagging never damages stack or the cau
   it('tagging an existing error preserves its constructor identity (RangeError stays a RangeError)', () => {
     let caught: unknown
     try {
-      new Scheduler(undefined, 0)
+      createRuntime({ maxFlushPasses: 0 })
     } catch (error) {
       caught = error
     }

@@ -50,18 +50,13 @@ export class Scheduler {
   /** Reports scheduler failures, optionally identifying the cause-read phase. */
   #onAsyncError: (error: unknown, phase?: IReactiveErrorPhase) => void
 
+  /** Consumes the flush bound already admitted by the public Runtime constructor. */
   constructor(
     onAsyncError: (error: unknown, phase?: IReactiveErrorPhase) => void = (error, phase) =>
       defaultRuntimeAdapter.reportError(error, { phase: phase ?? ReactiveErrorPhase.asyncFlush }),
     maxFlushPasses = 100,
     scheduleMicrotask: (task: () => void) => void = defaultRuntimeAdapter.scheduleMicrotask
   ) {
-    if (!Number.isSafeInteger(maxFlushPasses) || maxFlushPasses < 1) {
-      throw tagReactiveError(
-        new RangeError(ReactiveErrorText.maxFlushPassesInvalid),
-        ReactiveErrorCode.invalidOption
-      )
-    }
     this.#onAsyncError = onAsyncError
     this.#maxFlushPasses = maxFlushPasses
     // 默认冲刷走注入的微任务调度入口，不直接 queueMicrotask。
