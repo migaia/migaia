@@ -29,7 +29,7 @@ import type {
   IStyledEventChannel,
   IStyledEventChannelOptions
 } from './types.js'
-import { createSubscriptionHandle, installSubscriptionSource } from './internal/subscription.js'
+import { createRawSubscriptionOwner, installSubscriptionSource } from './internal/subscription.js'
 import { isRecord } from './internal/record.js'
 import {
   EventAdmissionPolicy,
@@ -736,7 +736,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       /** A duplicate handle may release the shared owner only after projection succeeds. */
       let bound = false
       try {
-        const handle = createSubscriptionHandle(
+        const handle = createRawSubscriptionOwner(
           shared
             ? () => {
                 if (bound) shared()

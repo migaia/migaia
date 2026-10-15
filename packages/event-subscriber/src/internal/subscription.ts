@@ -105,9 +105,6 @@ export const createRawSubscriptionOwner = <T extends ISubscriptionHandle<unknown
   return handle
 }
 
-/** Builds public subscription handles through the shared raw owner. */
-export const createSubscriptionHandle = createRawSubscriptionOwner
-
 /** Installs one structural source subscription with the canonical synchronous-delivery guard. */
 export const installSubscriptionSource = <TEvent, R>(
   subscribe: (listener: (event: TEvent) => R) => unknown,
