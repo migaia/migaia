@@ -113,9 +113,11 @@ export class DependencyTracker {
 
   /** Stages a dependency in the current frame. Cross-runtime reads throw immediately. */
   track(observable: IObservable): void {
-    this.#assertObservableOwner(observable)
     if (activeTracker === this) {
-      this.#top?.nextDeps.add(observable)
+      if (this.#top !== null) {
+        this.#assertObservableOwner(observable)
+        this.#top.nextDeps.add(observable)
+      }
       return
     }
     // 派发到的是本 observable 所属 runtime 的 tracker；若它不是当前活跃 tracker 而别处正在追踪 → 跨 runtime
