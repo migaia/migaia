@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createDynamicCapabilityGraph,
-  type IDynamicCapabilityGraph,
-  type IGraphMutationResult,
-  type IGraphTraversalMetrics
+  type IDynamicCapabilityGraph
 } from '../../src/graph/dynamic.js'
 import {
   CapabilityGraphErrorCode,
@@ -270,8 +268,7 @@ describe('dynamic capability graph', () => {
     await graph.dispose()
   })
 
-  it('TPD-T08 preserves node identity and bounded traversal on same-edge replacement', async () => {
-    const samples: IGraphMutationResult[] = []
+  it('TPD-T08 preserves node identity on same-edge replacement across graph sizes', async () => {
     const states: IGraphNodeDiagnostic[] = []
     const sizes: number[] = []
     for (const unrelatedCount of [0, 1_000, 4_000, 8_000]) {
@@ -282,12 +279,11 @@ describe('dynamic capability graph', () => {
         await graph.register(node(`unrelated-${index}`))
       const before = graph.nodeState('consumer' as IGraphNodeId)
       const result = await graph.replace(node('consumer', ['provider']))
-      samples.push(result)
       states.push(graph.nodeState('consumer' as IGraphNodeId))
       sizes.push(graph.nodes.length)
       expect(result.topologyChanged).toBe(false)
       expect(result.affected).toEqual(['consumer'])
-      expect(result.metrics.fullScan).toBe(false)
+      expect(result).not.toHaveProperty('metrics')
       expect(graph.nodeState('consumer' as IGraphNodeId).state).toBe('ready')
       expect(states.at(-1)?.ordinal).toBe(before.ordinal)
       expect(states.at(-1)?.rank).toBe(before.rank)
@@ -295,17 +291,6 @@ describe('dynamic capability graph', () => {
       await graph.dispose()
     }
     expect(sizes).toEqual([2, 1_002, 4_002, 8_002])
-    /** Scale-invariant index node visits for the same-edge leaf replacement. */
-    const visitedNodes = samples.map(({ metrics }) => metrics.visitedNodes)
-    /** Scale-invariant index edge visits for the same-edge leaf replacement. */
-    const visitedEdges = samples.map(({ metrics }) => metrics.visitedEdges)
-    /** Scale-invariant compatibility counter derived from index traversal. */
-    const queueOperations = samples.map(({ metrics }) => metrics.queueOperations)
-    expect(new Set(visitedNodes)).toEqual(new Set([visitedNodes[0]]))
-    expect(new Set(visitedEdges)).toEqual(new Set([visitedEdges[0]]))
-    expect(new Set(queueOperations)).toEqual(new Set([queueOperations[0]]))
-    expect(visitedNodes[0]).toBeLessThanOrEqual(2)
-    expect(visitedEdges[0]).toBeLessThanOrEqual(2)
     expect(states.map(({ ordinal, rank, level }) => [ordinal, rank, level])).toEqual([
       [1, 1, 1],
       [1, 1_001, 1],
@@ -314,17 +299,11 @@ describe('dynamic capability graph', () => {
     ])
   })
 
-  it('TPD-T56 keeps large sparse and dense mutations on the affected frontier', async () => {
+  it('TPD-T56 reconciles the affected frontier in large sparse and dense graphs', async () => {
     const samples: Array<{
       readonly size: number
       readonly backgroundNodes: number
       readonly dense: boolean
-      readonly vDelta: number
-      readonly eDelta: number
-      readonly visited: number
-      readonly queue: number
-      readonly queueTimeMs: number
-      readonly metrics: IGraphTraversalMetrics
     }> = []
     for (const backgroundNodes of [1, 1_000, 2_000, 4_000, 8_000]) {
       for (const dense of [false, true]) {
@@ -346,34 +325,16 @@ describe('dynamic capability graph', () => {
         for (let index = 0; index < backgroundNodes; index += 1)
           await graph.register(node(`unrelated-${index}`))
         const expectedAffected = ['target', ...frontier]
-        const expectedEdges = dense
-          ? frontier.reduce((total, _id, index) => total + 1 + Math.min(8, index), 0)
-          : frontier.length
         const result = await graph.replace(node('target'))
         samples.push({
           size: graph.nodes.length,
           backgroundNodes,
-          dense,
-          vDelta: result.metrics.visitedNodes,
-          eDelta: result.metrics.visitedEdges,
-          visited: result.metrics.visitedNodes,
-          queue: result.metrics.queueOperations,
-          queueTimeMs: result.metrics.queueTimeMs,
-          metrics: result.metrics
+          dense
         })
         expect(result.affected).toEqual(expectedAffected)
-        expect(result.metrics.fullScan).toBe(false)
-        // Index counts (BC2): closure and ordering each touch the affected frontier once, so the
-        // node count is bounded by twice the frontier and the edge count by its edges plus one
-        // reverse lookup per member; neither may depend on the background size (checked below).
-        expect(result.metrics.visitedNodes).toBeLessThanOrEqual(expectedAffected.length * 2)
-        expect(result.metrics.visitedEdges).toBeLessThanOrEqual(
-          (expectedEdges + expectedAffected.length) * 2
-        )
-        expect(result.metrics.queueOperations).toBe(expectedAffected.length)
-        expect(Number.isFinite(result.metrics.queueTimeMs)).toBe(true)
-        expect(result.metrics.queueTimeMs).toBeGreaterThanOrEqual(0)
-        expect(Number.isFinite(result.metrics.wallTimeMs)).toBe(true)
+        expect(result).not.toHaveProperty('metrics')
+        for (const id of expectedAffected)
+          expect(graph.nodeState(id as IGraphNodeId).state).toBe('ready')
         await graph.dispose()
       }
     }
@@ -384,25 +345,5 @@ describe('dynamic capability graph', () => {
     expect(samples.map(({ size }) => size)).toEqual([
       34, 34, 1_033, 1_033, 2_033, 2_033, 4_033, 4_033, 8_033, 8_033
     ])
-    // Scale invariance: for each density, every background size reports identical counts.
-    for (const dense of [false, true]) {
-      const series = samples.filter((sample) => sample.dense === dense)
-      expect(new Set(series.map(({ vDelta }) => vDelta)).size).toBe(1)
-      expect(new Set(series.map(({ eDelta }) => eDelta)).size).toBe(1)
-      expect(new Set(series.map(({ queue }) => queue)).size).toBe(1)
-    }
-    expect(samples.map(({ visited }) => visited)).toEqual(samples.map(({ vDelta }) => vDelta))
-    expect(samples.every(({ queueTimeMs }) => Number.isFinite(queueTimeMs))).toBe(true)
-    expect(samples.every(({ queueTimeMs }) => queueTimeMs >= 0)).toBe(true)
-    // Exact index counts for this fixture (33 affected nodes): closure plus ordering visit each
-    // node twice; edges are the frontier's reverse lookups (sparse 32, dense 252).
-    expect(samples.map(({ vDelta }) => vDelta)).toEqual(Array(10).fill(66))
-    expect(samples.map(({ queue }) => queue)).toEqual(Array(10).fill(33))
-    expect(samples.filter(({ dense }) => dense).map(({ eDelta }) => eDelta)).toEqual(
-      Array(5).fill(252)
-    )
-    expect(samples.filter(({ dense }) => !dense).map(({ eDelta }) => eDelta)).toEqual(
-      Array(5).fill(32)
-    )
   }, 20_000)
 })

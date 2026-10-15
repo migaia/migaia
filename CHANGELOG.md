@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+- Capability topology readers no longer expose `metrics()` or
+  `ITopologyIndexMetrics`. Dynamic mutation results no longer contain `metrics`
+  or export `IGraphTraversalMetrics`. Use `affected`, `topologyChanged` and
+  `generation` for business outcomes; traversal counters and wall-clock sampling
+  have been removed from production rather than moved to another public seam.
+
 - CapabilityHost removes `enableResult`, `enableLegacyBoolean` and `disableNow`.
   Use `enable()` for the structured result and derive a boolean from its status
   when needed. `disable()` starts revocation synchronously and returns a Promise

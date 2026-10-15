@@ -18,8 +18,7 @@ import {
   createTopologyIndex,
   TopologyInvalidReason,
   type IGraphDependents,
-  type ITopologyIndex,
-  type ITopologyIndexMetrics
+  type ITopologyIndex
 } from './topology.js'
 import type {
   IGraphNodeDefinition,
@@ -33,22 +32,11 @@ import {
   createQuiescenceTracker
 } from '@migaia/lifecycle'
 
-/** Deterministic traversal counters for one dynamic mutation. */
-export type IGraphTraversalMetrics = Readonly<{
-  readonly visitedNodes: number
-  readonly visitedEdges: number
-  readonly queueOperations: number
-  readonly queueTimeMs: number
-  readonly fullScan: boolean
-  readonly wallTimeMs: number
-}>
-
 /** Result returned after one dynamic graph mutation commits. */
 export type IGraphMutationResult = Readonly<{
   readonly affected: readonly IGraphNodeId[]
   readonly topologyChanged: boolean
   readonly generation: number
-  readonly metrics: IGraphTraversalMetrics
 }>
 
 /** Policy used when a node still has required dependents. */
@@ -176,15 +164,6 @@ type IStoredNode<TBinding> = {
   leaseKey: object
 }
 
-type IMutableTraversalMetrics = {
-  visitedNodes: number
-  visitedEdges: number
-  queueOperations: number
-  fullScan: boolean
-  startedAt: number
-  queueTimeMs: number
-}
-
 /** Creates a serialized dynamic graph with fail-closed required-edge reconciliation. */
 export function createDynamicCapabilityGraph<TBinding = unknown>(
   options: IDynamicCapabilityGraphOptions<TBinding>
@@ -195,48 +174,6 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   let disposePromise: Promise<void> | undefined
   /** Sole authority for exact binding-generation acquire/seal/drain fences. */
   const bindingLeases = createQuiescenceTracker<object>()
-  let traversalMetrics: IMutableTraversalMetrics = {
-    visitedNodes: 0,
-    visitedEdges: 0,
-    queueOperations: 0,
-    fullScan: false,
-    startedAt: Date.now(),
-    queueTimeMs: 0
-  }
-  /** Cumulative index counters captured at the start of the current mutation. */
-  let topologyMetricBaseline: ITopologyIndexMetrics = { visitedNodes: 0, visitedEdges: 0 }
-
-  /** Starts deterministic per-mutation instrumentation without changing graph semantics. */
-  const beginMetrics = (queueTimeMs = 0): void => {
-    topologyMetricBaseline = topologyIndex.metrics()
-    traversalMetrics = {
-      visitedNodes: 0,
-      visitedEdges: 0,
-      queueOperations: 0,
-      fullScan: false,
-      startedAt: Date.now(),
-      queueTimeMs
-    }
-  }
-
-  /** Freezes traversal counters for acceptance evidence and diagnostics. */
-  const readMetrics = (): IGraphTraversalMetrics => {
-    /** Raw topology-index counters for the accepted mutation. */
-    const current = topologyIndex.metrics()
-    /** Index node visits made by this mutation (closure, ordering, level upkeep). */
-    const visitedNodes = current.visitedNodes - topologyMetricBaseline.visitedNodes
-    /** Index edge visits made by this mutation. */
-    const visitedEdges = current.visitedEdges - topologyMetricBaseline.visitedEdges
-    return Object.freeze({
-      visitedNodes,
-      visitedEdges,
-      queueOperations: traversalMetrics.queueOperations,
-      queueTimeMs: traversalMetrics.queueTimeMs,
-      fullScan: traversalMetrics.fullScan,
-      wallTimeMs: Math.max(0, Date.now() - traversalMetrics.startedAt)
-    })
-  }
-
   /** Reports secondary cleanup failures without changing the mutation primary. */
   const report = (error: unknown): void => {
     try {
@@ -291,8 +228,6 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
    * `GRAPH_MUTATION_ADMISSION_TIMEOUT`, keeping the lifecycle timeout on `cause`.
    */
   const schedule = <T>(task: () => Promise<T>): Promise<T> => {
-    /** Enqueue time used for the per-mutation queue metric. */
-    const enqueuedAt = Date.now()
     /** True once the queue admitted this mutation; separates task failures from admission timeouts. */
     let admitted = false
     return mutationQueue
@@ -300,7 +235,6 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         admitted = true
         // Keep the mutation body asynchronous relative to the caller, as the former Promise chain did.
         await undefined
-        beginMetrics(Math.max(0, Date.now() - enqueuedAt))
         return task()
       })
       .catch((error: unknown) => {
@@ -359,10 +293,8 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
 
   /** Resolves one canonical index order into lifecycle entries. */
   const readOrderedEntries = (ids?: Iterable<string>): IStoredNode<TBinding>[] => {
-    if (!ids) traversalMetrics.fullScan = true
     /** Frontier entries handed to the start or release owner. */
     const entries = topologyIndex.order(ids).map((id) => definitions.get(id)!)
-    traversalMetrics.queueOperations += entries.length
     return entries
   }
 
@@ -594,8 +526,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         return {
           affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
           topologyChanged: true,
-          generation: graphGeneration,
-          metrics: readMetrics()
+          generation: graphGeneration
         }
       })
     },
@@ -619,8 +550,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         return {
           affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
           topologyChanged: true,
-          generation: graphGeneration,
-          metrics: readMetrics()
+          generation: graphGeneration
         }
       })
     },
@@ -640,8 +570,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         return {
           affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
           topologyChanged: false,
-          generation: graphGeneration,
-          metrics: readMetrics()
+          generation: graphGeneration
         }
       })
     },
@@ -676,8 +605,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         return {
           affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
           topologyChanged: false,
-          generation: graphGeneration,
-          metrics: readMetrics()
+          generation: graphGeneration
         }
       })
     },
@@ -743,8 +671,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           return {
             affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
             topologyChanged: !sameTopology,
-            generation: graphGeneration,
-            metrics: readMetrics()
+            generation: graphGeneration
           }
         }
         await release(affected, new Set([node.id]), 'replace')
@@ -756,8 +683,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         return {
           affected: Object.freeze(affected.map((item) => item.definition.id as IGraphNodeId)),
           topologyChanged: !sameTopology,
-          generation: graphGeneration,
-          metrics: readMetrics()
+          generation: graphGeneration
         }
       })
     },

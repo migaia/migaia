@@ -22,11 +22,6 @@ export type IGraphDependents = Readonly<{
   readonly optional: readonly string[]
 }>
 
-export type ITopologyIndexMetrics = Readonly<{
-  readonly visitedNodes: number
-  readonly visitedEdges: number
-}>
-
 export type ITopologyIndexReader = Readonly<{
   readonly size: number
   has(id: string): boolean
@@ -36,7 +31,6 @@ export type ITopologyIndexReader = Readonly<{
   closure(roots: readonly string[]): readonly string[]
   order(ids?: Iterable<string>): readonly string[]
   snapshot(): ICapabilityTopology
-  metrics(): ITopologyIndexMetrics
 }>
 
 export type ITopologyIndexWriter = Readonly<{
@@ -180,26 +174,14 @@ class TopologyIndex implements ITopologyIndex {
   /** Nodes indexed by stable ID, including monotonic ordinal and current level. */
   readonly #nodes: IKeyedStore<string, IStoredTopologyNode>
 
-  /** Reverse adjacency for present and dangling provider IDs. */
+  /** Requiredness indexed by consumer in registration order, including dangling provider IDs. */
   readonly #consumers: IKeyedStore<string, Map<string, boolean>>
 
   /** Next monotonic registration ordinal; removals never reclaim it. */
   #nextOrdinal: number
 
-  /** Cumulative node visits exposed by the performance oracle. */
-  #visitedNodes: number
-
-  /** Cumulative edge visits exposed by the performance oracle. */
-  #visitedEdges: number
-
   /** Whether one isolated transaction currently owns mutation authority. */
   #transactionOpen = false
-
-  /**
-   * Counter values this view started from. A transaction view reports only its own visits on
-   * commit, so base reads made while the transaction was open are not overwritten.
-   */
-  readonly #visitBaseline: ITopologyIndexMetrics
 
   /**
    * Creates an empty index, or — given `parent` — a transaction working view whose stores overlay
@@ -210,9 +192,6 @@ class TopologyIndex implements ITopologyIndex {
     this.#nodes = parent ? new OverlayStore(parent.#nodes) : new Map()
     this.#consumers = parent ? new OverlayStore(parent.#consumers) : new Map()
     this.#nextOrdinal = parent ? parent.#nextOrdinal : 0
-    this.#visitedNodes = parent ? parent.#visitedNodes : 0
-    this.#visitedEdges = parent ? parent.#visitedEdges : 0
-    this.#visitBaseline = { visitedNodes: this.#visitedNodes, visitedEdges: this.#visitedEdges }
   }
 
   /** Number of currently present nodes. */
@@ -220,30 +199,25 @@ class TopologyIndex implements ITopologyIndex {
     return this.#nodes.size
   }
 
-  /** Reports membership while accounting for one direct node lookup. */
+  /** Reports membership with one direct node lookup. */
   has(id: string): boolean {
-    this.#visitedNodes += 1
     return this.#nodes.has(id)
   }
 
   /** Returns the frozen dependency facts for one present node. */
   dependencies(id: string): readonly ITopologyDependency[] {
     const node = this.#requireNode(id)
-    this.#visitedNodes += 1
-    this.#visitedEdges += node.dependencies.length
     return node.dependencies
   }
 
   /** Returns direct present dependents split by required and optional edge kind. */
   dependents(id: string): IGraphDependents {
     this.#requireNode(id)
-    this.#visitedNodes += 1
     /** Required consumers in registration order. */
     const required: string[] = []
     /** Optional consumers in registration order. */
     const optional: string[] = []
     for (const [consumerId, requiredEdge] of this.#consumers.get(id) ?? []) {
-      this.#visitedEdges += 1
       ;(requiredEdge ? required : optional).push(consumerId)
     }
     return Object.freeze({
@@ -255,11 +229,9 @@ class TopologyIndex implements ITopologyIndex {
   /** Returns edges from one node to providers not currently present. */
   missing(id: string): readonly ITopologyDependency[] {
     const node = this.#requireNode(id)
-    this.#visitedNodes += 1
     /** Dangling edges retained in declaration order. */
     const missing: ITopologyDependency[] = []
     for (const dependency of node.dependencies) {
-      this.#visitedEdges += 1
       if (!this.#nodes.has(dependency.provider)) missing.push(dependency)
     }
     return Object.freeze(missing)
@@ -280,9 +252,7 @@ class TopologyIndex implements ITopologyIndex {
     }
     for (let index = 0; index < queue.length; index += 1) {
       const provider = queue[index]!
-      this.#visitedNodes += 1
       for (const [consumerId, required] of this.#consumers.get(provider) ?? []) {
-        this.#visitedEdges += 1
         if (!required || reached.has(consumerId)) continue
         reached.add(consumerId)
         queue.push(consumerId)
@@ -296,7 +266,6 @@ class TopologyIndex implements ITopologyIndex {
     /** Requested IDs, deduplicated without changing their semantic set. */
     const selected = ids ? new Set(ids) : new Set(this.#nodes.keys())
     for (const id of selected) this.#requireNode(id)
-    this.#visitedNodes += selected.size
     return Object.freeze(this.#sortCanonical(selected))
   }
 
@@ -306,7 +275,6 @@ class TopologyIndex implements ITopologyIndex {
     const ordinalNodes = [...this.#nodes.values()].sort(
       (left, right) => left.ordinal - right.ordinal
     )
-    this.#visitedNodes += ordinalNodes.length
     /** Frozen public nodes keyed by ID. */
     const publicNodes = new Map<string, ITopologyNode>()
     for (let ordinal = 0; ordinal < ordinalNodes.length; ordinal += 1) {
@@ -331,7 +299,6 @@ class TopologyIndex implements ITopologyIndex {
       consumerEntries.push([node.id, node.dependencies])
       let indegree = 0
       for (const dependency of node.dependencies) {
-        this.#visitedEdges += 1
         const provider = publicNodes.get(dependency.provider)
         if (!provider) continue
         indegree += 1
@@ -356,14 +323,6 @@ class TopologyIndex implements ITopologyIndex {
       indegree: createReadonlyMap(indegreeEntries),
       level: createReadonlyMap(levelEntries),
       ordinal: createReadonlyMap(ordinalEntries)
-    })
-  }
-
-  /** Returns cumulative traversal counters without changing them. */
-  metrics(): ITopologyIndexMetrics {
-    return Object.freeze({
-      visitedNodes: this.#visitedNodes,
-      visitedEdges: this.#visitedEdges
     })
   }
 
@@ -419,9 +378,7 @@ class TopologyIndex implements ITopologyIndex {
     const node = this.#requireNode(id)
     /** Present consumers whose level may fall after this provider disappears. */
     const affected = [...(this.#consumers.get(id)?.keys() ?? [])]
-    this.#visitedNodes += 1
     for (const dependency of node.dependencies) {
-      this.#visitedEdges += 1
       this.#removeReverseEdge(dependency.provider, id)
     }
     this.#nodes.delete(id)
@@ -455,8 +412,7 @@ class TopologyIndex implements ITopologyIndex {
 
   /**
    * Opens one isolated transaction while base readers retain pre-transaction state. Opening costs
-   * O(1); commit costs the keys the transaction wrote; rollback drops the overlay but keeps the
-   * transaction's visit counts.
+   * O(1); commit costs the keys the transaction wrote; rollback drops the overlay.
    */
   begin(): ITopologyTransaction {
     if (this.#transactionOpen) this.#adapter.onInvalid(TopologyInvalidReason.transactionOpen)
@@ -466,28 +422,21 @@ class TopologyIndex implements ITopologyIndex {
     return new TopologyTransaction(
       working,
       () => this.#adopt(working),
-      () => this.#discard(working),
+      () => this.#discard(),
       () => this.#adapter.onInvalid(TopologyInvalidReason.transactionClosed)
     )
   }
 
-  /** Applies a transaction view's overlay writes and its own visit counts, then releases ownership. */
+  /** Applies a transaction view's overlay writes, then releases ownership. */
   #adopt(working: TopologyIndex): void {
     ;(working.#nodes as OverlayStore<string, IStoredTopologyNode>).applyTo(this.#nodes)
     ;(working.#consumers as OverlayStore<string, Map<string, boolean>>).applyTo(this.#consumers)
     this.#nextOrdinal = working.#nextOrdinal
-    this.#visitedNodes += working.#visitedNodes - working.#visitBaseline.visitedNodes
-    this.#visitedEdges += working.#visitedEdges - working.#visitBaseline.visitedEdges
     this.#transactionOpen = false
   }
 
-  /**
-   * Drops a transaction view's writes but keeps its visit counts: the reads happened, and a
-   * validation transaction that always rolls back must still show its cost in `metrics()`.
-   */
-  #discard(working: TopologyIndex): void {
-    this.#visitedNodes += working.#visitedNodes - working.#visitBaseline.visitedNodes
-    this.#visitedEdges += working.#visitedEdges - working.#visitBaseline.visitedEdges
+  /** Drops a transaction view's writes and releases ownership. */
+  #discard(): void {
     this.#transactionOpen = false
   }
 
@@ -571,7 +520,6 @@ class TopologyIndex implements ITopologyIndex {
         path.pop()
         continue
       }
-      this.#visitedEdges += 1
       const provider = dependency.provider
       const activeIndex = active.get(provider)
       if (activeIndex !== undefined) {
@@ -580,7 +528,6 @@ class TopologyIndex implements ITopologyIndex {
       if (complete.has(provider)) continue
       const providerNode = provider === id ? undefined : this.#nodes.get(provider)
       if (!providerNode) continue
-      this.#visitedNodes += 1
       active.set(provider, path.length)
       path.push(provider)
       frames.push({ id: provider, dependencies: providerNode.dependencies, index: 0 })
@@ -603,10 +550,8 @@ class TopologyIndex implements ITopologyIndex {
       queued.delete(id)
       const node = this.#nodes.get(id)
       if (!node) continue
-      this.#visitedNodes += 1
       let level = 0
       for (const dependency of node.dependencies) {
-        this.#visitedEdges += 1
         const provider = this.#nodes.get(dependency.provider)
         if (provider) level = Math.max(level, provider.level + 1)
       }
@@ -709,12 +654,6 @@ class TopologyTransaction implements ITopologyTransaction {
   snapshot(): ICapabilityTopology {
     this.#assertOpen()
     return this.#working.snapshot()
-  }
-
-  /** Delegates metrics reads to the transaction view. */
-  metrics(): ITopologyIndexMetrics {
-    this.#assertOpen()
-    return this.#working.metrics()
   }
 
   /** Adds a node only to the transaction view. */

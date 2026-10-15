@@ -86,7 +86,7 @@ Graph 状态为 `open → starting → ready | failed → quiescing → terminal
 
 ## 增量拓扑索引
 
-`createTopologyIndex(adapter)` 从 `@migaia/capability/graph/topology` 导入。索引支持 `add`、`remove`、`setDependencies`、`dependencies`、`dependents`、`missing`、`closure`、`order`、`snapshot`、`metrics` 与 `begin`。required 与当前存在的 optional 边都参与层级和环检测；optional provider 缺席时保留悬空事实，但不阻塞节点。
+`createTopologyIndex(adapter)` 从 `@migaia/capability/graph/topology` 导入。索引支持 `add`、`remove`、`setDependencies`、`dependencies`、`dependents`、`missing`、`closure`、`order`、`snapshot` 与 `begin`。required 与当前存在的 optional 边都参与层级和环检测；optional provider 缺席时保留悬空事实，但不阻塞节点。
 
 `order()` 使用 `(level, ordinal)`：先输出较低依赖层级，同层按首次加入索引的顺序。`begin()` 返回隔离事务；事务 `commit()` 前基础索引保持不变，`rollback()` 恢复完整可观察快照。事务打开期间基础索引禁止写入，已提交或回滚的事务禁止继续读取或写入。
 
@@ -465,8 +465,8 @@ suspended 状态的节点调用 `resume()` 抛 `GRAPH_NODE_NOT_SUSPENDED`；排�
 先 seal 后 drain，新 generation 使用不同 lease key，因而晚到的旧 release 不会替新 binding 解锁。
 
 `releaseBatch` 收到的 `fence` 只在所有 exact leases 归零后 resolve。owner 可以先提交逻辑撤销并返回
-incomplete observation，但不能在 fence 之前启动物理 disposer。`metrics.queueTimeMs` 只计算 mutation 在 Graph
-FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，二者不可相互替代。
+incomplete observation，但不能在 fence 之前启动物理 disposer。mutation result 只返回业务事实
+`affected`、`topologyChanged` 和 `generation`；公开测试计数器和计时字段已移除。
 
 Graph ownership admission: ctx.own(resource, descriptor) requires a callable force immediately. Invalid descriptors throw GRAPH_INVALID_OPTION with the original lifecycle TypeError reachable through cause; they do not wait until disposal or report a closed graph. Dynamic graph report callbacks are final observers: synchronous throws and returned Promise rejections are contained without changing the mutation result.
 
