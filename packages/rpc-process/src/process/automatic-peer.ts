@@ -13,6 +13,7 @@ import { ProcessChannelDiagnostics } from './diagnostics.js'
 import { RpcProcessErrorText } from './error-text.js'
 import type { IProcessByteChannel } from './types.js'
 import { captureProcessTask, type IProcessAdapterTask } from './adapter.js'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** A process owns one automatic stdio pair; failure never permits another physical reader. */
 let claimed = false
@@ -28,7 +29,7 @@ export async function createAutomaticProcessPeer(
   prepared?: IProcessAdapterTask
 ): Promise<IRuntimePeer> {
   /** Cleanup uses the same observable default as the public Peer, without rebuilding provenance. */
-  const report = options.report ?? console.error
+  const report = options.report ?? defaultRpcReporter
   if (prepared) validateAdapterPeerTimeout(options)
   /** The same genuine preparation view preserves the original Host and transfer policy. */
   const task = prepared ?? captureProcessTask(options)

@@ -32,6 +32,7 @@ import {
   type IRuntimePeerOptions,
   type IRuntimePeer
 } from './peer.js'
+import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
 
 /** Exact facade provenance points to the original generation owner and duplicates no state. */
 const managedRegistrations = new WeakMap<
@@ -82,7 +83,7 @@ export async function createManagedRuntimePeer<TUnit, TSpec>(
   execution?: import('@migaia/supervision').ISupervisor<unknown, unknown>
 ): Promise<IRuntimePeer> {
   /** All managed diagnostics share one default without copying the genuine options object. */
-  const report = options.report ?? console.error
+  const report = options.report ?? defaultRpcReporter
   /** This private native restriction never grants execution, channel or Host authority. */
   const restrictTransfer = preparation?.restrictTransfer
   /** The original registration receives a logical deadline before applying its launcher cap. */

@@ -52,6 +52,7 @@ import { createProviderAdmissionScope } from '../../core/features/provider.js'
 import { attachProviderPreflight } from '../../core/internal/provider.js'
 import { registerLocalErrorWireSummary } from '../../core/internal/error-wire-metadata.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
+import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
 
 /** A private extension uses the original atomic shared-slot owner across both adapter families. */
 const providerAdmissionSlot = Symbol('runtime-provider-admission')
@@ -378,7 +379,7 @@ export function createRuntimePlugin<TSpawn, TConnect, TListen>(
   createPeer: (options: IRuntimePeerOptions) => Promise<IRuntimePeer> = createRuntimePeer
 ): IDefinedPluginConstraint<Record<string, never>, never, Record<string, never>> {
   /** Preserve the original options identity while defaulting all captured diagnostic paths. */
-  const report = options.report ?? console.error
+  const report = options.report ?? defaultRpcReporter
   /** Invalid defaults fail during cold Plugin construction, before any installation side effects. */
   const defaultTimeoutMs = readRuntimeDefaultTimeout(options)
   /** Registration name is copied before installation; caller mutation cannot change publication. */

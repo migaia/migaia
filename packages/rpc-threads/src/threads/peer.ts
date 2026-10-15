@@ -8,6 +8,7 @@ import { createThreadSourcePeer, type IRuntimeThreadPeerOptions } from './runtim
 import { threadWebParent } from './child.js'
 import { expandThreadSpawn, isShortThreadSpawn } from './short-spawn.js'
 import { captureThreadTask } from './adapter.js'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** Create one owned or borrowed Worker Peer; entry shorthand uses the existing deployment path. */
 export function createThreadPeer<TRemote = Record<never, never>>(
@@ -41,6 +42,6 @@ export function createThreadPeer(
   return preparation.peer({
     ...options,
     self: preparation.context.self,
-    report: options.report ?? console.error
+    report: options.report ?? defaultRpcReporter
   } as IRuntimePeerOptions)
 }

@@ -8,6 +8,7 @@ import {
   RpcPoolState,
   RpcPoolText
 } from './text.js'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** Only original public Peer calls and cleanup cross the scheduling boundary. */
 type IPoolPeer = Pick<IRuntimePeer, 'request' | 'notify' | 'stream' | 'close'>
@@ -140,7 +141,7 @@ export async function createPool(
   const retire = (member: IPoolMember): Promise<void> => {
     member.retiring = true
     clearIdle(member)
-    if (!member.busy) void closeMember(member).catch((error: unknown) => console.error(error))
+    if (!member.busy) void closeMember(member).catch(defaultRpcReporter)
     return member.closed
   }
   /** Arm only real idle resources with no pending pool demand. */
@@ -209,7 +210,7 @@ export async function createPool(
     member.busy = false
     member.inFlight = false
     accepted--
-    if (member.retiring) void closeMember(member).catch((error: unknown) => console.error(error))
+    if (member.retiring) void closeMember(member).catch(defaultRpcReporter)
     pump()
     notifyDrain()
   }
@@ -262,7 +263,7 @@ export async function createPool(
                 try {
                   await result.value.close()
                 } catch (cleanup) {
-                  console.error(cleanup)
+                  defaultRpcReporter(cleanup)
                 }
               }
             })
@@ -294,8 +295,7 @@ export async function createPool(
           member.inFlight = member.busy
           member.resolveReady(result.value)
           if (state !== RpcPoolState.open && !member.busy) member.retiring = true
-          if (member.retiring && !member.busy)
-            void closeMember(member).catch((error: unknown) => console.error(error))
+          if (member.retiring && !member.busy) void closeMember(member).catch(defaultRpcReporter)
         }
         pump()
       })
