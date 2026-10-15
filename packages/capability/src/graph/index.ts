@@ -577,7 +577,7 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
     for (const node of nodeOrder) node.value = undefined
     let generationError: unknown
     try {
-      generations.dispose(CapabilityGraphErrorText.disposed)
+      generations.dispose(fail(CapabilityGraphErrorCode.graphDisposed))
     } catch (error) {
       generationError = error
       reportError(error)

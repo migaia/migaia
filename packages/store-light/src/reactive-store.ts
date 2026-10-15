@@ -35,33 +35,13 @@ import { StoreLightErrorText } from './error-text.js'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
-/** Re-throws construction primary while retaining cleanup failure for non-Error primaries. */
+/**
+ * Re-throws the construction primary with the cleanup failure appended to its non-enumerable
+ * `errors`. Primitive, frozen or hostile primaries fall back to a coded aggregate whose first entry
+ * is the primary, so both failures stay reachable.
+ */
 function throwConstructionFailure(primary: unknown, cleanup: unknown): never {
-  if (primary instanceof Error) {
-    try {
-      /** Preserve any earlier causal failure while making the latest cleanup failure reachable. */
-      const cause = primary.cause
-      Object.defineProperty(primary, 'cause', {
-        configurable: true,
-        enumerable: false,
-        value:
-          cause === undefined
-            ? cleanup
-            : createStoreLightAggregateError(
-                StoreLightErrorCode.initAndCleanupFailed,
-                [cause, cleanup],
-                StoreLightErrorText.cleanupFailed
-              ),
-        writable: true
-      })
-      throw primary
-    } catch (attachmentError) {
-      if (attachmentError === primary) throw primary
-      // Frozen or hostile Error objects fall through to the aggregate path.
-    }
-  }
-  const attached = attachSecondaryErrors(primary, [cleanup])
-  if (attached === primary) throw primary
+  if (attachSecondaryErrors(primary, [cleanup]) === primary) throw primary
   throw createStoreLightAggregateError(
     StoreLightErrorCode.initAndCleanupFailed,
     [primary, cleanup],
@@ -69,21 +49,12 @@ function throwConstructionFailure(primary: unknown, cleanup: unknown): never {
   )
 }
 
-/** Reports synchronous-construction cleanup failures without creating a late rejection. */
+/**
+ * Reports synchronous-construction cleanup failures without creating a late rejection.
+ * `Runtime.reportError` already contains reporter failures, so no host fallback is needed.
+ */
 function reportSynchronousCleanupFailure(runtime: IRuntime, error: unknown): void {
-  try {
-    runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
-    return
-  } catch (reporterError) {
-    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError
-    try {
-      if (host) host(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // A failing host sink cannot be allowed to turn cleanup observation into
-      // an unhandled rejection; the original cleanup error remains the input.
-    }
-  }
+  runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
 }
 
 /** Rejects JavaScript-boundary API values before internal reactive machinery sees them. */
