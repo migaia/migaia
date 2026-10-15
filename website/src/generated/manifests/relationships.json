@@ -6323,6 +6323,36 @@
     },
     {
       "from": "/en/docs/event-subscriber/api",
+      "to": "/en/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "to": "/en/docs/event-subscriber/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "to": "/en/docs/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "to": "/en/docs/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/event-subscriber",
+      "to": "/en/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/api",
       "to": "/en/docs/event-subscriber/api#event-subscriber-index--EventSubscriberErrorCode",
       "type": "api-symbol"
     },
@@ -6829,6 +6859,36 @@
     {
       "from": "/en/docs/event-subscriber",
       "to": "/en/docs/event-subscriber/api#event-subscriber-index--IEventMap",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/api",
+      "to": "/en/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "to": "/en/docs/event-subscriber/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "to": "/en/docs/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/event-subscriber/getting-started",
+      "to": "/en/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "to": "/en/docs/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/event-subscriber",
+      "to": "/en/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
       "type": "architecture-symbol"
     },
     {
@@ -7332,36 +7392,6 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/en/docs/event-subscriber/api#subscribeOnce",
-      "to": "/en/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeOnce",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeOnce",
-      "to": "/en/docs/event-subscriber/api#subscribeOnce",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber/api#subscribeSubscriber",
-      "to": "/en/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeSubscriber",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeSubscriber",
-      "to": "/en/docs/event-subscriber/api#subscribeSubscriber",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/en/docs/event-subscriber/api#subscribeUntil",
-      "to": "/en/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeUntil",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeUntil",
-      "to": "/en/docs/event-subscriber/api#subscribeUntil",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/zh/docs/event-subscriber/api",
       "to": "/zh/docs/event-subscriber/getting-started",
       "type": "api-guide"
@@ -7593,6 +7623,36 @@
     },
     {
       "from": "/zh/docs/event-subscriber/api",
+      "to": "/zh/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "to": "/zh/docs/event-subscriber/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "to": "/zh/docs/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "to": "/zh/docs/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/event-subscriber",
+      "to": "/zh/docs/event-subscriber/api#event-subscriber-index--EventRemovalPolicy",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/api",
       "to": "/zh/docs/event-subscriber/api#event-subscriber-index--EventSubscriberErrorCode",
       "type": "api-symbol"
     },
@@ -8099,6 +8159,36 @@
     {
       "from": "/zh/docs/event-subscriber",
       "to": "/zh/docs/event-subscriber/api#event-subscriber-index--IEventMap",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/api",
+      "to": "/zh/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "to": "/zh/docs/event-subscriber/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "to": "/zh/docs/event-subscriber/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/getting-started",
+      "to": "/zh/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
+      "to": "/zh/docs/event-subscriber",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/event-subscriber",
+      "to": "/zh/docs/event-subscriber/api#event-subscriber-index--IEventRemovalPolicy",
       "type": "architecture-symbol"
     },
     {
@@ -8599,36 +8689,6 @@
     {
       "from": "/zh/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--IUnsubscribe",
       "to": "/zh/docs/event-subscriber/api#IUnsubscribe",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/api#subscribeOnce",
-      "to": "/zh/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeOnce",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeOnce",
-      "to": "/zh/docs/event-subscriber/api#subscribeOnce",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/api#subscribeSubscriber",
-      "to": "/zh/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeSubscriber",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeSubscriber",
-      "to": "/zh/docs/event-subscriber/api#subscribeSubscriber",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/api#subscribeUntil",
-      "to": "/zh/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeUntil",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/event-subscriber/api/subscriber#event-subscriber-subscriber--subscribeUntil",
-      "to": "/zh/docs/event-subscriber/api#subscribeUntil",
       "type": "alias-symbol"
     },
     {
@@ -137602,6 +137662,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/utils/api#isNativeErrorValue",
+      "to": "/en/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "to": "/en/docs/utils/api#isNativeErrorValue",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/utils/api#isNullish",
       "to": "/en/docs/utils/api/value#utils-value--isNullish",
       "type": "symbol-alias"
@@ -139319,6 +139389,16 @@
     {
       "from": "/zh/docs/utils/api/object#utils-object--ISnapshotDiagnostic",
       "to": "/zh/docs/utils/api#ISnapshotDiagnostic",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api#isNativeErrorValue",
+      "to": "/zh/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "to": "/zh/docs/utils/api#isNativeErrorValue",
       "type": "alias-symbol"
     },
     {
@@ -142093,6 +142173,36 @@
     },
     {
       "from": "/en/docs/utils/api/error",
+      "to": "/en/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "to": "/en/docs/utils/api/error",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "to": "/en/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/utils/getting-started",
+      "to": "/en/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "to": "/en/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/error",
       "to": "/en/docs/utils/api/error#utils-error--isUtilsAbortError",
       "type": "api-symbol"
     },
@@ -142829,6 +142939,36 @@
     {
       "from": "/zh/docs/utils",
       "to": "/zh/docs/utils/api/error#utils-error--ISerializedErrorChain",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/error",
+      "to": "/zh/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "to": "/zh/docs/utils/api/error",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "to": "/zh/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/utils/getting-started",
+      "to": "/zh/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/error#utils-error--isNativeErrorValue",
+      "to": "/zh/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils/api/error#utils-error--isNativeErrorValue",
       "type": "architecture-symbol"
     },
     {

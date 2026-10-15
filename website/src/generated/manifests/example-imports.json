@@ -1127,6 +1127,7 @@
       "isEmptyValue": "@migaia/utils/value",
       "ISerializedErrorChain": "@migaia/utils/error",
       "ISnapshotDiagnostic": "@migaia/utils/object",
+      "isNativeErrorValue": "@migaia/utils/error",
       "isNullish": "@migaia/utils/value",
       "isPlainObject": "@migaia/utils/object",
       "isPrimitive": "@migaia/utils/value",

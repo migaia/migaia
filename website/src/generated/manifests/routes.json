@@ -633,6 +633,12 @@
       "library": "event-subscriber"
     },
     {
+      "path": "/en/docs/event-subscriber/api/EventRemovalPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
       "path": "/en/docs/event-subscriber/api/EventSubscriberErrorCode",
       "locale": "en",
       "domain": "docs",
@@ -730,6 +736,12 @@
     },
     {
       "path": "/en/docs/event-subscriber/api/IEventMap",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/api/IEventRemovalPolicy",
       "locale": "en",
       "domain": "docs",
       "library": "event-subscriber"
@@ -14697,6 +14709,12 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/api/error/isNativeErrorValue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/api/error/isUtilsAbortError",
       "locale": "en",
       "domain": "docs",
@@ -16221,6 +16239,12 @@
       "library": "event-subscriber"
     },
     {
+      "path": "/zh/docs/event-subscriber/api/EventRemovalPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
       "path": "/zh/docs/event-subscriber/api/EventSubscriberErrorCode",
       "locale": "zh",
       "domain": "docs",
@@ -16318,6 +16342,12 @@
     },
     {
       "path": "/zh/docs/event-subscriber/api/IEventMap",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/api/IEventRemovalPolicy",
       "locale": "zh",
       "domain": "docs",
       "library": "event-subscriber"
@@ -30280,6 +30310,12 @@
     },
     {
       "path": "/zh/docs/utils/api/error/deserializeErrorChain",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/error/isNativeErrorValue",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"

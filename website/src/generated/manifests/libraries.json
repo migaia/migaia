@@ -1351,7 +1351,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。"
+                  "text": "提供两个入口：root `@migaia/event-subscriber`（channel/Hub 与 invoke helper），以及唯一的订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。"
                 }
               ]
             },
@@ -1419,7 +1419,7 @@
                   "type": "list",
                   "items": [
                     "`subscribe(listener, options?: { taskId?: string }): subscription` —— 返回可直接调用的 handle；handle 同时提供 `unsubscribe` 自身别名与链式 `subscribe`。styled handle 还提供对应的 subscribe/cancellation aliases（如 `on`/`off`）。解除会按逆序释放整条 chain；关闭后再扩展抛 `SUBSCRIPTION_CLOSED`。显式 `unique` 只改变 listener admission，不改变同步失败的 `PUBLISH_FAILED` 聚合。",
-                    "`subscribeOnce` / `subscribeUntil`（见下方 Helper 模块，channel 上也直接暴露同名方法）",
+                    "一次性与 signal 订阅使用 `@migaia/event-subscriber/subscriber` 的独立 helper（见下方）。",
                     "`publish(value: T): void` —— 按快照顺序同步调用全部 listener，不等待 Promise；默认同步重入 publish 递归交付，`dispatchPolicy: 'queued'` 才会排队到当前快照完成后再交付；同步失败以 `PUBLISH_FAILED` 的 `AggregateError` 抛出",
                     "`filterTaskId(taskId: string): IFilteredEventChannel<T, R>` —— 创建只读 task 选择 view，交给异步发布 helper",
                     "`clear(): void` —— 清空全部 registration，不执行 listener 自身的 cleanup",
@@ -1483,7 +1483,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel；但它们不读取 style 配置，函数名固定为 `subscribeOnce` / `subscribeUntil` / `subscribeSubscriber`，返回值固定为 canonical `IUnsubscribe`，不会带上 `off`、`dispose`、`unlisten` 等 style alias。需要 styled handle 时，请直接调用 channel 自己的 `subscribeOnce()` / `subscribeUntil()` 方法。"
+                  "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel；但它们不读取 style 配置，函数名固定为 `subscribeOnce` / `subscribeUntil` / `subscribeSubscriber`，返回值固定为 canonical `IUnsubscribe`，不会带上 `off`、`dispose`、`unlisten` 等 style alias。需要 styled 链式 handle 时，使用 channel.subscribe()；这些独立 helper 统一返回 canonical IUnsubscribe。"
                 },
                 {
                   "type": "paragraph",
@@ -1757,7 +1757,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
+                  "code": "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
                 }
               ]
             },
@@ -1779,7 +1779,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
+                  "code": "import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
                 }
               ]
             },
@@ -1806,6 +1806,20 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+                }
+              ]
+            },
+            {
+              "id": "固定-hub-策略与-channel-移除策略",
+              "heading": "固定 Hub 策略与 channel 移除策略",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Hub 的内部 channel 固定使用 recursive 派发、multiple 准入、handle 移除、每次 publish 100000 listener 调用预算及非严格 aborted 准入；它不暴露内部 channel，也不接受单 channel 的策略配置。需要选择 dispatchPolicy、admissionPolicy、publishBudget 或 throwOnAborted 时，直接创建 channel。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`EventRemovalPolicy.handle` 仅释放当前 registration；`EventRemovalPolicy.listenerAll` 释放相同 listener identity 的全部登记。logger hook 会复用同一 hook 对应的 listener，所以 listenerAll 在真实 hook 注销路径生效。"
                 }
               ]
             }
@@ -2002,7 +2016,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel，不要求是 `createEventChannel()` 产出的实例。但 helper 本身不读取 style 配置：导出名固定，返回值固定为 canonical `IUnsubscribe`，不会投影 `off`、`dispose`、`unlisten` 等 alias。需要 styled handle 时，直接调用 channel 实例上的 `subscribeOnce()` / `subscribeUntil()`。"
+                  "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel，不要求是 `createEventChannel()` 产出的实例。但 helper 本身不读取 style 配置：导出名固定，返回值固定为 canonical `IUnsubscribe`，不会投影 `off`、`dispose`、`unlisten` 等 alias。需要 styled 链式 handle 时，使用 channel.subscribe()；独立 helper 统一返回 canonical IUnsubscribe。"
                 }
               ]
             },
@@ -2466,7 +2480,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
+                  "code": "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
                 }
               ]
             },
@@ -2488,7 +2502,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
+                  "code": "import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
                 }
               ]
             },
@@ -2534,6 +2548,20 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+                }
+              ]
+            },
+            {
+              "id": "固定-hub-策略与-channel-移除策略",
+              "heading": "固定 Hub 策略与 channel 移除策略",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Hub 的内部 channel 固定使用 recursive 派发、multiple 准入、handle 移除、每次 publish 100000 listener 调用预算及非严格 aborted 准入；它不暴露内部 channel，也不接受单 channel 的策略配置。需要选择 dispatchPolicy、admissionPolicy、publishBudget 或 throwOnAborted 时，直接创建 channel。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`EventRemovalPolicy.handle` 仅释放当前 registration；`EventRemovalPolicy.listenerAll` 释放相同 listener identity 的全部登记。logger hook 会复用同一 hook 对应的 listener，所以 listenerAll 在真实 hook 注销路径生效。"
                 }
               ]
             }
@@ -35334,6 +35362,21 @@
                   "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
                 }
               ]
+            },
+            {
+              "id": "跨-realm-error-识别",
+              "heading": "跨 realm Error 识别",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`isNativeErrorValue(value)` 从 `@migaia/utils/error`（或 root）导入。它识别 Error-family 的 prototype chain，帮助边界保留原 Error identity；不会调用输入的方法，无法检查的 proxy 返回 false。它只是诊断形状检查，不能用于认证不可信输入。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
+                }
+              ]
             }
           ]
         },
@@ -36516,6 +36559,21 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+                }
+              ]
+            },
+            {
+              "id": "跨-realm-error-识别",
+              "heading": "跨 realm Error 识别",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`isNativeErrorValue(value)` 从 `@migaia/utils/error`（或 root）导入。它识别 Error-family 的 prototype chain，帮助边界保留原 Error identity；不会调用输入的方法，无法检查的 proxy 返回 false。它只是诊断形状检查，不能用于认证不可信输入。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
                 }
               ]
             }
