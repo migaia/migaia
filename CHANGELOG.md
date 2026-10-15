@@ -15,6 +15,11 @@
 
 ### Behavior
 
+- Middleware pipeline construction snapshots three distinct generator sentinels;
+  duplicate identities now throw `INVALID_OPTION` instead of silently halting.
+  Later caller mutation no longer changes dispatch. A non-object options argument
+  gets its own diagnostic text, and later signal getter failures preserve their
+  cause behind a coded `INVALID_OPTION` TypeError.
 - Lifecycle adds `abortableDelay`, returning `true` for elapsed time and `false`
   for abort delivery. HTTP backoff and Resource retries share its timer/listener
   ownership; HTTP keeps cancellation successful and Resource keeps its AbortError.

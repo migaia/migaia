@@ -1,4 +1,5 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
+import { tryReadProperty } from '@migaia/utils/error'
 import { MiddlewarePipelineErrorText } from './error-text.js'
 import { createMiddlewarePipelineInvalidOptionError } from './signal-errors.js'
 import {
@@ -131,21 +132,38 @@ const readCallback = <TCallback extends Function>(value: unknown): TCallback | u
 /** Validates generator sentinel identities used by generator reductions. */
 const readSignals = (value: unknown): IGeneratorMiddlewareSignals => {
   if (value === undefined) return MiddlewarePipelineGeneratorSignals
+  if (value === null || typeof value !== 'object')
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
+  /** Only the three named properties are admitted from the caller's structural record. */
+  const candidate = value as Record<string, unknown>
+  /** Read each caller-owned getter exactly once before committing the immutable sentinel set. */
+  const reads = ['undefined', 'halt', 'continue'].map((key) => tryReadProperty(candidate, key))
+  for (const read of reads) {
+    if (read.threw)
+      throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, {
+        cause: read.error
+      })
+  }
+  /** Local values cannot change after construction even if the caller mutates its options. */
+  const [undefinedSignal, halt, continueSignal] = reads.map((read) =>
+    read.threw ? undefined : read.value
+  )
   if (
-    value === null ||
-    typeof value !== 'object' ||
-    typeof (value as { readonly undefined?: unknown }).undefined !== 'symbol' ||
-    typeof (value as { readonly halt?: unknown }).halt !== 'symbol' ||
-    typeof (value as { readonly continue?: unknown }).continue !== 'symbol'
+    typeof undefinedSignal !== 'symbol' ||
+    typeof halt !== 'symbol' ||
+    typeof continueSignal !== 'symbol' ||
+    undefinedSignal === halt ||
+    undefinedSignal === continueSignal ||
+    halt === continueSignal
   )
     throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
-  return value as IGeneratorMiddlewareSignals
+  return Object.freeze({ undefined: undefinedSignal, halt, continue: continueSignal })
 }
 
 /** Validates and freezes construction options before any mode-specific work begins. */
 const readPipelineOptions = (options: unknown): INormalizedPipelineOptions => {
   if (!isOptionRecord(options))
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidMode)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOptions)
   /** Unknown input narrowed only after object admission. */
   const candidate = options as Record<string, unknown>
   if (!isPipelineMode(candidate.mode))

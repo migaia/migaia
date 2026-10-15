@@ -100,7 +100,7 @@ pipeline.run(
 )
 ```
 
-`GENERATOR_CONTINUE` 采用最后一次 `yield` 的值继续；`GENERATOR_HALT` 终止整条流水线；`GENERATOR_UNDEFINED` 用于把 `undefined` 作为显式终值。也可以在构造时通过 `signals` 注入兼容的三个 sentinel。
+`GENERATOR_CONTINUE` 采用最后一次 `yield` 的值继续；`GENERATOR_HALT` 终止整条流水线；`GENERATOR_UNDEFINED` 用于把 `undefined` 作为显式终值。也可以在构造时通过 `signals` 注入兼容的三个 sentinel：必须为互不相同的 symbol，构造时只读取一次并快照，后续修改调用方对象不影响管道。
 
 ## 生命周期、取消与违约
 

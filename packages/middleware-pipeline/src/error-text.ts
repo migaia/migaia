@@ -5,6 +5,8 @@ export const MiddlewarePipelineErrorText = {
    * combiner.
    */
   executionFailed: 'middleware stage and downstream failed',
+  /** Describes a non-record construction argument before the mode field can be admitted. */
+  invalidOptions: 'middleware pipeline options must be an object',
   /** Describes `createPipeline` rejecting a creation option outside the public mode values. */
   invalidMode: 'middleware pipeline mode is invalid',
   /**
