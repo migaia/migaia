@@ -23542,8 +23542,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'capability:graph-dynamic:createDynamicCapabilityGraph': {
     en: {
       purpose:
-        'Creates a serialized mutable required-edge graph. Each register, replace, or remove reconciles only the affected consumer closure and preserves exact binding-generation leases until physical release is safe.',
-      quickStart: `import { createDynamicCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst reportCleanupFailure = (error: unknown) => console.error('graph cleanup failed:', error)\nconst openMemoryCache = () => ({ close: async () => undefined })\nconst openDistributedCache = () => ({ close: async () => undefined })\nconst cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph({\n  mutationAdmissionMs: 1_000,\n  report: reportCleanupFailure\n})\n\nawait graph.register({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openMemoryCache()\n    return { value, release: () => value.close() }\n  }\n})\nawait graph.ready()\n\nconst mutation = await graph.replace({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openDistributedCache()\n    return { value, release: () => value.close() }\n  }\n})\nconsole.log(mutation.affected, mutation.metrics)`,
+        'Creates a serialized mutable required-edge graph. Each register, replace, or remove reconciles only the affected consumer closure and preserves exact binding-generation leases until physical release is safe. Registration and replacement snapshot caller fields once at queue admission; change nodes through replace. Captured start methods retain their original receiver.',
+      quickStart: `import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\nimport type { IGraphNodeId } from '@migaia/capability/graph'\n\ntype ICache = { backend: string; close: () => Promise<void> }\nconst openMemoryCache = (): ICache => ({ backend: 'memory', close: async () => undefined })\nconst openDistributedCache = (): ICache => ({ backend: 'distributed', close: async () => undefined })\n// This single-node composition already owns the bindings; batch release owns their cleanup.\nconst asInstance = (value: ICache) => ({ value, release: () => undefined })\nconst cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph<ICache>({\n  mutationAdmissionMs: 1_000,\n  report: (error) => console.error('graph cleanup failed:', error),\n  startBatch: (entries) => entries.map((entry) => asInstance(entry.binding!)),\n  releaseBatch: async (entries, fence) => {\n    await fence\n    for (const entry of entries) await entry.binding!.close()\n  }\n})\n\nconst memory = openMemoryCache()\nawait graph.register({\n  id: cache, kind: 'cache', dependencies: [], start: () => asInstance(memory)\n}, memory)\nawait graph.ready()\nconst lease = graph.acquireBinding(cache)\nconsole.log(lease.value.backend)\nlease.release()\n\nconst distributed = openDistributedCache()\nconst mutation = await graph.replace({\n  id: cache, kind: 'cache', dependencies: [], start: () => asInstance(distributed)\n}, distributed)\nconsole.log(mutation.affected, mutation.metrics)\nawait graph.dispose()`,
       scenarios: [
         'Services must be registered, replaced, or removed while the composition root remains alive.',
         'Only the changed node and its transitive consumers should restart.',
@@ -23578,20 +23578,20 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
           name: 'startBatch',
           description:
             'Transfers physical startup of one topologically ordered affected frontier to a composition owner.',
-          defaultValue: 'calls each definition.start',
+          defaultValue: 'required (no fallback)',
           type: '(entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>',
           whenToUse:
-            'Set only when the same composition layer owns batch startup, rollback, and the matching release path.',
+            'Required: the same composition layer must own batch startup, rollback, and the matching release path.',
           example: 'createDynamicCapabilityGraph({ startBatch: (entries) => owner.start(entries) })'
         },
         {
           name: 'releaseBatch',
           description:
             'Transfers physical release of one sealed cascade. The supplied fence resolves only after all exact old-generation leases reach zero.',
-          defaultValue: 'calls each instance.release after its lease fence',
+          defaultValue: 'required (no fallback)',
           type: '(entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>',
           whenToUse:
-            'Set together with startBatch when one composition layer can await the fence before disposing old bindings.',
+            'Required together with startBatch: await the fence before disposing old bindings.',
           example:
             'createDynamicCapabilityGraph({ releaseBatch: async (entries, fence) => { await fence; await owner.release(entries) } })'
         },
@@ -23610,8 +23610,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose:
-        '创建串行化的可变 required-edge Graph。每次 register、replace 或 remove 只协调受影响 consumer 闭包，并用精确 binding-generation lease 等到物理释放真正安全。',
-      quickStart: `import { createDynamicCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst reportCleanupFailure = (error: unknown) => console.error('graph cleanup failed:', error)\nconst openMemoryCache = () => ({ close: async () => undefined })\nconst openDistributedCache = () => ({ close: async () => undefined })\nconst cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph({\n  mutationAdmissionMs: 1_000,\n  report: reportCleanupFailure\n})\n\nawait graph.register({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openMemoryCache()\n    return { value, release: () => value.close() }\n  }\n})\nawait graph.ready()\n\nconst mutation = await graph.replace({\n  id: cache, kind: 'cache', dependencies: [],\n  start: () => {\n    const value = openDistributedCache()\n    return { value, release: () => value.close() }\n  }\n})\nconsole.log(mutation.affected, mutation.metrics)`,
+        '创建串行化的可变 required-edge Graph。每次 register、replace 或 remove 只协调受影响 consumer 闭包，并用精确 binding-generation lease 等到物理释放真正安全。 register/replace 在队列准入时只读一次并快照节点字段；后续变更通过 replace 提交，start 保留原定义的 receiver。',
+      quickStart: `import { createDynamicCapabilityGraph } from '@migaia/capability/graph/dynamic'\nimport type { IGraphNodeId } from '@migaia/capability/graph'\n\ntype ICache = { backend: string; close: () => Promise<void> }\nconst openMemoryCache = (): ICache => ({ backend: 'memory', close: async () => undefined })\nconst openDistributedCache = (): ICache => ({ backend: 'distributed', close: async () => undefined })\n// This single-node composition already owns the bindings; batch release owns their cleanup.\nconst asInstance = (value: ICache) => ({ value, release: () => undefined })\nconst cache = 'cache' as IGraphNodeId\nconst graph = createDynamicCapabilityGraph<ICache>({\n  mutationAdmissionMs: 1_000,\n  report: (error) => console.error('graph cleanup failed:', error),\n  startBatch: (entries) => entries.map((entry) => asInstance(entry.binding!)),\n  releaseBatch: async (entries, fence) => {\n    await fence\n    for (const entry of entries) await entry.binding!.close()\n  }\n})\n\nconst memory = openMemoryCache()\nawait graph.register({\n  id: cache, kind: 'cache', dependencies: [], start: () => asInstance(memory)\n}, memory)\nawait graph.ready()\nconst lease = graph.acquireBinding(cache)\nconsole.log(lease.value.backend)\nlease.release()\n\nconst distributed = openDistributedCache()\nconst mutation = await graph.replace({\n  id: cache, kind: 'cache', dependencies: [], start: () => asInstance(distributed)\n}, distributed)\nconsole.log(mutation.affected, mutation.metrics)\nawait graph.dispose()`,
       scenarios: [
         '组合根存活期间仍需注册、替换或移除服务。',
         '只应重启变化节点及其传递 consumers。',
@@ -23643,16 +23643,16 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         {
           name: 'startBatch',
           description: '把一个已按拓扑排序的 affected frontier 的物理启动交给组合 owner。',
-          defaultValue: '逐项调用 definition.start',
+          defaultValue: '必填（无默认实现）',
           type: '(entries: readonly IGraphStartEntry<TBinding>[]) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>',
-          whenToUse: '仅当同一组合层同时拥有 batch 启动、回滚与对应释放路径时设置。',
+          whenToUse: '必填：由同一组合层拥有 batch 启动、回滚与对应释放路径。',
           example: 'createDynamicCapabilityGraph({ startBatch: (entries) => owner.start(entries) })'
         },
         {
           name: 'releaseBatch',
           description:
             '把一个 sealed cascade 的物理释放交给组合 owner；传入 fence 只在旧 generation 的精确 lease 全部归零后 resolve。',
-          defaultValue: 'lease fence 后逐项调用 instance.release',
+          defaultValue: '必填（无默认实现）',
           type: '(entries: readonly IGraphReleaseEntry<TBinding>[], fence: Promise<void>) => void | PromiseLike<void>',
           whenToUse: '与 startBatch 一起设置，并保证旧 binding 在 fence 前不会 dispose。',
           example:
