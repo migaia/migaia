@@ -243,6 +243,11 @@ export type IEventHubReport<C extends IEventMap, V = undefined> = {
   }
 }[keyof C]
 
+/**
+ * A keyed fanout hub deliberately fixes recursive dispatch, multiple admission, handle removal,
+ * a 100000-invocation publish budget and non-throwing aborted admission on its private channels.
+ * Use createEventChannel when dispatch/admission/budget/abort policies must be selected by the owner.
+ */
 export type IEventHubOptions<
   C extends IEventMap,
   S extends IEventApiStyle | undefined = undefined,
