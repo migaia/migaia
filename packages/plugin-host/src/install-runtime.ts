@@ -10,7 +10,11 @@ import {
 import { observeAbortSubscription } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { copyConfig, readPlainDataRecord } from './config.js'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, {
+  PluginHostError,
+  createPluginHostTypeError,
+  PluginHostInternalText
+} from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { mountPluginExtensions, isSharedExtensionSlot } from './extension.js'
 import { invokeCaptured } from './invocation.js'
@@ -595,7 +599,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     const error = this.#port.decorateError(
       new PluginHostError(
         PluginHostErrorCode.pluginInstallFailed,
-        `${ERROR_TEXT.PLUGIN_INSTALL_FAILED(failedName)}: ${cause instanceof Error ? cause.message : String(cause)}`,
+        PluginHostInternalText.PLUGIN_INSTALL_FAILURE_DETAIL(failedName, cause),
         { cause, detail }
       )
     )
@@ -799,12 +803,10 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
   /** Diagnostics are observational and can never alter transaction control flow. */
   #reportRollbackFailure(failedName: string, rollbackErrors: readonly unknown[]): void {
     if (rollbackErrors.length === 0) return
-    const detail = rollbackErrors
-      .map((error) => (error instanceof Error ? error.message : String(error)))
-      .join('; ')
+
     reportDiagnostic(
       this.#port.diagnostic,
-      `${ERROR_TEXT.PLUGIN_ROLLBACK_FAILED(failedName)}: ${detail}`,
+      PluginHostInternalText.PLUGIN_ROLLBACK_FAILURE_DETAIL(failedName, rollbackErrors),
       PluginHostErrorCode.pluginInstallRollbackFailed,
       new AggregateError(rollbackErrors, ERROR_TEXT.PLUGIN_ROLLBACK_FAILED(failedName))
     )

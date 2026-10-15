@@ -1,4 +1,4 @@
-import { createPluginHostTypeError } from './error-text.js'
+import { createPluginHostTypeError, PluginHostInternalText } from './error-text.js'
 
 /**
  * Option validation for the host's timeout budgets.
@@ -13,7 +13,7 @@ import { createPluginHostTypeError } from './error-text.js'
 export const assertTimeoutOption = (value: number | false | undefined, label: string): void => {
   if (value === undefined || value === false) return
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
-    throw createPluginHostTypeError(`${label} must be false or a non-negative finite number`)
+    throw createPluginHostTypeError(PluginHostInternalText.TIMEOUT_OPTION(label))
 }
 
 /** Rejects an omitted mandatory execution budget before any unrelated option is observed. */
@@ -22,8 +22,6 @@ export const assertRequiredTimeoutOption = (
   label: string
 ): void => {
   if (value === undefined)
-    throw createPluginHostTypeError(
-      `${label} must be provided as false or a non-negative finite number`
-    )
+    throw createPluginHostTypeError(PluginHostInternalText.TIMEOUT_REQUIRED(label))
   assertTimeoutOption(value, label)
 }

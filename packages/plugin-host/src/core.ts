@@ -1,4 +1,8 @@
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, {
+  PluginHostError,
+  createPluginHostTypeError,
+  PluginHostInternalText
+} from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import {
   MiddlewarePipelineMode,
@@ -96,7 +100,7 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
   const domainCore = context.createDomainCore() as object
   const prototype = Object.getPrototypeOf(domainCore)
   if (prototype !== Object.prototype && prototype !== null)
-    throw createPluginHostTypeError('domain core must be a plain object')
+    throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_OBJECT)
   const reservedKeys = new Set<PropertyKey>([
     'config',
     'operation',
@@ -110,10 +114,10 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
   const facade: Record<PropertyKey, unknown> = {}
   for (const key of Reflect.ownKeys(domainCore)) {
     if (reservedKeys.has(key))
-      throw createPluginHostTypeError(`domain core key "${String(key)}" is reserved`)
+      throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_RESERVED(key))
     const descriptor = Object.getOwnPropertyDescriptor(domainCore, key)
     if (!descriptor || !('value' in descriptor) || !descriptor.enumerable)
-      throw createPluginHostTypeError('domain core must contain enumerable data properties')
+      throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_DATA)
     Object.defineProperty(facade, key, descriptor)
   }
   const define = (key: PropertyKey, value: unknown): void => {

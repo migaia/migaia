@@ -4,7 +4,8 @@ import ERROR_TEXT, {
   formatPluginHostDiagnostic,
   PluginHostError,
   createPluginHostTypeError,
-  tagPluginHostError
+  tagPluginHostError,
+  PluginHostInternalText
 } from './error-text.js'
 import { issueHostIdentity, readHostNodeId, type IPluginHostIdentity } from './host-identity.js'
 import {
@@ -41,7 +42,8 @@ import {
   type IAbortController,
   type IQuiescenceTracker,
   type IPendingTracker,
-  type ITerminalController
+  type ITerminalController,
+  LifecycleState
 } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import {
@@ -242,7 +244,7 @@ export class PluginHost<
     // initializers have already created the basic lifecycle and shared-state owners.
     const execution = options.execution
     if (execution === null || typeof execution !== 'object')
-      throw createPluginHostTypeError('execution must provide mutation and pipeline drain budgets')
+      throw createPluginHostTypeError(PluginHostInternalText.EXECUTION_REQUIRED)
     const mutationTimeoutMs = execution.mutationTimeoutMs
     const pipelineDrainTimeoutMs = execution.pipelineDrainTimeoutMs
     assertRequiredTimeoutOption(mutationTimeoutMs, 'mutationTimeoutMs')
@@ -335,7 +337,7 @@ export class PluginHost<
         )
       }
       if (schedulerSnapshot === undefined) {
-        throw createPluginHostTypeError('scheduler must provide now() and schedule() functions')
+        throw createPluginHostTypeError(PluginHostInternalText.SCHEDULER_FUNCTIONS)
       }
     }
     this.#scheduler = schedulerSnapshot ?? systemScheduler
@@ -343,7 +345,7 @@ export class PluginHost<
       parentSignal: this.#executionController.signal,
       scheduler: this.#scheduler,
       timeoutMs: mutationTimeoutMs,
-      isHostOpen: () => this.#terminal.lifecycle === 'open',
+      isHostOpen: () => this.#terminal.lifecycle === LifecycleState.open,
       diagnostic: this.#diagnostic
     })
     /** One admitted cleanup budget shared by the hook context and the bounded disposer. */

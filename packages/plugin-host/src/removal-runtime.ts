@@ -7,7 +7,7 @@ import {
 } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
+import ERROR_TEXT, { PluginHostError, PluginHostInternalText } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { invokeCaptured } from './invocation.js'
 import type { IRegistration } from './registry.js'
@@ -175,7 +175,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
               }
             }
           ],
-          'plugin dispose hook',
+          PluginHostInternalText.PLUGIN_DISPOSE_PHASE,
           preserveErrorIdentity,
           registration
         ))
@@ -193,7 +193,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     errors.push(
       ...(await this.#port.cleanupRuntime.disposeScope(
         registration.scope,
-        'resource disposer',
+        PluginHostInternalText.RESOURCE_DISPOSER_PHASE,
         preserveErrorIdentity
       ))
     )

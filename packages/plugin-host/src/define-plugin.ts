@@ -4,7 +4,8 @@ import { invokeCaptured } from './invocation.js'
 import ERROR_TEXT, {
   createPluginDefinitionTypeError,
   createPluginHostTypeError,
-  PluginHostError
+  PluginHostError,
+  PluginHostInternalText
 } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { createFeatureReference, snapshotFeatureRecord } from './define-feature.js'
@@ -52,7 +53,7 @@ const readData = (source: object, key: PropertyKey): unknown => {
   const descriptor = Object.getOwnPropertyDescriptor(source, key)
   if (!descriptor) return undefined
   if (!('value' in descriptor))
-    throw createPluginHostTypeError(`plugin ${String(key)} must be a data property`)
+    throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_PROPERTY_DATA(key))
   return descriptor.value
 }
 
@@ -83,9 +84,9 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   const syncDisposer = syncDispose && 'value' in syncDispose ? syncDispose.value : undefined
 
   if (typeof name !== 'string' || name.length === 0 || name.includes('.'))
-    throw createPluginHostTypeError('plugin name must be a non-empty string without "."')
+    throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_NAME_STRICT)
   if (typeof install !== 'function')
-    throw createPluginHostTypeError('plugin install must be a function')
+    throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_INSTALL_FUNCTION)
   if (setup !== undefined && typeof setup !== 'function')
     throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_SETUP_FUNCTION)
   if (beforeRelease !== undefined && typeof beforeRelease !== 'function')
@@ -100,7 +101,7 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     [String(Symbol.dispose), syncDisposer]
   ] as const)
     if (value !== undefined && typeof value !== 'function')
-      throw createPluginHostTypeError(`plugin ${key} must be a function`)
+      throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_HOOK_FUNCTION(key))
   if (activation !== 'eager' && activation !== 'lazy') throw createPluginDefinitionTypeError()
   if (retiredShared !== undefined) throw createPluginDefinitionTypeError()
   if (
@@ -116,7 +117,7 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     if (knownKeys.has(key)) continue
     const descriptor = Object.getOwnPropertyDescriptor(source, key)
     if (!descriptor || !('value' in descriptor) || !descriptor.enumerable)
-      throw createPluginHostTypeError('plugin metadata must be enumerable data properties')
+      throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_METADATA_DATA)
     const value = Array.isArray(descriptor.value)
       ? Object.freeze([...descriptor.value])
       : descriptor.value

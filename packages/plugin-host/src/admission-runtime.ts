@@ -5,7 +5,8 @@ import { readPluginDefinitionData } from './define-plugin.js'
 import ERROR_TEXT, {
   PluginHostError,
   createPluginDefinitionTypeError,
-  createPluginHostTypeError
+  createPluginHostTypeError,
+  PluginHostInternalText
 } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginDefinition } from './registry.js'
@@ -92,10 +93,10 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       disposer
     } = captured
     if (typeof name !== 'string' || name.length === 0)
-      throw createPluginHostTypeError('plugin name must be a non-empty string')
-    if (name.includes('.')) throw createPluginHostTypeError('plugin name must not contain "."')
+      throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_NAME_REQUIRED)
+    if (name.includes('.')) throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_NAME_DOT)
     if (typeof install !== 'function')
-      throw createPluginHostTypeError('plugin install must be a function')
+      throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_INSTALL_FUNCTION)
     if (setup !== undefined && typeof setup !== 'function')
       throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_SETUP_FUNCTION)
     if (beforeRelease !== undefined && typeof beforeRelease !== 'function')
@@ -108,13 +109,13 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       ['dispose', dispose]
     ] as const)
       if (hook !== undefined && typeof hook !== 'function')
-        throw createPluginHostTypeError(`plugin ${key} must be a function`)
+        throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_HOOK_FUNCTION(key))
     if (activation !== 'eager' && activation !== 'lazy') throw createPluginDefinitionTypeError()
     if (retiredShared !== undefined) throw createPluginDefinitionTypeError()
     for (const candidate of [...disposer.asyncCandidates, ...disposer.disposeCandidates])
       if (candidate.value !== undefined && typeof candidate.value !== 'function')
         throw createPluginHostTypeError(
-          `plugin disposer ${String(candidate.key)} must be a function`
+          PluginHostInternalText.PLUGIN_DISPOSER_FUNCTION(candidate.key)
         )
     if (names.has(name))
       throw new PluginHostError(

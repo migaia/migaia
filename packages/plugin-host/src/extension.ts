@@ -1,5 +1,9 @@
 import { reportDiagnostic } from './diagnostic-report.js'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, {
+  PluginHostError,
+  createPluginHostTypeError,
+  PluginHostInternalText
+} from './error-text.js'
 import { asyncDisposeKey, disposeKeys } from './symbols.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginHostErrorCode } from './typing.js'
@@ -61,10 +65,10 @@ type IExtensionOwnerStore<TRegistration> = Readonly<{
 /** Validate extension container before Host-specific descriptor mounting. */
 const assertExtensionResult = (extension: unknown, pluginName: string): object => {
   if (extension === null || typeof extension !== 'object' || Array.isArray(extension))
-    throw createPluginHostTypeError('plugin install() must return an object')
+    throw createPluginHostTypeError(PluginHostInternalText.EXTENSION_OBJECT)
   const prototype = Object.getPrototypeOf(extension)
   if (prototype !== Object.prototype && prototype !== null)
-    throw createPluginHostTypeError('plugin install() must return a plain object')
+    throw createPluginHostTypeError(PluginHostInternalText.EXTENSION_PLAIN_OBJECT)
   for (const key of Reflect.ownKeys(extension)) {
     if (
       (asyncDisposeKey !== undefined && key === asyncDisposeKey) ||
@@ -103,7 +107,7 @@ export const mountPluginExtensions = <TRegistration extends IExtensionRegistrati
         ERROR_TEXT.EXTENSION_DUPLICATE(registration.name, key)
       )
     if ('get' in descriptor || 'set' in descriptor || descriptor.configurable === false)
-      throw createPluginHostTypeError('extension property must be a configurable data property')
+      throw createPluginHostTypeError(PluginHostInternalText.EXTENSION_DATA)
     registration.extensions.push({ key, descriptor })
     extensionOwners.set(key, registration)
   }
