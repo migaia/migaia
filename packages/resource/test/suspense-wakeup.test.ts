@@ -1,10 +1,37 @@
+/* oxlint-disable unicorn/no-thenable -- The cancellation regression deliberately throws a captured thenable. */
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { Resource } from '../src/index.js'
-import { flushAsync } from './helpers.js'
+import { deferred, flushAsync } from './helpers.js'
 
 describe('Suspense request wakeups', () => {
+  it('RSB-T3 observes a thrown dependency when its then getter cancels the request', async () => {
+    /** Rejection is released after cancellation to detect an abandoned thrown dependency. */
+    const dependency = deferred()
+    /** Getter cancellation occurs during supported thenable admission. */
+    const thrown = Object.defineProperty({}, 'then', {
+      get: () => {
+        resource.cancel()
+        return (resolve: () => void, reject: (error: unknown) => void) => {
+          void dependency.promise.then(resolve, reject)
+        }
+      }
+    })
+    /** Explicit request admission permits the getter to address the constructed Resource. */
+    const resource = new Resource(
+      () => {
+        throw thrown
+      },
+      createRuntime(),
+      { autoStart: false }
+    )
+    await expect(resource.promise).rejects.toMatchObject({ name: 'AbortError' })
+    dependency.reject(new Error('cancelled dependency failure'))
+    await flushAsync()
+    resource.dispose()
+  })
+
   it('RSB-T1 shares one pending Promise and admits cancellation between immediate wakeups', async () => {
     /** Manual deadlines prove Suspense cannot consume an unbounded microtask queue. */
     const scheduler = createManualScheduler()

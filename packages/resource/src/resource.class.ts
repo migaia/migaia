@@ -811,10 +811,6 @@ export class Resource<T> implements IObserver, IDisposable {
             failed(error)
             return
           }
-          if (controller.signal.aborted) {
-            reject(abortError())
-            return
-          }
           // A void callback starts the next attempt on this same completion Promise. Settled
           // wakeup chains can be collected, and the scheduler admits cancellation between them.
           void assimilateCapturedThen<void>(probe.thenFn, error)
