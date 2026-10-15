@@ -161,6 +161,21 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
     }
   }
 
+  /**
+   * Drops the consumed prefix once it dominates the backing array, re-indexing the live tail.
+   * Shared by dequeue and timeout removal so the array stays bounded by live work instead of by the
+   * total number of tasks ever enqueued; the 1024 floor keeps the splice cost amortized O(1).
+   */
+  const compactConsumedPrefix = (): void => {
+    if (queueHead <= 1024 || queueHead * 2 <= queue.length) return
+    queue.splice(0, queueHead)
+    for (let index = 0; index < queue.length; index++) {
+      const entry = queue[index]
+      if (entry !== undefined) entry.queueIndex = index
+    }
+    queueHead = 0
+  }
+
   /** Removes a queued record in O(1), leaving a tombstone for the FIFO head scanner. */
   const removeQueued = (record: IMutationRecord): boolean => {
     const index = record.queueIndex
@@ -168,14 +183,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
     queue[index] = undefined
     record.queueIndex = -1
     queuedCount--
-    if (queueHead > 1024 && queueHead * 2 > queue.length) {
-      queue.splice(0, queueHead)
-      for (let index = 0; index < queue.length; index++) {
-        const entry = queue[index]
-        if (entry !== undefined) entry.queueIndex = index
-      }
-      queueHead = 0
-    }
+    compactConsumedPrefix()
     return true
   }
 
@@ -249,6 +257,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       queueHead++
       queuedCount--
     }
+    compactConsumedPrefix()
     if (!next) return
     disarmAdmission(next)
     running = true
