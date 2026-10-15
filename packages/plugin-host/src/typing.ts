@@ -1,6 +1,7 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { asyncDisposeKey, disposeKey } from './symbols.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
+import type { ICleanupResult } from '@migaia/lifecycle'
 import type {
   IFeatureOutput,
   IFeatureReference,
@@ -664,17 +665,14 @@ export type IPluginHostOptions = {
 }
 
 /** Physical completion detail for work that outlives bounded logical disposal. */
-export type IPluginHostPhysicalCleanupResult = Readonly<{
-  readonly cleanupErrors: readonly unknown[]
-}>
+export type IPluginHostPhysicalCleanupResult = ICleanupResult
 
 /** Structured logical terminal result; cleanup failures never reopen or reject the Host. */
-export type IPluginHostDisposalResult = Readonly<{
-  readonly logicalTerminal: true
-  readonly cleanupComplete: boolean
-  readonly cleanupErrors: readonly unknown[]
-  readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>
-}>
+export type IPluginHostDisposalResult = ICleanupResult &
+  Readonly<{
+    readonly logicalTerminal: true
+    readonly cleanupComplete: boolean
+  }>
 
 /** Opaque Host-owned ordering slot; callers may retain it but cannot inspect its ordinal. */
 export type IPluginDataOrderSlot = Readonly<{ readonly __pluginDataOrderSlot: unique symbol }>
@@ -714,24 +712,22 @@ export type IPluginPreparedRemovalBatch = object
 export type IPluginBatchRemovalOptions = Readonly<{ readonly beforeCleanup?: PromiseLike<void> }>
 
 /** Result of one prepared batch removal, preserving the Host dynamic-view contract. */
-export type IPluginBatchRemovalLeaf = Readonly<{
-  readonly receipt: IPluginRegistrationReceipt
-  readonly name: string
-  readonly cleanupComplete: boolean
-  readonly cleanupErrors: readonly unknown[]
-  readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>
-}>
+export type IPluginBatchRemovalLeaf = ICleanupResult &
+  Readonly<{
+    readonly receipt: IPluginRegistrationReceipt
+    readonly name: string
+    readonly cleanupComplete: boolean
+  }>
 
 /** Aggregate result for one all-or-nothing prepared removal commit. */
-export type IPluginBatchRemovalResult<TSnapshot> = Readonly<{
-  readonly ok: boolean
-  readonly committed: true
-  readonly snapshot: TSnapshot
-  readonly leaves: readonly IPluginBatchRemovalLeaf[]
-  readonly cleanupComplete: boolean
-  readonly cleanupErrors: readonly unknown[]
-  readonly physicalCompletion?: Promise<IPluginHostPhysicalCleanupResult>
-}>
+export type IPluginBatchRemovalResult<TSnapshot> = ICleanupResult &
+  Readonly<{
+    readonly ok: boolean
+    readonly committed: true
+    readonly snapshot: TSnapshot
+    readonly leaves: readonly IPluginBatchRemovalLeaf[]
+    readonly cleanupComplete: boolean
+  }>
 
 /** Internal composition snapshot; ordinary Host consumers receive name-addressed handles. */
 export type IPluginHostCompositionSnapshot = Readonly<{

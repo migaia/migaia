@@ -166,9 +166,10 @@ export const LifecycleErrorCode = {
   /**
    * Rejects invalid scheduler or task options at the lifecycle boundary. Examples include throwing
    * accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction `unref`. Also rejects
-   * nonfinite time values, nonfinite or negative delays, or addition that overflows. Enforces
-   * scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative
-   * delays in R-9. Correct the scheduler or delay instead of retrying the same invalid input.
+   * nonfinite time values, nonfinite or negative delays, addition that overflows, or cleanup
+   * observations without the error array required by `mergeCleanupResults`. Enforces scheduler
+   * admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative delays in R-9.
+   * Correct the scheduler or delay instead of retrying the same invalid input.
    */
   invalidOption: 'INVALID_OPTION'
 } as const

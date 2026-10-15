@@ -1,3 +1,4 @@
+import { mergeCleanupResults } from '@migaia/lifecycle'
 import {
   createDynamicCapabilityGraph,
   type IDynamicCapabilityGraph,
@@ -208,7 +209,7 @@ export async function createHost<
             : await settleWithin(removalPromise, captured.quiescenceMs)
         if (!bounded.complete) {
           cleanup.complete = false
-          cleanup.physical.push(observePhysical(removalPromise))
+          cleanup.physical.push(mergeCleanupResults([removalPromise]))
           hostSnapshot = composition!.getCurrentSnapshot()
           receipt = composition!.revision
           for (const entry of cleanupOrder) receiptsByName.delete(String(entry.id))
@@ -356,7 +357,8 @@ export async function createHost<
       try {
         const result = (await concrete.dispose()) as IPluginHostDisposalResult
         cleanupErrors.push(...result.cleanupErrors)
-        if (result.physicalCompletion) physical.push(observePhysical(result.physicalCompletion))
+        if (result.physicalCompletion)
+          physical.push(mergeCleanupResults([result.physicalCompletion]))
       } catch (cleanupError) {
         cleanupErrors.push(cleanupError)
       }
@@ -368,7 +370,7 @@ export async function createHost<
       phase: graph ? 'setup' : 'factory',
       cleanupComplete: cleanup.complete && cleanupErrors.length === 0 && physical.length === 0,
       cleanupErrors: Object.freeze(cleanupErrors),
-      ...(physical.length > 0 ? { physicalCompletion: settlePhysical(physical) } : {})
+      ...(physical.length > 0 ? { physicalCompletion: mergeCleanupResults(physical) } : {})
     })
     Object.defineProperty(primary, 'detail', { value: detail, enumerable: true })
     throw attachTrayError(primary, TrayErrorCode.invalidEntry)
@@ -711,7 +713,7 @@ function createManagedHost(
             const delayed = runtimeFence.then(
               () => concrete!.dispose() as Promise<IPluginHostDisposalResult>
             )
-            physical.push(observePhysical(delayed))
+            physical.push(mergeCleanupResults([delayed]))
             return true
           }
           const externallyMutated = composition!.revision !== readExpectedRevision()
@@ -728,13 +730,13 @@ function createManagedHost(
                 termination: 'external-host' as const,
                 cleanupComplete: false,
                 cleanupErrors: Object.freeze(cleanupErrors),
-                physicalCompletion: settlePhysical(physical)
+                physicalCompletion: mergeCleanupResults(physical)
               }
             }
             const externalResult = (await concrete.dispose()) as IPluginHostDisposalResult
             cleanupErrors.push(...externalResult.cleanupErrors)
             if (externalResult.physicalCompletion)
-              physical.push(observePhysical(externalResult.physicalCompletion))
+              physical.push(mergeCleanupResults([externalResult.physicalCompletion]))
             state = TrayHostState.terminal
             claims.delete(concrete as object)
             const cleanupComplete =
@@ -748,7 +750,7 @@ function createManagedHost(
               termination: 'external-host' as const,
               cleanupComplete,
               cleanupErrors: Object.freeze(cleanupErrors),
-              ...(physical.length > 0 ? { physicalCompletion: settlePhysical(physical) } : {})
+              ...(physical.length > 0 ? { physicalCompletion: mergeCleanupResults(physical) } : {})
             }
           }
           await graph.dispose()
@@ -766,12 +768,13 @@ function createManagedHost(
               termination: 'managed' as const,
               cleanupComplete: false,
               cleanupErrors: Object.freeze(cleanupErrors),
-              physicalCompletion: settlePhysical(physical)
+              physicalCompletion: mergeCleanupResults(physical)
             }
           }
           const result = (await concrete.dispose()) as IPluginHostDisposalResult
           cleanupErrors.push(...result.cleanupErrors)
-          if (result.physicalCompletion) physical.push(observePhysical(result.physicalCompletion))
+          if (result.physicalCompletion)
+            physical.push(mergeCleanupResults([result.physicalCompletion]))
           const cleanupComplete =
             cleanup.complete && result.cleanupComplete && physical.length === 0
           state = TrayHostState.terminal
@@ -785,7 +788,7 @@ function createManagedHost(
             termination: 'managed' as const,
             cleanupComplete,
             cleanupErrors: Object.freeze(cleanupErrors),
-            ...(physical.length > 0 ? { physicalCompletion: settlePhysical(physical) } : {})
+            ...(physical.length > 0 ? { physicalCompletion: mergeCleanupResults(physical) } : {})
           }
         } catch (error) {
           state = TrayHostState.failed
@@ -890,7 +893,9 @@ function mutationResult(
     view,
     cleanupComplete: cleanup.complete,
     cleanupErrors: Object.freeze([...cleanup.errors]),
-    ...(cleanup.physical.length > 0 ? { physicalCompletion: settlePhysical(cleanup.physical) } : {})
+    ...(cleanup.physical.length > 0
+      ? { physicalCompletion: mergeCleanupResults(cleanup.physical) }
+      : {})
   })
 }
 
@@ -932,7 +937,9 @@ function removalResult(
     view,
     cleanupComplete: cleanup.complete,
     cleanupErrors: Object.freeze([...cleanup.errors]),
-    ...(cleanup.physical.length > 0 ? { physicalCompletion: settlePhysical(cleanup.physical) } : {})
+    ...(cleanup.physical.length > 0
+      ? { physicalCompletion: mergeCleanupResults(cleanup.physical) }
+      : {})
   })
 }
 
@@ -963,53 +970,6 @@ function removalFailure(name: string, error: unknown, view: unknown, committed =
     cleanupErrors: Object.freeze([]),
     error: error instanceof Error ? error : createTrayError(TrayErrorCode.invalidEntry, error)
   })
-}
-
-/** Converts physical cleanup promises into one exact non-rejecting observation. */
-function settlePhysical(values: readonly unknown[]): Promise<ITrayPluginPhysicalCleanupResult> {
-  return Promise.all(
-    values
-      .filter((value): value is Promise<unknown> => value instanceof Promise)
-      .map((value) =>
-        value.then(
-          (result) =>
-            result &&
-            typeof result === 'object' &&
-            'cleanupErrors' in result &&
-            Array.isArray(result.cleanupErrors)
-              ? result.cleanupErrors
-              : [],
-          (error) => [error]
-        )
-      )
-  ).then((groups) => Object.freeze({ cleanupErrors: Object.freeze(groups.flat()) }))
-}
-
-/** Converts one Host cleanup result or promise into the non-rejecting Tray observation. */
-function observePhysical<T extends Readonly<{ readonly cleanupErrors: readonly unknown[] }>>(
-  value: Promise<T>
-): Promise<ITrayPluginPhysicalCleanupResult> {
-  return value.then(
-    async (result) => {
-      const errors = [...result.cleanupErrors]
-      const nested = (
-        result as T & {
-          readonly physicalCompletion?: Promise<
-            Readonly<{ readonly cleanupErrors: readonly unknown[] }>
-          >
-        }
-      ).physicalCompletion
-      if (nested) {
-        try {
-          errors.push(...(await nested).cleanupErrors)
-        } catch (error) {
-          errors.push(error)
-        }
-      }
-      return Object.freeze({ cleanupErrors: Object.freeze(errors) })
-    },
-    (error) => Object.freeze({ cleanupErrors: Object.freeze([error]) })
-  )
 }
 
 /** Bounds Tray's logical wait while preserving the original physical cleanup promise. */

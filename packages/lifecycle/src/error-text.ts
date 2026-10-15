@@ -12,6 +12,8 @@ export const LifecycleErrorText = {
   scopeReentrantDispose: '[lifecycle] cannot join the same scope disposal from its disposer',
   /** Stable message for a descriptor that cannot be admitted into a release transaction. */
   disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed',
+  /** Shared cleanup observation admission requires the error array used by the merge helper. */
+  cleanupResultInvalid: '[lifecycle] cleanup result must provide a cleanupErrors array',
   /**
    * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its
    * budget. The release still counts as successful and `force` does not run; consumed by

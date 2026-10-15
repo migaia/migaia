@@ -1,5 +1,6 @@
 import { openComposition, registerManagedHost } from '@migaia/plugin-host/composition'
 import { describe, expect, it } from 'vitest'
+import { runInNewContext } from 'node:vm'
 import {
   PluginHost,
   defineFeature,
@@ -522,6 +523,44 @@ describe('@migaia/tray/host', () => {
     expect(disposed).toBe(true)
     expect(timeline).toEqual(['stage:start', 'stage:release', 'dispose:staged', 'dispose:provider'])
     await managed.dispose()
+  })
+
+  it('PCC-T2 keeps physical cleanup from a Host-owned resource in another realm', async () => {
+    /** A Host subclass can own additional realm-specific resources after its base cleanup. */
+    const failure = new Error('foreign resource cleanup')
+    /** Completes the actual foreign Promise after the managed result is returned. */
+    let finish!: () => void
+    const foreign = runInNewContext(
+      'new Promise(resolve => install(() => resolve({ cleanupErrors: [failure] })))',
+      {
+        failure,
+        install: (complete: () => void) => {
+          finish = complete
+        }
+      }
+    ) as Promise<{ readonly cleanupErrors: readonly unknown[] }>
+    /** Base Host cleanup remains genuine; the extra resource keeps its own realm's Promise. */
+    class ForeignResourceHost extends TestHost {
+      override async dispose() {
+        const result = await super.dispose()
+        return { ...result, cleanupComplete: false, physicalCompletion: foreign }
+      }
+    }
+    const managed = await createHost(
+      options(
+        [],
+        () =>
+          new ForeignResourceHost({
+            execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+          })
+      )
+    )
+    const result = await managed.dispose()
+    expect(result.cleanupComplete).toBe(false)
+    finish()
+    const physical = await result.physicalCompletion!
+    expect(physical.cleanupErrors).toEqual([failure])
+    expect(physical.cleanupErrors[0]).toBe(failure)
   })
 
   it('keeps creation cleanupErrors immediate and physicalCompletion separate', async () => {
