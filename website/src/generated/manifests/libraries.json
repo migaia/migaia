@@ -8354,6 +8354,10 @@
                 {
                   "type": "paragraph",
                   "text": "更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 USEGUIDE.md。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
                 }
               ]
             }
@@ -8977,6 +8981,10 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
                 }
               ]
             }
