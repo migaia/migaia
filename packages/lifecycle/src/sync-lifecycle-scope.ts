@@ -14,6 +14,7 @@ import {
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
+import { createOwnedEntryList } from './owned-entries.js'
 import { createTerminalController } from './terminal-controller.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import { LifecycleState, ThenableProbeKind } from './state-constants.js'
@@ -105,11 +106,12 @@ export function createSyncLifecycleScope(
   const errorPolicy = options.errorPolicy ?? 'throw'
   assertErrorPolicyReporter(errorPolicy, options.report)
   const terminal = createTerminalController()
-  const entries: Array<{
+  /** Live owned resources in registration order with O(1) release lookup (LC-P1). */
+  const entries = createOwnedEntryList<{
     readonly resource: unknown
     readonly source: string
     readonly descriptor: ISyncReleaseDescriptor
-  }> = []
+  }>()
   let nextId = 0
   let disposed = false
   let currentlyReleasing = false
@@ -155,10 +157,7 @@ export function createSyncLifecycleScope(
   }
 
   const release = (resource: unknown): boolean => {
-    const index = entries.findIndex((entry) => entry.resource === resource)
-    if (index < 0) return false
-    entries.splice(index, 1)
-    return true
+    return entries.release(resource) !== undefined
   }
 
   const close = (): void => {
@@ -177,7 +176,7 @@ export function createSyncLifecycleScope(
     }
     close()
     disposed = true
-    const released = entries.splice(0).reverse()
+    const released = entries.drain().reverse()
     const collector = createErrorCollector(errorPolicy, options.report)
     const admissionErrors: Array<{ readonly source: string; readonly error: unknown }> = []
     const admitted = released.flatMap((entry) => {

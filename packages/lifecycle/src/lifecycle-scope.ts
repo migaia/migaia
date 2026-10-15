@@ -11,6 +11,7 @@ import { createDisposerContext } from './disposer-context.js'
 import { assertErrorPolicyReporter, containAsyncRejection, createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
+import { createOwnedEntryList } from './owned-entries.js'
 import { createTerminalController } from './terminal-controller.js'
 import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
 import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
@@ -80,12 +81,13 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
   const closingController = createController()
   /** Immutable owner-bound capability shared by this scope's release callbacks. */
   const disposerContext = createDisposerContext()
-  const entries: Array<{
+  /** Live owned resources in registration order with O(1) release lookup (LC-P1). */
+  const entries = createOwnedEntryList<{
     readonly resource: unknown
     readonly source: string
     readonly descriptor: IReleaseDescriptor
     readonly unregisterToken?: object
-  }> = []
+  }>()
   let nextId = 0
   let disposePromise: Promise<readonly ICollectedError[]> | undefined
   /**
@@ -215,12 +217,11 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
   }
 
   const release = (resource: unknown): boolean => {
-    const index = entries.findIndex((entry) => entry.resource === resource)
-    if (index < 0) return false
-    const [entry] = entries.splice(index, 1)
+    const entry = entries.release(resource)
+    if (entry === undefined) return false
     // The caller has already released this resource independently — the GC-fallback finalizer
     // must not run `force` a second time (L-T19).
-    unregisterGcFallback(entry?.unregisterToken)
+    unregisterGcFallback(entry.unregisterToken)
     return true
   }
 
@@ -237,7 +238,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
     // Atomic: nothing added between the snapshot and the loop, nothing skipped, nothing doubled
     // (L-T33). LIFO order; `DisposeTransaction`'s order-mode stable sort preserves this for
     // same-`order` items.
-    const snapshot = entries.splice(0).reverse()
+    const snapshot = entries.drain().reverse()
     // Every one of these is about to be explicitly released by the transaction below; the
     // GC-fallback finalizer must not also fire for any of them afterward.
     for (const entry of snapshot) unregisterGcFallback(entry.unregisterToken)
