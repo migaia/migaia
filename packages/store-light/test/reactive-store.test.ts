@@ -2,7 +2,7 @@ import { StoreLightErrorCode } from '../src/error-code.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import type { IDisposable } from '@migaia/reactive'
+import type { IDisposable, IReactiveSignal } from '@migaia/reactive'
 import {
   createStore,
   createAsyncStore,
@@ -734,6 +734,73 @@ describe('$subscribe', () => {
 })
 
 describe('$dispose lifecycle', () => {
+  it('does not require AbortController for pure reactive construction or release', async () => {
+    const runtime = createRuntime()
+    vi.stubGlobal('AbortController', undefined)
+    try {
+      const store = createStore(
+        {
+          count: 2,
+          get doubled() {
+            return this.count * 2
+          }
+        },
+        { runtime }
+      )
+      expect(store.doubled).toBe(4)
+      const released = store.$dispose()
+      expect(store.$disposed).toBe(true)
+      await released
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('preserves LIFO across pure node segments, fields and external ownership', async () => {
+    const runtime = createRuntime()
+    /** Record native node release while preserving its actual synchronous disposer. */
+    const order: string[] = []
+    const signal = runtime.signal
+    vi.spyOn(runtime, 'signal').mockImplementation(
+      <T>(value: T, options?: Parameters<typeof signal>[1]) => {
+        const node = Reflect.apply(signal, runtime, [value, options]) as IReactiveSignal<T>
+        /** The bound arrow preserves this native node's actual disposal behavior. */
+        const originalDispose = node.dispose
+        vi.spyOn(node, 'dispose').mockImplementation(() => {
+          order.push(options?.debugName ?? '')
+          Reflect.apply(originalDispose, node, [])
+        })
+        return node
+      }
+    )
+    const field: IFieldBuilder<IDisposable> = {
+      [FIELD_BUILDER]: true,
+      mode: 'sync',
+      create: () => ({
+        disposed: false,
+        dispose: () => {
+          order.push('field')
+        }
+      })
+    }
+    const store = createStore({ first: 0, second: 0, field, third: 0, fourth: 0 }, { runtime })
+    store.$own({
+      disposed: false,
+      dispose: () => {
+        order.push('owned')
+      }
+    })
+    await store.$dispose()
+    expect(order).toEqual([
+      'owned',
+      'Store.fourth',
+      'Store.third',
+      'field',
+      'Store.second',
+      'Store.first'
+    ])
+  })
+
   it('is single-flight while asynchronous owned cleanup is still pending', async () => {
     const store = createStore({ count: 1 })
     let release!: () => void

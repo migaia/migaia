@@ -33,7 +33,7 @@ import {
   FIELD_BUILDER,
   createStoreResource,
   createStoreResourceScope
-} from '@migaia/store-light';
+} from '@migaia/store-light'
 ```
 
 `store-light` 只依赖 `@migaia/reactive`（Signal/Computed/Effect/Runtime 内核）。所有节点默认创建在 `@migaia/reactive` 的 `defaultRuntime` 上；需要隔离运行时（多 root、SSR 每请求、单测互不串状态）时，通过 `@migaia/reactive` 的 `createRuntime()` 构造独立 Runtime，再传入 `options.runtime`。`store-light` 本身不 import 任何 UI 框架，也不假设特定宿主环境。
@@ -60,15 +60,17 @@ import {
 
 ## 3. 创建入口参考
 
-| API                                  | 签名                                | 参数类型                                                      | 同步/异步 | 行为                                                                                                                                                                                         |
-| ------------------------------------ | ----------------------------------- | ------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createStore(shape, options?)`       | `(S) => IReactiveStore<S>`          | `shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions` | 同步      | 同步创建；**shape 中任意字段是非 `mode: 'sync'` 的 `FieldBuilder`（`mode: 'async'` 或历史无 mode 的 Builder）会在读取属性描述符阶段直接抛错**，不会执行任何 I/O，提示改用 `createAsyncStore` |
-| `createAsyncStore(shape, options?)`  | `(S) => Promise<IReactiveStore<S>>` | `shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions` | 异步      | 允许异步 `FieldBuilder`；返回的 Promise 在全部异步字段初始化完成（或抛错）后才 resolve/reject，resolve 后每个字段都已就绪                                                                    |
-| `storeReady(store)`                  | `(store: object) => Promise<void>`  | `store: object`                                               | 异步      | 返回该 Store 的就绪 Promise；只对通过上述任一入口创建的 Store 有效，传入非 Store 对象会抛 `[store] store has no asynchronous initialization`                                                 |
+| API                                 | 签名                                | 参数类型                                                      | 同步/异步 | 行为                                                                                                                                                                                         |
+| ----------------------------------- | ----------------------------------- | ------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createStore(shape, options?)`      | `(S) => IReactiveStore<S>`          | `shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions` | 同步      | 同步创建；**shape 中任意字段是非 `mode: 'sync'` 的 `FieldBuilder`（`mode: 'async'` 或历史无 mode 的 Builder）会在读取属性描述符阶段直接抛错**，不会执行任何 I/O，提示改用 `createAsyncStore` |
+| `createAsyncStore(shape, options?)` | `(S) => Promise<IReactiveStore<S>>` | `shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions` | 异步      | 允许异步 `FieldBuilder`；返回的 Promise 在全部异步字段初始化完成（或抛错）后才 resolve/reject，resolve 后每个字段都已就绪                                                                    |
+| `storeReady(store)`                 | `(store: object) => Promise<void>`  | `store: object`                                               | 异步      | 返回该 Store 的就绪 Promise；只对通过上述任一入口创建的 Store 有效，传入非 Store 对象会抛 `[store] store has no asynchronous initialization`                                                 |
 
 创建入口只有 `createStore`（纯同步定义）和 `createAsyncStore`（含异步字段的定义）。
 
-**初始化失败的清理语义**：无论走哪个入口，构造过程中任何一步抛错（字段类型非法、Builder 的 `create()` 拒绝所有权等），已经创建的内部节点都会被回收（`scope.dispose()`），不会遗留半初始化的资源。异步字段初始化失败（`readyList` 中的 Promise reject）同样会把整个 Store 标记为 `disposed` 并回收资源，即使有的字段在此之前已经初始化成功。
+纯 Signal/Computed Store 不建立异步 lifecycle scope；遇到 FieldBuilder、source capability、订阅 Effect 或 `$own` 外部资源时才创建。相邻原生节点合为一个同步逆序释放段，在不同资源边界登记该段，保持原混合 LIFO。初始化 AbortController 只在第一个 Builder 准入时通过 lifecycle native factory 创建。`$dispose()` 的 Promise identity、外部异步清理与错误策略保持。
+
+**初始化失败的清理语义**：无论走哪个入口，构造过程中任何一步抛错（字段类型非法、Builder 的 `create()` 拒绝所有权等），已经创建的内部节点都会按注册逆序回收，不会遗留半初始化的资源。异步字段初始化失败（`readyList` 中的 Promise reject）同样会把整个 Store 标记为 `disposed` 并回收资源，即使有的字段在此之前已经初始化成功。
 
 ---
 
@@ -80,7 +82,7 @@ const store = createStore(shape, {
   debugName: 'settings',
   warnAsyncActions: true,
   mutationPolicy: createMutationPolicy('actions-only')
-});
+})
 ```
 
 | 选项               | 类型              | 必填性 | 默认值           | 作用                                                                                                                                      |
@@ -123,22 +125,22 @@ Store 定义协议，扩展去实现——`store-light` 不知道 WASM、也不�
 
 ```ts
 export type IFieldContext = {
-  runtime: IRuntime;
-  signal: AbortSignal; // Store dispose 时中止在途初始化
-  createSource(debugName?: string): IFieldSource;
-};
+  runtime: IRuntime
+  signal: AbortSignal // Store dispose 时中止在途初始化
+  createSource(debugName?: string): IFieldSource
+}
 
 export type ISyncFieldBuilder<F extends IDisposable> = {
-  readonly [FIELD_BUILDER]: true;
-  readonly mode: 'sync';
-  create(context: IFieldContext): F;
-};
+  readonly [FIELD_BUILDER]: true
+  readonly mode: 'sync'
+  create(context: IFieldContext): F
+}
 
 export type IAsyncFieldBuilder<F extends IDisposable> = {
-  readonly [FIELD_BUILDER]: true;
-  readonly mode: 'async';
-  create(context: IFieldContext): Promise<F>;
-};
+  readonly [FIELD_BUILDER]: true
+  readonly mode: 'async'
+  create(context: IFieldContext): Promise<F>
+}
 ```
 
 | 名称                    | 作用                                                                                                                                                                                                             |
@@ -155,37 +157,37 @@ export type IAsyncFieldBuilder<F extends IDisposable> = {
 一个最小的自定义同步字段实现（改编自 `@migaia/store-wasm` 的 `number()`）：
 
 ```ts
-import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light';
-import type { IDisposable } from '@migaia/reactive';
+import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'
+import type { IDisposable } from '@migaia/reactive'
 
-type ICounterField = IDisposable & { value: number };
+type ICounterField = IDisposable & { value: number }
 
 function counterField(initial: number): IFieldBuilder<ICounterField> {
   return {
     [FIELD_BUILDER]: true,
     mode: 'sync',
     create({ createSource }: IFieldContext): ICounterField {
-      const source = createSource('CounterField');
-      let value = initial;
-      let disposed = false;
+      const source = createSource('CounterField')
+      let value = initial
+      let disposed = false
       return {
         get value() {
-          source.track();
-          return value;
+          source.track()
+          return value
         },
         set value(v) {
           source.commit(() => {
-            value = v;
-          });
+            value = v
+          })
         },
         dispose() {
-          if (disposed) return;
-          disposed = true;
-          source.dispose();
+          if (disposed) return
+          disposed = true
+          source.dispose()
         }
-      };
+      }
     }
-  };
+  }
 }
 ```
 
@@ -196,8 +198,8 @@ function counterField(initial: number): IFieldBuilder<ICounterField> {
 `store-light` 只定义协议，不提供具体策略实现：
 
 ```ts
-export type IMutationGuard = { assertMutationAllowed(operation?: string): void };
-export type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T };
+export type IMutationGuard = { assertMutationAllowed(operation?: string): void }
+export type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T }
 ```
 
 - Store 与 collections 类的包只需要回答"能不能改"这一个问题（`IMutationGuard`）；
@@ -206,21 +208,21 @@ export type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T 
 具体实现（MobX 风格 actions-only 模式）由 `@migaia/store-middleware` 提供：
 
 ```ts
-import { createStore } from '@migaia/store-light';
-import { createMutationPolicy } from '@migaia/store-middleware';
+import { createStore } from '@migaia/store-light'
+import { createMutationPolicy } from '@migaia/store-middleware'
 
 const store = createStore(
   {
     count: 0,
     increment() {
-      this.count += 1; // 在 action 内，允许
+      this.count += 1 // 在 action 内，允许
     }
   },
   { mutationPolicy: createMutationPolicy('actions-only') }
-);
+)
 
-store.increment(); // OK
-store.count = 5; // 抛错：[store] set(count) is not allowed outside an action
+store.increment() // OK
+store.count = 5 // 抛错：[store] set(count) is not allowed outside an action
 ```
 
 不传 `mutationPolicy` 时（默认），任何地方直接赋值都允许，这是为了不改变既有 Store 的行为——严格模式是显式接入的。
@@ -286,12 +288,12 @@ ready/loading --dispose()（有持有者）--> closing --最后一个持有者�
 ### 8.4 createStoreResourceScope
 
 ```ts
-const scope = createStoreResourceScope();
-const userResource = scope.resource((ctx) => fetchUser(ctx.signal));
-const settingsResource = scope.resource((ctx) => fetchSettings(ctx.signal));
+const scope = createStoreResourceScope()
+const userResource = scope.resource((ctx) => fetchUser(ctx.signal))
+const settingsResource = scope.resource((ctx) => fetchSettings(ctx.signal))
 
 // 组件卸载 / 请求结束
-scope.dispose(); // 对组内每个资源调用 forceDispose()
+scope.dispose() // 对组内每个资源调用 forceDispose()
 ```
 
 `scope.resource()` 原样委托 `createStoreResource()` 的已知字段快照与 callback precedence，不会再次 spread/枚举 factory；用户的 effective `onTerminal` 保持不变。Scope 通过 `whenTerminal()` 从私有集合摘除自然终止的资源，不改写公开 disposer。`scope.dispose()` 会强制释放（`forceDispose`）组内所有仍然存在的资源，不等待持有者释放——它假定"整个作用域要关闭了，个别资源的持有者不再重要"。
@@ -310,15 +312,15 @@ export const StoreResourceKind = {
   failed: 'failed',
   closing: 'closing',
   disposed: 'disposed'
-} as const;
-export type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];
+} as const
+export type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]
 
-export const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;
+export const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const
 export type IStoreResourceDataKind =
-  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];
+  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]
 
-export const StoreFieldMode = { sync: 'sync', async: 'async' } as const;
-export type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];
+export const StoreFieldMode = { sync: 'sync', async: 'async' } as const
+export type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]
 ```
 
 - `StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 [§8.1](#81-状态机)），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。
@@ -326,24 +328,24 @@ export type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMod
 - `StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 [§6](#6-fieldbuilder自定义字段扩展协议)。
 
 ```ts
-export const STORE_LIGHT_SOURCE = '@migaia/store-light';
+export const STORE_LIGHT_SOURCE = '@migaia/store-light'
 
 function createStoreLightError(
   code: IStoreLightErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): Error;
-function createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;
+): Error
+function createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError
 function createStoreLightTypeError(
   code: IStoreLightErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): TypeError;
+): TypeError
 function createStoreLightAggregateError(
   code: IStoreLightErrorCode,
   errors: unknown[],
   message: string
-): AggregateError;
+): AggregateError
 ```
 
 - `STORE_LIGHT_SOURCE`：本包所有错误 `error.source` 的固定值 `'@migaia/store-light'`，用于按来源过滤/断言错误。
@@ -362,20 +364,20 @@ function createStoreLightAggregateError(
 `code`。例如已释放 Store 为 `STORE_DISPOSED`，未就绪异步字段为 `STORE_NOT_READY`；初始化与
 cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。
 
-| `StoreLightErrorCode` | 码值 | 触发条件 / 处理 |
-| --- | --- | --- |
-| `storeDisposed` | `STORE_DISPOSED` | Store 终结后继续访问；创建新 Store，不复活旧实例 |
-| `resourceDisposed` | `RESOURCE_DISPOSED` | Resource closing/disposed 后读取或保留；停止使用并创建新资源 |
-| `captureInvalid` | `CAPTURE_INVALID` | capture token 无效或已消费；重新捕获，token 只能提交一次 |
-| `unknownVersion` | `UNKNOWN_VERSION` | 保留/捕获不可见版本；从当前 snapshot 重新取得版本 |
-| `identityRequired` | `IDENTITY_REQUIRED` | 带 dispose 的 factory 返回原始值；返回可追踪身份的对象或函数 |
-| `noAsyncInit` | `NO_ASYNC_INIT` | 对同步 Store 调 `storeReady()`；改用 `createAsyncStore()` 或移除等待 |
-| `storeNotReady` | `STORE_NOT_READY` | 异步字段 pending/failed 时访问；先等待 `storeReady()` |
-| `initAndCleanupFailed` | `INIT_AND_CLEANUP_FAILED` | 初始化与回滚同时失败；展开 `AggregateError.errors` |
-| `syncFieldRequired` | `SYNC_FIELD_REQUIRED` | `createStore()` 收到异步 FieldBuilder；改用 `createAsyncStore()` |
-| `actionBatchBoundary` | `ACTION_BATCH_BOUNDARY` | 异步 action 首次 await 后继续写的诊断；把后续写显式放入 `$batch()` |
-| `envUnsupported` | `ENV_UNSUPPORTED` | 缺少 `WeakRef`/`FinalizationRegistry`；修复部署环境 |
-| `invalidOption` | `INVALID_OPTION` | keepAlive、写目标或 hydrate 选项非法；按 message 修正输入 |
+| `StoreLightErrorCode`  | 码值                      | 触发条件 / 处理                                                      |
+| ---------------------- | ------------------------- | -------------------------------------------------------------------- |
+| `storeDisposed`        | `STORE_DISPOSED`          | Store 终结后继续访问；创建新 Store，不复活旧实例                     |
+| `resourceDisposed`     | `RESOURCE_DISPOSED`       | Resource closing/disposed 后读取或保留；停止使用并创建新资源         |
+| `captureInvalid`       | `CAPTURE_INVALID`         | capture token 无效或已消费；重新捕获，token 只能提交一次             |
+| `unknownVersion`       | `UNKNOWN_VERSION`         | 保留/捕获不可见版本；从当前 snapshot 重新取得版本                    |
+| `identityRequired`     | `IDENTITY_REQUIRED`       | 带 dispose 的 factory 返回原始值；返回可追踪身份的对象或函数         |
+| `noAsyncInit`          | `NO_ASYNC_INIT`           | 对同步 Store 调 `storeReady()`；改用 `createAsyncStore()` 或移除等待 |
+| `storeNotReady`        | `STORE_NOT_READY`         | 异步字段 pending/failed 时访问；先等待 `storeReady()`                |
+| `initAndCleanupFailed` | `INIT_AND_CLEANUP_FAILED` | 初始化与回滚同时失败；展开 `AggregateError.errors`                   |
+| `syncFieldRequired`    | `SYNC_FIELD_REQUIRED`     | `createStore()` 收到异步 FieldBuilder；改用 `createAsyncStore()`     |
+| `actionBatchBoundary`  | `ACTION_BATCH_BOUNDARY`   | 异步 action 首次 await 后继续写的诊断；把后续写显式放入 `$batch()`   |
+| `envUnsupported`       | `ENV_UNSUPPORTED`         | 缺少 `WeakRef`/`FinalizationRegistry`；修复部署环境                  |
+| `invalidOption`        | `INVALID_OPTION`          | keepAlive、写目标或 hydrate 选项非法；按 message 修正输入            |
 
 | 错误信息                                                                                                                                                                                                                           | 触发条件                                                                                                                               |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -384,7 +386,7 @@ cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。
 | `[store] createStore() only accepts synchronous fields; "${key}" is a FieldBuilder. Use createAsyncStore().`                                                                                                                       | `createStore()`（非 `createAsyncStore`）的 shape 里含非 `mode: 'sync'` 的 `FieldBuilder`                                               |
 | `[store] field is not settable: ${key}`                                                                                                                                                                                            | `$set()` 传入的 key 不对应任何 signal（computed/wasm/方法字段，或压根不存在的 key）                                                    |
 | `[store] unknown hydration field: ${key}`                                                                                                                                                                                          | `$hydrate(partial, { unknown: 'strict' })` 遇到未知 key                                                                                |
-| `[store] store has no asynchronous initialization`                                                                                                                                                                                 | 对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`                           |
+| `[store] store has no asynchronous initialization`                                                                                                                                                                                 | 对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`                                               |
 | `[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime` | `$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）          |
 | `[store] resource is disposed`                                                                                                                                                                                                     | 对已 `disposed`/`closing` 的 `StoreResource` 调用 `preload`/`retry`/`retain*`/`captureVersion`/`commitCapture` 等操作                  |
 | `[store] unknown resource version`                                                                                                                                                                                                 | `retainVersion(version)`/`captureVersion(id)`/`commitCapture(capture)` 传入的版本号既不是当前版本，也不在 retired/stale/closing 列表里 |
@@ -397,11 +399,11 @@ cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。
 
 ## 11. 生命周期与释放语义
 
-**Store 构造失败**：`shape` 里任意字段处理阶段抛错（比如某个 `FieldBuilder.create()` 抛错），整个构造过程回滚——已创建的 scope 内节点被 `scope.dispose()`，内部的 `signals`/`computeds`/`wasmFields`/`fieldSources` 全部清空，原始错误继续向外抛出（清理阶段自身失败时，会尽量把清理错误挂到原错误的 `cause` 上，不会替换原始错误）。
+**Store 构造失败**：`shape` 里任意字段处理阶段抛错（比如某个 `FieldBuilder.create()` 抛错），整个构造过程回滚——原生节点同步分段释放、外部资源由 lifecycle scope 释放，内部的 `signals`/`computeds`/`wasmFields`/`fieldSources` 全部清空，原始错误继续向外抛出（清理阶段自身失败时，会尽量把清理错误挂到原错误的 `cause` 上，不会替换原始错误）。
 
 **异步字段初始化失败**：`readyList` 中任一 Promise reject，Store 立即被标记为 `disposed = true`，中止其余在途初始化（`initAbort.abort()`），并回收已经创建的资源；这个转变发生在 `ready` Promise 的 reject 路径里，因此哪怕调用方没有 `await storeReady()`，Store 内部状态也已经正确收敛，不会有"部分字段可用"的僵尸状态。
 
-**`$dispose()` 时机**：字段读写方法在闭包里直接引用底层节点（`node.value`），不经过任何"Store 对象本身"的代理层；因此 `$dispose()` 唯一要做的事就是把 `disposed` 标志位翻转、释放 scope、清空内部 Map。所有已经拿到 Store 引用的调用方，下一次任何操作都会立刻看到统一的 `[store] store is disposed`。
+**`$dispose()` 时机**：字段读写方法在闭包里直接引用底层节点（`node.value`），不经过任何"Store 对象本身"的代理层；因此 `$dispose()` 唯一要做的事就是把 `disposed` 标志位翻转、释放原生节点段与已有 scope、清空内部 Map。所有已经拿到 Store 引用的调用方，下一次任何操作都会立刻看到统一的 `[store] store is disposed`。
 
 **`StoreResource` 的持有者概念**：一份值被判定为"没有持有者"（可以被回收）需要同时满足：没有 `retainResource()`/`retainVersion()` 产生的活跃 lease，也没有任何未提交/未过期的 `captureVersion()` provisional token（渲染阶段的临时保护，默认 4 秒内没有 commit/discard 会被视为放弃）。`keepAliveMs` 超时只在"当前没有任何持有者"时才开始计算，一旦有新的持有者出现，倒计时会被取消。
 
@@ -412,46 +414,46 @@ cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。
 一个"用户设置面板"场景：本地可写字段用严格 action 守卫，远端用户资料用 `StoreResource` 异步加载，并在组件卸载时统一释放。
 
 ```ts
-import { createStore } from '@migaia/store-light';
-import { createMutationPolicy } from '@migaia/store-middleware';
-import { createStoreResourceScope } from '@migaia/store-light';
+import { createStore } from '@migaia/store-light'
+import { createMutationPolicy } from '@migaia/store-middleware'
+import { createStoreResourceScope } from '@migaia/store-light'
 
-const mutationPolicy = createMutationPolicy('actions-only');
+const mutationPolicy = createMutationPolicy('actions-only')
 
 const settingsStore = createStore(
   {
     theme: 'light' as 'light' | 'dark',
     fontSize: 14,
     get isDark() {
-      return this.theme === 'dark';
+      return this.theme === 'dark'
     },
     setTheme(theme: 'light' | 'dark') {
-      this.theme = theme;
+      this.theme = theme
     }
   },
   { debugName: 'settings', mutationPolicy }
-);
+)
 
-const scope = createStoreResourceScope();
+const scope = createStoreResourceScope()
 const profileResource = scope.resource(
   async ({ signal }) => {
-    const res = await fetch('/api/profile', { signal });
-    if (!res.ok) throw new Error(`profile fetch failed: ${res.status}`);
-    return res.json() as Promise<{ name: string }>;
+    const res = await fetch('/api/profile', { signal })
+    if (!res.ok) throw new Error(`profile fetch failed: ${res.status}`)
+    return res.json() as Promise<{ name: string }>
   },
   {
     keepAliveMs: 30_000,
     onError: (error, phase) => console.error(`[profile] ${phase} failed`, error)
   }
-);
+)
 
 // 类 React 组件渲染路径：
 // const profile = profileResource.read(); // loading 时 throw Promise，交给 Suspense 边界
 
 // 组件卸载 / 页面销毁时统一收尾：
 function teardown() {
-  scope.dispose(); // 强制释放 profileResource
-  settingsStore.$dispose();
+  scope.dispose() // 强制释放 profileResource
+  settingsStore.$dispose()
 }
 ```
 
