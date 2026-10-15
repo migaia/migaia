@@ -1,4 +1,4 @@
-import type { IQuiescenceTracker } from '@migaia/lifecycle'
+import { createQuiescenceTracker, type IQuiescenceTracker } from '@migaia/lifecycle'
 import type { IMiddlewarePipelineMode, IMiddlewarePipelineStage } from '@migaia/middleware-pipeline'
 import type { IDataOrderSlotState } from './composition.js'
 import type { IRegistration } from './registry.js'
@@ -34,15 +34,21 @@ export type IStageSnapshot<TValue> = Readonly<{
 
 /** Append-only allocation-order lane with one cached immutable execution snapshot per version. */
 export class StageLanes<TValue> {
+  /** One lifecycle tracker owns execution, version, and generation leases. */
+  readonly leases = createQuiescenceTracker<object>()
   /** Host entries and stable plugin slots in allocation order. */
   #segments: Array<IHostSegment<TValue> | IStageOwnerSegment> = []
   /** Retired empty slots left as tombstones until amortized compaction. */
   #dead = 0
   /** Cached version, invalidated only when visible execution can change. */
   #snapshot: IStageSnapshot<TValue> | undefined
+  /** Retires the cached version's owner pins after its last execution releases. */
+  #retireSnapshot: (() => void) | undefined
 
   /** Invalidates the cached execution version after a visible mutation. */
   invalidate(): void {
+    this.#retireSnapshot?.()
+    this.#retireSnapshot = undefined
     this.#snapshot = undefined
   }
 
@@ -152,23 +158,36 @@ export class StageLanes<TValue> {
       }
       if (contributed) ownerKeys.push(owner.pipelineOwnerKey)
     }
-    this.#snapshot = Object.freeze({
+    /** Immutable version doubles as the lifecycle execution lease key. */
+    const snapshot = Object.freeze({
       stages: Object.freeze(stages),
       ownerKeys: Object.freeze(ownerKeys)
     })
-    return this.#snapshot
+    /** Owner pins belong to the immutable version, rather than every execution. */
+    const releases = ownerKeys.map((key) => this.leases.retain(key))
+    /** Retired versions keep their owners alive until all executions have left. */
+    const releaseOwners = (): void => {
+      for (const release of releases) release()
+    }
+    this.#retireSnapshot = () => {
+      this.leases.seal(snapshot)
+      if (this.leases.count(snapshot) === 0) releaseOwners()
+      else void this.leases.whenZero(snapshot).then(releaseOwners)
+    }
+    this.#snapshot = snapshot
+    return snapshot
   }
 
-  /** Retains the global key and only the generation keys present in this snapshot. */
-  retainLeases(
-    leases: IQuiescenceTracker<object>,
-    pipelineKey: object,
-    ownerKeys: readonly object[]
-  ): () => void {
-    const releases = [leases.retain(pipelineKey)]
-    for (const key of ownerKeys) releases.push(leases.retain(key))
+  /** Each execution retains exactly the global key and its immutable version. */
+  retainLeases(pipelineKey: object, snapshot: IStageSnapshot<TValue>): () => void {
+    /** Global draining counts real executions; owner draining counts their pinned versions. */
+    const releaseGlobal = this.leases.retain(pipelineKey)
+    if (snapshot.ownerKeys.length === 0) return releaseGlobal
+    /** The version cannot retire between snapshot capture and this synchronous retain. */
+    const releaseVersion = this.leases.retain(snapshot)
     return () => {
-      for (const release of releases) release()
+      releaseVersion()
+      releaseGlobal()
     }
   }
 

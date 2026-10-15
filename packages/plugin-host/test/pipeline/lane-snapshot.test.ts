@@ -24,18 +24,20 @@ const verifySnapshot = async (mode: IMiddlewarePipelineMode): Promise<void> => {
     }, MiddlewarePipelineMode.sync),
     0n
   )
-  await executePluginHostPipeline({
-    mode,
-    snapshot: lanes.snapshot(),
-    value: 0,
-    done: () => seen.push('done'),
-    runner,
-    assertActive: () => undefined,
-    retainLease: () => () => undefined,
-    enter: () => undefined,
-    leave: () => undefined,
-    pending: createPendingTracker()
-  } as never)
+  await executePluginHostPipeline(
+    {
+      mode,
+      runner,
+      assertActive: () => undefined,
+      retainLease: () => () => undefined,
+      enter: () => undefined,
+      leave: () => undefined,
+      pending: createPendingTracker()
+    } as never,
+    lanes.snapshot(),
+    0,
+    () => seen.push('done')
+  )
   expect(seen).toEqual(['first', 'done'])
   expect(lanes.snapshot().stages).toHaveLength(2)
 }
