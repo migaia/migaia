@@ -35,6 +35,12 @@
 
 ### Behavior
 
+- Dynamic capability graph registration and replacement snapshot node identity,
+  kind, start and dependencies once when their queued mutation is admitted.
+  Later caller mutation no longer rewrites graph facts. Captured starts retain
+  their original receiver and return value; throwing getters become coded
+  `GRAPH_INVALID_NODE` failures. Pure and incremental topology share private
+  edge admission, while static ordinal admission remains local to its owner.
 - Capability graph `ctx.own()` rejects a missing or non-callable `force` during
   registration with `GRAPH_INVALID_OPTION`, retaining the lifecycle TypeError on
   `cause`. Previously the facade hid it until disposal. Dynamic graph reporters

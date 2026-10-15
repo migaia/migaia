@@ -1,4 +1,9 @@
-import { createTopologyIndex } from './topology-index.js'
+import { createTopologyIndexFromSnapshots } from './topology-index.js'
+import {
+  admitTopologyId,
+  isTopologyRecord,
+  snapshotTopologyDependencies
+} from './topology-admission.js'
 
 /** Stable structural reasons passed to the caller-owned topology error adapter. */
 export const TopologyInvalidReason = {
@@ -27,7 +32,7 @@ export type ITopologyDependency = {
   readonly required: boolean
 }
 
-/** Minimal admitted node shape consumed by the static and future dynamic topology owners. */
+/** Minimal admitted node shape consumed by the static and incremental topology owners. */
 export type ITopologyNode = {
   readonly id: string
   readonly dependencies: readonly ITopologyDependency[]
@@ -35,7 +40,7 @@ export type ITopologyNode = {
   readonly ordinal: number
 }
 
-/** Frozen topology snapshot shared by static Graph and future dynamic graph oracles. */
+/** Frozen topology snapshot shared by static Graph and incremental topology projections. */
 export type ICapabilityTopology = {
   readonly ordered: readonly ITopologyNode[]
   /** Provider-to-consumer facts retained for dynamic graph reuse. */
@@ -55,15 +60,18 @@ function snapshotTopologyNode(
   nodeCount: number,
   onInvalid: (reason: ITopologyInvalidReason, nodeId?: string) => never
 ): ITopologyNode {
-  if ((typeof candidate !== 'object' || candidate === null) && typeof candidate !== 'function')
-    onInvalid(TopologyInvalidReason.invalidNode)
+  if (!isTopologyRecord(candidate)) onInvalid(TopologyInvalidReason.invalidNode)
+  /** Static projection captures all three caller fields before validating their values. */
   const record = candidate as {
     readonly id?: unknown
     readonly ordinal?: unknown
     readonly dependencies?: unknown
   }
+  /** One captured public node identity. */
   let idValue: unknown
+  /** Static inputs own a dense registration ordinal, unlike incremental index inputs. */
   let ordinalValue: unknown
+  /** Caller-owned edge list captured before traversing any dependency getter. */
   let dependenciesValue: unknown
   try {
     idValue = record.id
@@ -72,46 +80,21 @@ function snapshotTopologyNode(
   } catch {
     onInvalid(TopologyInvalidReason.invalidNode)
   }
-  const nodeId = typeof idValue === 'string' ? idValue : undefined
-  if (typeof idValue !== 'string' || idValue.length === 0)
-    onInvalid(TopologyInvalidReason.invalidNode)
+  /** ID validation is shared while this leaf retains its existing invalid-ID diagnostic shape. */
+  const nodeId = admitTopologyId(idValue, (reason) => onInvalid(reason))
   if (
     !Number.isSafeInteger(ordinalValue) ||
     (ordinalValue as number) < 0 ||
     (ordinalValue as number) >= nodeCount
   )
     onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-  if (!Array.isArray(dependenciesValue)) onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-  const dependencyValues: unknown[] = dependenciesValue.slice()
-  const edgeProviders = new Set<string>()
-  const dependencies = dependencyValues.map((candidateDependency) => {
-    if (
-      (typeof candidateDependency !== 'object' || candidateDependency === null) &&
-      typeof candidateDependency !== 'function'
-    )
-      onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-    const dependencyRecord = candidateDependency as {
-      readonly provider?: unknown
-      readonly required?: unknown
-    }
-    let providerValue: unknown
-    let requiredValue: unknown
-    try {
-      providerValue = dependencyRecord.provider
-      requiredValue = dependencyRecord.required
-    } catch {
-      onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-    }
-    if (typeof providerValue !== 'string' || providerValue.length === 0)
-      onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-    if (typeof requiredValue !== 'boolean') onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-    if (edgeProviders.has(providerValue)) onInvalid(TopologyInvalidReason.duplicateEdge, nodeId)
-    edgeProviders.add(providerValue)
-    return Object.freeze({ provider: providerValue, required: requiredValue })
-  })
+  /** Canonical edge admission supplies the frozen dependency snapshot once. */
+  const dependencies = snapshotTopologyDependencies(dependenciesValue, nodeId, (reason, id) =>
+    onInvalid(reason, id)
+  )
   return Object.freeze({
-    id: idValue,
-    dependencies: Object.freeze(dependencies),
+    id: nodeId,
+    dependencies,
     ordinal: ordinalValue as number
   })
 }
@@ -156,26 +139,24 @@ export function buildCapabilityTopology(
   }
   /** Temporary index centralizes adjacency, level, ordering, and cycle semantics. */
   const ordinalById = new Map(snapshots.map((node) => [node.id, node.ordinal]))
-  const index = createTopologyIndex({
-    onCycle: (path) => {
-      /** Open cycle nodes rotated to the legacy static projection's lowest ordinal. */
-      const cycle = path.slice(0, -1)
-      if (cycle.length === 0) return onCycle(path)
-      let start = 0
-      for (let index = 1; index < cycle.length; index += 1) {
-        if ((ordinalById.get(cycle[index]!) ?? 0) < (ordinalById.get(cycle[start]!) ?? 0))
-          start = index
-      }
-      const normalized = [...cycle.slice(start), ...cycle.slice(0, start)]
-      return onCycle(Object.freeze([...normalized, normalized[0]!]))
+  const index = createTopologyIndexFromSnapshots(
+    {
+      onCycle: (path) => {
+        /** Open cycle nodes rotated to the legacy static projection's lowest ordinal. */
+        const cycle = path.slice(0, -1)
+        if (cycle.length === 0) return onCycle(path)
+        let start = 0
+        for (let index = 1; index < cycle.length; index += 1) {
+          if ((ordinalById.get(cycle[index]!) ?? 0) < (ordinalById.get(cycle[start]!) ?? 0))
+            start = index
+        }
+        const normalized = [...cycle.slice(start), ...cycle.slice(0, start)]
+        return onCycle(Object.freeze([...normalized, normalized[0]!]))
+      },
+      onInvalid
     },
-    onInvalid
-  })
-  for (const node of [...snapshots].sort((left, right) => left.ordinal - right.ordinal))
-    index.add({
-      id: node.id,
-      dependencies: node.dependencies
-    })
+    [...snapshots].sort((left, right) => left.ordinal - right.ordinal)
+  )
   return index.snapshot()
 }
 

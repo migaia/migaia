@@ -5,10 +5,11 @@ import {
   type IGraphMutationResult,
   type IGraphTraversalMetrics
 } from '../../src/graph/dynamic.js'
-import type {
-  IGraphNodeDefinition,
-  IGraphNodeDiagnostic,
-  IGraphNodeId
+import {
+  CapabilityGraphErrorCode,
+  type IGraphNodeDefinition,
+  type IGraphNodeDiagnostic,
+  type IGraphNodeId
 } from '../../src/graph/index.js'
 import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.js'
 
@@ -37,6 +38,97 @@ const node = (
 })
 
 describe('dynamic capability graph', () => {
+  it.each(['register', 'replace'] as const)(
+    'CAP-C2 snapshots %s getters once and preserves the original start receiver',
+    async (operation) => {
+      /** Count only caller accessors, independently of reads of the frozen admitted data. */
+      const reads = { id: 0, kind: 0, dependencies: 0, start: 0, provider: 0, required: 0 }
+      /** Mutating caller storage after admission must not rewrite graph identity or diagnostics. */
+      let name = 'captured'
+      let kind = 'test'
+      /** Edge accessors share the canonical admission boundary with the topology index. */
+      const dependencies = [
+        {
+          get provider() {
+            reads.provider += 1
+            return 'provider' as IGraphNodeId
+          },
+          get required(): true {
+            reads.required += 1
+            return true
+          }
+        }
+      ]
+      /** Private state makes a lost method receiver fail at the genuine node start. */
+      class Definition {
+        /** Value can only be read by invoking start with this original instance. */
+        #value = 42
+        get id() {
+          reads.id += 1
+          return name as IGraphNodeId
+        }
+        get kind() {
+          reads.kind += 1
+          return kind
+        }
+        get dependencies() {
+          reads.dependencies += 1
+          return dependencies
+        }
+        get start() {
+          reads.start += 1
+          return this.#start
+        }
+        /** Captured method retains the caller's receiver without a second start getter read. */
+        #start() {
+          return { value: this.#value, release: () => undefined }
+        }
+      }
+      /** Real batch lifecycle ownership remains responsible for start and release. */
+      const graph = createDynamicCapabilityGraph(createTestBatchOwner())
+      await graph.register(node('provider'))
+      if (operation === 'replace') await graph.register(node('captured', ['provider']))
+      /** One caller-owned instance supplies every descriptor getter. */
+      const definition = new Definition()
+      if (operation === 'register') await graph.register(definition)
+      else await graph.replace(definition)
+      name = 'mutated'
+      kind = 'mutated'
+      dependencies.length = 0
+      expect(graph.nodeState('captured' as IGraphNodeId)).toMatchObject({
+        id: 'captured',
+        kind: 'test',
+        value: 42,
+        state: 'ready'
+      })
+      expect(graph.dependentsOf('provider' as IGraphNodeId).required).toEqual(['captured'])
+      await graph.dispose()
+      expect(reads).toEqual({ id: 1, kind: 1, dependencies: 1, start: 1, provider: 1, required: 1 })
+    }
+  )
+
+  it('CAP-C2 codes a node getter failure before mutation while preserving its native identity', async () => {
+    /** Exact original failure remains the thrown graph error after identity attachment. */
+    const failure = new TypeError('node getter')
+    /** Failed admission must leave this real dynamic graph usable for the next registration. */
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
+    /** A valid descriptor apart from the getter that fails during admission. */
+    const definition: IGraphNodeDefinition<string> = {
+      get id(): IGraphNodeId {
+        throw failure
+      },
+      kind: 'test',
+      dependencies: [],
+      start: () => ({ value: 'unused', release: () => undefined })
+    }
+    await expect(graph.register(definition)).rejects.toBe(failure)
+    expect(failure).toMatchObject({ code: CapabilityGraphErrorCode.invalidNode })
+    expect(graph.nodes).toEqual([])
+    await graph.register(node('next'))
+    expect(graph.nodes).toEqual(['next'])
+    await graph.dispose()
+  })
+
   it('TPD-T55 seals the exact binding generation until every acquired lease releases', async () => {
     let fenceObserved = false
     const graph = createDynamicCapabilityGraph<INodeBinding>({

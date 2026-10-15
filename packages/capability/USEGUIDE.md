@@ -471,3 +471,9 @@ FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，�
 Graph ownership admission: ctx.own(resource, descriptor) requires a callable force immediately. Invalid descriptors throw GRAPH_INVALID_OPTION with the original lifecycle TypeError reachable through cause; they do not wait until disposal or report a closed graph. Dynamic graph report callbacks are final observers: synchronous throws and returned Promise rejections are contained without changing the mutation result.
 
 CapabilityHost 使用 `enable(name)` 返回结构化激活结果，使用 `disable(name)` 等待资源释放。`enableResult`、`enableLegacyBoolean`、`disableNow` 已移除；需要布尔值时比较 `(await host.enable(name)).status === CapabilityEnableStatus.enabled`。保留并等待 `disable()` 返回的 Promise，以确认物理清理已完成。
+
+### Graph node snapshots
+
+Dynamic register/replace capture id, kind, start and dependency facts once when the mutation leaves the queue. The stored definition and its edges are immutable snapshots; changing the original caller object after admission no longer changes graph identity, diagnostics or dependencies. Call replace explicitly to change a node. Captured start methods keep the original definition receiver and return value. Getter failures reject with GRAPH_INVALID_NODE while retaining the original native error or cause.
+
+Pure topology and incremental indexes share one private structural/edge admission owner. Static topology keeps its dense ordinal contract and constructs its index from the admitted snapshots without repeating edge validation. The trusted construction helper is not a package export.
