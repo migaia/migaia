@@ -582,29 +582,15 @@ export class Resource<T> implements IObserver, IDisposable {
 
   hydrate(snapshot: IResourceCacheSnapshot<T>): void {
     this.#assertUsable()
-    let version: number
-    let data: T
-    let updatedAt: number
-    let expiresAt: number | null
-    try {
-      ;({ version, data, updatedAt, expiresAt } = snapshot)
-    } catch (error) {
-      throw createResourceError(
-        ResourceErrorCode.invalidSnapshot,
-        ResourceErrorText.invalidSnapshot,
-        { cause: error }
-      )
-    }
-    if (
-      version !== 1 ||
-      !Number.isFinite(updatedAt) ||
-      (expiresAt !== null && !Number.isFinite(expiresAt))
-    ) {
+    /** Hydration shares constructor admission; unlike an omitted option, its value is required. */
+    const admitted = snapshotInitialSnapshot<T>(snapshot)
+    if (admitted === undefined) {
       throw createResourceError(
         ResourceErrorCode.invalidSnapshot,
         ResourceErrorText.invalidSnapshot
       )
     }
+    const { data, updatedAt, expiresAt } = admitted
     this.#requests.supersede()
     this.#requestPending = false
     this.#paused = false
