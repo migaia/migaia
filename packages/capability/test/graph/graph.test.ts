@@ -59,6 +59,36 @@ describe('capability graph core', () => {
     expect(released).toHaveBeenCalledTimes(1)
   })
 
+  it('CAP-B7 contains asynchronous diagnostic rejection without changing removal', async () => {
+    /** Binding cleanup is the original diagnostic; reporter failure must remain observer-only. */
+    const cleanupFailure = new Error('binding cleanup')
+    /** A real rejected Promise must be handled by the diagnostic boundary, not by the fixture. */
+    const reporterFailure = new Error('reporter rejection')
+    /** Exact raw errors reaching the final sink are independently observable. */
+    const reports: unknown[] = []
+    /** A genuine batch owner drives the same removal path used by production consumers. */
+    const graph = createDynamicCapabilityGraph<object>({
+      ...createTestBatchOwner<object>(),
+      releaseBinding: () => {
+        throw cleanupFailure
+      },
+      report: (error) => {
+        reports.push(error)
+        return Promise.reject(reporterFailure)
+      }
+    })
+    await graph.register(
+      { id: id('reported'), kind: 'test', dependencies: [], start: () => instance(1) },
+      {}
+    )
+    await graph.remove(id('reported'))
+    // Cross the host rejection-observation turn; Vitest fails the case for an unhandled rejection.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    expect(reports).toEqual([cleanupFailure])
+    expect(graph.nodes).toEqual([])
+    await graph.dispose()
+  })
+
   it('CG-T01 exposes the graph subpath contract and stable public nodes', () => {
     const graph = createCapabilityGraph()
     graph.register({

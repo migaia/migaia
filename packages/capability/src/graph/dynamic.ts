@@ -22,7 +22,11 @@ import type {
   IGraphNodeId,
   IGraphNodeInstance
 } from './index.js'
-import { createMutationQueue, createQuiescenceTracker } from '@migaia/lifecycle'
+import {
+  containAsyncRejection,
+  createMutationQueue,
+  createQuiescenceTracker
+} from '@migaia/lifecycle'
 
 /** Deterministic traversal counters for one dynamic mutation. */
 export type IGraphTraversalMetrics = Readonly<{
@@ -231,9 +235,9 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   /** Reports secondary cleanup failures without changing the mutation primary. */
   const report = (error: unknown): void => {
     try {
-      options.report?.(error)
+      containAsyncRejection(options.report?.(error), () => undefined)
     } catch {
-      // Diagnostics are intentionally observer-only.
+      // This final diagnostic sink contains its own throws and rejections without recursion.
     }
   }
 
