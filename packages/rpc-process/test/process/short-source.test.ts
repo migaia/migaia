@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { dirname, join } from 'node:path'
@@ -188,4 +189,30 @@ describe('short Process sources', () => {
       ).rejects.toBeInstanceOf(Error)
     }
   )
+})
+
+it('RPC-B3 gives an explicit default reporter and its wrapper identical per-launch notices', async () => {
+  const notices: unknown[] = []
+  const capture = vi.spyOn(console, 'error').mockImplementation((error) => {
+    notices.push(error)
+  })
+  try {
+    for (const report of [defaultRpcReporter, (error: unknown) => defaultRpcReporter(error)]) {
+      for (let index = 0; index < 2; index++) {
+        const peer = await createProcessPeer<IMathApi>({ spawn: serviceEntry, report })
+        await peer.close()
+      }
+    }
+    const termination = notices.filter((error) => {
+      const notice = error as { source?: string; code?: string; detail?: { capability?: string } }
+      return (
+        notice.source === '@migaia/supervision' &&
+        notice.code === 'CAPABILITY_UNSUPPORTED' &&
+        notice.detail?.capability === 'termination'
+      )
+    })
+    expect(termination).toHaveLength(4)
+  } finally {
+    capture.mockRestore()
+  }
 })

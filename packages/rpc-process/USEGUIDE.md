@@ -546,3 +546,6 @@ try { console.log(channel.peerId) } finally { await channel.close() }
 
 **怎样传大文件？**
 单条消息受帧上限约束。用 `stream` 分块传输，或者把文件路径传过去，由对端自己读取。
+
+
+Explicit reporting policy: omitting `report` keeps the short-source default termination notice once per native process. Supplying any `report` function receives every notice, including `defaultRpcReporter` itself; wrapping the same function does not change this policy. `onNotice` receives each expected termination notice instead of the reporter when supplied. Other failures are always reported. No policy depends on function identity.
