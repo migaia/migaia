@@ -32,8 +32,7 @@ import {
 } from './errors.js'
 import { ResourceErrorCode } from './error-code.js'
 import { ResourceErrorText } from './error-text.js'
-import { ResourceStatus } from './state-constants.js'
-export { ResourceStatus, type IResourceStatus } from './state-constants.js'
+import { ResourceStatus, ResourceFetchStatus } from './state-constants.js'
 
 export type IResourceState<T> =
   | { status: typeof ResourceStatus.idle }
@@ -45,8 +44,6 @@ export type IResourceState<T> =
    * types.
    */
   | { status: typeof ResourceStatus.cancelled; error: Error }
-
-export type IResourceFetchStatus = typeof ResourceStatus.idle | typeof ResourceStatus.fetching
 
 export type IResourceFetcher<T> = (ctx: { signal: IAbortSignal }) => T | PromiseLike<T>
 
@@ -501,9 +498,9 @@ export class Resource<T> implements IObserver, IDisposable {
   }
 
   /** Transport status, separate from the visible data/error state. */
-  get fetchStatus(): IResourceFetchStatus {
+  get fetchStatus(): ResourceFetchStatus {
     this.#assertUsable()
-    return this.#requestPending ? ResourceStatus.fetching : ResourceStatus.idle
+    return this.#requestPending ? ResourceFetchStatus.fetching : ResourceFetchStatus.idle
   }
 
   /** Whether the currently cached success value has crossed its TTL. */

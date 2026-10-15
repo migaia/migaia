@@ -6,7 +6,7 @@
 
 - [`Resource<T>`](#resource)：构造函数、状态读取、操作方法、快照方法
 - [配置项 `IResourceOptions`](#配置项)
-- [状态类型](#状态类型)：`IResourceState`、`ResourceStatus`、`IResourceFetchStatus`
+- [状态类型](#状态类型)：`IResourceState`、`ResourceStatus`、`ResourceFetchStatus`
 - [`IResourceFetcher` 与依赖追踪](#fetcher-与依赖追踪)
 - [快照类型 `IResourceCacheSnapshot`](#快照类型)
 - [底层依赖：lifecycle 原语的使用方式](#底层依赖)
@@ -36,7 +36,7 @@ class Resource<T> implements IObserver, IDisposable {
   readonly promise: Promise<T>;
   readonly disposed: boolean;
   readonly refreshing: boolean;
-  readonly fetchStatus: IResourceFetchStatus;
+  readonly fetchStatus: ResourceFetchStatus;
   readonly isStale: boolean;
   readonly observed: boolean;
 
@@ -107,7 +107,7 @@ export function disposeUserPanel(): void {
 - `promise: Promise<T>` —— 当前请求或最新缓存值对应的共享 Promise；多个读取者拿到同一个 Promise，只在 `idle`/过期时才真正启动工作。没有可返回的 Promise（内部状态机异常）时抛 `NO_ACTIVE_PROMISE`。
 - `disposed: boolean` —— 是否已 `dispose()`；这是唯一在已释放后仍可安全读取、不抛错的成员。
 - `refreshing: boolean` —— 是否正在后台刷新（`staleWhileRevalidate: true` 且当前展示的仍是旧成功值时为真）；已释放时返回 `false`（不抛错）。
-- `fetchStatus: IResourceFetchStatus` —— 传输层状态，独立于可见的 data/error：`'fetching'` 或 `'idle'`。
+- `fetchStatus: ResourceFetchStatus` —— 传输层状态，独立于可见的 data/error：`'fetching'` 或 `'idle'`。
 - `isStale: boolean` —— 当前缓存的成功值是否已超过 TTL；非 `success` 状态恒为 `false`。
 - `observed: boolean` —— 是否有响应式消费者正在观察本资源的 `state`。
 
@@ -212,10 +212,10 @@ const ResourceStatus: {
   fetching: 'fetching';
 };
 
-type IResourceFetchStatus = 'idle' | 'fetching';
+type ResourceFetchStatus = 'idle' | 'fetching';
 ```
 
-`IResourceState<T>` 是 `state`/`peek()` 底层的判别联合，五态：`idle`（尚未发起过请求）、`pending`（请求在途，无历史数据）、`success`（`data` 为最新成功值，`refreshing` 仅在 `staleWhileRevalidate` 后台刷新时为 `true`）、`error`（`error` 为最近一次失败原因）、`cancelled`（`error` 恒为 `name === 'AbortError'` 的 `DOMException`，`code === ResourceErrorCode.requestCancelled`）。`ResourceStatus` 常量还额外包含一个第六值 `fetching`，只用于 `fetchStatus`（传输层状态），不会出现在 `IResourceState.status` 里。
+`IResourceState<T>` 是 `state`/`peek()` 底层的判别联合，五态：`idle`（尚未发起过请求）、`pending`（请求在途，无历史数据）、`success`（`data` 为最新成功值，`refreshing` 仅在 `staleWhileRevalidate` 后台刷新时为 `true`）、`error`（`error` 为最近一次失败原因）、`cancelled`（`error` 恒为 `name === 'AbortError'` 的 `DOMException`，`code === ResourceErrorCode.requestCancelled`）。`ResourceStatus` 只包含这五种数据状态；独立的 `ResourceFetchStatus` 常量与同名 key union 只包含 `idle/fetching`，供 `fetchStatus` 表示传输活动。
 
 ---
 
@@ -368,3 +368,6 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 
 
 同一请求在所有 Suspense 等待阶段复用同一个 pending Promise。fetcher 抛出的 thenable 完成后，经注入 scheduler 的 0ms 任务继续执行；Suspense 不计入 retry 次数，也不设计数上限。即使 fetcher 连续抛立即完成的 thenable，取消任务仍可执行，cancel/dispose 会停止后续调用。
+
+
+状态类型迁移：`ResourceStatus.fetching` 改为 `ResourceFetchStatus.fetching`；旧 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` key union。运行时的状态字符串与 SWR 数据/传输语义保持不变。
