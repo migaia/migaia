@@ -23,6 +23,9 @@ export const StorePersistErrorText = {
     `[store] persist "${key}" version must be a safe, non-negative integer`,
   debounce: (key: string): string =>
     `[store] persist "${key}" debounceMs must be a finite, non-negative number`,
+  /** Invalid maximum debounce window is rejected before subscribing or allocating status nodes. */
+  maxWait: (key: string): string =>
+    `[store] persist "${key}" maxWaitMs must be a finite, non-negative number within the timer range`,
   callback: (key: string, name: string): string =>
     `[store] persist "${key}" ${name} must be a function`,
   callbackAsync: (key: string, name: string): string =>

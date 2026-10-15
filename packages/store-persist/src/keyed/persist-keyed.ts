@@ -1,13 +1,21 @@
 import type { IAtomStore, IWritableAtomDefinition } from '@migaia/store-keyed'
 import { persistUnit } from '../core/persist-unit.js'
 import type { ICodec } from '@migaia/storage-contract'
-import type { IPersistHandle, IPersistStorage, IPersistUnit } from '../core/types.js'
+import type {
+  IPersistHandle,
+  IPersistStorage,
+  IPersistUnit,
+  IPersistUnitOptions
+} from '../core/types.js'
 import { snapshotPersistOptions, assertPersistString } from '../core/options.js'
 import { createStorePersistTypeError } from '../errors.js'
 import { StorePersistErrorCode } from '../error-code.js'
 import { StorePersistErrorText } from '../error-text.js'
 
-export type IPersistKeyedOptions<T> = {
+export type IPersistKeyedOptions<T> = Pick<
+  IPersistUnitOptions<T>,
+  'debounceMs' | 'maxWaitMs' | 'scheduler'
+> & {
   /**
    * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the
    * prefix.
@@ -16,7 +24,6 @@ export type IPersistKeyedOptions<T> = {
   storage: IPersistStorage
   codec?: ICodec
   version?: number
-  debounceMs?: number
   partialize?: (value: T) => Partial<T>
   merge?: (persisted: Partial<T>, current: T) => T
 }
@@ -63,7 +70,9 @@ export function persistKeyed<T>(
     version: snapshot.version,
     partialize: snapshot.partialize,
     merge: snapshot.merge,
-    debounceMs: snapshot.debounceMs
+    debounceMs: snapshot.debounceMs,
+    maxWaitMs: snapshot.maxWaitMs,
+    scheduler: snapshot.scheduler
   })
   return {
     ...handle,
