@@ -1,7 +1,7 @@
-import { assimilateCapturedThen } from '@migaia/utils/function'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 
 /**
- * Ported from `@migaia/capability`'s `containAsyncRejection`.
+ * Delegates callback-result inspection to the canonical utils thenable boundary.
  *
  * `() => void` in TypeScript still accepts an `async` function. This guards a diagnostic/release
  * callback's return value for a thenable and observes its rejection, so a callback that turns out
@@ -9,30 +9,7 @@ import { assimilateCapturedThen } from '@migaia/utils/function'
  * (L-T17, L-T26, L-T35).
  */
 export function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void {
-  if ((value === null || typeof value !== 'object') && typeof value !== 'function') return
-  let then: unknown
-  try {
-    then = (value as { then?: unknown }).then
-  } catch (error) {
-    onRejected(error)
-    return
-  }
-  if (typeof then !== 'function') return
-  // Reuse the `then` we already read — `assimilateCapturedThen` invokes it exactly once with the
-  // thenable as receiver, so we never hand the value back to `Promise.resolve()` to read `.then` a
-  // second time (a stateful getter could return a different function or throw on the second read).
-  const settled = assimilateCapturedThen<unknown>(
-    then as (resolve: unknown, reject: unknown) => void,
-    value
-  )
-  void settled.catch((error: unknown) => {
-    try {
-      onRejected(error)
-    } catch {
-      // The rejection handler is itself the last error boundary; it must not manufacture a new
-      // unhandled rejection by throwing back out of this `.catch`.
-    }
-  })
+  observeThenableRejection(value, inspectThenable(value), onRejected)
 }
 
 /**

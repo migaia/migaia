@@ -9,8 +9,8 @@
  * 分层：kernel → atom-definition（此处）→ atom-store → atom facade → React
  */
 
+import { probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { createStoreKeyedTypeError, StoreKeyedErrorCode } from '../errors.js'
-import { probeThenable, ThenableProbeKind } from '@migaia/lifecycle'
 import { AtomKind } from './kind-constants.js'
 import { StoreKeyedErrorText } from '../error-text.js'
 

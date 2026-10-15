@@ -1,3 +1,4 @@
+import { assimilateCapturedThen } from '@migaia/utils/function'
 import { createStorageTypeError, StorageErrorCode } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
 import {
@@ -11,7 +12,6 @@ import {
   type IFeatureRecordRequiredExpose,
   invokeCaptured
 } from '@migaia/plugin-host'
-import { assimilateCapturedThen } from '@migaia/lifecycle'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type {
   IStorageBackendKind,

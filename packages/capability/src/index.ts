@@ -14,8 +14,8 @@
  * 但省下体积的是打包器，不是闸门。
  */
 
+import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import {
-  assimilateCapturedThen,
   containAsyncRejection,
   createGenerationController,
   createQuiescenceTracker,
@@ -245,13 +245,15 @@ export function createCapabilityHost<Context>(
     }
     void promise.then(settle, settle)
   }
+  /** Captures disposal thenables once while preserving getter failures for the host policy. */
   const asPromiseLike = (value: unknown): Promise<void> | undefined => {
-    if (value === null || (typeof value !== 'object' && typeof value !== 'function'))
-      return undefined
-    const then = (value as { then?: unknown }).then
-    if (typeof then !== 'function') return undefined
-    return assimilateCapturedThen<void>(then as (resolve: unknown, reject: unknown) => void, value)
+    /** One protocol read shared with the other package boundaries. */
+    const probe = probeThenable(value)
+    if (probe.kind === ThenableProbeKind.notThenable) return undefined
+    if (probe.kind === ThenableProbeKind.failed) throw probe.error
+    return assimilateCapturedThen<void>(probe.thenFn, value)
   }
+
   /**
    * 记录真正进入 on 的顺序，回退按这个顺序 LIFO。
    *

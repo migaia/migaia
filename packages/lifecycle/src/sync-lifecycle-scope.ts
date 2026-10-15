@@ -1,3 +1,4 @@
+import { probeThenable } from '@migaia/utils/function'
 import { assertErrorPolicyReporter } from './error-boundary.js'
 import type {
   ICollectedError,
@@ -7,7 +8,7 @@ import type {
   ILifecycleState
 } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
-import { createLifecycleError, createErrorCollector, probeThenable } from './errors.js'
+import { createLifecycleError, createErrorCollector } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createOwnedEntryList } from './owned-entries.js'

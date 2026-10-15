@@ -1,4 +1,4 @@
-import { assimilateCapturedThen } from '@migaia/lifecycle'
+import { assimilateCapturedThen } from '@migaia/utils/function'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import type {
   IPluginDataOrderSlot,

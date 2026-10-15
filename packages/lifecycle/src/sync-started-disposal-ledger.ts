@@ -1,4 +1,5 @@
-import { createLifecycleError, probeThenable, assimilateCapturedThen } from './errors.js'
+import { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'
+import { createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { LifecycleState } from './state-constants.js'

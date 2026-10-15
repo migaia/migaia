@@ -1,4 +1,4 @@
-import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/lifecycle'
+import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 
 /** Captures one thenable `.then` function and returns a receiver-preserving Promise. */
 export function captureLoggerPromiseLike(value: unknown): Promise<void> | undefined {

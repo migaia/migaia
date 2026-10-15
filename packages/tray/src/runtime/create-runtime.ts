@@ -1,9 +1,5 @@
-import {
-  assimilateCapturedThen,
-  createAbortController,
-  probeThenable,
-  ThenableProbeKind
-} from '@migaia/lifecycle'
+import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
+import { createAbortController } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { TrayErrorCode } from '../error-code.js'
 import { attachTrayError, createTrayError } from '../errors.js'

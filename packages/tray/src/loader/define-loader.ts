@@ -1,4 +1,4 @@
-import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/lifecycle'
+import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { TrayErrorCode } from '../error-code.js'
 import { createTrayError } from '../errors.js'
 import type { ILoadedArtifact, ILoader, ILoaderContext } from './typing.js'
