@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
-import { peerFrame } from '../../../rpc-integration/test/bridge/fixture.js'
+import { peerFrame } from './fixture.js'
 
 describe('JSON-RPC byte framing', () => {
   it('[A11] preserves the same excerpt-free JSON engine failure', () => {

@@ -21,17 +21,17 @@
 
 所有字段名、枚举值与上限都以常量对象导出，其它语言的实现应以这些值为准，不要自行拼写字符串：
 
-| 常量                      | 内容                                                                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------------ |
-| `RpcProtocol`             | 协议标识 `migaia.rpc` 与当前版本 `major` / `minor`（1.1）                                         |
-| `RpcCodecId`              | codec 名，例如 `json`                                                                            |
-| `RpcPeerRuntime`          | 对端运行时标签：`node`、`bun`、`deno`、`browser` 等                                               |
-| `RpcCapability`           | 能力名，形如 `name@version`：`ping@1`、`batch@1`、`stream@1`、`runtime-api@1`、`group@1`、`transfer@1` 等 |
-| `RpcEnvelopeKind`         | 信封种类                                                                                         |
-| `RpcRouteField`           | 路由字段名：`timeoutMs`、`idempotencyKey`、`trace` 等                                             |
-| `RpcWireLimit`、`RpcStreamLimit`、`RpcWireErrorLimit` | 各类上限（深度、长度、字节数）                                      |
-| `RpcRuntime*`（`./runtime`） | runtime 调用的模式、字段、结果状态等                                                         |
-| `RpcBinary*`（`./binary*`）  | 二进制清单的 profile、存储方式、标签                                                         |
+| 常量                                                  | 内容                                                                                                      |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `RpcProtocol`                                         | 协议标识 `migaia.rpc` 与当前版本 `major` / `minor`（1.1）                                                 |
+| `RpcCodecId`                                          | codec 名，例如 `json`                                                                                     |
+| `RpcPeerRuntime`                                      | 对端运行时标签：`node`、`bun`、`deno`、`browser` 等                                                       |
+| `RpcCapability`                                       | 能力名，形如 `name@version`：`ping@1`、`batch@1`、`stream@1`、`runtime-api@1`、`group@1`、`transfer@1` 等 |
+| `RpcEnvelopeKind`                                     | 信封种类                                                                                                  |
+| `RpcRouteField`                                       | 路由字段名：`timeoutMs`、`idempotencyKey`、`trace` 等                                                     |
+| `RpcWireLimit`、`RpcStreamLimit`、`RpcWireErrorLimit` | 各类上限（深度、长度、字节数）                                                                            |
+| `RpcRuntime*`（`./runtime`）                          | runtime 调用的模式、字段、结果状态等                                                                      |
+| `RpcBinary*`（`./binary*`）                           | 二进制清单的 profile、存储方式、标签                                                                      |
 
 完整列表从 `@migaia/rpc-contract/wire` 导入；该入口只导出常量，不包含校验逻辑。
 
@@ -40,7 +40,11 @@
 连接建立后，双方先交换一次握手：发起方发送 hello，响应方选出共同的版本、codec 与能力并回复 accept 或 reject，发起方再确认结果。
 
 ```ts doc-test=run
-import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'
+import {
+  acceptRpcHandshake,
+  completeRpcHandshake,
+  createRpcHello
+} from '@migaia/rpc-contract/handshake'
 import { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'
 
 const clientOffer = {
@@ -93,13 +97,13 @@ try {
 }
 ```
 
-| 输入                                    | 结果                                                         |
-| --------------------------------------- | ------------------------------------------------------------ |
-| `null`、布尔、字符串、有限数值（含 `-0`） | 原样保留                                                   |
-| 普通对象                                | 冻结的无原型副本；getter 只读取一次                          |
-| 数组                                    | 逐项规范化                                                   |
-| `Uint8Array`                            | 标签对象 `{ $rpc: 'bytes', base64url }`（无填充 base64url）  |
-| `ArrayBuffer`、`Date`、`Map`、`Set`、类实例、函数、`undefined`（包括值为 `undefined` 的属性）、`NaN`、`Infinity`、循环引用 | 拒绝 |
+| 输入                                                                                                                       | 结果                                                        |
+| -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `null`、布尔、字符串、有限数值（含 `-0`）                                                                                  | 原样保留                                                    |
+| 普通对象                                                                                                                   | 冻结的无原型副本；getter 只读取一次                         |
+| 数组                                                                                                                       | 逐项规范化                                                  |
+| `Uint8Array`                                                                                                               | 标签对象 `{ $rpc: 'bytes', base64url }`（无填充 base64url） |
+| `ArrayBuffer`、`Date`、`Map`、`Set`、类实例、函数、`undefined`（包括值为 `undefined` 的属性）、`NaN`、`Infinity`、循环引用 | 拒绝                                                        |
 
 `ArrayBuffer` 不能直接作为可移植数据；Peer 调用中的 `ArrayBuffer` 由协商后的二进制 profile（第 7 节）处理。
 
@@ -109,16 +113,19 @@ try {
 
 分帧负责把消息切分成可在字节流上传输的帧，以及把收到的字节重新组装成完整消息。本包提供三种格式：
 
-| 格式                     | 入口                     | 用途                                               |
-| ------------------------ | ------------------------ | -------------------------------------------------- |
-| 4 字节大端长度前缀       | `./framing/stream`       | 原生协议的字节流（stdio、socket）；bootstrap 帧     |
-| `Content-Length` 头      | `./framing/jsonrpc`      | JSON-RPC 桥                                        |
-| 完整字符串消息           | `./framing`              | 载体本身已按消息投递（例如 postMessage 字符串）    |
+| 格式                | 入口                | 用途                                            |
+| ------------------- | ------------------- | ----------------------------------------------- |
+| 4 字节大端长度前缀  | `./framing/stream`  | 原生协议的字节流（stdio、socket）；bootstrap 帧 |
+| `Content-Length` 头 | `./framing/jsonrpc` | JSON-RPC 桥                                     |
+| 完整字符串消息      | `./framing`         | 载体本身已按消息投递（例如 postMessage 字符串） |
 
 ### 长度前缀
 
 ```ts doc-test=run
-import { createRpcStreamFrameDecoder, encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'
+import {
+  createRpcStreamFrameDecoder,
+  encodeRpcStreamFrame
+} from '@migaia/rpc-contract/framing/stream'
 
 const frame = encodeRpcStreamFrame(new TextEncoder().encode('hello')) // 4 字节长度 + 5 字节内容
 
@@ -162,13 +169,13 @@ decoder.finish()
 
 runtime 调用（Peer 的 request / notify / stream / group）在线上以 runtime 信封传输：
 
-| 函数                                   | 入口                    | 用途                                                                  |
-| -------------------------------------- | ----------------------- | --------------------------------------------------------------------- |
-| `normalizeRuntimeEnvelope(value)`      | `./runtime`             | 严格校验收到的信封：只接受自身数据属性，不执行 getter                  |
-| `normalizeRuntimeEnvelopeDecoded(value)` | `./runtime`           | 校验**由本库 codec 刚解码出的**纯 JSON 对象，省去属性描述符检查        |
-| `createRuntimeCallEnvelope(...)`       | `./runtime/metadata`    | 按类型构造出站调用信封                                                |
-| `normalizeRuntimeGeneration`、`normalizeRuntimeSteps` | `./runtime/metadata` | 校验代次与 group 步骤                                     |
-| 同名函数                               | `./runtime/lazy`        | 异步版本，首次使用时才加载完整解析器，适合冷启动路径                  |
+| 函数                                                  | 入口                 | 用途                                                            |
+| ----------------------------------------------------- | -------------------- | --------------------------------------------------------------- |
+| `normalizeRuntimeEnvelope(value)`                     | `./runtime`          | 严格校验收到的信封：只接受自身数据属性，不执行 getter           |
+| `normalizeRuntimeEnvelopeDecoded(value)`              | `./runtime`          | 校验**由本库 codec 刚解码出的**纯 JSON 对象，省去属性描述符检查 |
+| `createRuntimeCallEnvelope(...)`                      | `./runtime/metadata` | 按类型构造出站调用信封                                          |
+| `normalizeRuntimeGeneration`、`normalizeRuntimeSteps` | `./runtime/metadata` | 校验代次与 group 步骤                                           |
+| 同名函数                                              | `./runtime/lazy`     | 异步版本，首次使用时才加载完整解析器，适合冷启动路径            |
 
 **`*Decoded` 系列只用于本库 codec 的输出**：它们读取对象自身的可枚举属性时会执行 getter，不对调用方自行构造的对象做防御性检查。接收来源不确定的数据时，使用对应的严格版本（`normalizeRuntimeEnvelope`、`restoreRpcBinary`）。
 
@@ -184,13 +191,13 @@ runtime 调用（Peer 的 request / notify / stream / group）在线上以 runti
 
 二进制数据可以内联在消息中（base64url 标签），也可以作为原生 sidecar 随消息传输并以摘要校验完整性。
 
-| 函数                                   | 入口                          | 用途                                                                    |
-| -------------------------------------- | ----------------------------- | ----------------------------------------------------------------------- |
-| `prepareRpcBinary(envelope, storage, limit, digest, codec?)` | `./binary`、`./binary/lazy` | 为出站消息生成二进制清单、原生 sidecar 列表与总字节数 |
-| `restoreRpcBinary(...)`                | `./binary`、`./binary/lazy`   | 校验清单与完整性后还原数据                                              |
-| `restoreRpcBinaryDecoded(...)`         | 同上                          | 同上，用于本库 codec 刚解码的数据（限制同第 5 节）                       |
-| `captureRpcBinaryData(...)`            | `./binary/capture`            | 先同步捕获数据，稍后再 `prepare()`；适合捕获点早于编码的场景              |
-| `assertRpcNativeBinaryFrameSize` 等    | `./binary/inspect`            | 按完整 backing 字节数检查帧大小、读取原生二进制、判断完整性错误          |
+| 函数                                                         | 入口                        | 用途                                                            |
+| ------------------------------------------------------------ | --------------------------- | --------------------------------------------------------------- |
+| `prepareRpcBinary(envelope, storage, limit, digest, codec?)` | `./binary`、`./binary/lazy` | 为出站消息生成二进制清单、原生 sidecar 列表与总字节数           |
+| `restoreRpcBinary(...)`                                      | `./binary`、`./binary/lazy` | 校验清单与完整性后还原数据                                      |
+| `restoreRpcBinaryDecoded(...)`                               | 同上                        | 同上，用于本库 codec 刚解码的数据（限制同第 5 节）              |
+| `captureRpcBinaryData(...)`                                  | `./binary/capture`          | 先同步捕获数据，稍后再 `prepare()`；适合捕获点早于编码的场景    |
+| `assertRpcNativeBinaryFrameSize` 等                          | `./binary/inspect`          | 按完整 backing 字节数检查帧大小、读取原生二进制、判断完整性错误 |
 
 - 大小与配额按**完整的底层 `ArrayBuffer`** 计算，而不只是视图可见的部分。
 - `./binary/lazy` 导出同名函数，在加载完整 codec 前先同步捕获数据并计算第一个摘要，适合冷启动路径。
@@ -200,31 +207,31 @@ runtime 调用（Peer 的 request / notify / stream / group）在线上以 runti
 
 本包错误的 source 为 `@migaia/rpc/contract`（`RPC_CONTRACT_SOURCE`）：
 
-| code                       | 何时发生                                        | 处理                                                                 |
-| -------------------------- | ----------------------------------------------- | -------------------------------------------------------------------- |
-| `INVALID_DESCRIPTOR`       | codec / framer / 协议描述不合法                  | 修正配置                                                             |
-| `INVALID_ENVELOPE`         | 信封字段或数据不合法（包括不可移植的数据）       | 修正发送端；不要重发同一坏消息                                       |
-| `INVALID_STREAM`           | 流消息的序号、字段或值不合法                     | 终止该流；已交付的项不重放                                           |
-| `INVALID_FRAME`            | 物理帧格式错误                                  | 修正分帧或编码                                                       |
-| `FRAME_LIMIT_EXCEEDED`     | 帧超过上限                                      | 减小数据量，或改用流式传输                                           |
-| `FRAME_ASSEMBLY_EXPIRED`   | 分片重组超时                                    | 关闭未完成的重组；对应调用是否已执行需另行确认                       |
-| `INVALID_WIRE_ERROR`       | 收到的错误树不合法                              | 拒绝该错误帧；调用结果视为未知                                       |
-| `HANDSHAKE_INVALID`        | 握手文本的 UTF-8、JSON 或字段不合法              | 关闭连接，修正后重新建立                                             |
-| `HANDSHAKE_INCOMPATIBLE`   | 没有共同的版本、codec 或必需能力                | 升级双方实现；不会降级到旧协议                                       |
-| `HANDSHAKE_REJECTED`       | 对端拒绝握手（例如认证失败）                    | 查看 `cause`，修正凭据或配置                                         |
+| code                     | 何时发生                                   | 处理                                           |
+| ------------------------ | ------------------------------------------ | ---------------------------------------------- |
+| `INVALID_DESCRIPTOR`     | codec / framer / 协议描述不合法            | 修正配置                                       |
+| `INVALID_ENVELOPE`       | 信封字段或数据不合法（包括不可移植的数据） | 修正发送端；不要重发同一坏消息                 |
+| `INVALID_STREAM`         | 流消息的序号、字段或值不合法               | 终止该流；已交付的项不重放                     |
+| `INVALID_FRAME`          | 物理帧格式错误                             | 修正分帧或编码                                 |
+| `FRAME_LIMIT_EXCEEDED`   | 帧超过上限                                 | 减小数据量，或改用流式传输                     |
+| `FRAME_ASSEMBLY_EXPIRED` | 分片重组超时                               | 关闭未完成的重组；对应调用是否已执行需另行确认 |
+| `INVALID_WIRE_ERROR`     | 收到的错误树不合法                         | 拒绝该错误帧；调用结果视为未知                 |
+| `HANDSHAKE_INVALID`      | 握手文本的 UTF-8、JSON 或字段不合法        | 关闭连接，修正后重新建立                       |
+| `HANDSHAKE_INCOMPATIBLE` | 没有共同的版本、codec 或必需能力           | 升级双方实现；不会降级到旧协议                 |
+| `HANDSHAKE_REJECTED`     | 对端拒绝握手（例如认证失败）               | 查看 `cause`，修正凭据或配置                   |
 
-`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 [rpc-bridge-jsonrpc USEGUIDE](../rpc-bridge-jsonrpc/USEGUIDE.md#6-错误处理)。
+`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 [Process JSON-RPC 错误](../rpc-process/USEGUIDE.md#json-rpc-6-错误处理)。
 
 其它 RPC 包的错误身份：
 
-| 包                           | source 常量                     | code 表                     |
-| ---------------------------- | ------------------------------- | --------------------------- |
-| `@migaia/rpc-contract`       | `RPC_CONTRACT_SOURCE`（`@migaia/rpc/contract`） | `RpcContractErrorCode` |
-| `@migaia/rpc-core`           | `RPC_CORE_ERROR_SOURCE`（`@migaia/rpc/core`）   | `RpcCoreErrorCode`     |
-| `@migaia/rpc-core/remote`    | `RPC_REMOTE_ERROR_SOURCE`（`@migaia/rpc/remote`） | `RpcRemoteLayerErrorCode` |
-| `@migaia/rpc-process`        | `RPC_PROCESS_ERROR_SOURCE`（`@migaia/rpc/process`） | `RpcProcessErrorCode` |
-| `@migaia/rpc-threads`        | `RPC_THREAD_ERROR_SOURCE`（`@migaia/rpc/threads`） | `RpcThreadErrorCode` |
-| `@migaia/rpc-bridge-jsonrpc` | `JSONRPC_BRIDGE_ERROR_SOURCE`（`@migaia/rpc/bridge/jsonrpc`） | `JsonRpcBridgeErrorCode` |
+| 包                                     | source 常量                                                   | code 表                   |
+| -------------------------------------- | ------------------------------------------------------------- | ------------------------- |
+| `@migaia/rpc-contract`                 | `RPC_CONTRACT_SOURCE`（`@migaia/rpc/contract`）               | `RpcContractErrorCode`    |
+| `@migaia/rpc-core`                     | `RPC_CORE_ERROR_SOURCE`（`@migaia/rpc/core`）                 | `RpcCoreErrorCode`        |
+| `@migaia/rpc-core/remote`              | `RPC_REMOTE_ERROR_SOURCE`（`@migaia/rpc/remote`）             | `RpcRemoteLayerErrorCode` |
+| `@migaia/rpc-process`                  | `RPC_PROCESS_ERROR_SOURCE`（`@migaia/rpc/process`）           | `RpcProcessErrorCode`     |
+| `@migaia/rpc-threads`                  | `RPC_THREAD_ERROR_SOURCE`（`@migaia/rpc/threads`）            | `RpcThreadErrorCode`      |
+| `@migaia/rpc-contract/framing/jsonrpc` | `JSONRPC_BRIDGE_ERROR_SOURCE`（`@migaia/rpc/bridge/jsonrpc`） | `JsonRpcBridgeErrorCode`  |
 
 请按 `(source, code)` 分支。错误的 `message` 文本只用于展示，可能变化，不要据此决定重试。
 
@@ -314,7 +321,7 @@ try {
 线上格式要求所有语言都能无歧义地表示同一个值。请转换为字符串（例如 ISO 时间）、数组或普通对象。
 
 **我在其它语言里实现对端，最少需要实现什么？**
-原生协议需要长度前缀分帧、握手（第 2 节）与 runtime 信封；JSON-RPC 桥只需要 Content-Length 分帧与四个扩展方法，见 [rpc-bridge-jsonrpc USEGUIDE](../rpc-bridge-jsonrpc/USEGUIDE.md#5-高阶用法对端协议规范)。
+原生协议需要长度前缀分帧、握手（第 2 节）与 runtime 信封；JSON-RPC 桥只需要 Content-Length 分帧与四个扩展方法，见 [Process JSON-RPC 协议](../rpc-process/USEGUIDE.md#json-rpc-5-高阶用法对端协议规范)。
 
 **`*Decoded` 和严格版本该用哪个？**
 数据刚从本库 codec 解码出来、没有经过其它代码时可用 `*Decoded`；其它情况一律用严格版本。

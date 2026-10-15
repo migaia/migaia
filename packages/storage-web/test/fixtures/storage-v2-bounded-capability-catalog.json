@@ -9,7 +9,14 @@
     "@migaia/plugin-host",
     "@migaia/reactive",
     "@migaia/resource",
-    "@migaia/rpc",
+    "@migaia/rpc-browser",
+    "@migaia/rpc-contract",
+    "@migaia/rpc-core",
+    "@migaia/rpc-devtools",
+    "@migaia/rpc-integration",
+    "@migaia/rpc-pool",
+    "@migaia/rpc-process",
+    "@migaia/rpc-threads",
     "@migaia/serialize",
     "@migaia/storage-contract",
     "@migaia/storage-web",
@@ -36,7 +43,12 @@
       "owner": "@migaia/event-subscriber",
       "routes": ["@migaia/event-subscriber"],
       "symbols": ["EventDispatchPolicy", "createEventChannel"],
-      "consumers": ["@migaia/logger", "@migaia/rpc", "@migaia/storage-web", "@migaia/store-light"]
+      "consumers": [
+        "@migaia/logger",
+        "@migaia/rpc-core",
+        "@migaia/storage-web",
+        "@migaia/store-light"
+      ]
     },
     {
       "name": "abort-timeout",
@@ -61,7 +73,9 @@
       "routes": ["@migaia/utils/bytes"],
       "symbols": ["isArrayBuffer", "isUint8Array"],
       "consumers": [
-        "@migaia/rpc",
+        "@migaia/rpc-browser",
+        "@migaia/rpc-contract",
+        "@migaia/rpc-core",
         "@migaia/serialize",
         "@migaia/storage-contract",
         "@migaia/storage-web",
@@ -78,7 +92,7 @@
         "@migaia/capability",
         "@migaia/plugin-host",
         "@migaia/resource",
-        "@migaia/rpc",
+        "@migaia/rpc-core",
         "@migaia/store-light",
         "@migaia/supervision"
       ]
@@ -263,7 +277,6 @@
       ]
     }
   ],
-
   "targetedRules": [
     {
       "id": "SWV2-RED02",
@@ -295,7 +308,11 @@
     {
       "id": "SWV2-RED10",
       "packages": [
-        "@migaia/rpc",
+        "@migaia/rpc-contract",
+        "@migaia/rpc-core",
+        "@migaia/rpc-process",
+        "@migaia/rpc-threads",
+        "@migaia/rpc-browser",
         "@migaia/serialize",
         "@migaia/storage-contract",
         "@migaia/storage-web",

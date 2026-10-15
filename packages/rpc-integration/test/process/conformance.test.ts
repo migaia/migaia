@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { describe, expect, it, beforeAll } from 'vitest'
 import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
 import { createProcessTransport } from '@migaia/rpc-process'
-import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
+import { createProcessJsonRpcChannel } from '@migaia/rpc-process'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import {
   peers,
@@ -137,7 +137,7 @@ describe('[A3] independent JSON-RPC business through public process facades', ()
           let deniedError: unknown
           try {
             await expect(
-              createJsonRpcRemoteChannel({
+              createProcessJsonRpcChannel({
                 byte: denied,
                 peerId: peer.id,
                 target: host

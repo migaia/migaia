@@ -73,7 +73,6 @@ export const RPC_COVERAGE_FAMILY = Object.freeze({
     'rpc-core',
     'rpc-process',
     'rpc-threads',
-    'rpc-bridge-jsonrpc',
     'rpc-browser'
   ])
 })

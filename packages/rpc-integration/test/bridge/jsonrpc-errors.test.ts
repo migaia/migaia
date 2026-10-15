@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract'
 import { toJsonRpcError } from '@migaia/rpc-contract'
-import { JsonRpcBridgeErrorCode } from '@migaia/rpc-bridge-jsonrpc'
-import { createJsonRpcBridgeError } from '../../../rpc-bridge-jsonrpc/dist/bridge/jsonrpc/error.js'
+import { JsonRpcBridgeErrorCode } from '@migaia/rpc-contract/framing/jsonrpc'
+import { createJsonRpcBridgeError } from '@migaia/rpc-core/adapter/internal-advanced'
 import { bridgeFixture, request } from './fixture.js'
 
 describe('JSON-RPC error graph', () => {

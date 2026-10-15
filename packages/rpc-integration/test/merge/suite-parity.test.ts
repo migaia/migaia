@@ -14,7 +14,6 @@ const testOwners = [
   'rpc-core',
   'rpc-process',
   'rpc-threads',
-  'rpc-bridge-jsonrpc',
   'rpc-browser',
   'rpc-integration'
 ] as const

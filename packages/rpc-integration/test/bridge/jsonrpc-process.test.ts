@@ -10,7 +10,7 @@ import { createUnitBudget } from '@migaia/supervision'
 
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
-import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
+import { createProcessJsonRpcChannel } from '@migaia/rpc-process'
 import { createProcessPlugin } from '@migaia/rpc-process'
 import type { IProcessPlugin } from '@migaia/rpc-process'
 import { createProcessResilience } from '@migaia/rpc-process'
@@ -177,12 +177,12 @@ describe('JSON-RPC real process carriers', () => {
       }
       try {
         const options = { ...bridgeFixture().options, byte, scheduler: systemScheduler }
-        await expect(createJsonRpcRemoteChannel({ ...options, token: '' })).rejects.toMatchObject({
+        await expect(createProcessJsonRpcChannel({ ...options, token: '' })).rejects.toMatchObject({
           code: 'JSONRPC_PROFILE_INVALID'
         })
         expect(writes).toEqual([])
         await expect(
-          createJsonRpcRemoteChannel({ ...options, token: 'wrong-credential' })
+          createProcessJsonRpcChannel({ ...options, token: 'wrong-credential' })
         ).rejects.toMatchObject({
           code: 'HANDSHAKE_REJECTED',
           cause: { source: 'jsonrpc-fixture', code: 'AUTH_DENIED' }
@@ -223,7 +223,7 @@ describe('JSON-RPC real process carriers', () => {
       /** The factory cannot run before authenticated bridge readiness. */
       let endpoints = 0
       /** A healthy connection proves failed installation does not own the external process. */
-      const second = await createJsonRpcRemoteChannel({
+      const second = await createProcessJsonRpcChannel({
         ...bridgeFixture().options,
         byte: await dialProcessByteChannel({ address }),
         scheduler: systemScheduler,
@@ -319,9 +319,9 @@ describe('JSON-RPC real process carriers', () => {
         reports: unknown[] = [],
         removals: number[] = []
       const open = establish(logs, reports, removals)
-      let second: Awaited<ReturnType<typeof createJsonRpcRemoteChannel>> | undefined
+      let second: Awaited<ReturnType<typeof createProcessJsonRpcChannel>> | undefined
       try {
-        second = await createJsonRpcRemoteChannel({
+        second = await createProcessJsonRpcChannel({
           ...bridgeFixture().options,
           byte: await dialProcessByteChannel({ address }),
           scheduler: systemScheduler,

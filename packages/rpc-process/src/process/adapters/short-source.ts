@@ -15,7 +15,6 @@ import {
   retainAdapterRuntimeFlags,
   readAdapterAbortReason,
   createAdapterSourceConfigurationError,
-  createAdapterJsonRpcChannel,
   JSONRPC_ALLOWED_CAPABILITIES
 } from '@migaia/rpc-core/adapter/internal-advanced'
 import type { IAdapterPeerPreparation } from '@migaia/rpc-core/adapter/internal-advanced'
@@ -23,8 +22,7 @@ import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
 import type { IRemoteContract } from '@migaia/rpc-core/remote'
 import { createProcessTransport } from '../handshake.js'
 import { createNativeProcessOffer } from '../offer.js'
-import { createProcessChannelClosedError } from '../error.js'
-import { openProcessObjectChannel } from '../object-channel.js'
+import { createProcessJsonRpcChannel } from '../jsonrpc-channel.js'
 import { RpcProcessErrorCode, ERROR_SOURCE } from '../error-code.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import { ProcessPluginWire } from '../plugin/constants.js'
@@ -477,29 +475,23 @@ export async function normalizeProcessSources(
           /** Native stderr is presentation metadata around this one held Core connection. */
           const ipc = { ...prepared.session, stderr: prepared.stderr, log: () => undefined }
           return wire === ProcessPluginWire.jsonrpc
-            ? createAdapterJsonRpcChannel(
-                {
-                  byte: raw as IProcessByteChannel,
-                  peerId: contract!.plugin,
-                  target: { kind: 'plugin', contract: contract! },
-                  offer: {
-                    ...prepared.offer!,
-                    capabilities: prepared.offer!.capabilities.filter((capability) =>
-                      JSONRPC_ALLOWED_CAPABILITIES.includes(capability)
-                    )
-                  },
-                  token: prepared.token!,
-                  scheduler: prepared.scheduler,
-                  wallClock: systemWallClock,
-                  signal: prepared.signal,
-                  ipc,
-                  report
+            ? createProcessJsonRpcChannel({
+                byte: raw as IProcessByteChannel,
+                peerId: contract!.plugin,
+                target: { kind: 'plugin', contract: contract! },
+                offer: {
+                  ...prepared.offer!,
+                  capabilities: prepared.offer!.capabilities.filter((capability) =>
+                    JSONRPC_ALLOWED_CAPABILITIES.includes(capability)
+                  )
                 },
-                {
-                  closedError: createProcessChannelClosedError,
-                  openConnection: openProcessObjectChannel
-                }
-              )
+                token: prepared.token!,
+                scheduler: prepared.scheduler,
+                wallClock: systemWallClock,
+                signal: prepared.signal,
+                ipc,
+                report
+              })
             : createProcessTransport(raw as IProcessByteChannel, {
                 role: 'initiator',
                 offer: prepared.offer!,

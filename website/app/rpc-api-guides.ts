@@ -2125,24 +2125,6 @@ const rpcErrorCatalogGuides = {
       '应用保留原采样 cause，同时显示测量 unavailable。'
     ]
   }),
-  jsonrpc: errorIdentityGuide({
-    importPath: '@migaia/rpc-bridge-jsonrpc',
-    source: 'JSONRPC_BRIDGE_ERROR_SOURCE',
-    codeTable: 'JsonRpcBridgeErrorCode',
-    member: 'frameInvalid',
-    purposeEn:
-      'Identifies framing, profile, extension and hello-deadline failures with the stable @migaia/rpc/bridge/jsonrpc source. The JSON-RPC integer code policy remains with the foreign peer profile.',
-    purposeZh:
-      '用稳定的 @migaia/rpc/bridge/jsonrpc source 识别 framing、profile、扩展与 hello deadline 失败。JSON-RPC 整数 code 策略仍归外部 peer profile。',
-    useEn: [
-      'A foreign-language carrier reports Content-Length or UTF-8 rejection without parsing messages.',
-      'A peer maps its actual wire error tree through toJsonRpcError/fromJsonRpcError while preserving semantic identity.'
-    ],
-    useZh: [
-      '外部语言载体不解析 message 文本地报告 Content-Length 或 UTF-8 拒绝。',
-      'peer 用 toJsonRpcError/fromJsonRpcError 映射实际 wire 错误树，保留语义身份。'
-    ]
-  }),
   processAdapter: errorIdentityGuide({
     importPath: '@migaia/rpc-core/adapter/diagnostics',
     source: 'RPC_PROCESS_ERROR_SOURCE',
@@ -2210,8 +2192,6 @@ const rpcPublicErrorGuides = {
   'rpc-process:index:RpcProcessErrorCode': rpcErrorCatalogGuides.process,
   'rpc-threads:index:RPC_THREAD_ERROR_SOURCE': rpcErrorCatalogGuides.threads,
   'rpc-threads:index:RpcThreadErrorCode': rpcErrorCatalogGuides.threads,
-  'rpc-bridge-jsonrpc:index:JSONRPC_BRIDGE_ERROR_SOURCE': rpcErrorCatalogGuides.jsonrpc,
-  'rpc-bridge-jsonrpc:index:JsonRpcBridgeErrorCode': rpcErrorCatalogGuides.jsonrpc,
   'rpc-core:index:isRpcErrorInstance': errorFamilyGuide({
     name: 'isRpcErrorInstance',
     purposeEn:
@@ -3934,6 +3914,44 @@ if (await isThreadChild()) {
     avoidZh: [
       '浏览器打包器需要 new Worker(new URL(...)) 写法，浏览器中请使用独立的 Worker 入口。',
       '该标记不是认证信息，不能用来授予权限。'
+    ]
+  }),
+  'rpc-process:index:createProcessJsonRpcChannel': guide({
+    purposeEn:
+      'Negotiates an authenticated JSON-RPC channel over caller-held Process bytes. Core owns protocol framing, correlation and cleanup; Process retains its original closed errors, stderr and diagnostic presentation. Ordinary spawned services use createProcessPeer with wire jsonrpc.',
+    purposeZh:
+      '在调用方持有的 Process 字节资源上协商已认证 JSON-RPC channel。Core 拥有协议 framing、correlation 与 cleanup，Process 保留原 closed error、stderr 和诊断呈现。普通子进程使用 createProcessPeer 的 jsonrpc wire。',
+    quickStart: `import { createProcessJsonRpcChannel, type IProcessJsonRpcChannelOptions } from '@migaia/rpc-process'
+import type { IRemoteChannel } from '@migaia/rpc-core/remote'
+
+// Deployment supplies its actual held bytes, offer, credentials and diagnostic sinks.
+export async function useForeignChannel<T>(
+  options: IProcessJsonRpcChannelOptions,
+  use: (channel: IRemoteChannel) => Promise<T>
+): Promise<T> {
+  const channel = await createProcessJsonRpcChannel(options)
+  try { return await use(channel) }
+  finally { await channel.close() }
+}`,
+    useEn: [
+      'A custom launcher already owns an ordered byte connection to a foreign-language peer.',
+      'A local socket session needs authenticated hello with the existing Process diagnostics.',
+      'The connection owner must close that exact channel while retaining external process ownership.'
+    ],
+    useZh: [
+      '自定义 launcher 已持有外部语言 peer 的有序字节连接。',
+      '本机 socket 会话需要认证 hello 并沿用 Process 诊断。',
+      '连接 owner 需要关闭原 channel，同时保留外部进程所有权。'
+    ],
+    avoidEn: [
+      'Use createProcessPeer spawn for ordinary supervised child services.',
+      'Do not advertise streaming or transfer through the JSON-only peer profile.',
+      'Import framing and error constants from rpc-contract/framing/jsonrpc.'
+    ],
+    avoidZh: [
+      '普通受监督子进程使用 createProcessPeer spawn。',
+      '不要给 JSON-only peer profile 宣称支持 streaming 或 transfer。',
+      '分帧和错误常量从 rpc-contract/framing/jsonrpc 导入。'
     ]
   }),
   'rpc-pool:index:createThreadPool': guide({

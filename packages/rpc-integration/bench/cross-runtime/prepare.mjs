@@ -172,14 +172,7 @@ const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: wt, encoding: 'ut
 const manifest = { sourceCommit: head, built: false, trees: {}, foreign: [] }
 /** BC14 is already product code; final plain/count use the same actual final source. */
 /** The disposable graph preserves the six actual package owners and their declared public entries. */
-const runtimePackages = [
-  'rpc-contract',
-  'rpc-core',
-  'rpc-process',
-  'rpc-threads',
-  'rpc-bridge-jsonrpc',
-  'rpc-browser'
-]
+const runtimePackages = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser']
 for (const mode of ['plain', 'count']) {
   const target = join(root, 'fixture', mode, 'packages')
   mkdirSync(target, { recursive: true })

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
-import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
-import { JSONRPC_ALLOWED_CAPABILITIES } from '../../../rpc-bridge-jsonrpc/dist/bridge/jsonrpc/constants.js'
+import { createProcessJsonRpcChannel } from '@migaia/rpc-process'
+import { JSONRPC_ALLOWED_CAPABILITIES } from '@migaia/rpc-core/adapter/internal-advanced'
 import { BRIDGE_CONTRACT, flush } from './fixture.js'
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
@@ -64,7 +64,7 @@ for (const fixture of peers.filter((peer) => peer.language !== 'ts-reference')) 
               physical.onClose(listener),
             close: () => physical.close()
           })
-          return createJsonRpcRemoteChannel({
+          return createProcessJsonRpcChannel({
             byte,
             peerId: fixture.id,
             target: { kind: 'plugin', contract: BRIDGE_CONTRACT },

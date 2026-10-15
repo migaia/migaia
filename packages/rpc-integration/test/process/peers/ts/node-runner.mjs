@@ -30,7 +30,6 @@ for (const name of [
   'rpc-core',
   'rpc-process',
   'rpc-threads',
-  'rpc-bridge-jsonrpc',
   'rpc-browser',
   'plugin-host',
   // The peer attaches its own diagnostic identity through this ordinary public dependency.

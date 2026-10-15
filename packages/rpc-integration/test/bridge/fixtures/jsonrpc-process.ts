@@ -9,7 +9,10 @@ import {
   type IProcessHandle,
   type IProcessLauncher
 } from '@migaia/supervision/process'
-import { createJsonRpcRemoteChannel, type IJsonRpcBridgeOptions } from '@migaia/rpc-bridge-jsonrpc'
+import {
+  createProcessJsonRpcChannel,
+  type IProcessJsonRpcChannelOptions
+} from '@migaia/rpc-process'
 import type { IProcessPluginEstablish } from '@migaia/rpc-process'
 import { nodeByteStream } from '../../../../rpc-process/dist/process/node-byte-stream.js'
 import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'
@@ -65,11 +68,11 @@ export function establish(
   reports: unknown[],
   removals: number[],
   retained: Array<(chunk: Uint8Array) => void> = [],
-  target: IJsonRpcBridgeOptions['target'] = { kind: 'plugin', contract: BRIDGE_CONTRACT }
+  target: IProcessJsonRpcChannelOptions['target'] = { kind: 'plugin', contract: BRIDGE_CONTRACT }
 ): IProcessPluginEstablish {
   return (raw, options) => {
     if (raw.kind !== 'byte') throw new TypeError('fixture requires byte channel')
-    return createJsonRpcRemoteChannel({
+    return createProcessJsonRpcChannel({
       byte: raw,
       peerId: 'peer',
       target,

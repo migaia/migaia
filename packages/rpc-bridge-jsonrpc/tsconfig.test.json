@@ -1,9 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "lib": ["ES2023", "DOM", "ESNext.Disposable"],
-    "noEmit": true,
-    "types": ["vite/client", "vitest/globals", "node"]
-  },
-  "include": ["src", "test"]
-}

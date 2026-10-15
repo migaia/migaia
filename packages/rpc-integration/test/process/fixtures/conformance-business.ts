@@ -11,7 +11,7 @@ import { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-chi
 import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
 import type { IRemoteContract, IRuntimeDynamicSurface } from '@migaia/rpc-core/remote'
 import { fdLauncher } from '../../bridge/fixtures/jsonrpc-process.js'
-import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
+import { createProcessJsonRpcChannel } from '@migaia/rpc-process'
 import { createProcessPeer } from '@migaia/rpc-process'
 import {
   readRuntimePeerConnection,
@@ -156,7 +156,7 @@ function deployment(
       }
     }
     if (bridge)
-      return createJsonRpcRemoteChannel({
+      return createProcessJsonRpcChannel({
         byte: observed,
         peerId: peer.id,
         target: host

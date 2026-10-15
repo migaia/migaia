@@ -8,56 +8,16 @@ import ts from 'typescript'
 
 /** Public surface and retained packed checks frozen by rpc-merge A11. */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const legacy = JSON.parse(
-  readFileSync(join(root, 'packages/rpc-integration/test/fixtures/legacy-exports.json'), 'utf8')
-)
-/** I3's admitted contract additions and retired core exports amend the frozen merge count. */
-const errorFormatDelta = JSON.parse(
-  readFileSync(
-    join(root, 'packages/rpc-integration/test/fixtures/error-format-export-delta.json'),
-    'utf8'
-  )
-)
-/** I5's admitted contract and core additions extend the same frozen merge count. */
-const controlDelta = JSON.parse(
-  readFileSync(
-    join(root, 'packages/rpc-integration/test/fixtures/control-semantics-export-delta.json'),
-    'utf8'
-  )
-)
-/** I6's stream contract names amend the reviewed packed public surface. */
-const streamingDelta = JSON.parse(
-  readFileSync(
-    join(root, 'packages/rpc-integration/test/fixtures/streaming-export-delta.json'),
-    'utf8'
-  )
-)
-/** I26's registered batch limit is an exact addition; the merge baseline remains frozen. */
-const batchDelta = JSON.parse(
-  readFileSync(join(root, 'packages/rpc-integration/test/fixtures/batch-export-delta.json'), 'utf8')
-)
-/** I18's additive subpath extends the frozen forty entries without changing their counts. */
-const bridgeDelta = JSON.parse(
-  readFileSync(
-    join(root, 'packages/rpc-integration/test/fixtures/jsonrpc-bridge-export-delta.json'),
-    'utf8'
-  )
-)
-/** I19's seven new entries retain exact names alongside the frozen forty and bridge. */
-const threadsDelta = JSON.parse(
-  readFileSync(
-    join(root, 'packages/rpc-integration/test/fixtures/threads-export-delta.json'),
-    'utf8'
-  )
-)
-/** Approved public entry moves retarget readers while preserving the immutable legacy snapshot. */
-const coreRefactorDelta = JSON.parse(
-  readFileSync(
-    join(root, 'packages/rpc-integration/test/fixtures/core-refactor-export-delta.json'),
-    'utf8'
-  )
-)
+/** The reviewed current baseline owns exact names; export-mapping preserves historic deltas. */
+const baseline = JSON.parse(
+  readFileSync(join(root, 'scripts/fixtures/public-exports.baseline.json'), 'utf8')
+).packages
+/** Runtime artifacts after removal of the forwarding bridge package. */
+const owners = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser']
 const checks = [
+  'five-packed-artifacts',
+  'five-owner-duplicate-instances',
+  'runtime-peer-pair',
   'subpath-imports',
   'obsolete-subpaths',
   'identity-observer-hidden',
@@ -73,40 +33,16 @@ const checks = [
   'selective-browser'
 ]
 const obsolete = [
-  '.',
   './browser',
-  './core/memory',
-  './core/message-port',
-  './core/web-worker',
-  './core/wire',
-  './core/middleware/protocol',
-  './core/middleware/chunk',
-  './core/features/chunk',
-  './core/internal/chunk-attachment'
+  './memory',
+  './message-port',
+  './web-worker',
+  './wire',
+  './middleware/protocol',
+  './middleware/chunk',
+  './features/chunk',
+  './internal/chunk-attachment'
 ]
-
-/**
- * Map immutable legacy entry identities to their directly installed split public entry.
- *
- * @param {string} name Frozen legacy entry or reviewed relocation.
- * @returns {string} The ordinary entry installed by the six-package consumer.
- */
-function splitEntry(name) {
-  const entries = [
-    ['@migaia/rpc/bridge/jsonrpc', '@migaia/rpc-bridge-jsonrpc'],
-    ['@migaia/rpc/contract', '@migaia/rpc-contract'],
-    ['@migaia/rpc/core', '@migaia/rpc-core'],
-    ['@migaia/rpc/remote', '@migaia/rpc-core/remote'],
-    ['@migaia/rpc/testing', '@migaia/rpc-core/testing'],
-    ['@migaia/rpc/process', '@migaia/rpc-process'],
-    ['@migaia/rpc/threads', '@migaia/rpc-threads'],
-    ['@migaia/rpc/browser', '@migaia/rpc-browser']
-  ]
-  for (const [previous, current] of entries)
-    if (name === previous || name.startsWith(`${previous}/`))
-      return current + name.slice(previous.length)
-  return name
-}
 
 /** Read the packed script's literal obsolete-subpath probe instead of matching comments. */
 function obsoleteProbe(script) {
@@ -132,7 +68,7 @@ function obsoleteProbe(script) {
   assert.fail('obsoleteSubpaths literal probe is missing')
 }
 
-test('A11 packed consumer runs every preserved check against all 40 deep exports', () => {
+test('A11 packed consumer runs every preserved check against the current five owners', () => {
   const script = readFileSync(
     join(root, 'packages/rpc-integration/test/core/packed-export-smoke.mjs'),
     'utf8'
@@ -149,47 +85,28 @@ test('A11 packed consumer runs every preserved check against all 40 deep exports
     const match = /^CHECK ([a-z-]+) PASS$/.exec(line.trim())
     return match ? [match[1]] : []
   })
-  assert.equal(observedChecks.length, 13)
+  assert.equal(observedChecks.length, checks.length)
   assert.deepEqual(observedChecks.sort(), [...checks].sort())
   const subpaths = new Map(
     lines.flatMap((line) => {
       const match =
-        /^SUBPATH (@migaia\/rpc(?:-contract|-core|-process|-threads|-bridge-jsonrpc|-browser)(?:\/\S+)?) (\d+)$/.exec(
+        /^SUBPATH (@migaia\/rpc(?:-contract|-core|-process|-threads|-browser)(?:\/\S+)?) (\d+)$/.exec(
           line.trim()
         )
       return match ? [[match[1], Number(match[2])]] : []
     })
   )
-  assert.equal(
-    subpaths.size,
-    40 + Object.keys(bridgeDelta.added).length + Object.keys(threadsDelta.added).length
+  /** Packed imports must retain every reviewed runtime name count, including schema defaults. */
+  const expected = owners.flatMap((owner) =>
+    Object.entries(baseline['@migaia/' + owner]).map(([key, names]) => [
+      '@migaia/' + owner + (key === '.' ? '' : key.slice(1)),
+      names.length
+    ])
   )
-  for (const [name, names] of Object.entries({ ...bridgeDelta.added, ...threadsDelta.added }))
-    assert.equal(subpaths.get(splitEntry(name)), names.length, name)
-  assert.equal(subpaths.get('@migaia/rpc-core/transport-kit'), 16)
-  assert.equal(subpaths.get('@migaia/rpc-core/stream'), 2)
-  for (const [name, record] of Object.entries(legacy)) {
-    /** Count each reviewed export delta against the frozen merge surface. */
-    const removed = [
-      ...(errorFormatDelta.removed[name] ?? []),
-      ...(controlDelta.removed[name] ?? [])
-    ]
-    const added = [
-      ...(errorFormatDelta.added[name] ?? []),
-      ...(controlDelta.added[name] ?? []),
-      ...(streamingDelta.added[name] ?? []),
-      ...(batchDelta.added[name] ?? []),
-      // K215 admits exactly one core runtime export; every other packed count stays frozen.
-      ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : [])
-    ]
-    /** The canonical Worker factory moved entry; its original symbol count stays unchanged. */
-    const currentName = splitEntry(coreRefactorDelta.relocations?.[name] ?? name)
-    assert.equal(
-      subpaths.get(currentName),
-      record.names.length - removed.length + added.length,
-      currentName
-    )
-  }
+  expected.push(['@migaia/rpc-contract/schema/wire-error', 1])
+  assert.equal(subpaths.size, expected.length)
+  for (const [name, count] of expected) assert.equal(subpaths.get(name), count, name)
+  assert.equal(subpaths.has('@migaia/rpc-bridge-jsonrpc'), false)
   assert.deepEqual([...obsoleteProbe(script)].sort(), [...obsolete].sort())
   assert.ok(script.includes('@migaia/rpc-core/composed'))
   assert.ok(script.includes('dist/contract/'))

@@ -202,7 +202,6 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
             'rpc-core',
             'rpc-process',
             'rpc-threads',
-            'rpc-bridge-jsonrpc',
             'rpc-browser',
             'logger',
             'storage-web'
@@ -230,10 +229,10 @@ test('SITE-T-A24 generated projections contain no volatile metadata', () => {
   assert.equal(routeManifest.version, 1)
   assert.equal(relationshipManifest.version, 1)
   /**
-   * Six RPC runtime owners replace the former single package, adding exactly five libraries; the
+   * Five RPC runtime owners replace the former single package, adding exactly four libraries; the
    * separate rpc-pool package adds one more, and rpc-devtools adds the observation contracts.
    */
-  assert.equal(libraryManifest.libraries.length, 34)
+  assert.equal(libraryManifest.libraries.length, 33)
   assert.equal(
     libraryManifest.libraries.some((library: { readonly slug: string }) => library.slug === 'docs'),
     false
@@ -448,7 +447,6 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
         'rpc-core',
         'rpc-process',
         'rpc-threads',
-        'rpc-bridge-jsonrpc',
         'rpc-browser',
         'rpc-devtools'
       ].includes(api.library)
@@ -471,7 +469,8 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
    */
   /** Coroutine BC1 removes createCoroutineHost while keeping the createCoroutinePlugin export. */
   /** The canonical defaultRpcReporter adds one runtime export to the reviewed RPC surface. */
-  assert.equal(runtimeSymbols.length, 337)
+  /** Removing four Bridge exports and adding one Process binding yields net minus three. */
+  assert.equal(runtimeSymbols.length, 334)
   for (const { api, symbol } of runtimeSymbols)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide(api.library, api.module, symbol.name, locale)

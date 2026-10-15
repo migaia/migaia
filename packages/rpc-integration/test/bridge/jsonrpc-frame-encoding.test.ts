@@ -2,7 +2,7 @@ import * as bytes from '@migaia/utils/bytes'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { JsonRpcLimit } from '@migaia/rpc-contract/framing/jsonrpc'
 import { encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'
-import { peerFrame } from '../../../rpc-integration/test/bridge/fixture.js'
+import { peerFrame } from './fixture.js'
 
 afterEach(() => {
   vi.restoreAllMocks()

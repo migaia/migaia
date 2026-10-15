@@ -105,3 +105,9 @@ export {
 export type * from './resilience/types.js'
 export type * from './plugin/types.js'
 export type * from './host/types.js'
+
+/** Process owns byte-channel presentation; Contract owns framing and error constants. */
+export {
+  createProcessJsonRpcChannel,
+  type IProcessJsonRpcChannelOptions
+} from './jsonrpc-channel.js'

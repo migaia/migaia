@@ -28,4 +28,4 @@ description: 进程与 Worker 之间的类型化双向调用
 
 握手必须支持 v2 describe 与批量帧接收，不回退到旧 describe 或单帧。反向调用、orderKey、group、cancel before-start、outcome、binary 与 transfer 仍按实际能力协商；显式调用缺失能力时拒绝。
 
-此接口不提供事务、共享内存、透明安全重试或自动 direct/upgrade 通道。进程使用 `@migaia/rpc-process`，线程使用 `@migaia/rpc-threads`，浏览器载体使用 `@migaia/rpc-browser`。第三方协议实现使用 `@migaia/rpc-contract`；外部语言 JSON-RPC 使用 `@migaia/rpc-bridge-jsonrpc`。六包采用精确锁步版本，按实际用途分别安装。
+此接口不提供事务、共享内存、透明安全重试或自动 direct/upgrade 通道。进程使用 `@migaia/rpc-process`，线程使用 `@migaia/rpc-threads`，浏览器载体使用 `@migaia/rpc-browser`。第三方协议实现使用 `@migaia/rpc-contract`；外部语言 JSON-RPC 使用 `@migaia/rpc-process` 的内置支持。五包采用精确锁步版本，按实际用途分别安装。

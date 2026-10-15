@@ -740,11 +740,11 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
     } else throw new Error(IpcBenchErrorText.bridgeCarrier)
     cleanup.push(() => raw.close())
     if (side === 'rpc') {
-      const { createJsonRpcRemoteChannel } = await import('@migaia/rpc-bridge-jsonrpc')
+      const { createProcessJsonRpcChannel } = await import('@migaia/rpc-process')
       const { createProcessPeer } = await import('@migaia/rpc-process')
       /** Only capabilities with actual mappings in the canonical bridge profile are offered. */
       const { JSONRPC_ALLOWED_CAPABILITIES } =
-        await import('../../../rpc-bridge-jsonrpc/dist/bridge/jsonrpc/constants.js')
+        await import('@migaia/rpc-core/adapter/internal-advanced')
       /** Contract describes the same request echo already proved by the conformance facade cases. */
       const contract = {
         schemaVersion: 1,
@@ -762,7 +762,7 @@ async function createBridgeIpcSession({ carrier, side, payload, peerRuntime }) {
         self: { name: 'parent', instanceId: 'parent' },
         providerLimits: nativeProviderLimits,
         connect: (context) =>
-          createJsonRpcRemoteChannel({
+          createProcessJsonRpcChannel({
             byte: raw,
             peerId: id,
             target: { kind: 'plugin', contract },
