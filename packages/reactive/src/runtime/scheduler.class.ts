@@ -349,10 +349,10 @@ export class Scheduler {
    * Delay scheduling until a notification fan-out has marked every subscriber. Unlike a user batch,
    * this preserves the configured async/sync strategy.
    */
-  runDeferred<T>(fn: () => T): T {
+  runDeferred<TArg, TResult>(fn: (arg: TArg) => TResult, arg: TArg): TResult {
     this.batchDepth++
     try {
-      return fn()
+      return fn(arg)
     } finally {
       if (--this.batchDepth === 0 && this.#queued.size > 0) this.requestFlush()
     }

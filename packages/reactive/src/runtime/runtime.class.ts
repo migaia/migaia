@@ -1,5 +1,5 @@
 import { tryReadProperty } from '@migaia/utils/error'
-import { DependencyTracker } from './dependency-tracker.class.js'
+import { DependencyTracker, markSubscribers } from './dependency-tracker.class.js'
 import { Scheduler } from './scheduler.class.js'
 import { VersionClock } from './version-clock.class.js'
 import { defaultRuntimeAdapter } from './default-runtime-adapter.js'
@@ -210,9 +210,7 @@ export class Runtime implements IRuntime {
           })
         )
       }
-      scheduler.runDeferred(() => {
-        for (const subscriber of Array.from(source.subs)) subscriber.markDirty()
-      })
+      scheduler.runDeferred(markSubscribers, source)
     }
     const notify = (source: IObservable): void => {
       publish(source, clock.next())
@@ -227,17 +225,18 @@ export class Runtime implements IRuntime {
       return result
     }
     // 内部面只经 WeakMap 暴露；拿到 Runtime 的第三方无法沿引用链摸到图。
+    /** Captures the admitted idle callback and its original receiver once for this Runtime. */
+    const scheduleIdle =
+      scheduleIdleOption === undefined
+        ? adapter.scheduleMicrotask
+        : createReceiverCallback(scheduleIdleOption, options)
     /** Admits idle cleanup through the configured hook and recovers through the safe microtask port. */
     const deferIdle = (task: () => void): void => {
-      const schedule =
-        scheduleIdleOption === undefined
-          ? adapter.scheduleMicrotask
-          : createReceiverCallback(scheduleIdleOption, options)
       try {
-        schedule(task)
+        scheduleIdle(task)
       } catch (error) {
         this.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
-        if (schedule !== adapter.scheduleMicrotask) {
+        if (scheduleIdle !== adapter.scheduleMicrotask) {
           try {
             adapter.scheduleMicrotask(task)
           } catch (fallbackError) {

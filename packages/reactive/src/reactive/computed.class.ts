@@ -1,5 +1,5 @@
 import type { IDisposable, IObservable, IObserver, IRuntime } from '../runtime/types.js'
-import type { ICapture } from '../runtime/dependency-tracker.class.js'
+import { markSubscribers, type ICapture } from '../runtime/dependency-tracker.class.js'
 import { internalsOf, type IRuntimeInternals } from '../runtime/internals.js'
 import { claimOwnership } from '../runtime/ownership.js'
 import { createObserverRunTrace, describeObserver } from '../runtime/diagnostics.js'
@@ -90,7 +90,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     this.#previewDirty = true
     if (this.#dirty) return // 幂等 → diamond 去重
     this.#dirty = true
-    for (const s of Array.from(this.subs)) s.markDirty() // 向下游传播「可能脏」
+    markSubscribers(this)
   }
   isStale(): boolean {
     return this.#dirty

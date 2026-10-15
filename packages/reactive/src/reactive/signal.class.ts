@@ -11,6 +11,7 @@ import { describeObservable, emitTraceSafely } from '../runtime/diagnostics.js'
 import { registerSubs } from '../runtime/node-internals.js'
 import { createReactiveError, tagReactiveError } from '../errors.js'
 import { ReactiveErrorCode } from '../error-code.js'
+import { markSubscribers } from '../runtime/dependency-tracker.class.js'
 import {
   ReactiveErrorPhase,
   ReactiveTraceReason,
@@ -100,9 +101,7 @@ export class Signal<T> implements IObservable, IDisposable {
       )
     }
     // 先快照 subs：同步 scheduler 可能在通知过程中重新追踪并改动 subs，直接迭代活 Set 会死循环
-    runtime.scheduler.runDeferred(() => {
-      for (const s of Array.from(this.subs)) s.markDirty() // push：向下游标脏/入队
-    })
+    runtime.scheduler.runDeferred(markSubscribers, this)
   }
   peek(): T {
     this.#assertActive()
