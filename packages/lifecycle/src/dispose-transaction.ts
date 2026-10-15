@@ -1,21 +1,20 @@
+import { defaultLifecycleScheduler } from './default-scheduler.js'
+import { assertErrorPolicyReporter, attachLifecycleSecondaryErrors } from './error-boundary.js'
+import { safeReport } from './report-boundary.js'
 import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
 import type { IDisposerContext } from './disposer-context.js'
 import {
-  assertErrorPolicyReporter,
   assimilateCapturedThen,
-  attachLifecycleSecondaryErrors,
   createErrorCollector,
   createLifecycleError,
   createLifecycleTypeError,
-  probeThenable,
-  safeReport
+  probeThenable
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { boundedWait } from './bounded-wait.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
-  defaultLifecycleScheduler,
   resolveSchedulerOption,
   addSchedulerTime,
   validateSchedulerDelay,

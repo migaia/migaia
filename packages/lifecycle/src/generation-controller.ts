@@ -1,11 +1,12 @@
+import { defaultLifecycleScheduler } from './default-scheduler.js'
+import { attachLifecycleSecondaryErrors } from './error-boundary.js'
+import { safeReport } from './report-boundary.js'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
-  attachLifecycleSecondaryErrors,
   containAsyncRejection,
   createLifecycleError,
   createLifecycleFailure,
   createLifecycleTypeError,
-  safeReport,
   tagLifecycleError,
   type ILifecycleError
 } from './errors.js'
@@ -19,11 +20,7 @@ import {
   type IObservedAbortSubscription
 } from './observed-subscription.js'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
-import {
-  defaultLifecycleScheduler,
-  resolveSchedulerOption,
-  validateSchedulerDelay
-} from './scheduler.js'
+import { resolveSchedulerOption, validateSchedulerDelay } from './scheduler.js'
 
 export type IGenerationToken = object
 

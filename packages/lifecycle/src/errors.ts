@@ -1,8 +1,10 @@
+import { safeReport } from './report-boundary.js'
 import type { ICollectedError, IErrorPolicy } from './types.js'
-import { attachErrorIdentity, attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
+import { attachErrorIdentity, attachSecondaryErrors } from '@migaia/utils/error'
 import { assimilateCapturedThen, probeThenable, type IThenableProbe } from '@migaia/utils/function'
 import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
+
+export { containAsyncRejection } from './report-boundary.js'
 export { assimilateCapturedThen, probeThenable }
 export type { IThenableProbe }
 
@@ -83,39 +85,6 @@ export function createLifecycleError(
   }
   if (options?.errors !== undefined) attachSecondaryErrors(error, options.errors)
   return error as ILifecycleError
-}
-
-/**
- * Lifecycle's single entry point for attaching secondary failures (cleanup, rollback, cancellation)
- * to a primary failure. Delegates to `@migaia/utils/error` `attachSecondaryErrors`, which appends
- * to any existing `errors` list as a non-enumerable, frozen array and keeps the primary's identity.
- * Entries identical to the primary and repeated entries are dropped first. When the primary cannot
- * carry the list (primitive, frozen, hostile `errors` accessor), the returned `AggregateError`
- * fallback lists the primary first, takes the primary's reason (or `fallbackMessage`) as its
- * message and is tagged with `fallbackCode` (`SCOPE_DISPOSAL_FAILED` unless the call site owns a
- * narrower code). Returns the value the caller must throw or reject with.
- */
-export function attachLifecycleSecondaryErrors(
-  primary: unknown,
-  secondaryErrors: readonly unknown[],
-  fallbackMessage: string,
-  fallbackCode: string = LifecycleErrorCode.scopeDisposalFailed
-): unknown {
-  /** Secondary failures without the primary itself or repeated objects, in first-seen order. */
-  const distinct = secondaryErrors.filter(
-    (error, index) => error !== primary && secondaryErrors.indexOf(error) === index
-  )
-  /** Either the primary (attached in place) or utils' freshly built AggregateError fallback. */
-  const attached = attachSecondaryErrors(primary, distinct)
-  if (attached === primary) return primary
-  // The fallback aggregate is a fresh object owned by this call, so giving it a message is safe.
-  Object.defineProperty(attached, 'message', {
-    configurable: true,
-    enumerable: false,
-    value: safeErrorReason(primary, fallbackMessage),
-    writable: true
-  })
-  return tagLifecycleError(attached as AggregateError, fallbackCode)
 }
 
 /**
@@ -204,77 +173,6 @@ export function createLifecycleTypeError(
   if (options?.detail !== undefined)
     Object.defineProperty(error, 'detail', { value: options.detail, enumerable: true })
   return error
-}
-
-/**
- * Ported from `@migaia/capability`'s `containAsyncRejection`.
- *
- * `() => void` in TypeScript still accepts an `async` function. This guards a diagnostic/release
- * callback's return value for a thenable and observes its rejection, so a callback that turns out
- * to be `async` behind our backs doesn't surface as an unhandled rejection one microtask later
- * (L-T17, L-T26, L-T35).
- */
-export function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void {
-  if ((value === null || typeof value !== 'object') && typeof value !== 'function') return
-  let then: unknown
-  try {
-    then = (value as { then?: unknown }).then
-  } catch (error) {
-    onRejected(error)
-    return
-  }
-  if (typeof then !== 'function') return
-  // Reuse the `then` we already read — `assimilateCapturedThen` invokes it exactly once with the
-  // thenable as receiver, so we never hand the value back to `Promise.resolve()` to read `.then` a
-  // second time (a stateful getter could return a different function or throw on the second read).
-  const settled = assimilateCapturedThen<unknown>(
-    then as (resolve: unknown, reject: unknown) => void,
-    value
-  )
-  void settled.catch((error: unknown) => {
-    try {
-      onRejected(error)
-    } catch {
-      // The rejection handler is itself the last error boundary; it must not manufacture a new
-      // unhandled rejection by throwing back out of this `.catch`.
-    }
-  })
-}
-
-/**
- * Hands `error` to a caller-supplied reporter, the last error boundary of a lifecycle operation.
- * The reporter's own synchronous throw and async rejection are contained here because no lower
- * layer exists to receive them (L-T26, L-T35). An absent reporter makes this a no-op.
- */
-export function safeReport(report: ((error: unknown) => void) | undefined, error: unknown): void {
-  if (!report) return
-  try {
-    const result: unknown = report(error)
-    containAsyncRejection(result, () => {
-      // The reporter's own async failure has no lower layer to report to; it terminates here.
-    })
-  } catch {
-    // The reporter is the last error boundary for its own failures too (L-T35).
-  }
-}
-
-/**
- * Rejects, at the creating factory, an error policy whose only observation channel is a reporter
- * that was not supplied. `report` hands every failure to the reporter and `firstError` hands every
- * failure after the first to it; without one those failures would vanish (X2=a, LC-B5). Throws an
- * `INVALID_OPTION` TypeError carrying `detail.field = 'report'`.
- */
-export function assertErrorPolicyReporter(
-  policy: IErrorPolicy,
-  report: ((error: unknown) => void) | undefined
-): void {
-  if (policy !== 'report' && policy !== 'firstError') return
-  if (typeof report === 'function') return
-  throw createLifecycleTypeError(
-    LifecycleErrorCode.invalidOption,
-    LifecycleErrorText.errorPolicyReporterMissing,
-    { detail: { field: 'report', errorPolicy: policy } }
-  )
 }
 
 /** Collects errors under one of the four policies (D-4) and produces the correct finalize behavior. */

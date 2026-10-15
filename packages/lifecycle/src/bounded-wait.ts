@@ -1,6 +1,6 @@
+import { defaultLifecycleScheduler } from './default-scheduler.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
-  defaultLifecycleScheduler,
   resolveSchedulerOption,
   validateSchedulerDelay,
   validateSchedulerTime
