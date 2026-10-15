@@ -232,15 +232,21 @@ export async function createHost<
         if (activeRuntimeNames.has(entry.binding?.snapshot.name ?? '')) {
           cleanup.complete = false
           const deferred = waitForRuntimeQuiescence().then(async () => {
+            /**
+             * Errors raised by this binding's deferred rollback only. `cleanup.errors` is shared by
+             * the whole removal, so returning it would repeat other bindings' errors here.
+             */
+            const bindingErrors: unknown[] = []
             try {
               await entry.binding?.artifactCustody?.rollback()
             } catch (error) {
               const cleanupError = attachTrayError(error, TrayErrorCode.artifactCleanupFailed)
+              bindingErrors.push(cleanupError)
               cleanup.errors.push(cleanupError)
               cleanup.complete = false
               report(cleanupError)
             }
-            return Object.freeze({ cleanupErrors: Object.freeze([...cleanup.errors]) })
+            return Object.freeze({ cleanupErrors: Object.freeze(bindingErrors) })
           })
           cleanup.physical.push(deferred)
           return
