@@ -4,10 +4,10 @@ import * as publicApi from '../src/index.js'
 import type { IRuntime } from '../src/index.js'
 
 describe('public-surface convergence', () => {
-  it('A1 exposes only application, extension, and internals entries', async () => {
+  it('REX-T1 A1 exposes only application and controlled extension entries', async () => {
     /** Published entry names form the supported import boundary. */
     const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
-    expect(Object.keys(manifest.exports)).toEqual(['.', './extension', './internals'])
+    expect(Object.keys(manifest.exports)).toEqual(['.', './extension'])
     for (const name of ['Signal', 'Computed', 'Effect', 'ReactiveErrorText']) {
       expect(publicApi).not.toHaveProperty(name)
     }
@@ -18,15 +18,26 @@ describe('public-surface convergence', () => {
       'currentRuntimeVersion',
       'claimOwnership',
       'createFieldSource',
+      'createSourceBinding',
+      'createTrackedObserver',
+      'invalidateObservable',
       'createObserverBinding',
       'internalRuntimeOf'
     ]) {
       expect(extension).toHaveProperty(name, expect.any(Function))
     }
-    /** Dangerous runtime and node mutation capabilities remain in their dedicated entry. */
-    const internals = await import('../src/entry/internals.js')
-    expect(internals.internalsOf).toBeTypeOf('function')
-    expect(extension).not.toHaveProperty('internalsOf')
+    /** No public entry returns the kernel's mutable service objects or bookkeeping writers. */
+    for (const name of [
+      'internalsOf',
+      'registerInternals',
+      'mutableSubs',
+      'mutableDeps',
+      'tracker',
+      'scheduler',
+      'clock'
+    ]) {
+      expect(extension).not.toHaveProperty(name)
+    }
   })
 
   it('A2 keeps versions and observation hooks while hiding graph methods', () => {

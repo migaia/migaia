@@ -18,7 +18,7 @@ export function deferred<T = void>(): {
 /**
  * Drain the microtask queue (queueMicrotask-based idle scheduling, promise `.then` chains). A
  * macrotask boundary (`setTimeout`) only runs once every pending microtask has settled, so this
- * reliably observes effects scheduled via `internalsOf(runtime).deferIdle`.
+ * reliably observes tasks scheduled via the resource observer binding's idle channel.
  */
 export function flushAsync(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))

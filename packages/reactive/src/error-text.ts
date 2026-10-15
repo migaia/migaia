@@ -1,5 +1,7 @@
 /** Stable reactive diagnostics and public error messages owned by this package. */
 export const ReactiveErrorText = {
+  /** Prevents a second extension binding from replacing a node's live dependency bookkeeping. */
+  graphNodeAlreadyRegistered: 'reactive graph node is already registered',
   /** Identifies the option getter that failed before Runtime state allocation. */
   runtimeOptionGetterFailed: (option: string): string => `runtime option "${option}" getter failed`,
   /** Identifies the adapter method getter that failed during Runtime admission. */

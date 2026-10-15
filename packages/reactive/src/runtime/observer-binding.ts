@@ -5,6 +5,60 @@ import { Effect } from '../reactive/effect.class.js'
 import { createReactiveError } from '../errors.js'
 import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
+import type { IObservable, IObserver } from './types.js'
+import { assertGraphNodeUnregistered, registerDeps, registerDepVersions } from './node-internals.js'
+import { claimOwnership } from './ownership.js'
+
+/** Graph participation for one custom observer; the tracker and mutable edge sets stay private. */
+export type ITrackedObserverBinding = Readonly<{
+  /** Read-only current dependencies maintained by the tracker. */
+  readonly deps: ReadonlySet<IObservable>
+  /** Read-only versions recorded during the last tracked execution. */
+  readonly depVersions: ReadonlyMap<IObservable, number>
+  /** Runs synchronous reads in this observer's dependency frame and preserves callback errors. */
+  runTracked<T>(read: () => T): T
+  /** Disconnects this observer while keeping lifecycle policy with its owner. */
+  clear(): void
+  /** Removes reverse edges while retaining the dependency version snapshot. */
+  suspend(): void
+  /** Reports whether this observer has a retained suspended snapshot. */
+  isSuspended(): boolean
+  /** Pulls and compares the retained snapshot, reattaching unchanged dependencies. */
+  revalidate(): boolean
+  /** Pulls upstream dependencies and reports whether any recorded version changed. */
+  hasStaleDependencies(): boolean
+  /** Uses the runtime's admitted idle channel for this observer owner's work. */
+  deferIdle(task: () => void): void
+}>
+
+/**
+ * Registers a fresh custom observer and binds only its required graph operations. Assign the
+ * returned readonly edge views before invoking any operation or exposing the observer.
+ * Resource/request ownership and scheduling decisions remain with the caller.
+ */
+export function createTrackedObserver(observer: IObserver): ITrackedObserverBinding {
+  /** Capture the owning services before creating graph bookkeeping. */
+  const runtime = observer.runtime
+  /** Methods close over this one tracker but never return the tracker itself. */
+  const services = internalsOf(runtime)
+  assertGraphNodeUnregistered(observer)
+  claimOwnership(observer, runtime)
+  /** Canonical read-only views share the kernel's private writable edge collections. */
+  const deps = registerDeps(observer, new Set<IObservable>())
+  /** Version snapshots remain owned by the tracker rather than by the extension. */
+  const depVersions = registerDepVersions(observer, new Map<IObservable, number>())
+  return Object.freeze({
+    deps,
+    depVersions,
+    runTracked: <T>(read: () => T): T => services.tracker.runTracked(observer, read),
+    clear: () => services.tracker.clearDependencies(observer),
+    suspend: () => services.tracker.suspendDependencies(observer),
+    isSuspended: () => services.tracker.isSuspended(observer),
+    revalidate: () => services.tracker.revalidate(observer),
+    hasStaleDependencies: () => services.tracker.hasStaleDependencies(observer),
+    deferIdle: (task: () => void) => services.deferIdle(task)
+  })
+}
 
 /**
  * Outcome of a capture commit.

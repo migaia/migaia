@@ -21,10 +21,6 @@
     "./extension": {
       "types": "./dist/entry/extension.d.ts",
       "default": "./dist/entry/extension.js"
-    },
-    "./internals": {
-      "types": "./dist/entry/internals.d.ts",
-      "default": "./dist/entry/internals.js"
     }
   },
   "scripts": {

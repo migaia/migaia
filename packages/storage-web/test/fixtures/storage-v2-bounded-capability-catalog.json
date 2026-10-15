@@ -86,7 +86,7 @@
     {
       "name": "reactive-graph",
       "owner": "@migaia/reactive",
-      "routes": ["@migaia/reactive", "@migaia/reactive/extension", "@migaia/reactive/internals"],
+      "routes": ["@migaia/reactive", "@migaia/reactive/extension"],
       "symbols": ["*"],
       "consumers": [
         "@migaia/resource",

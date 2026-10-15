@@ -38,59 +38,6 @@ function guide(input: IGuideInput): Readonly<Record<IGuideLocale, IApiGuide>> {
   }
 }
 
-/** Creates a guide for the paired registration and mutable-access functions of one graph field. */
-function nodeFieldGuide(input: {
-  readonly mutableName: string
-  readonly nounEn: string
-  readonly nounZh: string
-  readonly registerName: string
-  readonly valueExpression: string
-}): Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> {
-  const register = guide({
-    purposeEn: `Registers the private mutable ${input.nounEn} owned by a custom reactive node and returns its read-only public view. Registration rejects a second backing collection for the same node.`,
-    purposeZh: `为自定义 reactive node 登记其私有、可变的${input.nounZh}，并返回只读公开视图。同一 node 再次登记另一份集合会被拒绝。`,
-    quickStart: `import { ${input.registerName}, ${input.mutableName} } from '@migaia/reactive/internals'\n\nconst node = {}\nconst state = ${input.valueExpression}\nconst readonlyState = ${input.registerName}(node, state)\n${input.mutableName}(node, readonlyState).clear()`,
-    scenariosEn: [
-      'A library author is implementing a new node type that participates in the Migaia dependency graph.',
-      `The node must expose read-only ${input.nounEn} while its implementation retains controlled mutation.`
-    ],
-    scenariosZh: [
-      '库作者正在实现需要加入 Migaia 依赖图的新节点类型。',
-      `节点需要公开只读${input.nounZh}，同时仅允许实现层受控修改。`
-    ],
-    avoidEn: [
-      'Application code is reading or updating reactive values; use Signal, Computed, Effect, or Runtime instead.',
-      'The object is not a reactive node owned by the extension implementation.'
-    ],
-    avoidZh: [
-      '普通应用正在读取或更新响应式数据；应使用 Signal、Computed、Effect 或 Runtime。',
-      '该对象不是扩展实现持有的 reactive node。'
-    ]
-  })
-  const mutable = guide({
-    purposeEn: `Returns the exact mutable ${input.nounEn} previously registered for a custom node. The supplied fallback is accepted only for an unregistered node, so callers can initialize and then mutate one canonical collection.`,
-    purposeZh: `取得此前为自定义 node 登记的同一份可变${input.nounZh}。仅当 node 尚未登记时才采用 fallback，从而保证实现层只修改一份规范集合。`,
-    quickStart: `import { ${input.registerName}, ${input.mutableName} } from '@migaia/reactive/internals'\n\nconst node = {}\nconst state = ${input.valueExpression}\nconst readonlyState = ${input.registerName}(node, state)\nconst writableState = ${input.mutableName}(node, readonlyState)\nwritableState.clear()`,
-    scenariosEn: [
-      'A custom node implementation must update graph bookkeeping after registration.',
-      `The public node shape keeps ${input.nounEn} read-only while the implementation needs the original collection.`
-    ],
-    scenariosZh: [
-      '自定义节点在登记后需要更新依赖图记录。',
-      `公开节点把${input.nounZh}保持为只读，但实现层需要取得原始集合。`
-    ],
-    avoidEn: [
-      'Do not use it to mutate built-in nodes from application code.',
-      'Do not pass a copied fallback and expect it to replace an already registered collection.'
-    ],
-    avoidZh: [
-      '不要在普通应用代码中用它修改内置节点。',
-      '不要传入复制的 fallback 并期待替换已登记集合。'
-    ]
-  })
-  return { [input.registerName]: register, [input.mutableName]: mutable }
-}
-
 /**
  * One coherent provider-to-consumer scenario kept separate from the descriptor and short-form
  * examples.
@@ -3701,99 +3648,6 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['不要把来源信息当作权限。', 'undefined 不能证明该值没有 disposer。']
   }),
-  ...Object.fromEntries(
-    Object.entries(
-      nodeFieldGuide({
-        mutableName: 'mutableDeps',
-        nounEn: 'upstream dependency set',
-        nounZh: '上游依赖集合',
-        registerName: 'registerDeps',
-        valueExpression: 'new Set<object>()'
-      })
-    ).map(([name, value]) => [`reactive:internals:${name}`, value])
-  ),
-  ...Object.fromEntries(
-    Object.entries(
-      nodeFieldGuide({
-        mutableName: 'mutableDepVersions',
-        nounEn: 'dependency-version map',
-        nounZh: '依赖版本映射',
-        registerName: 'registerDepVersions',
-        valueExpression: 'new Map<object, number>()'
-      })
-    ).map(([name, value]) => [`reactive:internals:${name}`, value])
-  ),
-  ...Object.fromEntries(
-    Object.entries(
-      nodeFieldGuide({
-        mutableName: 'mutableSubs',
-        nounEn: 'downstream subscriber set',
-        nounZh: '下游订阅者集合',
-        registerName: 'registerSubs',
-        valueExpression: 'new Set()'
-      })
-    ).map(([name, value]) => [`reactive:internals:${name}`, value])
-  ),
-  'reactive:internals:registerVersion': guide({
-    purposeEn:
-      'Registers the initial version held by a custom reactive node. Version updates must use setVersion so graph readers observe one canonical counter.',
-    purposeZh:
-      '登记自定义 reactive node 的初始版本。后续更新必须使用 setVersion，确保依赖图读取的是同一个规范计数器。',
-    quickStart:
-      "import { registerVersion, readVersion, setVersion } from '@migaia/reactive/internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)\nconsole.log(readVersion(node, 0))",
-    scenariosEn: [
-      'A custom node participates in invalidation and must expose a monotonically changing version.',
-      'The implementation keeps version storage private from consumers.'
-    ],
-    scenariosZh: [
-      '自定义节点需要参与失效传播，并公开单调变化的版本。',
-      '实现层需要向使用方隐藏可写版本存储。'
-    ],
-    avoidEn: [
-      'Ordinary application code should let Signal and Runtime manage versions.',
-      'Do not register the same node twice.'
-    ],
-    avoidZh: ['普通应用应让 Signal 与 Runtime 管理版本。', '不要对同一 node 重复登记。']
-  }),
-  'reactive:internals:setVersion': guide({
-    purposeEn:
-      'Updates the registered version of a custom reactive node after its value or topology changes. It refuses unregistered nodes instead of creating hidden state implicitly.',
-    purposeZh:
-      '在自定义 reactive node 的值或连接关系变化后更新已登记版本。未登记 node 会被拒绝，不会静默创建隐藏状态。',
-    quickStart:
-      "import { registerVersion, setVersion, readVersion } from '@migaia/reactive/internals'\n\nconst node = {}\nregisterVersion(node, 0)\nsetVersion(node, 1)\nconsole.log(readVersion(node))",
-    scenariosEn: [
-      'A custom node has committed a real change and must invalidate version-aware readers.',
-      'Version ownership was established during node construction.'
-    ],
-    scenariosZh: [
-      '自定义节点已提交真实变化，需要让依赖版本的读取方失效。',
-      '节点构造时已经登记版本所有权。'
-    ],
-    avoidEn: [
-      'Do not increment versions for Object.is-equal writes.',
-      'Do not use it before registerVersion.'
-    ],
-    avoidZh: ['Object.is 相等的写入不要推进版本。', '不要在 registerVersion 之前调用。']
-  }),
-  'reactive:internals:readVersion': guide({
-    purposeEn:
-      'Reads the version registered for a custom node, using the supplied fallback only when the node has no private registration. It never advances the graph clock.',
-    purposeZh:
-      '读取自定义 node 已登记的版本；仅当没有私有登记时才返回 fallback。该操作不会推进依赖图时钟。',
-    quickStart:
-      "import { readVersion, registerVersion } from '@migaia/reactive/internals'\n\nconst node = {}\nregisterVersion(node, 4)\nconsole.log(readVersion(node, 0)) // 4",
-    scenariosEn: [
-      'An extension compares captured dependency versions before reusing a result.',
-      'A custom node exposes read-only version observation.'
-    ],
-    scenariosZh: ['扩展在复用结果前需要比较捕获的依赖版本。', '自定义节点需要公开只读版本观察。'],
-    avoidEn: [
-      'Do not use it as a general counter.',
-      'Do not assume the fallback replaces a registered version.'
-    ],
-    avoidZh: ['不要把它当作普通计数器。', '不要认为 fallback 会覆盖已登记版本。']
-  }),
   'reactive:extension:createObserverBinding': guide({
     purposeEn:
       'Bridges render-and-commit hosts to one reactive observer. capture records reads without publishing edges, commit validates the snapshot, and observe owns the live Effect used after host subscription.',
@@ -3821,6 +3675,87 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       '普通响应式副作用可直接使用 runtime.effect。',
       'commit 返回 stale 后不要复用同一个 capture token。'
     ]
+  }),
+  'reactive:extension:createSourceBinding': guide({
+    purposeEn:
+      'Binds a custom observable, such as a SAB-backed node, to one canonical source version and subscriber set while preserving the original graph identity. The returned operations capture that node; runtime services and mutable edge sets stay private.',
+    purposeZh:
+      '把SAB等自定义observable绑定到唯一的source版本和订阅者集合，保留原节点身份。返回的操作只作用于该节点，不交出runtime服务或可写边集。',
+    quickStart:
+      "import { createRuntime } from '@migaia/reactive'\nimport { createSourceBinding, type IObservable, type IRuntimeSourceBinding } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nlet binding!: IRuntimeSourceBinding\nconst node: IObservable = {\n  runtime,\n  get version() { return binding.version },\n  get subs() { return binding.subs },\n  onObserved: () => console.log('watch external storage'),\n  onUnobserved: () => console.log('stop external watch')\n}\nbinding = createSourceBinding(node)\nlet stored = 1\nconst effect = runtime.effect(() => {\n  binding.source.track()\n  console.log(stored)\n})\nbinding.source.commit(() => { stored = 2 })\nruntime.flush()\nconsole.log(node.version, node.subs.size)\neffect.dispose()\nbinding.source.dispose()",
+    quickStartEn:
+      "// Bind the fresh node before exposing it; metadata getters are used only after binding.\nimport { createRuntime } from '@migaia/reactive'\nimport { createSourceBinding, type IObservable, type IRuntimeSourceBinding } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nlet binding!: IRuntimeSourceBinding\nconst node: IObservable = {\n  runtime,\n  get version() { return binding.version },\n  get subs() { return binding.subs },\n  onObserved: () => console.log('watch external storage'),\n  onUnobserved: () => console.log('stop external watch')\n}\nbinding = createSourceBinding(node)\nlet stored = 1\nconst effect = runtime.effect(() => {\n  binding.source.track()\n  console.log(stored)\n})\nbinding.source.commit(() => { stored = 2 })\nruntime.flush()\nconsole.log(node.version, node.subs.size)\neffect.dispose()\nbinding.source.dispose()",
+    quickStartZh:
+      "// 先绑定新节点再公开；元数据getter在binding赋值后才会被读取。\nimport { createRuntime } from '@migaia/reactive'\nimport { createSourceBinding, type IObservable, type IRuntimeSourceBinding } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nlet binding!: IRuntimeSourceBinding\nconst node: IObservable = {\n  runtime,\n  get version() { return binding.version },\n  get subs() { return binding.subs },\n  onObserved: () => console.log('watch external storage'),\n  onUnobserved: () => console.log('stop external watch')\n}\nbinding = createSourceBinding(node)\nlet stored = 1\nconst effect = runtime.effect(() => {\n  binding.source.track()\n  console.log(stored)\n})\nbinding.source.commit(() => { stored = 2 })\nruntime.flush()\nconsole.log(node.version, node.subs.size)\neffect.dispose()\nbinding.source.dispose()",
+    scenariosEn: [
+      'An adapter already implements IObservable hooks and must keep its node identity.',
+      'External writes must advance the local version and notify the same graph.'
+    ],
+    scenariosZh: [
+      '适配器已实现IObservable钩子，需要保留节点身份。',
+      '外部写入需要推进本地版本并通知同一依赖图。'
+    ],
+    avoidEn: [
+      'Use createFieldSource for a field that does not need a custom graph identity.',
+      'Do not rebind an existing graph node; GRAPH_NODE_REGISTERED preserves its live edges.'
+    ],
+    avoidZh: [
+      '不需要自定义节点身份的字段应使用createFieldSource。',
+      '不要重绑已有图节点；GRAPH_NODE_REGISTERED用于保护仍存活的边。'
+    ]
+  }),
+  'reactive:extension:createTrackedObserver': guide({
+    purposeEn:
+      'Gives an owner-controlled observer only its own dependency tracking, suspension and revalidation operations. The caller keeps scheduling and lifecycle policy; this factory creates neither another Effect nor an async request owner.',
+    purposeZh:
+      '只给调用方持有的observer提供自身依赖追踪、挂起和重验证能力。排程与生命周期仍由调用方负责；factory不再创建Effect或异步请求owner。',
+    quickStart:
+      "import { createRuntime } from '@migaia/reactive'\nimport { createTrackedObserver, type IObserver, type ITrackedObserverBinding } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst value = runtime.signal(1)\nlet dirty = false\nlet disposed = false\nlet binding!: ITrackedObserverBinding\nconst observer: IObserver = {\n  runtime,\n  get disposed() { return disposed },\n  get deps() { return binding.deps },\n  get depVersions() { return binding.depVersions },\n  markDirty: () => { dirty = true },\n  onDependencyDisconnected: () => { dirty = true }\n}\nbinding = createTrackedObserver(observer)\nconst read = () => binding.runTracked(() => value.value)\nconsole.log(read())\nvalue.value = 2\nif (dirty) console.log(read())\nbinding.suspend()\nconsole.log(binding.revalidate())\nbinding.clear()\ndisposed = true\nvalue.dispose()",
+    quickStartEn:
+      "// The owner supplies notifications; the binding alone maintains the dependency edges.\nimport { createRuntime } from '@migaia/reactive'\nimport { createTrackedObserver, type IObserver, type ITrackedObserverBinding } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst value = runtime.signal(1)\nlet dirty = false\nlet disposed = false\nlet binding!: ITrackedObserverBinding\nconst observer: IObserver = {\n  runtime,\n  get disposed() { return disposed },\n  get deps() { return binding.deps },\n  get depVersions() { return binding.depVersions },\n  markDirty: () => { dirty = true },\n  onDependencyDisconnected: () => { dirty = true }\n}\nbinding = createTrackedObserver(observer)\nconst read = () => binding.runTracked(() => value.value)\nconsole.log(read())\nvalue.value = 2\nif (dirty) console.log(read())\nbinding.suspend()\nconsole.log(binding.revalidate())\nbinding.clear()\ndisposed = true\nvalue.dispose()",
+    quickStartZh:
+      "// owner提供失效通知；依赖边由binding内部的既有tracker维护。\nimport { createRuntime } from '@migaia/reactive'\nimport { createTrackedObserver, type IObserver, type ITrackedObserverBinding } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst value = runtime.signal(1)\nlet dirty = false\nlet disposed = false\nlet binding!: ITrackedObserverBinding\nconst observer: IObserver = {\n  runtime,\n  get disposed() { return disposed },\n  get deps() { return binding.deps },\n  get depVersions() { return binding.depVersions },\n  markDirty: () => { dirty = true },\n  onDependencyDisconnected: () => { dirty = true }\n}\nbinding = createTrackedObserver(observer)\nconst read = () => binding.runTracked(() => value.value)\nconsole.log(read())\nvalue.value = 2\nif (dirty) console.log(read())\nbinding.suspend()\nconsole.log(binding.revalidate())\nbinding.clear()\ndisposed = true\nvalue.dispose()",
+    scenariosEn: [
+      'A Resource-like implementation owns its markDirty and refresh policy.',
+      'An idle observer must disconnect reverse edges while retaining version snapshots.'
+    ],
+    scenariosZh: [
+      '类似Resource的实现自己控制markDirty和刷新策略。',
+      '闲置observer需要断开反向边并保留版本快照。'
+    ],
+    avoidEn: [
+      'Use runtime.effect for an ordinary side effect or createObserverBinding for render/commit hosts.',
+      'Do not register the same graph node twice or mutate its dependency views.'
+    ],
+    avoidZh: [
+      '普通副作用用runtime.effect；render/commit宿主用createObserverBinding。',
+      '不要重复登记同一个图节点，也不要修改只读依赖视图。'
+    ]
+  }),
+  'reactive:extension:invalidateObservable': guide({
+    purposeEn:
+      'Disconnects downstream bindings from an owned observable while retaining its upstream graph and cached value. Routing adapters use it when a lookup target changes and consumers must reconnect without disposing the retained node.',
+    purposeZh:
+      '断开所持observable的下游绑定，同时保留其上游图与缓存。路由适配器切换读取目标时，可要求消费者重新连接，而不销毁仍保留的旧节点。',
+    quickStart:
+      "import { createRuntime } from '@migaia/reactive'\nimport { internalRuntimeOf, invalidateObservable } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst source = runtime.signal(2)\nconst derived = internalRuntimeOf(runtime).computed(() => source.value * 2)\nconst effect = runtime.effect(() => console.log(derived.value))\ninvalidateObservable(runtime, derived)\nruntime.flush()\nconsole.log(derived.value)\neffect.dispose()\nderived.dispose()\nsource.dispose()",
+    quickStartEn:
+      "// Invalidate downstream edges, then let the normal Runtime flush reconnect consumers.\nimport { createRuntime } from '@migaia/reactive'\nimport { internalRuntimeOf, invalidateObservable } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst source = runtime.signal(2)\nconst derived = internalRuntimeOf(runtime).computed(() => source.value * 2)\nconst effect = runtime.effect(() => console.log(derived.value))\ninvalidateObservable(runtime, derived)\nruntime.flush()\nconsole.log(derived.value)\neffect.dispose()\nderived.dispose()\nsource.dispose()",
+    quickStartZh:
+      "// 只摘下游边，再由正常Runtime flush让消费者重新连接。\nimport { createRuntime } from '@migaia/reactive'\nimport { internalRuntimeOf, invalidateObservable } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst source = runtime.signal(2)\nconst derived = internalRuntimeOf(runtime).computed(() => source.value * 2)\nconst effect = runtime.effect(() => console.log(derived.value))\ninvalidateObservable(runtime, derived)\nruntime.flush()\nconsole.log(derived.value)\neffect.dispose()\nderived.dispose()\nsource.dispose()",
+    scenariosEn: [
+      'An AtomStore override changes the node selected by future reads.',
+      'A retained computed must keep its cache while consumers reconnect.'
+    ],
+    scenariosZh: [
+      'AtomStore覆盖操作改变后续读取选择的节点。',
+      '保留的computed需要继续持有缓存，但消费者要重建连接。'
+    ],
+    avoidEn: [
+      'Use node.dispose when the node itself is permanently released.',
+      'The runtime and node must belong to the same graph.'
+    ],
+    avoidZh: ['真正永久释放节点时应调用node.dispose。', 'runtime与node必须属于同一依赖图。']
   }),
   'reactive:extension:createFieldSource': guide({
     purposeEn:
@@ -3866,75 +3801,6 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       '多份副本被刻意隔离，且不会交换受管对象。',
       '若把结果作为部署门禁，不要在全部应用 bundle 加载前调用。'
     ]
-  }),
-  'reactive:internals:registerInternals': guide({
-    purposeEn:
-      'Associates one trusted internal clock, tracker, and scheduler surface with a Runtime during construction. A second registration is rejected because replacing live graph machinery would split ownership.',
-    purposeZh:
-      '在 Runtime 构造期间，把一组可信的时钟、依赖追踪器与调度器内部能力关联到该 Runtime。重复登记会被拒绝，因为替换活动依赖图组件会破坏所有权。',
-    quickStart:
-      "import { registerInternals, internalsOf } from '@migaia/reactive/internals'\n\n/** Called once by an authorized Runtime constructor with its complete owned internals. */\nexport function registerKernel(...args: Parameters<typeof registerInternals>) {\n  registerInternals(...args)\n  console.log(internalsOf(args[0]) === args[1])\n}",
-    scenariosEn: [
-      'A custom Runtime implementation assembles the canonical internal services before creating nodes.',
-      'An infrastructure adapter needs the same internals lookup used by built-in factories.'
-    ],
-    scenariosZh: [
-      '自定义 Runtime 实现在创建节点前组装规范内部服务。',
-      '基础设施适配器需要复用内置工厂使用的同一内部能力查找。'
-    ],
-    avoidEn: [
-      'Application code should create a Runtime through createRuntime.',
-      'Do not register guessed or partial internals.'
-    ],
-    avoidZh: [
-      '普通应用应通过 createRuntime 创建 Runtime。',
-      '不要登记猜测出来或不完整的 internals。'
-    ]
-  }),
-  'reactive:internals:internalsOf': guide({
-    purposeEn:
-      'Returns the trusted internal services previously registered for a Runtime. It throws for an unregistered structural imitation so failures occur at the boundary rather than later during graph mutation.',
-    purposeZh:
-      '返回此前为 Runtime 登记的可信内部服务。未登记的结构伪造对象会在入口直接失败，避免直到依赖图修改时才出现难追踪错误。',
-    quickStart:
-      "import { createRuntime } from '@migaia/reactive'\nimport { internalsOf } from '@migaia/reactive/internals'\n\n// Authorized kernel integrations only; ordinary features use public Runtime methods.\nconst runtime = createRuntime()\nconst internals = internalsOf(runtime)\nconsole.log(internals.now())",
-    scenariosEn: [
-      'A reactive infrastructure extension needs the exact services owned by one Runtime.',
-      'A node factory must reject a forged Runtime before allocating graph state.'
-    ],
-    scenariosZh: [
-      'reactive 基础设施扩展需要取得某个 Runtime 实际持有的服务。',
-      '节点工厂必须在分配依赖图状态前拒绝伪造 Runtime。'
-    ],
-    avoidEn: [
-      'Application code should use public Runtime methods.',
-      'Do not cache internals across different Runtime instances.'
-    ],
-    avoidZh: [
-      '普通应用应使用 Runtime 的公开方法。',
-      '不要在不同 Runtime 实例之间缓存并复用 internals。'
-    ]
-  }),
-  'reactive:internals:isRuntime': guide({
-    purposeEn:
-      'Checks whether a value is a Runtime created and registered by this exact reactive module copy. It does not expose the internal clock, tracker, or scheduler.',
-    purposeZh:
-      '检查一个值是否为当前 reactive 模块副本创建并登记的 Runtime，同时不会暴露内部 clock、tracker 或 scheduler。',
-    quickStart:
-      "import { isRuntime } from '@migaia/reactive/internals'\n\nif (!isRuntime(candidate)) throw new TypeError('Expected a Migaia Runtime')",
-    scenariosEn: [
-      'An infrastructure extension accepts unknown input before calling Runtime internals.',
-      'A boundary must reject structural imitations and Runtime values from another copy.'
-    ],
-    scenariosZh: [
-      '基础设施扩展在调用 Runtime internals 前需要检查 unknown input。',
-      '入口必须拒绝结构伪造对象和其他副本创建的 Runtime。'
-    ],
-    avoidEn: [
-      'Application code can accept the public IRuntime contract directly.',
-      'Do not treat the result as a security decision.'
-    ],
-    avoidZh: ['普通应用可以直接接受公开 IRuntime contract。', '不要把检测结果当作安全决策。']
   }),
   'reactive:extension:currentRuntimeVersion': guide({
     purposeEn:

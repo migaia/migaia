@@ -5,9 +5,9 @@ import {
   type IRuntime,
   type IReactiveSignal
 } from '@migaia/reactive'
-import { internalsOf } from '@migaia/reactive/internals'
 import {
   claimOwnership,
+  invalidateObservable,
   currentRuntimeVersion,
   internalRuntimeOf,
   type IObservable
@@ -259,10 +259,9 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
       // 先摘旧边再强制下游重跑，避免 stale 检查先 pull 一个已经不再路由到的
       // dirty Computed；节点本身不 dispose，状态与缓存仍归 store 所有。
       //
-      // 这一处仍走内部面：需要的是「只断下游边」，而 Computed.dispose() 会连
-      // 上游边与缓存一起销毁——公开面上没有表达「保留自身、只摘下游」的操作。
-      // Signal 那侧已经有 dispose()（语义正是断下游边），所以只剩派生这一种。
-      internalsOf(runtime).tracker.disconnectObservable(observable, 'invalidate')
+      // 受控 extension 操作只断下游；Computed.dispose() 会同时销毁上游与缓存，
+      // 因而不能代替仍由本 store 持有的节点失效。
+      invalidateObservable(runtime, observable)
       if (observable.subs.size === 0) {
         try {
           observable.onUnobserved?.()

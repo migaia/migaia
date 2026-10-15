@@ -45,3 +45,8 @@ export function isRuntimeTracking(runtime: IRuntime): boolean {
 export function isAnyRuntimeTracking(): boolean {
   return DependencyTracker.isAnyTracking()
 }
+
+/** Invalidates downstream bindings while preserving this exact observable's cache and upstream. */
+export function invalidateObservable(runtime: IRuntime, observable: IObservable): void {
+  internalsOf(runtime).tracker.disconnectObservable(observable, 'invalidate')
+}

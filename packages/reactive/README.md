@@ -38,7 +38,6 @@ pnpm add @migaia/reactive
 | --- | --- |
 | `@migaia/reactive` | Runtime 工厂、`IReactiveSignal`/`IReactiveComputed`/`IReactiveEffect`、诊断常量与错误码。 |
 | `@migaia/reactive/extension` | 所有权、受控 source、observer binding、图协议类型与只读版本查询。 |
-| `@migaia/reactive/internals` | tracker/scheduler/clock 与可变依赖边；供需要危险能力的节点实现层使用。 |
 
 ## 5. 五分钟上手
 
@@ -84,7 +83,7 @@ count.dispose();
 
 ## 7. 包内入口一览
 
-应用作者从根入口使用工厂和窄节点类型。Store、集合、资源及框架适配层作者从 `/extension` 取得受控扩展能力；需要直接操作内部服务或可变图边时使用 `/internals`。三个节点类保持内部实现，不作为值导出。
+应用作者从根入口使用工厂和窄节点类型。Store、集合、资源及框架适配层作者从 `/extension` 取得受控扩展能力；自定义source/observer也只取得绑定到自身节点的能力，不取得内部服务或可变图边。三个节点类保持内部实现，不作为值导出。
 
 > 通用的「一组资源集中释放」的所有权容器（原 `Scope`/`createScope()`）已随 `docs/lifecycle/migration.sdd.md` §4.1 整体移出本包，改用 `@migaia/lifecycle` 的 `LifecycleScope`/`SyncLifecycleScope`。
 

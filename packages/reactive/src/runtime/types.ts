@@ -212,7 +212,7 @@ export type IRuntimeOptions = {
  * Kernel graph protocol exposed as a type from the `@migaia/reactive/extension` entry.
  *
  * Third-party extensions compose public signals instead of implementing and changing `subs` or
- * `version`. Built-in Wasm and SAB sources join the graph through restricted internal entry points.
+ * `version`. Built-in Wasm and SAB sources join the graph through controlled extension bindings.
  * They must register runtime ownership first.
  */
 export type IObservable = {

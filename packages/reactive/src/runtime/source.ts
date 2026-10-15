@@ -4,6 +4,12 @@ import type { IObservable, IObserver, IRuntime } from './types.js'
 import { createReactiveError } from '../errors.js'
 import { ReactiveErrorCode } from '../error-code.js'
 import { ReactiveErrorText } from '../error-text.js'
+import {
+  assertGraphNodeUnregistered,
+  registerSubs,
+  registerVersion,
+  readVersion
+} from './node-internals.js'
 
 /** Controlled source lifecycle and notification capabilities without exposing the graph node. */
 export type IRuntimeFieldSource = {
@@ -15,6 +21,16 @@ export type IRuntimeFieldSource = {
   dispose(): void
 }
 
+/** Custom node metadata is read-only; graph operations remain bound to this exact node. */
+export type IRuntimeSourceBinding = Readonly<{
+  /** Monotonic local graph version, advanced only by canonical source publication. */
+  readonly version: number
+  /** Live diagnostic view whose mutable backing set remains in the kernel. */
+  readonly subs: ReadonlySet<IObserver>
+  /** Lifecycle and update operations capture the original node without accepting another target. */
+  readonly source: IRuntimeFieldSource
+}>
+
 /**
  * Creates a controlled source for extension layers.
  *
@@ -23,15 +39,44 @@ export type IRuntimeFieldSource = {
  * edges, fabricate versions, or notify another runtime's graph.
  */
 export function createFieldSource(runtime: IRuntime, debugName?: string): IRuntimeFieldSource {
+  /** Metadata is assigned before this private node can enter any dependency frame. */
+  let binding: IRuntimeSourceBinding
+  /** The field source keeps its graph identity private while sharing canonical source state. */
   const node: IObservable = {
     runtime,
     debugName,
-    subs: new Set<IObserver>(),
-    version: internalsOf(runtime).clock.next()
+    get subs() {
+      return binding.subs
+    },
+    get version() {
+      return binding.version
+    }
   }
+  binding = createSourceBinding(node)
+  return binding.source
+}
+
+/**
+ * Binds a fresh custom observable, such as a SAB node, to the canonical source implementation.
+ * Assign the returned readonly metadata during construction before publishing the node. Rebinding
+ * an existing graph node rejects instead of replacing its live edges.
+ */
+export function createSourceBinding(node: IObservable): IRuntimeSourceBinding {
+  /** Captured services belong to this node's runtime and never escape through the binding. */
+  const runtime = node.runtime
+  /** Internal services are captured once without exposing the mutable service objects. */
+  const services = internalsOf(runtime)
+  assertGraphNodeUnregistered(node)
   claimOwnership(node, runtime)
+  /** Reserve the first version before publishing any source bookkeeping. */
+  const initialVersion = services.clock.next()
+  /** One registered set supplies both kernel mutation and the read-only diagnostic view. */
+  const subs = registerSubs(node, new Set<IObserver>())
+  registerVersion(node, initialVersion)
+  /** Source disposal is the existing graph disconnection lifecycle, independent of its owner's data. */
   let disposed = false
 
+  /** Rejects reads and notifications after the exact source has disconnected. */
   const assertActive = (): void => {
     if (disposed)
       throw createReactiveError(
@@ -40,18 +85,19 @@ export function createFieldSource(runtime: IRuntime, debugName?: string): IRunti
       )
   }
 
-  return {
+  /** Only these existing source operations are exposed, each capturing its original node. */
+  const source: IRuntimeFieldSource = {
     track() {
       assertActive()
-      internalsOf(runtime).tracker.track(node)
+      services.tracker.track(node)
     },
     notify() {
       assertActive()
-      internalsOf(runtime).notify(node)
+      services.notify(node)
     },
     commit<T>(write: () => T): T {
       assertActive()
-      return internalsOf(runtime).commitSource(node, write)
+      return services.commitSource(node, write)
     },
     get observed() {
       return !disposed && node.subs.size > 0
@@ -62,7 +108,14 @@ export function createFieldSource(runtime: IRuntime, debugName?: string): IRunti
     dispose() {
       if (disposed) return
       disposed = true
-      internalsOf(runtime).tracker.disconnectObservable(node, 'dispose')
+      services.tracker.disconnectObservable(node, 'dispose')
     }
   }
+  return Object.freeze({
+    get version() {
+      return readVersion(node)
+    },
+    subs,
+    source
+  })
 }
