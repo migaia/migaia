@@ -11,7 +11,7 @@
 5. [错误身份：`StoreSharedErrorCode` / `STORE_SHARED_SOURCE` / `createStoreSharedError` / `createStoreSharedRangeError`](#5-错误身份)
 6. [Seqlock：并发读写的正确性保证](#6-seqlock并发读写的正确性保证)
 7. [跨线程同步：`sync()` 与 `watch()`](#7-跨线程同步sync-与-watch)
-8. [脏页 bitmap：`SharedInt32Array` 的稀疏同步](#8-脏页-bitmapsharedint32array-的稀疏同步)
+8. [每读者独立的完整同步](#8-每读者独立的完整同步)
 9. [响应式集成细节](#9-响应式集成细节)
 10. [错误一览表](#10-错误一览表)
 11. [生产环境完整示例](#11-生产环境完整示例)
@@ -161,10 +161,10 @@ class SharedInt32Array implements IDisposable {
 3. `buffer` 不是 `undefined` 也不是 `SharedArrayBuffer` 实例 → 抛 `TypeError`（`invalidOption`，消息 `[store] shared buffer must be a SharedArrayBuffer`）。
 4. `length` 不是整数或小于 `0` → 抛 `RangeError`（`invalidOption`，消息 `[store] shared array length must be a non-negative integer`）。
 5. 未传 `buffer` 且提供了 `initialValues`：遍历该 iterable，逐个用 `asInt32` 校验并收集，达到 `length` 个就停止；遍历或校验中途抛错 → 抛 `RangeError`（`invalidOption`，消息 `[store] shared array initialValues could not be materialized safely`，`cause` 为原始错误）。
-6. 按 `length` 推算所需 slot 数：`headerSlots = 1(epoch) + ceil(ceil(length / 32) / 32)(脏页 bitmap words)`，`slots = headerSlots + length * 2`；若该结果不是安全整数或超过 `0xffffffff`（`Int32Array` 下标空间上限）→ 抛 `RangeError`（`invalidOption`，消息 `[store] shared array length exceeds the Int32Array capacity`）。
-7. `buffer = options.buffer ?? new SharedArrayBuffer(slots * Int32Array.BYTES_PER_ELEMENT)`；若提供的 `buffer.byteLength` 小于所需字节数 → 抛 `RangeError`（`bufferTooSmall`，消息 `[store] shared array buffer is too small`）。
+6. ABI v2：header 与 generation 占 32 bytes，后接 `length` 个 int32 value，按 8 bytes 对齐后接 `length` 个 int64 seq。所需字节数 `requiredBytes = align8(32 + length * 4) + length * 8`；容量溢出抛 `RangeError`（`invalidOption`）。
+7. `buffer = options.buffer ?? new SharedArrayBuffer(requiredBytes)`；过小的 buffer 抛 `RangeError`（`bufferTooSmall`）。已有 buffer 必须通过 magic、ABI version、kind、ready 与 length 校验。
 8. 若第 5 步收集到了 `initialValues`，逐个 `Atomics.store` 写入对应 value slot（**不经过 seqlock 写入路径**——全新 buffer 的 seq 天然是偶数 0，构造期直接写值即安全）。
-9. 构造函数**不扫描**任何格子的 seqlock 来建立版本基线——每个下标的响应式基线在该下标**第一次被追踪读取**时才建立（见 `SharedInt32ArrayCell` 构造逻辑），数组级 `sync()` 依赖 epoch 判断要不要扫描（见 [§8](#8-脏页-bitmapsharedint32array-的稀疏同步)）。
+9. 构造函数**不扫描**任何格子的 seqlock 来建立版本基线——每个下标的响应式基线在该下标**第一次被追踪读取**时才建立（见 `SharedInt32ArrayCell` 构造逻辑），数组级 `sync()` 依赖 epoch 判断要不要扫描（见 [§8](#8-每读者独立的完整同步)）。
 
 ### 3.2 实例成员
 
@@ -183,7 +183,7 @@ class SharedInt32Array implements IDisposable {
   dispose(): void
   assertActive(): void
   readCell(index: number): { readonly value: number; readonly version: number }
-  writeCell(index: number, value: number, expected?: number): number | undefined
+  writeCell(index: number, value: number, expected?: number): bigint | undefined
   notifyWaiters(): void
   recordObservedVersion(index: number, version: number): void
 }
@@ -196,13 +196,13 @@ class SharedInt32Array implements IDisposable {
 - **`update(index, updater): number`** —— `updater` 必须是函数，否则抛 `TypeError`（`invalidOption`，消息 `[store] shared array update callback must be a function`）。执行顺序（详见 [§6.2](#62-写占锁--写值--放锁)）：一致读当前值 → **锁外**调用 `updater(current)` → 校验结果为合法 `int32` → 若与当前值相同直接返回（不写入）→ 否则以 CAS（期望值 = 读到的 `current`）尝试写入，失败则从头重来，最多重试 `1 << 16`（65536）次；超限抛 `Error`（`contentionLimit`，消息 `[store] shared array update at <index> kept losing the race; another writer never settled`）。写入成功后同步更新本地记账、若下标已物化 cell 则调用其 `commitWrite`，否则直接 `notifyWaiters()`。**`updater` 必须是纯函数、可安全重复调用**——冲突时会被重跑，不要在里面产生不可逆副作用；`updater` 抛错会原样向上抛出，且不会留下任何脏锁状态（回调在锁外执行）。
 - **`sync(index?): number`**
   - 传 `index`：先做下标校验；比较该下标的一致读版本号与本地记录，未变返回 `0`；变了则更新记录、若已物化 cell 则调用其 `sync()`（触发通知），返回 `1`。
-  - 不传：整体扫描。先比较头部 epoch 与本地记录的 `#observedEpoch`，未变直接返回 `0`（连脏页 bitmap 都不碰）；变了则在 `runtime.batch()` 内逐 word `Atomics.exchange` 读出并清零脏页 bitmap，对每个置位的页逐格重新一致读、与本地记录比较，真正变化的下标才更新记录并调用其已物化 cell 的 `sync()`，最终返回本轮实际变化的下标个数（可能为 `0`，即 epoch 变了但没有格子真正稳定下来变化，理论上不会发生但代码按此语义实现）。整个批处理包在一次 `runtime.batch()` 内，多处变化只会让下游重跑一轮而不是逐个通知。
+  - 不传：先比较 64 位 generation；未变返回 0，变化后在一次 `runtime.batch()` 内扫描全部格的 seqlock。每个读者使用独立版本游标，统计所有变化下标（含无观察者格），只通知已物化 cell。
 - **`watch(): IDisposer`** —— 语义与 `SharedInt32Signal.watch()` 一致，但监听的是头部 **epoch slot** 而不是逐格 seq（一格一个 waiter 在长数组上不可行）；唤醒后调用整体 `sync()`（不带 `index`）。已在 watch 时重复调用返回同一停止函数；环境不支持 `waitAsync` 抛 `Error`（`envUnsupported`）。
 - **`snapshot(): Int32Array`** —— `assertActive()` 后遍历 `[0, length)`，对每个下标 `readCell(i).value`，写入一个新分配的 `Int32Array(length)` 并返回。返回值是**普通、非共享**的数组，修改它不会影响共享内存。
 - **`dispose(): void`** —— 幂等；停止 `watch()`、把所有已物化 cell 从追踪器断开。释放之后调用 `get`/`set`/`update`/`sync`/`watch`/`snapshot` 等会抛 `Error`（`arrayDisposed`）。
 - **`assertActive(): void`** —— 已释放则抛 `Error`（`arrayDisposed`，消息 `[store] shared array is disposed`）；公开方法，正常业务代码不需要直接调用，供组合式底层用法（如包装类）复用同一校验。
 - **`readCell(index): { value; version }`** —— 一致读某一格的原始 value/version（复用 seqlock 读协议），**不做下标范围校验、不检查是否已释放**，是最底层的读原语；`get()`/`sync()` 等内部都基于它实现，调用方若直接使用需自行保证 `index` 合法。
-- **`writeCell(index, value, expected?): number | undefined`** —— 最底层的写原语（`set`/`update` 都基于它），语义见 [§6.2](#62-写占锁--写值--放锁)：`expected` 省略即无条件写；提供则是 CAS；成功返回新版本并标记对应脏页，未写入（值未变或 CAS 失败）返回 `undefined`。同样不做下标校验。
+- **`writeCell(index, value, expected?): bigint | undefined`** —— 最底层的写原语（`set`/`update` 都基于它），语义见 [§6.2](#62-写占锁--写值--放锁)：`expected` 省略即无条件写；提供则是 CAS；成功返回新 64 位版本，未写入（值未变或 CAS 失败）返回 `undefined`。同样不做下标校验。
 - **`notifyWaiters(): void`** —— 把头部 epoch 原子 `+1` 并 `Atomics.notify`，用于在绕开 `set`/`update` 自行调用 `writeCell` 之后手动唤醒 `watch()` 回路。
 - **`recordObservedVersion(index, version): void`** —— 更新数组级"已观察版本"记账（`#observedVersions[index]`），供自行组合 `readCell`/`writeCell` 实现自定义写入路径时，保持与内建 `sync()`/`get()` 的记账一致，避免下一次 `sync()` 误判该下标"仍未变化"或重复上报。
 
@@ -362,15 +362,11 @@ seq 推进为 seq+2（committed）
 
 ---
 
-## 8. 脏页 bitmap：`SharedInt32Array` 的稀疏同步
+## 8. 每读者独立的完整同步
 
-`SharedInt32Array` 的共享内存布局是：`[epoch, ...bitmap words, value0, seq0, value1, seq1, ...]`，每页 32 格（`DIRTY_PAGE_SIZE = 32`），每个 bitmap word 覆盖 32 页（`DIRTY_BITS_PER_WORD = 32`）。
+ABI v2 包含版本化 header、一个 64 位 generation，以及每格 value/seq。写者完成一次提交后递增 generation 并唤醒 waiter；每个 JS array 实例保留自己的 generation 和每格已读版本。
 
-- **epoch**：每次任意下标完成一次落盘写入，写者都会把 epoch 原子 `+1`。`sync()` 不传 `index` 时，第一步就是比较本地记录的 epoch 和共享内存里的当前 epoch——完全没变就直接返回 `0`，连 bitmap 都不用碰。这一步是为了让**一条** `watch()` 唤醒回路就能覆盖整个数组，不需要给上万个下标各起一个 waiter。
-- **脏页 bitmap**：每次写入用 `Atomics.or` 点亮自己所在页的 bit（`Atomics.or` 是无损操作，多个写者并发点同一个 bit 不会互相覆盖或丢失标记）。`sync()` 发现 epoch 变化后，用 `Atomics.exchange` 逐 word 读出 bitmap 并清零（`exchange` 是单次原子读改写，不存在"清零期间丢失一次并发 `or`"的时间窗口：并发的 `or` 要么完整发生在 `exchange` 之前，已经反映在读出的旧值里；要么完整发生在之后，作用在刚清零的 0 上，正确地留给下一轮 `sync()` 发现）。
-- **逐格确认**：命中的每一页仍然要逐格读 seqlock 版本号，和本地记录比较，真正变了才会通知该下标的观察者。也就是说 **bitmap/epoch 只是"可能变了"的提示，不是正确性来源**——即便某个 bit 因为极端时序被提前清零、写入方的 `or` 恰好卡在那之前完成，页内逐格版本比较仍会在下一轮 `sync()` 里补上这次变化，不会真正漏掉。
-
-效果：百万格的数组里只改动几个分散的下标，`sync()` 的开销只和"变化的页数"相关，而不是和数组长度 `length` 相关。一次 `sync()` 扫描到的多个变化会被包在同一个 `runtime.batch()` 里，避免下游因为一次同步里的多处变化而被唤醒多轮。
+`sync()` 先比较 generation；未变化直接返回 0。变化后扫描全部 `length` 个 seqlock，与本实例的版本游标逐格比较，返回所有变化下标数（包括没有观察者的下标），在一次 `runtime.batch()` 中通知本地观察者。`sync(index)` 只比较指定格。完整扫描为 O(length)，当前没有共享清位的 dirty bitmap；一个读者不会消费另一个读者的变化。
 
 ---
 
@@ -471,7 +467,7 @@ setInterval(() => {
 错误码都是 `CONTENTION_LIMIT`，通常意味着另一个写者持锁期间异常终止（线程被杀、崩溃），共享内存的锁位永远停在了"正在写"状态。这种情况无法在应用层自动恢复，需要放弃这块 `buffer`，重新创建一份共享状态。
 
 **Q：`SharedInt32Array` 里成千上万个下标，`sync()` 会不会很慢？**
-不会。`sync()` 先比较头部 epoch，完全没变直接返回；有变化时只扫描被脏页 bitmap 标记过的页，不是整个数组，见 [§8](#8-脏页-bitmapsharedint32array-的稀疏同步)。
+未变时比较 generation 后直接返回 0；有变化时为 O(length) 的全数组扫描。已知目标下标时可用 `sync(index)` 限定工作量；完整 `sync()` 保持每读者独立的所有变化计数，见 [§8](#8-每读者独立的完整同步)。
 
 **Q：能不能把 `SharedInt32Signal` 对象直接 `postMessage` 给 Worker？**
 不能，且没有必要——`postMessage` 会尝试结构化克隆这个对象，其内部状态无法被克隆出等价实例。应该传 `.buffer`（真正的 `SharedArrayBuffer`，可以被 `postMessage` 直接传递而不拷贝），另一端用同一个 `buffer` 调用 `sharedInt32`/`sharedInt32Array` 各自创建一份实例。
