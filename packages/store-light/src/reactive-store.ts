@@ -813,14 +813,6 @@ function createStoreCore<S extends Record<string, unknown>>(
   return store as IReactiveStore<S>
 }
 
-/** Compatibility facade for the historical Store definition API. */
-export function createLegacyStore<S extends Record<string, unknown>>(
-  shape: IStoreDefinition<S>,
-  options?: ICreateStoreOptions
-): IReactiveStore<S> {
-  return createStoreCore(shape, options)
-}
-
 /**
  * Explicit asynchronous creation for definitions containing async FieldBuilders. The returned store
  * has completed initialization; callers do not need to expose a half-ready object or gate every
@@ -837,8 +829,7 @@ export async function createAsyncStore<S extends Record<string, unknown>>(
 
 const STORE_READY = new WeakMap<object, Promise<void>>()
 
-/** Internal readiness bridge; readiness is no longer a property on Store instances. */
-/** Internal bridge retained for the React adapter and legacy migration tests. */
+/** Returns the registered initialization Promise for Store adapters such as React. */
 export function storeReady(store: object): Promise<void> {
   const ready = STORE_READY.get(store)
   if (!ready)
@@ -889,6 +880,3 @@ export function createStore<S extends Record<string, unknown>>(
   Object.defineProperties(snapshot, descriptors)
   return createStoreCore(snapshot as IStoreDefinition<S>, options, descriptors) as IReactiveStore<S>
 }
-
-/** Explicit naming alias for `createStore()`; no separate lifecycle semantics. */
-export const createStoreSync = createStore

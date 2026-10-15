@@ -9708,7 +9708,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'list',
                 items: [
                   '对象模型：字段如何映射为 Signal、Computed 与 Action。',
-                  'Readiness：同步、异步与 legacy 创建入口如何选择。',
+                  'Readiness：同步与异步创建入口如何选择。',
                   '快照和 hydration：区分完整读取与可持久化字段。',
                   '扩展协议：FieldBuilder、runtime 隔离与 mutation policy。',
                   '异步资源：Suspense、版本 lease、capture 和确定性释放。'
@@ -9773,7 +9773,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'list',
                 items: [
                   'Object model: how fields map to Signal, Computed, and Action.',
-                  'Readiness: choose synchronous, asynchronous, or legacy creation.',
+                  'Readiness: choose synchronous or asynchronous creation.',
                   'Snapshots and hydration: separate complete reads from persistable fields.',
                   'Extension protocol: FieldBuilder, runtime isolation, and mutation policy.',
                   'Async resources: Suspense, version leases, captures, and deterministic release.'
@@ -10023,7 +10023,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   },
   'store-light:async-fields-and-readiness': {
     zh: {
-      title: '选择同步、异步或 Legacy Store 创建入口',
+      title: '选择同步或异步 Store 创建入口',
       lede: 'FieldBuilder.mode 决定创建路径；新代码应在返回 Store 前关闭 readiness，而不是暴露半初始化对象。',
       document: {
         sections: [
@@ -10035,18 +10035,13 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'table',
                 headers: ['入口', '接受字段', '返回'],
                 rows: [
-                  [
-                    'createStore / createStoreSync',
-                    '普通字段与 mode:sync Builder',
-                    '立即返回 ready Store'
-                  ],
+                  ['createStore', '普通字段与 mode:sync Builder', '立即返回 ready Store'],
                   [
                     'createAsyncStore',
                     'sync、async 与 legacy Builder',
                     'Promise resolve 后全部 ready'
                   ],
-                  ['createLegacyStore', '所有 Builder', '可能返回 pending Store，需 storeReady'],
-                  ['storeReady', '异步 Store', '同一个初始化 Promise']
+                  ['storeReady', '已有 Store', '同一个初始化 Promise']
                 ]
               }
             ]
@@ -10061,7 +10056,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   'createStore 在任何 I/O 前拒绝非同步 Builder，错误为 SYNC_FIELD_REQUIRED。',
                   '异步任一字段失败会 abort 其余初始化并释放已创建资源。',
                   '初始化与 rollback 同时失败时使用 INIT_AND_CLEANUP_FAILED，主失败仍可达。',
-                  'pending/failed 字段访问为 STORE_NOT_READY，不返回部分值。'
+                  'createAsyncStore 在失败时拒绝 Promise，不暴露部分初始化的 Store。'
                 ]
               }
             ]
@@ -10074,7 +10069,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     },
     en: {
-      title: 'Choose synchronous, asynchronous, or legacy Store creation',
+      title: 'Choose synchronous or asynchronous Store creation',
       lede: 'FieldBuilder.mode determines the creation path. New code closes readiness before returning a Store instead of exposing a partially initialized object.',
       document: {
         sections: [
@@ -10086,18 +10081,13 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'table',
                 headers: ['Entry', 'Accepted fields', 'Return'],
                 rows: [
-                  [
-                    'createStore / createStoreSync',
-                    'Plain fields and mode:sync Builders',
-                    'Ready Store immediately'
-                  ],
+                  ['createStore', 'Plain fields and mode:sync Builders', 'Ready Store immediately'],
                   [
                     'createAsyncStore',
                     'sync, async, and legacy Builders',
                     'All fields ready when Promise resolves'
                   ],
-                  ['createLegacyStore', 'Every Builder', 'May return pending; use storeReady'],
-                  ['storeReady', 'Asynchronous Store', 'The same initialization Promise']
+                  ['storeReady', 'Existing Store', 'The same initialization Promise']
                 ]
               }
             ]
@@ -10112,7 +10102,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   'createStore rejects a non-sync Builder before any I/O with SYNC_FIELD_REQUIRED.',
                   'Failure of any async field aborts remaining initialization and releases created resources.',
                   'When initialization and rollback both fail, INIT_AND_CLEANUP_FAILED keeps the primary reachable.',
-                  'Access to pending or failed fields throws STORE_NOT_READY instead of returning a partial value.'
+                  'createAsyncStore rejects on failure without exposing a partially initialized Store.'
                 ]
               }
             ]

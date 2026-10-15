@@ -54,7 +54,7 @@ export type IAsyncFieldBuilder<F extends IDisposable> = {
   create(context: IFieldContext): Promise<F>
 }
 
-/** Pre-discriminant builder accepted only by legacy creation paths. */
+/** Pre-discriminant builder accepted by createAsyncStore, never createStore. */
 export type ILegacyFieldBuilder<F extends IDisposable> = {
   readonly [FIELD_BUILDER]: true
   create(context: IFieldContext): Promise<F>

@@ -5,9 +5,7 @@ import { createRuntime } from '@migaia/reactive'
 import type { IDisposable } from '@migaia/reactive'
 import {
   createStore,
-  createStoreSync,
   createAsyncStore,
-  createLegacyStore,
   storeReady,
   raw,
   isRaw,
@@ -106,7 +104,7 @@ describe('$hydrate input boundary', () => {
 })
 
 // Async IFieldBuilder: resolves after a microtask, optionally rejecting, so tests can
-// exercise createAsyncStore()/createLegacyStore()/storeReady() and init-failure cleanup.
+// exercise createAsyncStore()/storeReady() and init-failure cleanup.
 function asyncCounterField(
   initial: number,
   opts?: { fail?: boolean; onCreate?: (signal: IAbortSignal) => void }
@@ -329,13 +327,9 @@ describe('createStore: IFieldBuilder protocol', () => {
       '[store] createStore() only accepts synchronous fields; "profile" is a IFieldBuilder. Use createAsyncStore().'
     )
   })
-
-  it('createStoreSync is a direct alias of createStore', () => {
-    expect(createStoreSync).toBe(createStore)
-  })
 })
 
-describe('createAsyncStore / createLegacyStore / storeReady', () => {
+describe('createAsyncStore / storeReady', () => {
   it('reports cleanup failure after synchronous construction failure', async () => {
     const cleanup = new Error('sync cleanup failed')
     /** Failures handed to the runtime reporter. */
@@ -356,7 +350,7 @@ describe('createAsyncStore / createLegacyStore / storeReady', () => {
       })
     }
     expect(() =>
-      createLegacyStore(
+      createStore(
         {
           dirty,
           bad: {
@@ -392,7 +386,7 @@ describe('createAsyncStore / createLegacyStore / storeReady', () => {
         throw new Error('sync field failed')
       }
     }
-    expect(() => createLegacyStore({ late, bad })).toThrow('sync field failed')
+    await expect(createAsyncStore({ late, bad })).rejects.toThrow('sync field failed')
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     expect(disposed).toBe(true)
   })
@@ -405,14 +399,33 @@ describe('createAsyncStore / createLegacyStore / storeReady', () => {
     store.$dispose()
   })
 
-  it('createLegacyStore returns synchronously with async fields still pending; access throws until storeReady() resolves', async () => {
-    const runtime = createRuntime()
-    const store = createLegacyStore({ price: asyncCounterField(3) }, { runtime })
-    expect(() => store.price).toThrow(
-      '[store] store is pending; use createAsyncStore() before accessing async fields'
-    )
-    await storeReady(store)
+  it('does not expose a Store before a deferred field is ready', async () => {
+    /** Release controlled by the field owner rather than a timer. */
+    let release!: () => void
+    /** Keeps construction pending until the caller releases the field. */
+    const initialized = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    /** Records whether construction has crossed the public ready boundary. */
+    let settled = false
+    const price: IFieldBuilder<IDisposable & { value: number }> = {
+      [FIELD_BUILDER]: true,
+      mode: 'async',
+      async create() {
+        await initialized
+        return { value: 3, disposed: false, dispose() {} }
+      }
+    }
+    const pending = createAsyncStore({ price }).then((store) => {
+      settled = true
+      return store
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    release()
+    const store = await pending
     expect(store.price.value).toBe(3)
+    await expect(storeReady(store)).resolves.toBeUndefined()
     store.$dispose()
   })
 
@@ -420,38 +433,24 @@ describe('createAsyncStore / createLegacyStore / storeReady', () => {
     expect(() => storeReady({})).toThrow('[store] store has no asynchronous initialization')
   })
 
-  it('async field initialization failure disposes the store and rejects storeReady()/createAsyncStore()', async () => {
+  it('async initialization failure rejects creation and aborts sibling builders', async () => {
     const runtime = createRuntime()
-    const store = createLegacyStore({ price: asyncCounterField(1, { fail: true }) }, { runtime })
-    await expect(storeReady(store)).rejects.toThrow('async field init failed')
-    expect(store.$disposed).toBe(true)
-    expect(() => store.price).toThrow('[store] store is disposed')
-
-    await expect(
-      createAsyncStore({ price: asyncCounterField(1, { fail: true }) }, { runtime })
-    ).rejects.toThrow('async field init failed')
-  })
-
-  it('$dispose() before async initialization completes aborts the IFieldBuilder signal and disposes the resolved field instead of leaking it', async () => {
-    const runtime = createRuntime()
+    /** The initialization scope must abort every builder when a sibling fails. */
     let capturedSignal: IAbortSignal | undefined
-    const store = createLegacyStore(
-      {
-        price: asyncCounterField(1, {
-          onCreate: (signal) => {
-            capturedSignal = signal
-          }
-        })
-      },
-      { runtime }
-    )
-    store.$dispose()
-    await Promise.resolve()
+    await expect(
+      createAsyncStore(
+        {
+          price: asyncCounterField(1, {
+            onCreate: (signal) => {
+              capturedSignal = signal
+            }
+          }),
+          broken: asyncCounterField(1, { fail: true })
+        },
+        { runtime }
+      )
+    ).rejects.toThrow('async field init failed')
     expect(capturedSignal?.aborted).toBe(true)
-    // Awaiting readiness after dispose must not throw synchronously nor hang; the store
-    // stays disposed regardless of how the in-flight async field settles.
-    await storeReady(store).catch(() => undefined)
-    expect(store.$disposed).toBe(true)
   })
 })
 
@@ -537,9 +536,9 @@ describe('$snapshot / $plain / $hydrate / $set', () => {
     store.$dispose()
   })
 
-  it('$plain does not require the store to be ready (works while async fields are pending)', () => {
+  it('$plain excludes async fields after asynchronous construction', async () => {
     const runtime = createRuntime()
-    const store = createLegacyStore({ count: 3, price: asyncCounterField(1) }, { runtime })
+    const store = await createAsyncStore({ count: 3, price: asyncCounterField(1) }, { runtime })
     expect(store.$plain()).toEqual({ count: 3 })
     store.$dispose()
   })

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { claimOwnership } from '@migaia/reactive/extension'
 import type { IDisposable } from '@migaia/reactive'
-import { createLegacyStore, storeReady, FIELD_BUILDER, type IFieldBuilder } from '../src'
+import { createStore, createAsyncStore, FIELD_BUILDER, type IFieldBuilder } from '../src'
 import { createStoreLightRangeError, StoreLightErrorCode, STORE_LIGHT_SOURCE } from '../src/errors'
 
 describe('store-light error-code contract (E-T9)', () => {
@@ -49,8 +49,9 @@ describe('store-light double-failure cause reachability (E-T13)', () => {
         throw new Error('init failed', { cause: 'root-cause' })
       }
     }
-    const store = createLegacyStore({ dirty, failing }, { runtime })
-    const error = await storeReady(store).catch((reason: unknown) => reason)
+    const error = await createAsyncStore({ dirty, failing }, { runtime }).catch(
+      (reason: unknown) => reason
+    )
 
     expect(error).toBeInstanceOf(Error)
     const cause = (error as Error).cause
@@ -92,8 +93,9 @@ describe('store-light frozen initialization rollback', () => {
         throw primary
       }
     }
-    const store = createLegacyStore({ dirty, failing }, { runtime })
-    const error = await storeReady(store).catch((reason: unknown) => reason)
+    const error = await createAsyncStore({ dirty, failing }, { runtime }).catch(
+      (reason: unknown) => reason
+    )
     expect(error).toBeInstanceOf(AggregateError)
     expect((error as AggregateError).errors).toContain(primary)
     expect((error as AggregateError).errors).toContain(cleanup)
@@ -121,7 +123,7 @@ describe('store-light foreign field adoption rollback', () => {
     }
     let thrown: unknown
     try {
-      createLegacyStore({ field: builder }, { runtime })
+      createStore({ field: builder }, { runtime })
     } catch (error) {
       thrown = error
     }
