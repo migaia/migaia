@@ -28,24 +28,13 @@ import { ClonePolicy } from './tolerant-clone.js'
 import { MiddlewareEventPhase, MiddlewareEventType } from './event-constants.js'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
-/** Reports middleware diagnostics without letting a hostile reporter escape the event boundary. */
+/** Routes middleware diagnostics to the Runtime reporter, which already contains reporter failures. */
 function reportMiddlewareFailure(
   runtime: IRuntime,
   error: unknown,
   phase: IRuntimeErrorContext['phase']
 ): void {
-  try {
-    runtime.reportError(error, { phase })
-    return
-  } catch (reporterError) {
-    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError
-    try {
-      if (host) host(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // A failing diagnostic sink must not create an unhandled rejection.
-    }
-  }
+  runtime.reportError(error, { phase })
 }
 
 export type IStoreMiddlewareCore<S> = {

@@ -21,20 +21,12 @@ import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 const STORE_TOKEN_VALUE = Symbol('store-token-value')
 
-/** Keeps lifecycle diagnostics from escaping timer and promise rejection boundaries. */
+/**
+ * Routes registry lifecycle failures to the Runtime reporter, which already contains reporter
+ * failures.
+ */
 function reportRegistryFailure(runtime: IRuntime, error: unknown): void {
-  try {
-    runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook })
-    return
-  } catch (reporterError) {
-    const hostReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError
-    try {
-      if (hostReportError) hostReportError(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // Host diagnostics are best effort and must not create a second unhandled failure.
-    }
-  }
+  runtime.reportError(error, { phase: ReactiveErrorPhase.lifecycleHook })
 }
 
 /**
