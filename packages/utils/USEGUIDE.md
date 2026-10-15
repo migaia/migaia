@@ -1294,3 +1294,14 @@ const text = converted.value;
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
+
+### 跨 realm Error 识别
+
+`isNativeErrorValue(value)` 从 `@migaia/utils/error`（或 root）导入。它识别 Error-family 的 prototype chain，帮助边界保留原 Error identity；不会调用输入的方法，无法检查的 proxy 返回 false。它只是诊断形状检查，不能用于认证不可信输入。
+
+```ts
+import { isNativeErrorValue } from '@migaia/utils/error'
+
+const failure: unknown = new TypeError('invalid input')
+if (isNativeErrorValue(failure)) console.log(failure.stack)
+```

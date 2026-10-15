@@ -4,43 +4,12 @@ import {
   type IEventSubscriberErrorCode
 } from './error-code.js'
 import { EventSubscriberErrorText } from './error-text.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
+import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
 type IEventError = Error & {
   readonly source?: string
   readonly code?: string
   readonly cause?: unknown
-}
-
-/**
- * Detects native Error-family objects across realms without invoking user-provided methods.
- * Prototype inspection is guarded because revoked proxies can throw from every structural read.
- */
-const isNativeErrorValue = (value: object): boolean => {
-  try {
-    if (value instanceof Error) return true
-    let prototype: object | null = Object.getPrototypeOf(value)
-    for (let depth = 0; prototype !== null && depth < 32; depth += 1) {
-      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value
-      const constructorPrototype =
-        typeof constructor === 'function'
-          ? Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value
-          : undefined
-      const name = Object.getOwnPropertyDescriptor(prototype, 'name')?.value
-      const toString = Object.getOwnPropertyDescriptor(prototype, 'toString')?.value
-      if (
-        constructorPrototype === prototype &&
-        name === 'Error' &&
-        typeof toString === 'function'
-      ) {
-        return true
-      }
-      prototype = Object.getPrototypeOf(prototype)
-    }
-    return false
-  } catch {
-    throw value
-  }
 }
 
 /** Creates the existing package wrapper when utils cannot attach identity in place. */
