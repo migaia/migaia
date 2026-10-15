@@ -14,6 +14,7 @@ import { CapabilityGraphErrorText } from '../../src/graph/error-text.js'
 import { CAPABILITY_GRAPH_SOURCE } from '../../src/graph/errors.js'
 import { buildCapabilityTopology, type ITopologyNode } from '../../src/graph/topology.js'
 import { createDynamicCapabilityGraph } from '../../src/graph/dynamic.js'
+import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.js'
 
 const id = (value: string): IGraphNodeId => value as IGraphNodeId
 
@@ -1134,7 +1135,7 @@ describe('capability graph core', () => {
     } catch (error) {
       assertCode(error, CapabilityGraphErrorCode.invalidOption)
     }
-    const dependentPolicy = createDynamicCapabilityGraph()
+    const dependentPolicy = createDynamicCapabilityGraph(createTestBatchOwner())
     await dependentPolicy.register({
       id: id('policy-provider'),
       kind: 'test',
@@ -1152,7 +1153,41 @@ describe('capability graph core', () => {
     } catch (error) {
       assertCode(error, CapabilityGraphErrorCode.nodeHasDependents)
     }
+    try {
+      await dependentPolicy.resume(id('policy-provider'))
+    } catch (error) {
+      assertCode(error, CapabilityGraphErrorCode.nodeNotSuspended)
+    }
     await dependentPolicy.dispose()
+    try {
+      createDynamicCapabilityGraph({} as never)
+    } catch (error) {
+      assertCode(error, CapabilityGraphErrorCode.invalidOption)
+    }
+    const stuck = deferred<ReturnType<typeof instance>>()
+    const admission = createDynamicCapabilityGraph({
+      ...createTestBatchOwner(),
+      mutationAdmissionMs: 5
+    })
+    const stuckRegister = admission.register({
+      id: id('stuck'),
+      kind: 'test',
+      dependencies: [],
+      start: () => stuck.promise
+    })
+    try {
+      await admission.register({
+        id: id('queued'),
+        kind: 'test',
+        dependencies: [],
+        start: () => instance(1)
+      })
+    } catch (error) {
+      assertCode(error, CapabilityGraphErrorCode.mutationAdmissionTimeout)
+    }
+    stuck.resolve(instance(1))
+    await stuckRegister
+    await admission.dispose()
     expect([...seenCodes].sort()).toEqual(Object.values(CapabilityGraphErrorCode).sort())
   })
 

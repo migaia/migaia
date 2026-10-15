@@ -80,6 +80,22 @@ const graphNode = (id: string, dependencies: readonly string[] = [], value: unkn
   start: () => ({ value, release: () => undefined })
 })
 
+/**
+ * Minimal batch owner for the bare dynamic-graph cases. The graph requires composition-owned start
+ * and release; these nodes read no providers and release synchronously.
+ */
+const graphBatch = {
+  startBatch: (entries: readonly { readonly definition: ReturnType<typeof graphNode> }[]) =>
+    entries.map((entry) => entry.definition.start()),
+  releaseBatch: async (
+    entries: readonly { readonly instance: { readonly release: () => void } }[],
+    fence: Promise<void>
+  ) => {
+    await fence
+    for (const entry of [...entries].reverse()) entry.instance.release()
+  }
+} as unknown as Parameters<typeof createDynamicCapabilityGraph>[0]
+
 type IRuntimeCase = Readonly<{ readonly id: string; readonly run: () => Promise<void> }>
 
 const runtimeCases: readonly IRuntimeCase[] = [
@@ -131,7 +147,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
   {
     id: 'TPD-T06',
     run: async () => {
-      const graph = createDynamicCapabilityGraph()
+      const graph = createDynamicCapabilityGraph(graphBatch)
       await graph.register(graphNode('provider'))
       await graph.register(graphNode('consumer', ['provider']))
       await graph.ready()
@@ -142,7 +158,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
   {
     id: 'TPD-T07',
     run: async () => {
-      const graph = createDynamicCapabilityGraph()
+      const graph = createDynamicCapabilityGraph(graphBatch)
       await expect(graph.register(graphNode('invalid', ['invalid']))).rejects.toBeDefined()
       expect(graph.nodes).toEqual([])
       await graph.dispose()
@@ -151,7 +167,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
   {
     id: 'TPD-T08',
     run: async () => {
-      const graph = createDynamicCapabilityGraph()
+      const graph = createDynamicCapabilityGraph(graphBatch)
       await graph.register(graphNode('one', [], 1))
       await graph.ready()
       const result = await graph.replace(graphNode('one', [], 2))
@@ -639,7 +655,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
   {
     id: 'TPD-T26',
     run: async () => {
-      const graph = createDynamicCapabilityGraph()
+      const graph = createDynamicCapabilityGraph(graphBatch)
       await graph.register(graphNode('one'))
       await graph.register(graphNode('unrelated'))
       const result = await graph.register(graphNode('two', ['one']))
@@ -652,7 +668,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
   {
     id: 'TPD-T27',
     run: async () => {
-      const graph = createDynamicCapabilityGraph()
+      const graph = createDynamicCapabilityGraph(graphBatch)
       await graph.register(graphNode('one'))
       await graph.register(graphNode('two', ['one']))
       expect(graph.nodes).toEqual(['one', 'two'])
@@ -732,7 +748,7 @@ const runtimeCases: readonly IRuntimeCase[] = [
   {
     id: 'TPD-T38',
     run: async () => {
-      const graph = createDynamicCapabilityGraph()
+      const graph = createDynamicCapabilityGraph(graphBatch)
       await graph.register(graphNode('first'))
       await graph.register(graphNode('second'))
       expect(graph.nodes).toEqual(['first', 'second'])

@@ -573,7 +573,7 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 ## Dynamic Graph generation leases
 
 `@migaia/capability/graph/dynamic` 为运行期 definition 增删提供唯一 Graph authority。composition owner
-通过 `startBatch(entries)` 收到 exact binding；消费者用 `acquireBinding(id)` 取得 generation lease，并在停止
+通过必填的 `startBatch(entries)` 收到 exact binding（`startBatch`/`releaseBatch` 缺一即 `GRAPH_INVALID_OPTION`）；消费者用 `acquireBinding(id)` 取得 generation lease，并在停止
 使用后调用幂等 `release()`。remove/replace/dispose 会先 seal 旧 generation，再把同一个 non-rejecting fence
 交给 `releaseBatch(entries, fence)`；物理 provider 清理不得越过该 fence。
 

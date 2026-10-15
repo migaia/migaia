@@ -71,7 +71,10 @@ export type IDynamicGraphDependency = Readonly<{
 export type IDynamicGraphNodeDefinition<T> = Omit<IGraphNodeDefinition<T>, 'dependencies'> &
   Readonly<{ readonly dependencies: readonly IDynamicGraphDependency[] }>
 
-/** Runtime-neutral dynamic graph options. */
+/**
+ * Runtime-neutral dynamic graph options. The composition owner supplies `startBatch` and
+ * `releaseBatch`; the graph owns ordering, reconciliation and binding custody only.
+ */
 export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{
   /**
    * Receives contained startup, release, and late failures without replacing the primary graph
@@ -80,12 +83,12 @@ export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{
   readonly report?: (error: unknown) => void
   /** Maximum time an accepted mutation may wait behind an older serialized mutation. */
   readonly mutationAdmissionMs?: number
-  /** Composition-owned startup for one topologically ordered affected frontier. */
-  readonly startBatch?: (
+  /** Composition-owned startup for one topologically ordered affected frontier. Required. */
+  readonly startBatch: (
     entries: readonly IGraphStartEntry<TBinding>[]
   ) => readonly IGraphNodeInstance<unknown>[] | PromiseLike<readonly IGraphNodeInstance<unknown>[]>
-  /** Composition-owned physical release for one sealed cascade. */
-  readonly releaseBatch?: (
+  /** Composition-owned physical release for one sealed cascade. Required. */
+  readonly releaseBatch: (
     entries: readonly IGraphReleaseEntry<TBinding>[],
     fence: Promise<void>
   ) => void | PromiseLike<void>
@@ -175,7 +178,7 @@ type IMutableTraversalMetrics = {
 
 /** Creates a serialized dynamic graph with fail-closed required-edge reconciliation. */
 export function createDynamicCapabilityGraph<TBinding = unknown>(
-  options: IDynamicCapabilityGraphOptions<TBinding> = {}
+  options: IDynamicCapabilityGraphOptions<TBinding>
 ): IDynamicCapabilityGraph<TBinding> {
   const definitions = new Map<string, IStoredNode<TBinding>>()
   let graphState: ICapabilityGraphState = CapabilityGraphState.open
@@ -252,6 +255,13 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     }
   })
 
+  // The graph has no node-level start/release of its own; both batch owners are mandatory.
+  if (
+    !options ||
+    typeof options.startBatch !== 'function' ||
+    typeof options.releaseBatch !== 'function'
+  )
+    throw fail(CapabilityGraphErrorCode.invalidOption)
   if (
     options.mutationAdmissionMs !== undefined &&
     (!Number.isFinite(options.mutationAdmissionMs) || options.mutationAdmissionMs < 0)
@@ -391,44 +401,22 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     const fence = Promise.all(
       leasedEntries.map((entry) => bindingLeases.whenZero(entry.leaseKey))
     ).then(() => undefined)
-    if (options.releaseBatch) {
-      const releasable = entries
-        .filter(
-          (entry): entry is IStoredNode<TBinding> & { instance: IGraphNodeInstance<unknown> } =>
-            entry.instance !== undefined
-        )
-        .map((entry) => ({
-          id: entry.definition.id,
-          binding: entry.binding,
-          instance: entry.instance
-        }))
-      if (releasable.length > 0) await options.releaseBatch(releasable, fence)
-      for (const entry of entries) {
-        entry.instance = undefined
-        entry.value = undefined
-        entry.state = CapabilityGraphNodeState.registered
-        entry.leaseKey = {}
-      }
-      await releaseBindings(entries, bindingIds, reason)
-      return
-    }
-    for (const entry of [...entries].reverse()) {
-      if (!entry.instance) continue
-      const instance = entry.instance
-      await bindingLeases.whenZero(entry.leaseKey)
+    const releasable = entries
+      .filter(
+        (entry): entry is IStoredNode<TBinding> & { instance: IGraphNodeInstance<unknown> } =>
+          entry.instance !== undefined
+      )
+      .map((entry) => ({
+        id: entry.definition.id,
+        binding: entry.binding,
+        instance: entry.instance
+      }))
+    if (releasable.length > 0) await options.releaseBatch(releasable, fence)
+    for (const entry of entries) {
       entry.instance = undefined
       entry.value = undefined
       entry.state = CapabilityGraphNodeState.registered
       entry.leaseKey = {}
-      try {
-        await instance.release({
-          signal: { aborted: false, reason: undefined } as never,
-          nodeId: entry.definition.id,
-          report
-        })
-      } catch (error) {
-        report(error)
-      }
     }
     await releaseBindings(entries, bindingIds, reason)
   }
@@ -467,115 +455,65 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
 
   /** Starts only blocked/registered/failed nodes in deterministic dependency order. */
   const start = async (entries: readonly IStoredNode<TBinding>[]): Promise<void> => {
-    if (options.startBatch) {
-      const startable: IStoredNode<TBinding>[] = []
-      const available = new Set(
-        [...definitions.values()]
-          .filter((entry) => entry.state === CapabilityGraphNodeState.ready)
-          .map((entry) => entry.definition.id)
+    const startable: IStoredNode<TBinding>[] = []
+    const available = new Set(
+      [...definitions.values()]
+        .filter((entry) => entry.state === CapabilityGraphNodeState.ready)
+        .map((entry) => entry.definition.id)
+    )
+    for (const entry of entries) {
+      if (entry.state === CapabilityGraphNodeState.ready) continue
+      const unavailable = entry.definition.dependencies.find(
+        (edge) => edge.required && !available.has(edge.provider)
       )
-      for (const entry of entries) {
-        if (entry.state === CapabilityGraphNodeState.ready) continue
-        const missing = entry.definition.dependencies.some(
-          (edge) => edge.required && !available.has(edge.provider)
-        )
-        if (missing) {
-          entry.state = CapabilityGraphNodeState.blocked
-          entry.blockedReason = 'missing'
-          continue
-        }
-        startable.push(entry)
-        available.add(entry.definition.id)
+      if (unavailable) {
+        entry.state = CapabilityGraphNodeState.blocked
+        entry.blockedReason = readBlockedReason(unavailable.provider)
+        continue
       }
-      if (startable.length === 0) return
-      let instances: readonly IGraphNodeInstance<unknown>[]
-      try {
-        instances = await options.startBatch(
-          startable.map((entry) => ({
-            id: entry.definition.id,
-            binding: entry.binding,
-            definition: entry.definition
-          }))
-        )
-        if (!Array.isArray(instances) || instances.length !== startable.length)
-          throw fail(CapabilityGraphErrorCode.invalidNode)
-      } catch (error) {
-        const failedEntry = startable[0]
-        for (const entry of entries) {
-          if (entry === failedEntry) {
-            entry.state = CapabilityGraphNodeState.failed
-            entry.error = error
-          } else if (entry.state !== CapabilityGraphNodeState.ready) {
-            entry.state = CapabilityGraphNodeState.blocked
-            entry.error = undefined
-            entry.blockedReason = failedEntry ? 'failed' : 'missing'
-          }
-        }
-        throw graphFailure(CapabilityGraphErrorCode.startFailed, error)
-      }
-      for (let index = 0; index < startable.length; index += 1) {
-        const entry = startable[index]
-        const instance = instances[index]
-        if (!instance || typeof instance !== 'object' || typeof instance.release !== 'function')
-          throw fail(CapabilityGraphErrorCode.invalidNode)
-        entry.instance = instance
-        entry.value = instance.value
-        entry.error = undefined
-        entry.blockedReason = undefined
-        entry.state = CapabilityGraphNodeState.ready
-        entry.generation = graphGeneration
-      }
-      return
+      startable.push(entry)
+      available.add(entry.definition.id)
     }
-    let failedEntry: IStoredNode<TBinding> | undefined
+    if (startable.length === 0) return
+    let instances: readonly IGraphNodeInstance<unknown>[]
     try {
-      for (const entry of entries) {
-        if (entry.state === CapabilityGraphNodeState.ready) continue
-        const unavailable = entry.definition.dependencies.find(
-          (edge) =>
-            edge.required &&
-            definitions.get(edge.provider)?.state !== CapabilityGraphNodeState.ready
-        )
-        if (unavailable) {
-          entry.state = CapabilityGraphNodeState.blocked
-          entry.blockedReason = readBlockedReason(unavailable.provider)
-          continue
-        }
-        const context = {
-          nodeId: entry.definition.id,
-          signal: { aborted: false, reason: undefined } as never,
-          get: <T>(provider: IGraphNodeId): T => {
-            const value = definitions.get(provider)?.value
-            if (value === undefined) throw fail(CapabilityGraphErrorCode.providerUnavailable)
-            return value as T
-          },
-          own: <T>(resource: T): T => resource
-        }
-        let instance: IStoredNode<TBinding>['instance']
-        failedEntry = entry
-        instance = await entry.definition.start(context)
-        if (!instance || typeof instance !== 'object' || typeof instance.release !== 'function')
-          throw fail(CapabilityGraphErrorCode.invalidNode)
-        entry.instance = instance
-        entry.value = instance.value
-        entry.error = undefined
-        entry.blockedReason = undefined
-        entry.state = CapabilityGraphNodeState.ready
-        entry.generation = graphGeneration
-        failedEntry = undefined
-      }
+      instances = await options.startBatch(
+        startable.map((entry) => ({
+          id: entry.definition.id,
+          binding: entry.binding,
+          definition: entry.definition
+        }))
+      )
+      if (!Array.isArray(instances) || instances.length !== startable.length)
+        throw fail(CapabilityGraphErrorCode.invalidNode)
     } catch (error) {
-      for (const entry of entries) {
-        if (entry === failedEntry) {
-          entry.state = CapabilityGraphNodeState.failed
-          entry.error = error
-        } else if (entry.state !== CapabilityGraphNodeState.ready) {
-          entry.state = CapabilityGraphNodeState.blocked
-          entry.error = undefined
-          entry.blockedReason = failedEntry ? 'failed' : 'missing'
-        }
+      // The batch owner reports one failure for the whole frontier. A single-node batch names the
+      // failed node exactly; in a larger batch the graph cannot tell which node caused it, so every
+      // node is blocked with reason `failed`. Either way each node keeps the original error.
+      /** True when the batch holds one node, so the failure is attributable to it. */
+      const attributable = startable.length === 1
+      for (const entry of startable) {
+        entry.state = attributable
+          ? CapabilityGraphNodeState.failed
+          : CapabilityGraphNodeState.blocked
+        entry.error = error
+        entry.blockedReason = attributable ? undefined : 'failed'
       }
-      throw graphFailure(CapabilityGraphErrorCode.startFailed, error)
+      throw graphFailure(CapabilityGraphErrorCode.startFailed, error, {
+        nodes: startable.map((entry) => entry.definition.id)
+      })
+    }
+    for (let index = 0; index < startable.length; index += 1) {
+      const entry = startable[index]
+      const instance = instances[index]
+      if (!instance || typeof instance !== 'object' || typeof instance.release !== 'function')
+        throw fail(CapabilityGraphErrorCode.invalidNode)
+      entry.instance = instance
+      entry.value = instance.value
+      entry.error = undefined
+      entry.blockedReason = undefined
+      entry.state = CapabilityGraphNodeState.ready
+      entry.generation = graphGeneration
     }
   }
 
@@ -676,7 +614,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         const target = definitions.get(id)
         if (!target) throw fail(CapabilityGraphErrorCode.unknownNode)
         if (target.state !== CapabilityGraphNodeState.suspended)
-          throw fail(CapabilityGraphErrorCode.invalidOption)
+          throw fail(CapabilityGraphErrorCode.nodeNotSuspended)
         const affected = readClosureEntries([id])
         target.state = CapabilityGraphNodeState.ready
         target.blockedReason = undefined

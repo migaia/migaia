@@ -31,7 +31,9 @@ export const CapabilityGraphErrorText = {
   /** Stable dependency-block message consumed by reject-policy mutations. */
   nodeHasDependents: 'capability graph node has required dependents',
   /** Stable admission-timeout message consumed by dynamic-graph mutation scheduling. */
-  mutationAdmissionTimeout: 'capability graph mutation admission timed out'
+  mutationAdmissionTimeout: 'capability graph mutation admission timed out',
+  /** Stable state-conflict message consumed by dynamic-graph `resume()`. */
+  nodeNotSuspended: 'capability graph node is not suspended'
 } as const
 
 export type ICapabilityGraphErrorText =
