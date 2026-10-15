@@ -363,7 +363,7 @@ export type IDisposeTransactionOptions = {
    * graceful-phase `boundedWait`.
    */
   readonly scheduler?: IScheduler
-  /** Forwarded into `context.signal` for every item; aborted automatically once `run()` starts. */
+  /** Mirrored into every item's context; run() does not abort the caller-owned input signal. */
   readonly signal?: IAbortSignal
   /** Owner-bound self-join capability, supplied only by a LifecycleScope owner. */
   readonly disposer?: IDisposerContext

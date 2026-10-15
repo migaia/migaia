@@ -6,9 +6,9 @@ import { LifecycleErrorPolicy, LifecycleState, LifecycleUnitState } from './stat
 /**
  * Synchronous, idempotent teardown/unregister function.
  *
- * Declared locally rather than imported from `@migaia/reactive` — this package is a zero-dependency
- * leaf (`docs/lifecycle/lifecycle-extraction.sdd.md` §1.1) and must not pull in any other workspace
- * package just to share a structural type.
+ * Declared locally rather than imported from `@migaia/reactive`: this runtime-neutral foundation
+ * depends on utils and must not depend outward on reactive merely to share a structural type
+ * (`docs/lifecycle/lifecycle-extraction.sdd.md` §1.1).
  */
 export type IDisposer = () => void
 
