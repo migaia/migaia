@@ -168,7 +168,7 @@ await createProcessPeer({
 })
 ```
 
-完整来源示例的 `report` 会收到 `@migaia/supervision` / `CAPABILITY_UNSUPPORTED`（`capability: 'termination'`）。这是预期提示：Node launcher 不能保证终止孙进程。短来源的默认 `console.error` 每进程只报告一次；短对象可用 `onNotice` 显式接收每次提示，其他错误始终正常报告。
+完整来源示例的 `report` 会收到 `@migaia/supervision` / `CAPABILITY_UNSUPPORTED`（`capability: 'termination'`）。这是预期提示：Node launcher 不能保证终止孙进程。短来源省略 `report` 时，每个 native process 至多报告一次终止能力提示。显式提供的所有 reporter（包括直接传 `defaultRpcReporter`）逐次接收，与包装同一函数的行为一致；短对象的 `onNotice` 可接管这些提示。其他错误始终正常报告，策略不再依赖函数身份。
 
 ## 三种来源
 
@@ -211,5 +211,3 @@ Process carrier 观察尚未实现：`createProcessTransport(...).transport.obse
 
 完整用法、选项说明、错误码表与高级用法见 [USEGUIDE](./USEGUIDE.md)。
 
-
-Explicit reporting policy: omitting `report` keeps the short-source default termination notice once per native process. Supplying any `report` function receives every notice, including `defaultRpcReporter` itself; wrapping the same function does not change this policy. `onNotice` receives each expected termination notice instead of the reporter when supplied. Other failures are always reported. No policy depends on function identity.
