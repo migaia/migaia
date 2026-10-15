@@ -3648,6 +3648,75 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['不要把来源信息当作权限。', 'undefined 不能证明该值没有 disposer。']
   }),
+  'reactive:extension:deferRuntimeCleanup': guide({
+    purposeEn:
+      'Schedules synchronous adapter cleanup on the exact Runtime idle channel. The configured scheduleIdle hook controls timing, the default uses microtasks, and thrown cleanup errors reach that Runtime reportError sink without exposing scheduler or graph services.',
+    purposeZh:
+      '把同步适配器清理交给准确 Runtime 的 idle 通道。scheduleIdle 决定执行时机，默认使用微任务；清理抛错由该 Runtime 的 reportError 接收，不暴露 scheduler 或图服务。',
+    quickStart:
+      "import { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\n\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({ scheduleIdle: (task) => { idle.push(task) } })\nlet released = false\ndeferRuntimeCleanup(runtime, () => { released = true })\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true",
+    quickStartEn:
+      "// Host-controlled cleanup runs only when its idle queue is drained.\nimport { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\n\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({ scheduleIdle: (task) => { idle.push(task) } })\nlet released = false\ndeferRuntimeCleanup(runtime, () => { released = true })\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true",
+    quickStartZh:
+      "// 宿主排空自己的 idle 队列时才执行清理。\nimport { createRuntime } from '@migaia/reactive'\nimport { deferRuntimeCleanup } from '@migaia/reactive/extension'\n\nconst idle: Array<() => void> = []\nconst runtime = createRuntime({ scheduleIdle: (task) => { idle.push(task) } })\nlet released = false\ndeferRuntimeCleanup(runtime, () => { released = true })\nconsole.log(released) // false\nidle.shift()?.()\nconsole.log(released) // true",
+    scenariosEn: [
+      'A Store adapter releases an abandoned speculative read.',
+      'A custom host supplies idle cleanup independently of reactive flush timing.'
+    ],
+    scenariosZh: [
+      'Store 适配器释放被放弃的投机读取。',
+      '自定义宿主需要让 idle 清理独立于响应式 flush 时机。'
+    ],
+    avoidEn: [
+      'Use lifecycle scopes to own asynchronous external resources.',
+      'Keep cleanup synchronous and release only resources owned by this adapter.'
+    ],
+    avoidZh: [
+      '异步外部资源的所有权应交给 lifecycle scope。',
+      '清理回调保持同步，只释放本适配器拥有的资源。'
+    ],
+    optionsEn: [
+      {
+        name: 'runtime',
+        description: 'Real Runtime whose idle hook and diagnostic sink own this cleanup.',
+        defaultValue: 'required',
+        optional: false,
+        type: 'IRuntime',
+        whenToUse: 'Pass the same owner used by the adapter nodes.',
+        example: 'deferRuntimeCleanup(runtime, cleanup)'
+      },
+      {
+        name: 'task',
+        description:
+          'Synchronous cleanup callback; thrown failures are reported through the Runtime.',
+        defaultValue: 'required',
+        optional: false,
+        type: '() => void',
+        whenToUse: 'Release an abandoned adapter value on the configured idle channel.',
+        example: '() => { cache.delete(key) }'
+      }
+    ],
+    optionsZh: [
+      {
+        name: 'runtime',
+        description: '提供 idle hook 与诊断出口的真实 Runtime。',
+        defaultValue: '必填',
+        optional: false,
+        type: 'IRuntime',
+        whenToUse: '传入适配器节点使用的同一个 owner。',
+        example: 'deferRuntimeCleanup(runtime, cleanup)'
+      },
+      {
+        name: 'task',
+        description: '同步清理回调；抛出的失败由所属 Runtime 报告。',
+        defaultValue: '必填',
+        optional: false,
+        type: '() => void',
+        whenToUse: '在已配置的 idle 通道释放被放弃的适配器值。',
+        example: '() => { cache.delete(key) }'
+      }
+    ]
+  }),
   'reactive:extension:getDefaultRuntime': guide({
     purposeEn:
       'Returns the one shared convenience Runtime on explicit first use. Adapter modules can import this pure extension function without constructing a graph; later calls and the root defaultRuntime binding reuse the exact same owner.',
