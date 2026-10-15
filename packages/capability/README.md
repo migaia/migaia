@@ -300,14 +300,6 @@ const result = await capabilities.enable('greeting')
 
 参数：`name: string`（必填）。无其他选项。并发调用共享同一次 `activate()`；开关为假时直接返回 `{ status: 'gated' }`，不会"偷偷打开"。返回值全部字段见下方 [`ICapabilityEnableResult`](#状态与枚举常量) 说明。
 
-**`enableResult`｜3 秒上手** —— `enable()` 的别名，语义完全一致：
-
-```ts
-await capabilities.enableResult('greeting')
-```
-
-参数与返回值同 `enable`，无其他选项。
-
 **`disable`｜5 秒上手** —— 关闭并等待 `dispose()`（含异步）真正完成：
 
 ```ts
@@ -323,22 +315,6 @@ await capabilities.dispose() // 之后 host 永久不可用
 ```
 
 无参数，无选项。首次调用返回唯一的 completion Promise；该 Promise 完成前的后续调用立即以 `HOST_TRANSITIONING` 拒绝，完成后才恢复为返回同一个 canonical Promise。
-
-**`enableLegacyBoolean`｜5 秒上手** —— 同步/布尔风格兼容适配器：
-
-```ts
-const ok: boolean = await capabilities.enableLegacyBoolean('greeting')
-```
-
-参数：`name: string`（必填），无其他选项。语义与 `enable()` 共享同一次激活，只是把结果压缩成布尔值。
-
-**`disableNow`｜5 秒上手** —— 同步触发关闭，不等待异步清理完成：
-
-```ts
-const changed: boolean = capabilities.disableNow('greeting')
-```
-
-参数：`name: string`（必填），无其他选项。确定要等清理完成用 `disable()`。
 
 **`disposed`｜3 秒上手** —— 只读属性，host 是否已整体关闭：
 
@@ -376,7 +352,7 @@ if (capabilities.state('greeting') === CapabilityState.on) {
 
 `ICapabilityState` 是这五个字符串字面量的联合类型。
 
-**`CapabilityEnableStatus`｜5 秒上手** —— `enable()`/`enableResult()` 返回结果的 `status` 取值：
+**`CapabilityEnableStatus`｜5 秒上手** —— `enable()` 返回结果的 `status` 取值：
 
 ```ts
 if (result.status === CapabilityEnableStatus.failed) console.error(result.error)
@@ -420,7 +396,7 @@ if (error.code === CapabilityErrorCode.hostDisposed) {
 - `invalidName`（`INVALID_NAME`）—— `register()` 传入的 `name` 不是非空字符串（`TypeError`）
 - `invalidActivate`（`INVALID_ACTIVATE`）—— `register()` 传入的 `activate` 不是函数（`TypeError`）
 - `invalidHandle`（`INVALID_HANDLE`）—— `activate()` 的返回值缺少可调用的 `dispose`（`TypeError`）
-- `gated`（`GATED`）—— 保留给未来诊断/事件通道；当前 `enable()`/`enableResult()` 用结构化返回 `{ status: 'gated' }` 表达拒绝，从不抛出这个码
+- `gated`（`GATED`）—— 保留给未来诊断/事件通道；当前 `enable()` 用结构化返回 `{ status: 'gated' }` 表达拒绝，从不抛出这个码
 - `invalidOption`（`INVALID_OPTION`）—— `options`/`flags`/`definition` 快照失败（例如恶意 Proxy 的 getter 抛错），或 `options` 本身不是对象/函数
 
 `ICapabilityErrorCode` 是这些取值的联合类型。
@@ -533,7 +509,7 @@ host.register({
 const [a, b, c] = await Promise.all([
   host.enable('search'),
   host.enable('search'),
-  host.enableLegacyBoolean('search')
+  host.enable('search')
 ])
 activateCalls // 1 —— 三个并发调用共享同一次 activate()
 ```
@@ -582,3 +558,5 @@ mutation metrics 同时报告 affected-frontier 的 `visitedNodes`、`visitedEdg
 按 `(level, ordinal)` 的规范顺序执行；无依赖关系但层级不同的节点不再沿用旧的最小 ordinal 堆顺序。
 
 Graph ownership admission: ctx.own(resource, descriptor) requires a callable force immediately. Invalid descriptors throw GRAPH_INVALID_OPTION with the original lifecycle TypeError reachable through cause; they do not wait until disposal or report a closed graph. Dynamic graph report callbacks are final observers: synchronous throws and returned Promise rejections are contained without changing the mutation result.
+
+CapabilityHost 使用 `enable(name)` 返回结构化激活结果，使用 `disable(name)` 等待资源释放。`enableResult`、`enableLegacyBoolean`、`disableNow` 已移除；需要布尔值时比较 `(await host.enable(name)).status === CapabilityEnableStatus.enabled`。保留并等待 `disable()` 返回的 Promise，以确认物理清理已完成。

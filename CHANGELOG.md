@@ -4,6 +4,10 @@
 
 ### Breaking changes
 
+- CapabilityHost removes `enableResult`, `enableLegacyBoolean` and `disableNow`.
+  Use `enable()` for the structured result and derive a boolean from its status
+  when needed. `disable()` starts revocation synchronously and returns a Promise
+  that settles after physical cleanup; retain and await that Promise.
 - Lifecycle keeps unused `createLifecycleUnit` and its option/result types internal.
   Use a generation controller with domain-owned loading state. String-key tracking
   uses the existing `createStringLeaseRegistry`; its old

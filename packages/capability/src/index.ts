@@ -118,8 +118,6 @@ export type ICapabilityHost<Context> = {
    * 'gated' }` without activating the capability.
    */
   enable(name: string): Promise<ICapabilityEnableResult>
-  /** Structured counterpart of enable(); false is retained for compatibility. */
-  enableResult(name: string): Promise<ICapabilityEnableResult>
   /**
    * Disables the capability and releases its handle. Returns whether an enabled capability was
    * disabled.
@@ -131,10 +129,6 @@ export type ICapabilityHost<Context> = {
    * Promise settles. After completion, repeated calls return the original Promise by identity.
    */
   dispose(): Promise<void>
-  /** Synchronous compatibility adapter for integrations that require a boolean. */
-  enableLegacyBoolean(name: string): Promise<boolean>
-  /** Synchronous release adapter; prefer awaitable `disable()`. */
-  disableNow(name: string): boolean
   readonly disposed: boolean
 }
 
@@ -531,21 +525,6 @@ export function createCapabilityHost<Context>(
     return pending
   }
 
-  /**
-   * Compatibility boolean view of `enableStructured()`; only `enabled` maps to `true`. It rejects
-   * only for an immediate API failure, which stays marked handled as in `rejectedOperation()`.
-   */
-  const enableBoolean = (name: string): Promise<boolean> => {
-    /** Derived boolean promise handed to the legacy caller. */
-    const enabled = enableStructured(name).then(
-      (result) => result.status === CapabilityEnableStatus.enabled
-    )
-    void enabled.catch(() => {
-      // Callers still observe the rejection; this only suppresses host-level unhandled noise.
-    })
-    return enabled
-  }
-
   const disableSync = (name: string): boolean => {
     assertUsable()
     assertNotTransitioning()
@@ -739,17 +718,7 @@ export function createCapabilityHost<Context>(
       })
     },
 
-    enableLegacyBoolean(name) {
-      return enableBoolean(name)
-    },
-
     enable: enableStructured,
-
-    enableResult: enableStructured,
-
-    disableNow(name) {
-      return disableSync(name)
-    },
 
     async disable(name) {
       // disposed 优先级高于 NOT_REGISTERED（AF-20）：先断言 host 可用，再做 name lookup。

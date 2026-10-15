@@ -21864,9 +21864,9 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '未列出的旧键变为 gated，不会继承上一份 true'
                   ],
                   [
-                    'disableNow(name)',
-                    '同步启动释放，不等待 disposer',
-                    '只用于确实不能 await 的退出边界；正常流程使用 await disable()'
+                    'disable(name)',
+                    '同步启动撤销，异步等待 disposer',
+                    '保留并等待返回的 Promise，确认物理清理已经完成'
                   ]
                 ]
               },
@@ -21882,7 +21882,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '优先 await disable() 或 dispose()。disableNow() 只触发同步关闭而不等待异步 disposer；只在调用边界明确不能 await 时使用。Host dispose 后永久终止，下一请求或租户必须创建新实例。'
+                text: '通过 await disable() 或 dispose() 确认异步 disposer 已完成。disable() 会先同步作废当前 generation，再等待物理清理。Host dispose 后永久终止，下一请求或租户必须创建新实例。'
               }
             ]
           }
@@ -21953,9 +21953,9 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'An old key omitted from next becomes gated instead of retaining true'
                   ],
                   [
-                    'disableNow(name)',
-                    'Starts release synchronously without awaiting the disposer',
-                    'Reserve it for an exit boundary that cannot await; normal flow uses await disable()'
+                    'disable(name)',
+                    'Starts revocation synchronously and awaits the disposer',
+                    'Retain and await the returned Promise to confirm physical cleanup'
                   ]
                 ]
               },
@@ -21971,7 +21971,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Prefer await disable() or dispose(). disableNow() starts shutdown without awaiting an asynchronous disposer and belongs only at a boundary that truly cannot await. A disposed Host is terminal; create another for a new request or tenant.'
+                text: 'Await disable() or dispose() to confirm asynchronous disposal. disable() first revokes the current generation synchronously, then waits for physical cleanup. A disposed Host is terminal; create another for a new request or tenant.'
               }
             ]
           }
