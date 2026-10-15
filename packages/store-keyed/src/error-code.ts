@@ -17,27 +17,12 @@ export const StoreKeyedErrorCode = {
   atomStoreDisposed: 'ATOM_STORE_DISPOSED',
 
   /**
-   * Family entries are read or written after disposal.
-   *
-   * Call `createFamily()` to create a new family instead of reusing the disposed instance.
-   */
-  familyDisposed: 'FAMILY_DISPOSED',
-
-  /**
-   * Multiple entries fail to clean up while an atom store or family is disposed. An
-   * `AggregateError` exposes each failure through `errors[]`.
+   * Multiple entries fail to clean up while an atom store is disposed. An `AggregateError` exposes
+   * each failure through `errors[]`.
    *
    * Treat this as a disposal failure and inspect each cause.
    */
   disposalFailed: 'DISPOSAL_FAILED',
-
-  /**
-   * Multiple entries fail to evict when a family enforces its capacity. An `AggregateError` exposes
-   * each failure through `errors[]`.
-   *
-   * Treat this as an eviction failure.
-   */
-  evictionFailed: 'EVICTION_FAILED',
 
   /**
    * An atom preview cycle is detected within one render or preview stack.
@@ -83,8 +68,8 @@ export const StoreKeyedErrorCode = {
   envUnsupported: 'ENV_UNSUPPORTED',
 
   /**
-   * Input validation fails for `maxSize`, `ttl`, a non-atom definition, an empty or inaccessible
-   * focus path, duplicate keys, a missing target key, or a thenable initial value.
+   * Input validation fails for `maxSize`, a non-atom definition, an empty or inaccessible focus
+   * path, duplicate keys, a missing target key, or a thenable initial value.
    *
    * Correct the input named in the error message.
    */

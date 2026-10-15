@@ -2,17 +2,8 @@
 export const StoreKeyedErrorText = {
   weakRef:
     '[store] family definitions require WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox',
-  createFamilyWeakRef:
-    '[store] createFamily() requires WeakRef and FinalizationRegistry; enable these capabilities in the host sandbox',
   familyCapacity: '[store] family maxSize must be a positive integer',
   familyLabel: '[store] family debugLabel must be a string',
-  familyTtl: '[store] family ttl must be non-negative',
-  familyNow: '[store] family now must be a function',
-  familyComputedOptions: '[store] computed family options could not be read',
-  familyCallback: (name: string): string => `[store] family ${name} must be a function`,
-  disposedFamily: '[store] cannot use a disposed family',
-  evictionFailed: '[store] family capacity eviction failed for multiple entries',
-  familyDisposalFailed: '[store] family disposal failed for multiple entries',
   crossRuntime: '[store] cross-runtime atom access is not allowed',
   focusPath: '[store] focusDef requires at least one path segment',
   primitiveClone: '[store] primitive initial values require structuredClone support',
