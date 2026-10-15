@@ -170,6 +170,8 @@ store.$hydrate({ count: 42, unknownKey: 'x' });
 - `unknown?: 'ignore' | 'report' | 'strict'` —— 默认 `'ignore'`；`'strict'` 遇到未知 key 抛错；`'report'` 对每个未知 key 调用一次 `onUnknown`
 - `onUnknown?: (key: string) => void` —— 配合 `unknown: 'report'` 使用
 
+每次水合只读取一次这两个选项；未知字段复用同一个回调及原 options receiver。选项 getter 失败会以 `INVALID_OPTION` 保留原始 cause，并在写入任何字段前拒绝。
+
 **`store.$own(resource)`｜5 秒上手** —— 把外部资源纳入本 Store 的所有权作用域，`$dispose()` 时一并释放：
 
 ```ts
