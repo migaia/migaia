@@ -2762,7 +2762,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "scope.own(handle, {\n  syncSafe: false,\n  order: 10, // 大的先释放；只在 order 模式事务里生效\n  graceful: (ctx) => flush(), // 优雅释放；异步超时只放弃等待，仍会跑 force；同步返回即算成功\n  gracefulTimeoutMs: 200,\n  force: (ctx) => handle.close(), // 必填，必须无条件完成\n  gcFallback: true // 显式释放时自动 unregister 的 FinalizationRegistry 兜底\n})"
+                  "code": "scope.own(handle, {\n  syncSafe: false,\n  order: 10, // 大的先释放；只在 order 模式事务里生效\n  graceful: (ctx) => flush(), // 优雅释放；异步超时只放弃等待，仍会跑 force；同步返回即算成功\n  gracefulTimeoutMs: 200,\n  force: (ctx) => handle.close(), // 必填，必须无条件完成\n  gcFallback: true // 遗忘整个异步 scope 后的尽力 GC 兜底；显式释放会 unregister\n})"
                 },
                 {
                   "type": "paragraph",
@@ -3476,7 +3476,7 @@
                     "`graceful?` —— 优雅释放；超时只放弃等待（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。同步返回的 `graceful` 视为已完成释放：即使超过预算也不再跑 `force`，只通过 `context.report` 上报一条 `DEADLINE_EXCEEDED` 诊断。",
                     "`gracefulTimeoutMs?: number` —— 优雅阶段自己的预算，会被事务共享的绝对 `deadlineAt` 进一步封顶（取两者较小值）。",
                     "`force: (context) => void | PromiseLike<void>`（必填）—— 必须无条件完成，不得依赖任何前置条件。",
-                    "`gcFallback?: boolean` —— 置为 `true` 时向内部 `FinalizationRegistry` 注册一个不强引用 `resource`/闭包 target 的兜底；显式释放（`dispose()`/`release()`）会自动 unregister 它。",
+                    "`gcFallback?: boolean` —— 异步 scope 可注册尽力而为的 `FinalizationRegistry` 兜底，显式释放（`dispose()`/`release()`）会 unregister。存活的 scope 强引用其资源，因此不会单独回收某个仍被 scope 拥有的资源；它只能作为遗忘整个 owner 后的兜底，不能替代显式 dispose。同步 scope 接受此共享 descriptor 字段，但不注册 finalizer。",
                     "`custom?` —— 逃生舱：一旦提供，完全接管释放，`graceful`/`force` 被忽略。"
                   ]
                 },
