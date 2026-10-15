@@ -1,3 +1,4 @@
+import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   ReactiveErrorPhase,
@@ -14,13 +15,10 @@ import {
 import { internalsOf, registerDeps, registerDepVersions } from '@migaia/reactive/internals'
 import { attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
 import {
-  assimilateCapturedThen,
   createGenerationController,
   createTerminalController,
-  probeThenable,
   snapshotScheduler,
   LifecycleState,
-  ThenableProbeKind,
   type IGenerationToken
 } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
