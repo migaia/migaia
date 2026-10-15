@@ -255,3 +255,46 @@ fn conversions_reject_trailing_documents() {
     assert_eq!(msgpack_result.id(), 0);
     assert!(msgpack_result.error().contains("msgpack to json"));
 }
+
+/// Layout rejects this rounded size before allocation on wasm32; the arena remains usable.
+#[wasm_bindgen_test]
+fn oversized_layout_returns_null_without_poisoning() {
+    assert_eq!(alloc_bytes(u32::MAX), 0);
+    let id = alloc_bytes(8);
+    assert_ne!(id, 0);
+    assert_eq!(byte_len_of(id), 8);
+    assert!(dealloc_bytes(id));
+}
+
+/// Both conversion directions restore the original input on success and parse failure.
+#[wasm_bindgen_test]
+fn conversion_retains_input_allocation_and_bytes() {
+    let json = format!(r#"{{"data":"{}"}}"#, "x".repeat(4096));
+    let id = put(json.as_bytes());
+    let pointer = ptr_of(id);
+    let packed = json_to_msgpack(id, json.len() as u32);
+    assert_ne!(packed.id(), 0, "{}", packed.error());
+    assert_ne!(packed.id(), id);
+    assert_eq!(ptr_of(id), pointer);
+    assert_eq!(take(id, json.len() as u32), json.as_bytes());
+    let packed_bytes = take(packed.id(), packed.len());
+    let restored = msgpack_to_json(packed.id(), packed.len());
+    assert_ne!(restored.id(), 0, "{}", restored.error());
+    assert_eq!(take(packed.id(), packed.len()), packed_bytes);
+    for allocation in [id, packed.id(), restored.id()] {
+        assert!(dealloc_bytes(allocation));
+    }
+    for (bytes, json_direction) in [(b"{broken".as_slice(), true), ([0xc1].as_slice(), false)] {
+        let id = put(bytes);
+        let pointer = ptr_of(id);
+        let result = if json_direction {
+            json_to_msgpack(id, bytes.len() as u32)
+        } else {
+            msgpack_to_json(id, bytes.len() as u32)
+        };
+        assert_eq!(result.id(), 0);
+        assert_eq!(ptr_of(id), pointer);
+        assert_eq!(take(id, bytes.len() as u32), bytes);
+        assert!(dealloc_bytes(id));
+    }
+}
