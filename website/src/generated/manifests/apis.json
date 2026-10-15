@@ -149356,7 +149356,7 @@
           "name": "createAsyncStore",
           "kind": "function",
           "signature": "export declare function createAsyncStore<S extends Record<string, unknown>>(\n  shape: IStoreDefinition<S>,\n  options?: ICreateStoreOptions,\n): Promise<IReactiveStore<S>>;",
-          "declarationLine": 94,
+          "declarationLine": 92,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "Explicit asynchronous creation for definitions containing async FieldBuilders. The returned store has completed initialization; callers do not need to expose a half-ready object or gate every field access with an explicit async creation boundary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createAsyncStore.",
@@ -149537,7 +149537,7 @@
                     ],
                     [
                       "`[store] store has no asynchronous initialization`",
-                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore`/`createLegacyStore` 创建的对象）调用 `storeReady()`"
+                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
                     ],
                     [
                       "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
@@ -149572,239 +149572,15 @@
               ]
             }
           ],
-          "usageScore": 78,
+          "usageScore": 76,
           "configuration": [],
           "fragment": "store-light-index--createAsyncStore"
-        },
-        {
-          "name": "createLegacyStore",
-          "kind": "function",
-          "signature": "export declare function createLegacyStore<S extends Record<string, unknown>>(\n  shape: IStoreDefinition<S>,\n  options?: ICreateStoreOptions,\n): IReactiveStore<S>;",
-          "declarationLine": 88,
-          "source": "packages/store-light/dist/reactive-store.d.ts",
-          "purpose": "Compatibility facade for the historical Store definition API.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLegacyStore.",
-          "advanced": "No additional advanced behavior is declared for createLegacyStore.",
-          "parameters": ["shape: IStoreDefinition<S>", "options: ICreateStoreOptions (optional)"],
-          "parameterDetails": [
-            {
-              "name": "shape",
-              "type": "IStoreDefinition<S>",
-              "optional": false
-            },
-            {
-              "name": "options",
-              "type": "ICreateStoreOptions",
-              "optional": true
-            }
-          ],
-          "returns": "IReactiveStore<S>",
-          "errors": ["No documented errors are declared for createLegacyStore."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createLegacyStore.",
-          "examples": [
-            "const store = createLegacyStore(shapeWithAsyncField);\nawait storeReady(store); // 或检查 store.$async"
-          ],
-          "members": [],
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function createLegacyStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S>, options?: ICreateStoreOptions): IReactiveStore<S>;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "shape",
-                "type": "IStoreDefinition<S>",
-                "optional": false
-              },
-              {
-                "name": "options",
-                "type": "ICreateStoreOptions",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": ["IReactiveStore<S>"],
-          "whenToUse": "Use createLegacyStore when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createLegacyStore does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Compatibility facade for the historical Store definition API."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import createLegacyStore from @migaia/store-light, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use createLegacyStore when its function contract and declared inputs match the result you need. Choose a different public symbol when createLegacyStore does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLegacyStore."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createLegacyStore."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/reactive-store.d.ts:createLegacyStore:export declare function createLegacyStore<S extends Record<string, unknown>>(shape: IStoreDefinition<S>, options?: ICreateStoreOptions): IReactiveStore<S>;",
-          "guidance": [
-            {
-              "id": "10-错误信息全表",
-              "heading": "10. 错误信息全表",
-              "blocks": [
-                {
-                  "type": "paragraph",
-                  "text": "每个离开本包边界的错误都保留原生类型，并带 `source: '@migaia/store-light'` 与稳定 `code`。例如已释放 Store 为 `STORE_DISPOSED`，未就绪异步字段为 `STORE_NOT_READY`；初始化与 cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。"
-                },
-                {
-                  "type": "table",
-                  "headers": ["`StoreLightErrorCode`", "码值", "触发条件 / 处理"],
-                  "rows": [
-                    [
-                      "`storeDisposed`",
-                      "`STORE_DISPOSED`",
-                      "Store 终结后继续访问；创建新 Store，不复活旧实例"
-                    ],
-                    [
-                      "`resourceDisposed`",
-                      "`RESOURCE_DISPOSED`",
-                      "Resource closing/disposed 后读取或保留；停止使用并创建新资源"
-                    ],
-                    [
-                      "`captureInvalid`",
-                      "`CAPTURE_INVALID`",
-                      "capture token 无效或已消费；重新捕获，token 只能提交一次"
-                    ],
-                    [
-                      "`unknownVersion`",
-                      "`UNKNOWN_VERSION`",
-                      "保留/捕获不可见版本；从当前 snapshot 重新取得版本"
-                    ],
-                    [
-                      "`identityRequired`",
-                      "`IDENTITY_REQUIRED`",
-                      "带 dispose 的 factory 返回原始值；返回可追踪身份的对象或函数"
-                    ],
-                    [
-                      "`noAsyncInit`",
-                      "`NO_ASYNC_INIT`",
-                      "对同步 Store 调 `storeReady()`；改用 `createAsyncStore()` 或移除等待"
-                    ],
-                    [
-                      "`storeNotReady`",
-                      "`STORE_NOT_READY`",
-                      "异步字段 pending/failed 时访问；先等待 `storeReady()`"
-                    ],
-                    [
-                      "`initAndCleanupFailed`",
-                      "`INIT_AND_CLEANUP_FAILED`",
-                      "初始化与回滚同时失败；展开 `AggregateError.errors`"
-                    ],
-                    [
-                      "`syncFieldRequired`",
-                      "`SYNC_FIELD_REQUIRED`",
-                      "`createStore()` 收到异步 FieldBuilder；改用 `createAsyncStore()`"
-                    ],
-                    [
-                      "`actionBatchBoundary`",
-                      "`ACTION_BATCH_BOUNDARY`",
-                      "异步 action 首次 await 后继续写的诊断；把后续写显式放入 `$batch()`"
-                    ],
-                    [
-                      "`envUnsupported`",
-                      "`ENV_UNSUPPORTED`",
-                      "缺少 `WeakRef`/`FinalizationRegistry`；修复部署环境"
-                    ],
-                    [
-                      "`invalidOption`",
-                      "`INVALID_OPTION`",
-                      "keepAlive、写目标或 hydrate 选项非法；按 message 修正输入"
-                    ]
-                  ]
-                },
-                {
-                  "type": "table",
-                  "headers": ["错误信息", "触发条件"],
-                  "rows": [
-                    [
-                      "`[store] store is disposed`",
-                      "`$dispose()` 之后读写任意字段/调用任意 `$`-方法（`$own` 除外，它先校验其他条件）"
-                    ],
-                    [
-                      "`[store] store is ${status}; use createAsyncStore() before accessing async fields`",
-                      "读取尚未就绪（`pending`）或已失败（`failed`）的异步字段"
-                    ],
-                    [
-                      "`[store] createStore() only accepts synchronous fields; \"${key}\" is a FieldBuilder. Use createAsyncStore().`",
-                      "`createStore()`（非 `createAsyncStore`）的 shape 里含非 `mode: 'sync'` 的 `FieldBuilder`"
-                    ],
-                    [
-                      "`[store] field is not settable: ${key}`",
-                      "`$set()` 传入的 key 不对应任何 signal（computed/wasm/方法字段，或压根不存在的 key）"
-                    ],
-                    [
-                      "`[store] unknown hydration field: ${key}`",
-                      "`$hydrate(partial, { unknown: 'strict' })` 遇到未知 key"
-                    ],
-                    [
-                      "`[store] store has no asynchronous initialization`",
-                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore`/`createLegacyStore` 创建的对象）调用 `storeReady()`"
-                    ],
-                    [
-                      "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
-                      "`$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）"
-                    ],
-                    [
-                      "`[store] resource is disposed`",
-                      "对已 `disposed`/`closing` 的 `StoreResource` 调用 `preload`/`retry`/`retain*`/`captureVersion`/`commitCapture` 等操作"
-                    ],
-                    [
-                      "`[store] unknown resource version`",
-                      "`retainVersion(version)`/`captureVersion(id)`/`commitCapture(capture)` 传入的版本号既不是当前版本，也不在 retired/stale/closing 列表里"
-                    ],
-                    [
-                      "`[store] resource factory returned a disposed value`",
-                      "`factory` 返回了一个已经被标记为 disposed 的值（复用了已释放的引用）"
-                    ],
-                    [
-                      "`[store] disposable resource values must use reference identity`（`TypeError`）",
-                      "配置了 `dispose` 但 `factory` 产出的是原始类型（非对象/函数），无法用引用去重和追踪生命周期"
-                    ],
-                    [
-                      "`[store] invalid or consumed resource capture`",
-                      "`commitCapture()`/`captures.inspect()` 收到的 capture 已提交过、已失效，或不是本资源签发的"
-                    ],
-                    [
-                      "`[store] keepAliveMs must be a finite non-negative number`（`RangeError`）",
-                      "`StoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
-                    ]
-                  ]
-                }
-              ]
-            }
-          ],
-          "usageScore": 42,
-          "configuration": [],
-          "fragment": "store-light-index--createLegacyStore"
         },
         {
           "name": "createStore",
           "kind": "function",
           "signature": "export declare function createStore<S extends Record<string, unknown>>(\n  shape: IStoreDefinition<S> & {\n    [K in keyof S]: S[K] extends\n      | IAsyncFieldBuilder<IDisposable>\n      | ILegacyFieldBuilder<IDisposable>\n      ? never\n      : S[K];\n  },\n  options?: ICreateStoreOptions,\n): IReactiveStore<S>;",
-          "declarationLine": 102,
+          "declarationLine": 99,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "Main synchronous creation contract. It rejects FieldBuilders before their create() method can start I/O; use createAsyncStore for async definitions.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStore.",
@@ -150083,7 +149859,7 @@
                     ],
                     [
                       "`[store] store has no asynchronous initialization`",
-                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore`/`createLegacyStore` 创建的对象）调用 `storeReady()`"
+                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
                     ],
                     [
                       "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
@@ -150129,7 +149905,7 @@
               ]
             }
           ],
-          "usageScore": 168,
+          "usageScore": 158,
           "configuration": [],
           "fragment": "store-light-index--createStore"
         },
@@ -150854,71 +150630,6 @@
           "fragment": "store-light-index--createStoreResourceScope"
         },
         {
-          "name": "createStoreSync",
-          "kind": "const",
-          "signature": "export declare const createStoreSync: typeof createStore;",
-          "declarationLine": 106,
-          "source": "packages/store-light/dist/reactive-store.d.ts",
-          "purpose": "Explicit naming alias for `createStore()`; no separate lifecycle semantics.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreSync.",
-          "advanced": "No additional advanced behavior is declared for createStoreSync.",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for createStoreSync."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreSync.",
-          "examples": [
-            "import {\n  createStore,\n  createStoreSync,\n  createAsyncStore,\n  createLegacyStore,\n  storeReady,\n  raw,\n  isRaw,\n  isFieldBuilder,\n  FIELD_BUILDER,\n  createStoreResource,\n  createStoreResourceScope\n} from '@migaia/store-light';",
-            "import {\n  createStore,\n  createStoreSync,\n  createAsyncStore,\n  createLegacyStore,\n  storeReady\n} from '@migaia/store-light';",
-            "const store = createStoreSync({ count: 0 });"
-          ],
-          "members": [],
-          "exportPath": ".",
-          "overloadSignatures": ["export declare const createStoreSync: typeof createStore;"],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use createStoreSync when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStoreSync does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Explicit naming alias for `createStore()`; no separate lifecycle semantics."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import createStoreSync from @migaia/store-light, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use createStoreSync when its const contract and declared inputs match the result you need. Choose a different public symbol when createStoreSync does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreSync."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStoreSync."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/reactive-store.d.ts:createStoreSync:export declare const createStoreSync: typeof createStore;",
-          "guidance": [],
-          "usageScore": 26,
-          "configuration": [],
-          "fragment": "store-light-index--createStoreSync"
-        },
-        {
           "name": "FIELD_BUILDER",
           "kind": "const",
           "signature": "export declare const FIELD_BUILDER: unique symbol;",
@@ -150933,7 +150644,7 @@
           "errors": ["No documented errors are declared for FIELD_BUILDER."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for FIELD_BUILDER.",
           "examples": [
-            "import {\n  createStore,\n  createStoreSync,\n  createAsyncStore,\n  createLegacyStore,\n  storeReady,\n  raw,\n  isRaw,\n  isFieldBuilder,\n  FIELD_BUILDER,\n  createStoreResource,\n  createStoreResourceScope\n} from '@migaia/store-light';",
+            "import {\n  createStore,\n  createAsyncStore,\n  storeReady,\n  raw,\n  isRaw,\n  isFieldBuilder,\n  FIELD_BUILDER,\n  createStoreResource,\n  createStoreResourceScope\n} from '@migaia/store-light';",
             "export type IFieldContext = {\n  runtime: IRuntime;\n  signal: AbortSignal; // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource;\n};\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'sync';\n  create(context: IFieldContext): F;\n};\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'async';\n  create(context: IFieldContext): Promise<F>;\n};",
             "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      let disposed = false;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          if (disposed) return;\n          disposed = true;\n          source.dispose();\n        }\n      };\n    }\n  };\n}",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';",
@@ -151156,7 +150867,7 @@
               ]
             }
           ],
-          "usageScore": 34,
+          "usageScore": 30,
           "configuration": [],
           "fragment": "store-light-index--ICreateStoreOptions"
         },
@@ -151433,7 +151144,7 @@
           "signature": "export type ILegacyFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  create(context: IFieldContext): Promise<F>;\n};",
           "declarationLine": 49,
           "source": "packages/store-light/dist/store-protocol.d.ts",
-          "purpose": "Pre-discriminant builder accepted only by legacy creation paths.",
+          "purpose": "Pre-discriminant builder accepted by createAsyncStore, never createStore.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILegacyFieldBuilder.",
           "advanced": "No additional advanced behavior is declared for ILegacyFieldBuilder.",
           "parameters": ["This type declaration has no parameters."],
@@ -151455,7 +151166,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Pre-discriminant builder accepted only by legacy creation paths."
+              "content": "Pre-discriminant builder accepted by createAsyncStore, never createStore."
             },
             {
               "id": "getting-started",
@@ -151790,7 +151501,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/reactive-store.d.ts:IReactiveStore:export type IReactiveStore<S> = IStoreShape<S> & IReactiveStoreApi<S>;",
           "guidance": [],
-          "usageScore": 20,
+          "usageScore": 16,
           "configuration": [],
           "fragment": "store-light-index--IReactiveStore"
         },
@@ -152134,7 +151845,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/reactive-store.d.ts:IStoreDefinition:export type IStoreDefinition<S extends Record<string, unknown>> = S & ThisType<IReactiveStore<S>>;",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 14,
           "configuration": [],
           "fragment": "store-light-index--IStoreDefinition"
         },
@@ -153507,9 +153218,9 @@
           "name": "storeReady",
           "kind": "function",
           "signature": "export declare function storeReady(store: object): Promise<void>;",
-          "declarationLine": 97,
+          "declarationLine": 94,
           "source": "packages/store-light/dist/reactive-store.d.ts",
-          "purpose": "Internal bridge retained for the React adapter and legacy migration tests.",
+          "purpose": "Returns the registered initialization Promise for Store adapters such as React.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for storeReady.",
           "advanced": "No additional advanced behavior is declared for storeReady.",
           "parameters": ["store: object"],
@@ -153523,10 +153234,7 @@
           "returns": "Promise<void>",
           "errors": ["No documented errors are declared for storeReady."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for storeReady.",
-          "examples": [
-            "const store = createLegacyStore(shapeWithAsyncField);\nawait storeReady(store); // 或检查 store.$async",
-            "await storeReady(store);"
-          ],
+          "examples": ["await storeReady(store);"],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -153548,7 +153256,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Internal bridge retained for the React adapter and legacy migration tests."
+              "content": "Returns the registered initialization Promise for Store adapters such as React."
             },
             {
               "id": "getting-started",
@@ -153679,7 +153387,7 @@
                     ],
                     [
                       "`[store] store has no asynchronous initialization`",
-                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore`/`createLegacyStore` 创建的对象）调用 `storeReady()`"
+                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
                     ],
                     [
                       "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
@@ -153736,7 +153444,7 @@
               ]
             }
           ],
-          "usageScore": 52,
+          "usageScore": 42,
           "configuration": [],
           "fragment": "store-light-index--storeReady"
         },

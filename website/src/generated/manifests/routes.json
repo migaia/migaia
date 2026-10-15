@@ -11283,12 +11283,6 @@
       "library": "store-light"
     },
     {
-      "path": "/en/docs/store-light/api/createLegacyStore",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
       "path": "/en/docs/store-light/api/createStore",
       "locale": "en",
       "domain": "docs",
@@ -11326,12 +11320,6 @@
     },
     {
       "path": "/en/docs/store-light/api/createStoreResourceScope",
-      "locale": "en",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
-      "path": "/en/docs/store-light/api/createStoreSync",
       "locale": "en",
       "domain": "docs",
       "library": "store-light"
@@ -26793,12 +26781,6 @@
       "library": "store-light"
     },
     {
-      "path": "/zh/docs/store-light/api/createLegacyStore",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
       "path": "/zh/docs/store-light/api/createStore",
       "locale": "zh",
       "domain": "docs",
@@ -26836,12 +26818,6 @@
     },
     {
       "path": "/zh/docs/store-light/api/createStoreResourceScope",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "store-light"
-    },
-    {
-      "path": "/zh/docs/store-light/api/createStoreSync",
       "locale": "zh",
       "domain": "docs",
       "library": "store-light"
