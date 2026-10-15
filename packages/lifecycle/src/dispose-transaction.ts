@@ -13,9 +13,9 @@ import {
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { boundedWait } from './bounded-wait.js'
-import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import {
-  resolveScheduler,
+  defaultLifecycleScheduler,
   resolveSchedulerOption,
   addSchedulerTime,
   validateSchedulerDelay,
@@ -107,7 +107,7 @@ async function raceGraceful(
 ): Promise<IGracefulOutcome> {
   // Start the graceful budget before user code runs so synchronous work cannot earn a fresh
   // timeout after it has already consumed the caller's budget.
-  const scheduler = context.scheduler ?? resolveScheduler(systemScheduler)
+  const scheduler = context.scheduler ?? defaultLifecycleScheduler
   const start = scheduler.now()
   const effectiveDeadline = computeEffectiveDeadline(gracefulTimeoutMs, context.deadlineAt, start)
   let result: void | PromiseLike<void>

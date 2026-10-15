@@ -5,8 +5,8 @@ import {
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { resolveScheduler, resolveSchedulerOption } from './scheduler.js'
+import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
+import { defaultLifecycleScheduler, resolveSchedulerOption } from './scheduler.js'
 
 export type IMutationQueueOptions = {
   /**
@@ -65,7 +65,7 @@ type IMutationRecord = {
 export function createMutationQueue(options: IMutationQueueOptions = {}): IMutationQueue {
   const defaultAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
   const admissionDiagnosticMs = options.admissionDiagnosticMs ?? 1000
-  const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
+  const scheduler = resolveSchedulerOption(options, defaultLifecycleScheduler)
   const queue: Array<IMutationRecord | undefined> = []
   let queueHead = 0
   let queuedCount = 0
