@@ -149370,7 +149370,7 @@
           "errors": ["No documented errors are declared for createAsyncStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAsyncStore.",
           "examples": [
-            "const store = await createAsyncStore({\n  count: 0,\n  wasmField: someAsyncFieldBuilder() // mode: 'async'\n});"
+            "const store = await createAsyncStore({\n  count: 0,\n  wasmField: someAsyncFieldBuilder() // mode: 'async'\n})"
           ],
           "members": [],
           "exportPath": ".",
@@ -149597,15 +149597,15 @@
           "errors": ["No documented errors are declared for createStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStore.",
           "examples": [
-            "const store = createStore(shape, {\n  runtime,\n  debugName: 'settings',\n  warnAsyncActions: true,\n  mutationPolicy: createMutationPolicy('actions-only')\n});",
-            "import { createStore } from '@migaia/store-light';\nimport { createMutationPolicy } from '@migaia/store-middleware';\n\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count += 1; // 在 action 内，允许\n    }\n  },\n  { mutationPolicy: createMutationPolicy('actions-only') }\n);\n\nstore.increment(); // OK\nstore.count = 5; // 抛错：[store] set(count) is not allowed outside an action",
-            "import { createStore } from '@migaia/store-light';\nimport { createMutationPolicy } from '@migaia/store-middleware';\nimport { createStoreResourceScope } from '@migaia/store-light';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    fontSize: 14,\n    get isDark() {\n      return this.theme === 'dark';\n    },\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme;\n    }\n  },\n  { debugName: 'settings', mutationPolicy }\n);\n\nconst scope = createStoreResourceScope();\nconst profileResource = scope.resource(\n  async ({ signal }) => {\n    const res = await fetch('/api/profile', { signal });\n    if (!res.ok) throw new Error(`profile fetch failed: ${res.status}`);\n    return res.json() as Promise<{ name: string }>;\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => console.error(`[profile] ${phase} failed`, error)\n  }\n);\n\n// 类 React 组件渲染路径：\n// const profile = profileResource.read(); // loading 时 throw Promise，交给 Suspense 边界\n\n// 组件卸载 / 页面销毁时统一收尾：\nfunction teardown() {\n  scope.dispose(); // 强制释放 profileResource\n  settingsStore.$dispose();\n}",
-            "const store = createStore({\n  count: 0,\n  get doubled() {\n    return this.count * 2; // Computed，依赖 count\n  },\n  increment() {\n    this.count += 1; // Action：方法体自动 batch + untracked\n  }\n});\n\nstore.count; // 0\nstore.doubled; // 0\nstore.increment();\nstore.count; // 1",
-            "const store = createStore({\n  onSubmit: raw((data: FormData) => console.log(data))\n});\nstore.onSubmit = (data) => save(data); // 可读可写可整体替换",
-            "import { createStore, createStoreResourceScope } from '@migaia/store-light';\nimport { createMutationPolicy } from '@migaia/store-middleware';\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme;\n    }\n  },\n  { debugName: 'settings', mutationPolicy: createMutationPolicy('actions-only') }\n);\n\nconst scope = createStoreResourceScope();\nconst profileResource = scope.resource(\n  async ({ signal }) => (await fetch('/api/profile', { signal })).json(),\n  { keepAliveMs: 30_000, onError: (error, phase) => console.error(`[profile] ${phase}`, error) }\n);\n\nfunction teardown() {\n  scope.dispose();\n  void settingsStore.$dispose();\n}",
-            "const store = createStore({ count: 0, name: 'guest' });\nconst snapshot = store.$plain(); // { count: 0, name: 'guest' }\nlocalStorage.setItem('state', JSON.stringify(snapshot));\n\nconst restored = JSON.parse(localStorage.getItem('state') ?? '{}');\nstore.$hydrate(restored, {\n  unknown: 'report',\n  onUnknown: (key) => console.warn('unknown field', key)\n});",
-            "import { createStore } from '@migaia/store-light';\nimport { createObjectLeaseRegistry } from '@migaia/lifecycle';\n\nconst store = createStore({ items: [] as string[] });\nconst registry = store.$own(createObjectLeaseRegistry());\n// registry 会在 store.$dispose() 时一并释放，无需单独管理",
-            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          source.dispose();\n        }\n      };\n    }\n  };\n}\n\nconst store = createStore({ counter: counterField(0) });\nstore.counter.value; // 0"
+            "const store = createStore(shape, {\n  runtime,\n  debugName: 'settings',\n  warnAsyncActions: true,\n  mutationPolicy: createMutationPolicy('actions-only')\n})",
+            "import { createStore } from '@migaia/store-light'\nimport { createMutationPolicy } from '@migaia/store-middleware'\n\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count += 1 // 在 action 内，允许\n    }\n  },\n  { mutationPolicy: createMutationPolicy('actions-only') }\n)\n\nstore.increment() // OK\nstore.count = 5 // 抛错：[store] set(count) is not allowed outside an action",
+            "import { createStore } from '@migaia/store-light'\nimport { createMutationPolicy } from '@migaia/store-middleware'\nimport { createStoreResourceScope } from '@migaia/store-light'\n\nconst mutationPolicy = createMutationPolicy('actions-only')\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    fontSize: 14,\n    get isDark() {\n      return this.theme === 'dark'\n    },\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme\n    }\n  },\n  { debugName: 'settings', mutationPolicy }\n)\n\nconst scope = createStoreResourceScope()\nconst profileResource = scope.resource(\n  async ({ signal }) => {\n    const res = await fetch('/api/profile', { signal })\n    if (!res.ok) throw new Error(`profile fetch failed: ${res.status}`)\n    return res.json() as Promise<{ name: string }>\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => console.error(`[profile] ${phase} failed`, error)\n  }\n)\n\n// 类 React 组件渲染路径：\n// const profile = profileResource.read(); // loading 时 throw Promise，交给 Suspense 边界\n\n// 组件卸载 / 页面销毁时统一收尾：\nfunction teardown() {\n  scope.dispose() // 强制释放 profileResource\n  settingsStore.$dispose()\n}",
+            "const store = createStore({\n  count: 0,\n  get doubled() {\n    return this.count * 2 // Computed，依赖 count\n  },\n  increment() {\n    this.count += 1 // Action：方法体自动 batch + untracked\n  }\n})\n\nstore.count // 0\nstore.doubled // 0\nstore.increment()\nstore.count // 1",
+            "const store = createStore({\n  onSubmit: raw((data: FormData) => console.log(data))\n})\nstore.onSubmit = (data) => save(data) // 可读可写可整体替换",
+            "import { createStore, createStoreResourceScope } from '@migaia/store-light'\nimport { createMutationPolicy } from '@migaia/store-middleware'\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme\n    }\n  },\n  { debugName: 'settings', mutationPolicy: createMutationPolicy('actions-only') }\n)\n\nconst scope = createStoreResourceScope()\nconst profileResource = scope.resource(\n  async ({ signal }) => (await fetch('/api/profile', { signal })).json(),\n  { keepAliveMs: 30_000, onError: (error, phase) => console.error(`[profile] ${phase}`, error) }\n)\n\nfunction teardown() {\n  scope.dispose()\n  void settingsStore.$dispose()\n}",
+            "const store = createStore({ count: 0, name: 'guest' })\nconst snapshot = store.$plain() // { count: 0, name: 'guest' }\nlocalStorage.setItem('state', JSON.stringify(snapshot))\n\nconst restored = JSON.parse(localStorage.getItem('state') ?? '{}')\nstore.$hydrate(restored, {\n  unknown: 'report',\n  onUnknown: (key) => console.warn('unknown field', key)\n})",
+            "import { createStore } from '@migaia/store-light'\nimport { createObjectLeaseRegistry } from '@migaia/lifecycle'\n\nconst store = createStore({ items: [] as string[] })\nconst registry = store.$own(createObjectLeaseRegistry())\n// registry 会在 store.$dispose() 时一并释放，无需单独管理",
+            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
           "exportPath": ".",
@@ -149671,7 +149671,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const store = createStore(shape, {\n  runtime,\n  debugName: 'settings',\n  warnAsyncActions: true,\n  mutationPolicy: createMutationPolicy('actions-only')\n});"
+                  "code": "const store = createStore(shape, {\n  runtime,\n  debugName: 'settings',\n  warnAsyncActions: true,\n  mutationPolicy: createMutationPolicy('actions-only')\n})"
                 },
                 {
                   "type": "table",
@@ -149720,7 +149720,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -149733,7 +149733,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -149892,7 +149892,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStore } from '@migaia/store-light';\nimport { createObjectLeaseRegistry } from '@migaia/lifecycle';\n\nconst store = createStore({ items: [] as string[] });\nconst registry = store.$own(createObjectLeaseRegistry());\n// registry 会在 store.$dispose() 时一并释放，无需单独管理"
+                  "code": "import { createStore } from '@migaia/store-light'\nimport { createObjectLeaseRegistry } from '@migaia/lifecycle'\n\nconst store = createStore({ items: [] as string[] })\nconst registry = store.$own(createObjectLeaseRegistry())\n// registry 会在 store.$dispose() 时一并释放，无需单独管理"
                 }
               ]
             }
@@ -150005,7 +150005,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -150018,7 +150018,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -150149,7 +150149,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -150162,7 +150162,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -150279,7 +150279,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -150292,7 +150292,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -150423,7 +150423,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -150436,7 +150436,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -150488,7 +150488,7 @@
           "errors": ["No documented errors are declared for createStoreResource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreResource.",
           "examples": [
-            "const userResource = createStoreResource(\n  async ({ signal }) => {\n    const res = await fetch('/api/user', { signal });\n    return res.json();\n  },\n  { keepAliveMs: 30_000 }\n);\n\nuserResource.preload(); // 提前触发加载\n// 组件渲染路径中：const user = userResource.read(); // loading 时 throw Promise"
+            "const userResource = createStoreResource(\n  async ({ signal }) => {\n    const res = await fetch('/api/user', { signal })\n    return res.json()\n  },\n  { keepAliveMs: 30_000 }\n)\n\nuserResource.preload() // 提前触发加载\n// 组件渲染路径中：const user = userResource.read(); // loading 时 throw Promise"
           ],
           "members": [],
           "aliasOf": "createStoreResource",
@@ -150567,10 +150567,10 @@
           "errors": ["No documented errors are declared for createStoreResourceScope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreResourceScope.",
           "examples": [
-            "const scope = createStoreResourceScope();\nconst userResource = scope.resource((ctx) => fetchUser(ctx.signal));\nconst settingsResource = scope.resource((ctx) => fetchSettings(ctx.signal));\n\n// 组件卸载 / 请求结束\nscope.dispose(); // 对组内每个资源调用 forceDispose()",
-            "import { createStore } from '@migaia/store-light';\nimport { createMutationPolicy } from '@migaia/store-middleware';\nimport { createStoreResourceScope } from '@migaia/store-light';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    fontSize: 14,\n    get isDark() {\n      return this.theme === 'dark';\n    },\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme;\n    }\n  },\n  { debugName: 'settings', mutationPolicy }\n);\n\nconst scope = createStoreResourceScope();\nconst profileResource = scope.resource(\n  async ({ signal }) => {\n    const res = await fetch('/api/profile', { signal });\n    if (!res.ok) throw new Error(`profile fetch failed: ${res.status}`);\n    return res.json() as Promise<{ name: string }>;\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => console.error(`[profile] ${phase} failed`, error)\n  }\n);\n\n// 类 React 组件渲染路径：\n// const profile = profileResource.read(); // loading 时 throw Promise，交给 Suspense 边界\n\n// 组件卸载 / 页面销毁时统一收尾：\nfunction teardown() {\n  scope.dispose(); // 强制释放 profileResource\n  settingsStore.$dispose();\n}",
-            "const scope = createStoreResourceScope();\nconst profile = scope.resource((ctx) => fetchProfile(ctx.signal));\nscope.dispose(); // 强制释放该 scope 内全部资源，不等待持有者",
-            "import { createStore, createStoreResourceScope } from '@migaia/store-light';\nimport { createMutationPolicy } from '@migaia/store-middleware';\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme;\n    }\n  },\n  { debugName: 'settings', mutationPolicy: createMutationPolicy('actions-only') }\n);\n\nconst scope = createStoreResourceScope();\nconst profileResource = scope.resource(\n  async ({ signal }) => (await fetch('/api/profile', { signal })).json(),\n  { keepAliveMs: 30_000, onError: (error, phase) => console.error(`[profile] ${phase}`, error) }\n);\n\nfunction teardown() {\n  scope.dispose();\n  void settingsStore.$dispose();\n}"
+            "const scope = createStoreResourceScope()\nconst userResource = scope.resource((ctx) => fetchUser(ctx.signal))\nconst settingsResource = scope.resource((ctx) => fetchSettings(ctx.signal))\n\n// 组件卸载 / 请求结束\nscope.dispose() // 对组内每个资源调用 forceDispose()",
+            "import { createStore } from '@migaia/store-light'\nimport { createMutationPolicy } from '@migaia/store-middleware'\nimport { createStoreResourceScope } from '@migaia/store-light'\n\nconst mutationPolicy = createMutationPolicy('actions-only')\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    fontSize: 14,\n    get isDark() {\n      return this.theme === 'dark'\n    },\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme\n    }\n  },\n  { debugName: 'settings', mutationPolicy }\n)\n\nconst scope = createStoreResourceScope()\nconst profileResource = scope.resource(\n  async ({ signal }) => {\n    const res = await fetch('/api/profile', { signal })\n    if (!res.ok) throw new Error(`profile fetch failed: ${res.status}`)\n    return res.json() as Promise<{ name: string }>\n  },\n  {\n    keepAliveMs: 30_000,\n    onError: (error, phase) => console.error(`[profile] ${phase} failed`, error)\n  }\n)\n\n// 类 React 组件渲染路径：\n// const profile = profileResource.read(); // loading 时 throw Promise，交给 Suspense 边界\n\n// 组件卸载 / 页面销毁时统一收尾：\nfunction teardown() {\n  scope.dispose() // 强制释放 profileResource\n  settingsStore.$dispose()\n}",
+            "const scope = createStoreResourceScope()\nconst profile = scope.resource((ctx) => fetchProfile(ctx.signal))\nscope.dispose() // 强制释放该 scope 内全部资源，不等待持有者",
+            "import { createStore, createStoreResourceScope } from '@migaia/store-light'\nimport { createMutationPolicy } from '@migaia/store-middleware'\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme\n    }\n  },\n  { debugName: 'settings', mutationPolicy: createMutationPolicy('actions-only') }\n)\n\nconst scope = createStoreResourceScope()\nconst profileResource = scope.resource(\n  async ({ signal }) => (await fetch('/api/profile', { signal })).json(),\n  { keepAliveMs: 30_000, onError: (error, phase) => console.error(`[profile] ${phase}`, error) }\n)\n\nfunction teardown() {\n  scope.dispose()\n  void settingsStore.$dispose()\n}"
           ],
           "members": [],
           "aliasOf": "createStoreResourceScope",
@@ -150636,12 +150636,12 @@
           "errors": ["No documented errors are declared for FIELD_BUILDER."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for FIELD_BUILDER.",
           "examples": [
-            "import {\n  createStore,\n  createAsyncStore,\n  storeReady,\n  raw,\n  isRaw,\n  isFieldBuilder,\n  FIELD_BUILDER,\n  createStoreResource,\n  createStoreResourceScope\n} from '@migaia/store-light';",
-            "export type IFieldContext = {\n  runtime: IRuntime;\n  signal: AbortSignal; // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource;\n};\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'sync';\n  create(context: IFieldContext): F;\n};\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'async';\n  create(context: IFieldContext): Promise<F>;\n};",
-            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      let disposed = false;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          if (disposed) return;\n          disposed = true;\n          source.dispose();\n        }\n      };\n    }\n  };\n}",
-            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';",
-            "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n};",
-            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          source.dispose();\n        }\n      };\n    }\n  };\n}\n\nconst store = createStore({ counter: counterField(0) });\nstore.counter.value; // 0"
+            "import {\n  createStore,\n  createAsyncStore,\n  storeReady,\n  raw,\n  isRaw,\n  isFieldBuilder,\n  FIELD_BUILDER,\n  createStoreResource,\n  createStoreResourceScope\n} from '@migaia/store-light'",
+            "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}",
+            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}",
+            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'",
+            "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n}",
+            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
           "exportPath": ".",
@@ -150704,7 +150704,7 @@
           "errors": ["No documented errors are declared for IAsyncFieldBuilder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAsyncFieldBuilder.",
           "examples": [
-            "export type IFieldContext = {\n  runtime: IRuntime;\n  signal: AbortSignal; // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource;\n};\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'sync';\n  create(context: IFieldContext): F;\n};\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'async';\n  create(context: IFieldContext): Promise<F>;\n};"
+            "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}"
           ],
           "members": [],
           "exportPath": ".",
@@ -150820,7 +150820,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const store = createStore(shape, {\n  runtime,\n  debugName: 'settings',\n  warnAsyncActions: true,\n  mutationPolicy: createMutationPolicy('actions-only')\n});"
+                  "code": "const store = createStore(shape, {\n  runtime,\n  debugName: 'settings',\n  warnAsyncActions: true,\n  mutationPolicy: createMutationPolicy('actions-only')\n})"
                 },
                 {
                   "type": "table",
@@ -150878,11 +150878,11 @@
           "errors": ["No documented errors are declared for IFieldBuilder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFieldBuilder.",
           "examples": [
-            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      let disposed = false;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          if (disposed) return;\n          disposed = true;\n          source.dispose();\n        }\n      };\n    }\n  };\n}",
-            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';",
-            "isFieldBuilder(someValue); // 是否为 IFieldBuilder（sync/async/legacy 任一形态）",
-            "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n};",
-            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          source.dispose();\n        }\n      };\n    }\n  };\n}\n\nconst store = createStore({ counter: counterField(0) });\nstore.counter.value; // 0"
+            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}",
+            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'",
+            "isFieldBuilder(someValue) // 是否为 IFieldBuilder（sync/async/legacy 任一形态）",
+            "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n}",
+            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
           "exportPath": ".",
@@ -150947,11 +150947,11 @@
           "errors": ["No documented errors are declared for IFieldContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFieldContext.",
           "examples": [
-            "export type IFieldContext = {\n  runtime: IRuntime;\n  signal: AbortSignal; // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource;\n};\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'sync';\n  create(context: IFieldContext): F;\n};\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'async';\n  create(context: IFieldContext): Promise<F>;\n};",
-            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      let disposed = false;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          if (disposed) return;\n          disposed = true;\n          source.dispose();\n        }\n      };\n    }\n  };\n}",
-            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';",
-            "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n};",
-            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light';\nimport type { IDisposable } from '@migaia/reactive';\n\ntype ICounterField = IDisposable & { value: number };\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField');\n      let value = initial;\n      return {\n        get value() {\n          source.track();\n          return value;\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v;\n          });\n        },\n        dispose() {\n          source.dispose();\n        }\n      };\n    }\n  };\n}\n\nconst store = createStore({ counter: counterField(0) });\nstore.counter.value; // 0"
+            "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}",
+            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}",
+            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'",
+            "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n}",
+            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
           "exportPath": ".",
@@ -151016,8 +151016,8 @@
           "errors": ["No documented errors are declared for IFieldSource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFieldSource.",
           "examples": [
-            "export type IFieldContext = {\n  runtime: IRuntime;\n  signal: AbortSignal; // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource;\n};\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'sync';\n  create(context: IFieldContext): F;\n};\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'async';\n  create(context: IFieldContext): Promise<F>;\n};",
-            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';"
+            "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}",
+            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'"
           ],
           "members": [],
           "exportPath": ".",
@@ -151208,8 +151208,8 @@
           "errors": ["No documented errors are declared for IMutationGuard."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMutationGuard.",
           "examples": [
-            "export type IMutationGuard = { assertMutationAllowed(operation?: string): void };\nexport type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T };",
-            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';"
+            "export type IMutationGuard = { assertMutationAllowed(operation?: string): void }\nexport type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T }",
+            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'"
           ],
           "members": [],
           "exportPath": ".",
@@ -151274,8 +151274,8 @@
           "errors": ["No documented errors are declared for IMutationPolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMutationPolicy.",
           "examples": [
-            "export type IMutationGuard = { assertMutationAllowed(operation?: string): void };\nexport type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T };",
-            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light';\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light';"
+            "export type IMutationGuard = { assertMutationAllowed(operation?: string): void }\nexport type IMutationPolicy = IMutationGuard & { runInAction<T>(fn: () => T): T }",
+            "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'"
           ],
           "members": [],
           "exportPath": ".",
@@ -151328,7 +151328,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const store = createStore(shape, {\n  runtime,\n  debugName: 'settings',\n  warnAsyncActions: true,\n  mutationPolicy: createMutationPolicy('actions-only')\n});"
+                  "code": "const store = createStore(shape, {\n  runtime,\n  debugName: 'settings',\n  warnAsyncActions: true,\n  mutationPolicy: createMutationPolicy('actions-only')\n})"
                 },
                 {
                   "type": "table",
@@ -151500,7 +151500,7 @@
         {
           "name": "IReactiveStoreApi",
           "kind": "type",
-          "signature": "export type IReactiveStoreApi<S> = {\n  $runtime: IRuntime;\n  $async: boolean;\n  $snapshot(): IStoreShape<S>;\n  $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer;\n  $batch(recipe: (draft: IStoreShape<S>) => void): void;\n  $set(patch: IWritableStorePatch<S>): void;\n  $plain(): Record<string, unknown>;\n  $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void;\n  readonly $disposed: boolean;\n  /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<\n    T extends IDisposable,\n  >(\n    resource: T,\n  ): T;\n  /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>;\n};",
+          "signature": "export type IReactiveStoreApi<S> = {\n  $runtime: IRuntime;\n  $async: boolean;\n  $snapshot(): IStoreShape<S>;\n  $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer;\n  $batch(recipe: (draft: IStoreShape<S>) => void): void;\n  $set(patch: IWritableStorePatch<S>): void;\n  $plain(): Record<string, unknown>;\n  $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void;\n  readonly $disposed: boolean;\n  /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<\n    T extends IDisposable,\n  >(\n    resource: T,\n  ): T;\n  /** * Always returns a Promise. Native reactive nodes release synchronously in LIFO segments; * external fields and owned resources drain through lifecycle. Resolves once every owned * Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is enough * (fire React `useEffect` cleanup, tear down a request scope) may call this without awaiting; * `$disposed` already flips to `true` synchronously before any owned resource is touched, so * read-path guards observe the disposed state immediately regardless of whether the caller * awaits. */ $dispose(): Promise<void>;\n};",
           "declarationLine": 31,
           "source": "packages/store-light/dist/reactive-store.d.ts",
           "purpose": "IReactiveStoreApi is part of this module's public type contract.",
@@ -151515,7 +151515,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<T extends IDisposable>(resource: T): T; /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>; };"
+            "export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<T extends IDisposable>(resource: T): T; /** * Always returns a Promise. Native reactive nodes release synchronously in LIFO segments; * external fields and owned resources drain through lifecycle. Resolves once every owned * Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is enough * (fire React `useEffect` cleanup, tear down a request scope) may call this without awaiting; * `$disposed` already flips to `true` synchronously before any owned resource is touched, so * read-path guards observe the disposed state immediately regardless of whether the caller * awaits. */ $dispose(): Promise<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -151554,7 +151554,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/reactive-store.d.ts:IReactiveStoreApi:export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<T extends IDisposable>(resource: T): T; /** * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is * touched, so read-path guards observe the disposed state immediately regardless of whether the * caller awaits. */ $dispose(): Promise<void>; };",
+          "identity": "packages/store-light/dist/reactive-store.d.ts:IReactiveStoreApi:export type IReactiveStoreApi<S> = { $runtime: IRuntime; $async: boolean; $snapshot(): IStoreShape<S>; $subscribe(fn: () => void, options?: ISubscribeOptions): IDisposer; $batch(recipe: (draft: IStoreShape<S>) => void): void; $set(patch: IWritableStorePatch<S>): void; $plain(): Record<string, unknown>; $hydrate(partial: Record<string, unknown>, options?: IHydrateOptions): void; readonly $disposed: boolean; /** * Registers an external resource, such as a collection, with this store's ownership scope. * * A store can hold root UI state and actions while collections hold frequently accessed * structures. Sharing a runtime alone does not share disposal ownership; `$own` prevents those * structures from leaking when the root is disposed. The resource must be unowned or owned by * this `Runtime`. Cross-runtime resources are rejected. */ $own<T extends IDisposable>(resource: T): T; /** * Always returns a Promise. Native reactive nodes release synchronously in LIFO segments; * external fields and owned resources drain through lifecycle. Resolves once every owned * Signal/Computed/Effect/wasm field has finished releasing. Callers that need \"started\" is enough * (fire React `useEffect` cleanup, tear down a request scope) may call this without awaiting; * `$disposed` already flips to `true` synchronously before any owned resource is touched, so * read-path guards observe the disposed state immediately regardless of whether the caller * awaits. */ $dispose(): Promise<void>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -151643,7 +151643,7 @@
           "errors": ["No documented errors are declared for isFieldBuilder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isFieldBuilder.",
           "examples": [
-            "isFieldBuilder(someValue); // 是否为 IFieldBuilder（sync/async/legacy 任一形态）"
+            "isFieldBuilder(someValue) // 是否为 IFieldBuilder（sync/async/legacy 任一形态）"
           ],
           "members": [],
           "exportPath": ".",
@@ -151721,7 +151721,7 @@
           "returns": "value is IRaw<unknown>",
           "errors": ["No documented errors are declared for isRaw."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isRaw.",
-          "examples": ["isRaw(raw(() => {})); // true"],
+          "examples": ["isRaw(raw(() => {})) // true"],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -151856,7 +151856,7 @@
           "errors": ["No documented errors are declared for IStoreFieldMode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreFieldMode.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "IStoreFieldMode",
@@ -151914,7 +151914,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -151927,7 +151927,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -152021,7 +152021,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -152034,7 +152034,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -152136,7 +152136,7 @@
           "errors": ["No documented errors are declared for IStoreResourceDataKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceDataKind.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "IStoreResourceDataKind",
@@ -152194,7 +152194,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -152207,7 +152207,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -152373,7 +152373,7 @@
           "errors": ["No documented errors are declared for IStoreResourceKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreResourceKind.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "IStoreResourceKind",
@@ -152431,7 +152431,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -152444,7 +152444,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -152798,7 +152798,7 @@
           "errors": ["No documented errors are declared for ISyncFieldBuilder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISyncFieldBuilder.",
           "examples": [
-            "export type IFieldContext = {\n  runtime: IRuntime;\n  signal: AbortSignal; // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource;\n};\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'sync';\n  create(context: IFieldContext): F;\n};\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true;\n  readonly mode: 'async';\n  create(context: IFieldContext): Promise<F>;\n};"
+            "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}"
           ],
           "members": [],
           "exportPath": ".",
@@ -152932,8 +152932,8 @@
           "errors": ["No documented errors are declared for raw."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for raw.",
           "examples": [
-            "const store = createStore({\n  onSubmit: raw((data: FormData) => console.log(data))\n});\nstore.onSubmit = (data) => save(data); // 可读可写可整体替换",
-            "isRaw(raw(() => {})); // true"
+            "const store = createStore({\n  onSubmit: raw((data: FormData) => console.log(data))\n})\nstore.onSubmit = (data) => save(data) // 可读可写可整体替换",
+            "isRaw(raw(() => {})) // true"
           ],
           "members": [],
           "exportPath": ".",
@@ -153004,7 +153004,7 @@
           "errors": ["No documented errors are declared for STORE_LIGHT_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_LIGHT_SOURCE.",
           "examples": [
-            "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+            "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
           ],
           "members": [],
           "exportPath": ".",
@@ -153061,7 +153061,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -153074,7 +153074,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -153112,7 +153112,7 @@
           "errors": ["No documented errors are declared for StoreFieldMode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreFieldMode.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "StoreFieldMode",
@@ -153170,7 +153170,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -153183,7 +153183,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -153226,7 +153226,7 @@
           "returns": "Promise<void>",
           "errors": ["No documented errors are declared for storeReady."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for storeReady.",
-          "examples": ["await storeReady(store);"],
+          "examples": ["await storeReady(store)"],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -153419,7 +153419,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Store 构造失败：`shape` 里任意字段处理阶段抛错（比如某个 `FieldBuilder.create()` 抛错），整个构造过程回滚——已创建的 scope 内节点被 `scope.dispose()`，内部的 `signals`/`computeds`/`wasmFields`/`fieldSources` 全部清空，原始错误继续向外抛出（清理阶段自身失败时，会尽量把清理错误挂到原错误的 `cause` 上，不会替换原始错误）。"
+                  "text": "Store 构造失败：`shape` 里任意字段处理阶段抛错（比如某个 `FieldBuilder.create()` 抛错），整个构造过程回滚——原生节点同步分段释放、外部资源由 lifecycle scope 释放，内部的 `signals`/`computeds`/`wasmFields`/`fieldSources` 全部清空，原始错误继续向外抛出（清理阶段自身失败时，会尽量把清理错误挂到原错误的 `cause` 上，不会替换原始错误）。"
                 },
                 {
                   "type": "paragraph",
@@ -153427,7 +153427,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`$dispose()` 时机：字段读写方法在闭包里直接引用底层节点（`node.value`），不经过任何\"Store 对象本身\"的代理层；因此 `$dispose()` 唯一要做的事就是把 `disposed` 标志位翻转、释放 scope、清空内部 Map。所有已经拿到 Store 引用的调用方，下一次任何操作都会立刻看到统一的 `[store] store is disposed`。"
+                  "text": "`$dispose()` 时机：字段读写方法在闭包里直接引用底层节点（`node.value`），不经过任何\"Store 对象本身\"的代理层；因此 `$dispose()` 唯一要做的事就是把 `disposed` 标志位翻转、释放原生节点段与已有 scope、清空内部 Map。所有已经拿到 Store 引用的调用方，下一次任何操作都会立刻看到统一的 `[store] store is disposed`。"
                 },
                 {
                   "type": "paragraph",
@@ -153455,7 +153455,7 @@
           "errors": ["No documented errors are declared for StoreResourceDataKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreResourceDataKind.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "StoreResourceDataKind",
@@ -153513,7 +153513,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -153526,7 +153526,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
@@ -153564,7 +153564,7 @@
           "errors": ["No documented errors are declared for StoreResourceKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreResourceKind.",
           "examples": [
-            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+            "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
           ],
           "members": [],
           "aliasOf": "StoreResourceKind",
@@ -153622,7 +153622,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const;\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind];\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const;\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind];\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const;\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode];"
+                  "code": "export const StoreResourceKind = {\n  idle: 'idle',\n  loading: 'loading',\n  ready: 'ready',\n  failed: 'failed',\n  closing: 'closing',\n  disposed: 'disposed'\n} as const\nexport type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]\n\nexport const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const\nexport type IStoreResourceDataKind =\n  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]\n\nexport const StoreFieldMode = { sync: 'sync', async: 'async' } as const\nexport type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]"
                 },
                 {
                   "type": "list",
@@ -153635,7 +153635,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light';\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError;\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                  "code": "export const STORE_LIGHT_SOURCE = '@migaia/store-light'\n\nfunction createStoreLightError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreLightRangeError(code: IStoreLightErrorCode, message: string): RangeError\nfunction createStoreLightTypeError(\n  code: IStoreLightErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreLightAggregateError(\n  code: IStoreLightErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
                 },
                 {
                   "type": "list",
