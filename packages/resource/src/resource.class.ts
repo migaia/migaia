@@ -422,7 +422,6 @@ export class Resource<T> implements IObserver, IDisposable {
   #forceRefresh = false
   #suspensionGeneration = 0
   #paused = false
-  #staleAfterSettlement = false
   /** Holds one validated expiry pair between request admission and success-state publication. */
   #settlementExpiry: IResourceExpiry | undefined
   #terminal = createTerminalController()
@@ -658,7 +657,6 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#refreshScheduled = false
     this.#forceRefresh = false
     this.#requestPending = false
-    this.#staleAfterSettlement = false
     this.#currentPromise = undefined
     runCleanup(() => internalsOf(this.runtime).tracker.clearDependencies(this))
     runCleanup(() => this.#stateSignal.dispose())
@@ -709,6 +707,16 @@ export class Resource<T> implements IObserver, IDisposable {
   #ensureFresh(): void {
     if (this.#requestPending || this.#paused) return
     const state = this.#stateSignal.peek()
+    if (state.status === ResourceStatus.success) {
+      /** Dependency tracker that owns this resource's suspended snapshot. */
+      const tracker = internalsOf(this.runtime).tracker
+      // An idle suspension kept the dependency snapshot. Unchanged dependencies keep the cache
+      // (TTL still applies below) and reattach the edges; a changed dependency expires it.
+      if (tracker.isSuspended(this)) {
+        if (tracker.revalidate(this)) this.#scheduleSuspension()
+        else this.#expiresAt = 0
+      }
+    }
     // error/cancelled are stable, inspectable states. Only explicit
     // refetch()/invalidate() retries them; passive reads must not loop.
     let fresh = true
@@ -749,7 +757,6 @@ export class Resource<T> implements IObserver, IDisposable {
     this.#paused = true
     this.#refreshScheduled = false
     this.#forceRefresh = false
-    this.#staleAfterSettlement = false
     this.#currentPromise = rejectedPromise
     this.#observe(rejectedPromise)
     this.#stateSignal.value = { status: ResourceStatus.error, error: failure }
@@ -764,7 +771,6 @@ export class Resource<T> implements IObserver, IDisposable {
     const token = requestToken.token
     const signal = requestToken.signal
     this.#requestPending = true
-    this.#staleAfterSettlement = false
     this.#settlementExpiry = undefined
     const current = this.#stateSignal.peek()
     if (this.#staleWhileRevalidate && current.status === ResourceStatus.success) {
@@ -1094,10 +1100,6 @@ export class Resource<T> implements IObserver, IDisposable {
           }
           this.#updatedAt = expiry.updatedAt
           this.#expiresAt = expiry.expiresAt
-          if (this.#staleAfterSettlement) {
-            this.#expiresAt = 0
-            this.#staleAfterSettlement = false
-          }
           this.#requestPending = false
           this.#stateSignal.value = { status: ResourceStatus.success, data }
           // autoStart 后从未被观察 → 主动休眠，防止上游边永驻
@@ -1109,7 +1111,6 @@ export class Resource<T> implements IObserver, IDisposable {
           if (!this.#requests.isCurrent(token) || this.#terminal.lifecycle !== LifecycleState.open)
             return
           this.#settlementExpiry = undefined
-          this.#staleAfterSettlement = false
           this.#requestPending = false
           this.#stateSignal.value = { status: ResourceStatus.error, error }
           // autoStart 后从未被观察 → 主动休眠
@@ -1196,12 +1197,9 @@ export class Resource<T> implements IObserver, IDisposable {
       ) {
         return
       }
-      const hadDependencies = this.deps.size > 0
-      internalsOf(this.runtime).tracker.clearDependencies(this)
-      if (hadDependencies) {
-        if (this.#stateSignal.peek().status === ResourceStatus.success) this.#expiresAt = 0
-        else if (this.#requestPending) this.#staleAfterSettlement = true
-      }
+      // Keep the version snapshot instead of expiring the cache: `#ensureFresh` refetches only when
+      // a dependency changed meanwhile or the TTL expired.
+      internalsOf(this.runtime).tracker.suspendDependencies(this)
     })
   }
 }
