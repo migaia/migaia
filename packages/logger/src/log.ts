@@ -46,7 +46,7 @@ type ILoggerExtendsTarget<TMode extends IMiddlewarePipelineMode> = Omit<
 >
 const loggerInternalState = Symbol('logger.internal.state')
 type ILoggerInternalState = { extendPath: string[]; topicChain: string[] }
-import { getLoggerRuntimeManager } from './runtime-manager.js'
+import { getLoggerRuntimeManager, type ILoggerRuntimeManager } from './runtime-manager.js'
 import { boundedWait, snapshotScheduler } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { LoggerStatus, type ILoggerStatus } from './state-constants.js'
@@ -81,8 +81,31 @@ function resolveLoggerScheduler(value: unknown): IScheduler {
   throw createLoggerTypeError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidScheduler)
 }
 
+/** Admits the selected host owner before a resource-owning plugin can be installed. */
+function resolveLoggerRuntimeManager(
+  value: ILoggerRuntimeManager | undefined
+): ILoggerRuntimeManager {
+  /** Omitted options capture the module default once, rather than consulting it on every dispatch. */
+  const runtime = value === undefined ? getLoggerRuntimeManager() : value
+  try {
+    if (
+      runtime &&
+      typeof runtime.randomUUID === 'function' &&
+      typeof runtime.defer === 'function' &&
+      typeof runtime.write === 'function'
+    )
+      return runtime
+  } catch (cause) {
+    throw createLoggerTypeError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidOption, {
+      cause
+    })
+  }
+  throw createLoggerTypeError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidOption)
+}
+
 type ILoggerConstructorSnapshot = {
   readonly execution: IPluginHostOptions['execution']
+  readonly runtimeManager: ILoggerRuntimeManager | undefined
   readonly scheduler: unknown
   readonly context: string[]
   readonly topic: string
@@ -114,6 +137,7 @@ function snapshotLoggerOptions(options: unknown): ILoggerConstructorSnapshot {
     const rawPlugins = source.plugins as readonly ILoggerPluginConstraint[] | undefined
     return {
       execution: rawExecution,
+      runtimeManager: source.runtimeManager as ILoggerRuntimeManager | undefined,
       scheduler,
       context: rawContext === undefined ? [] : [...rawContext],
       topic: (source.topic as string | undefined) ?? '',
@@ -170,6 +194,8 @@ class LoggerCore {
   #extendTargets: ILoggerExtendsTarget<IMiddlewarePipelineMode>[] = []
   /** 单调时钟源（R-9）；`flush`/`shutdown`/`#drain` 的 deadline 与 `boundedWait` 共用。 */
   #scheduler: IScheduler
+  /** Captured host capability owner prevents global default changes from retargeting this logger. */
+  #runtimeManager: ILoggerRuntimeManager
   /** Functional Host owns plugin admission, config, pipeline, and disposal for this facade. */
   #handle: IHostHandle<ILoggerDomainCore<IMiddlewarePipelineMode>, ILogEntry, readonly []>
   /** Config facade is fixed after the functional Host has been created. */
@@ -178,6 +204,11 @@ class LoggerCore {
     ILogEntry,
     readonly []
   >['config']
+
+  /** Exposes the same owner to plugins without permitting replacement of the binding. */
+  get runtimeManager(): ILoggerRuntimeManager {
+    return this.#runtimeManager
+  }
 
   get scheduler(): IScheduler {
     return this.#scheduler
@@ -189,12 +220,14 @@ class LoggerCore {
     topic: string,
     hostOptions: IPluginHostOptions,
     plugins: readonly ILoggerPluginConstraint[] = [],
-    scheduler: IScheduler = systemScheduler
+    scheduler: IScheduler,
+    runtimeManager: ILoggerRuntimeManager
   ) {
     this.#scheduler = scheduler
+    this.#runtimeManager = runtimeManager
     // Freeze the top-level context containers. Nested option values and Date remain
     // identity-preserving and mutable by contract; callers own that trade-off.
-    const runtime = getLoggerRuntimeManager()
+    const runtime = this.#runtimeManager
     const env = Object.freeze({
       isTTY: Boolean(runtime.process?.stdout.isTTY),
       isCI: Boolean(runtime.process?.env.CI)
@@ -246,6 +279,7 @@ class LoggerCore {
     const domainCore: ILoggerDomainCore<IMiddlewarePipelineMode> = {
       ctx: this.ctx,
       scheduler: this.scheduler,
+      runtimeManager: this.#runtimeManager,
       log: (tag, message, ...args) => this.log(tag, message, ...args),
       dispatchRaw: (input, options) => this.dispatchRaw(input, options),
       raw: (text, options) => this.raw(text, options),
@@ -375,7 +409,7 @@ class LoggerCore {
       shutdown: 'shutdown 异常'
     }
     try {
-      const runtime = getLoggerRuntimeManager()
+      const runtime = this.#runtimeManager
       const result = runtime.console
         ? runtime.console.error(`[logger] ${labels[source]}:`, error)
         : runtime.write(`[logger] ${labels[source]}: ${String(error)}`)
@@ -393,7 +427,7 @@ class LoggerCore {
       { cause: hookError }
     )
     try {
-      const runtime = getLoggerRuntimeManager()
+      const runtime = this.#runtimeManager
       const result = runtime.console
         ? runtime.console.error(reported, hookError)
         : runtime.write(`${LoggerErrorText.failureHookThrew} ${String(hookError)}`)
@@ -456,7 +490,7 @@ class LoggerCore {
     // closes, a disposer must not add a task that the completed shutdown can no longer drain.
     if (!this.#dispatchAdmissionOpen || this.#status === LoggerStatus.closed) return
     const run = new Promise<void>((resolve, reject) => {
-      getLoggerRuntimeManager().defer(() => {
+      this.#runtimeManager.defer(() => {
         try {
           const result = task()
           const pending = captureLoggerPromiseLike(result)
@@ -639,7 +673,7 @@ class LoggerCore {
   raw(text: string, options: ILogDispatchOptions = {}): void {
     if (!this.#dispatchAdmissionOpen || this.#status === LoggerStatus.closed) return
     const write = () => {
-      getLoggerRuntimeManager().write(text)
+      this.#runtimeManager.write(text)
     }
     if (options.asyncOutput) this.defer(write)
     else write()
@@ -932,6 +966,8 @@ class LoggerImpl<const P extends readonly ILoggerPluginConstraint[] = []> {
   constructor(options: ILoggerOptions<P>) {
     const snapshot = snapshotLoggerOptions(options)
     const scheduler = resolveLoggerScheduler(snapshot.scheduler)
+    /** Each logger captures one capability owner before any plugin installation. */
+    const runtimeManager = resolveLoggerRuntimeManager(snapshot.runtimeManager)
     const core = new LoggerCore(
       snapshot.options,
       snapshot.context,
@@ -942,7 +978,8 @@ class LoggerImpl<const P extends readonly ILoggerPluginConstraint[] = []> {
         scheduler
       },
       snapshot.plugins,
-      scheduler
+      scheduler,
+      runtimeManager
     )
 
     for (const [name, fn] of snapshot.onEntries) {

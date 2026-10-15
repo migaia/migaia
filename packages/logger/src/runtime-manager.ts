@@ -16,7 +16,10 @@ export type ILoggerRuntimeManager = {
     append(path: string, text: string): Promise<void>
     rotate?(path: string): Promise<void>
   }
-  /** Optional Logger-owned AbortController factory for hostile-realm and cancellation tests. */
+  /**
+   * Optional host cancellation factory for alternate AbortSignal implementations; native fallback
+   * when absent.
+   */
   readonly createAbortController?: () => AbortController
   randomUUID(): string
   defer(task: () => void): void
@@ -77,7 +80,7 @@ let runtimeManager: ILoggerRuntimeManager = createDefaultRuntimeManager()
 /** Returns the active host capability manager. */
 export const getLoggerRuntimeManager = (): ILoggerRuntimeManager => runtimeManager
 
-/** Replaces host capabilities and returns a restoration callback. */
+/** Sets the default for future Logger instances and returns an idempotent restoration callback. */
 export function setLoggerRuntimeManager(manager: ILoggerRuntimeManager): () => void {
   const layer: IRuntimeLayer = { manager, active: true }
   runtimeLayers.push(layer)
@@ -89,4 +92,12 @@ export function setLoggerRuntimeManager(manager: ILoggerRuntimeManager): () => v
       runtimeLayers.pop()
     runtimeManager = runtimeLayers.at(-1)?.manager ?? createDefaultRuntimeManager()
   }
+}
+
+/** Creates host cancellation through the injected owner, with the existing native fallback. */
+export function createLoggerAbortController(
+  runtime: ILoggerRuntimeManager
+): AbortController | undefined {
+  if (runtime.createAbortController) return runtime.createAbortController()
+  return typeof AbortController === 'function' ? new AbortController() : undefined
 }

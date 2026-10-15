@@ -1,5 +1,4 @@
 import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
-import { getLoggerRuntimeManager } from '../runtime-manager.js'
 
 export type IUuidPluginConfig = {
   /**
@@ -32,7 +31,7 @@ class UuidPlugin implements ILoggerPlugin<IEmptyPluginExt, IUuidPluginConfig> {
       // 只在 data 里追加 uuid 相关字段，其它字段原样透传
       next({
         ...entry,
-        data: { ...entry.data, uuid: getLoggerRuntimeManager().randomUUID(), uuidDisplay: display }
+        data: { ...entry.data, uuid: core.runtimeManager.randomUUID(), uuidDisplay: display }
       })
     })
 

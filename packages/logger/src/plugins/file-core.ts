@@ -2,7 +2,7 @@ import { type IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { defineFeature } from '@migaia/plugin-host'
 import { createLoggerError, LoggerErrorCode } from '../errors.js'
 import { LoggerErrorText } from '../error-text.js'
-import { getLoggerRuntimeManager, type ILoggerRuntimeManager } from '../runtime-manager.js'
+import type { ILoggerRuntimeManager } from '../runtime-manager.js'
 import type { IEmptyPluginExt, ILogEntry, ILoggerPlugin, ILoggerPluginCore } from '../typing.js'
 import {
   createBatcherForCore,
@@ -61,7 +61,7 @@ export const createFilePlugin = (
         Readonly<{ readonly features: { readonly dependencies: IFileFeatureDependencies } }>
     ) => {
       const resolved = core.config.get<IFilePluginConfig>() ?? config
-      const fs = getLoggerRuntimeManager().fs ?? defaultSink?.()
+      const fs = core.runtimeManager.fs ?? defaultSink?.()
       if (!fs)
         throw createLoggerError(
           LoggerErrorCode.fileSinkUnavailable,

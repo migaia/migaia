@@ -154,3 +154,7 @@ try {
 完整构造选项、全部 API 精确签名、pipeline 四种模式的执行顺序差异、每个内置插件的完整配置项、`flush`/`shutdown` 的精确语义与边界情况、自定义 runtime manager（替换底层能力用于测试/特殊宿主）、以及更多组合示例，见 **[USEGUIDE.md](./USEGUIDE.md)**。
 
 Pipeline replacements must retain a current-realm `Date` in `entry.time`. An invalid replacement (including serialized timestamps or a foreign-realm Date) reports `PIPELINE_ENTRY_INVALID` through `onFailure` with source `pipeline`, then delivers the original entry. Dispatch remains non-throwing.
+
+`new Logger({ execution, runtimeManager })` captures that host capability owner. If omitted, construction captures the current module default. Built-in console, UUID, HTTP and file plugins use their logger's owner. `createAbortController` is an optional host cancellation factory for alternate AbortSignal implementations; HTTP falls back to native controllers when it is absent. This is the same cancellation boundary in production and tests.
+
+`setLoggerRuntimeManager` now selects the default for **future instances**; it no longer retargets existing loggers. Migrate code that changes a live logger globally to construct it with an explicit `runtimeManager`. The manager object itself is retained by reference. ProcessPlugin still owns one shared set of exit/signal hooks: all participants must agree on process identity, configuration and scheduler domain, or receive `PLUGIN_CONFIG_CONFLICT`. Its late diagnostics use the first installer's captured manager.

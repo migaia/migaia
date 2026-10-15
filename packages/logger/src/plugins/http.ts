@@ -8,7 +8,7 @@ import {
 } from './batch.js'
 import { type IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { defineFeature } from '@migaia/plugin-host'
-import { getLoggerRuntimeManager } from '../runtime-manager.js'
+import { createLoggerAbortController, type ILoggerRuntimeManager } from '../runtime-manager.js'
 import {
   createLoggerAggregateError,
   createLoggerError,
@@ -243,6 +243,8 @@ class HttpPlugin implements ILoggerPlugin<
   readonly features = Object.freeze({ dependencies: httpDependenciesFeature })
 
   #resolvedConfig!: IHttpPluginConfig
+  /** Captured logger capabilities own every transport attempt and controller. */
+  #runtime!: ILoggerRuntimeManager
   #controller: AbortController | undefined
   #scheduler!: IScheduler
 
@@ -267,9 +269,7 @@ class HttpPlugin implements ILoggerPlugin<
 
   /** Creates a request/shutdown controller through the Logger runtime owner when available. */
   #createAbortController(): AbortController | undefined {
-    const factory = getLoggerRuntimeManager().createAbortController
-    if (factory) return factory()
-    return typeof AbortController === 'function' ? new AbortController() : undefined
+    return createLoggerAbortController(this.#runtime)
   }
 
   install(
@@ -279,6 +279,7 @@ class HttpPlugin implements ILoggerPlugin<
     // 不读 this.config——统一通过 core.config.get() 读取
     this.#resolvedConfig = core.config.get<IHttpPluginConfig>() ?? this.config
     this.#scheduler = core.scheduler
+    this.#runtime = core.runtimeManager
     this.#controller = this.#createAbortController()
     core.onDispose(core.onShutdown(() => this.#controller?.abort()))
 
@@ -335,7 +336,7 @@ class HttpPlugin implements ILoggerPlugin<
         }
       )
     }
-    const runtimeFetch = getLoggerRuntimeManager().fetch
+    const runtimeFetch = this.#runtime.fetch
     if (!runtimeFetch)
       throw createLoggerError(
         LoggerErrorCode.transportUnavailable,
