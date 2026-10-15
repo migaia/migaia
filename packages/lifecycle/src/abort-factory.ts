@@ -63,10 +63,19 @@ const validateHostController = (candidate: unknown): IAbortController => {
   }
 }
 
-/** Instantiates one validated controller from a captured host constructor. */
+/**
+ * Host constructors whose first instance already passed `validateHostController` (LC-P3). Native
+ * constructors produce one fixed instance shape, so later instances skip the five-property check.
+ */
+const validatedConstructors = new WeakSet<IHostAbortControllerConstructor>()
+
+/** Instantiates one controller, validating its shape only for the constructor's first instance. */
 const instantiate = (constructor: IHostAbortControllerConstructor): IAbortController => {
   try {
-    return validateHostController(new constructor())
+    if (validatedConstructors.has(constructor)) return new constructor()
+    const controller = validateHostController(new constructor())
+    validatedConstructors.add(constructor)
+    return controller
   } catch (error) {
     if (
       error instanceof Error &&
@@ -94,3 +103,38 @@ export const captureAbortControllerFactory = (): (() => IAbortController) => {
 /** Creates one controller using the current host realm at call time. */
 export const instantiateCurrentAbortController = (): IAbortController =>
   instantiate(resolveHostConstructor())
+
+/**
+ * Defers controller creation until `signal` is first read (LC-P3), for owners whose signal is often
+ * never observed (a `LifecycleUnit` generation, a scope disposed with nothing owned). An
+ * `abort(reason)` before that read only records the first reason; the first `signal` read then
+ * creates the controller and aborts it with that reason, so the already-aborted state is preserved.
+ * After materialization every call forwards to the real controller, including its failures. A
+ * creation failure (`ENV_UNSUPPORTED`) surfaces at the first `signal` read.
+ */
+export const createLazyAbortController = (create: () => IAbortController): IAbortController => {
+  /** Real controller, created on the first `signal` read. */
+  let controller: IAbortController | undefined
+  /** Whether `abort()` ran before the controller existed. */
+  let abortedEarly = false
+  /** First reason recorded by an early `abort()`, replayed on materialization. */
+  let earlyReason: unknown
+  return {
+    get signal() {
+      if (controller === undefined) {
+        controller = create()
+        if (abortedEarly) controller.abort(earlyReason)
+      }
+      return controller.signal
+    },
+    abort(reason) {
+      if (controller !== undefined) {
+        controller.abort(reason)
+        return
+      }
+      if (abortedEarly) return
+      abortedEarly = true
+      earlyReason = reason
+    }
+  }
+}

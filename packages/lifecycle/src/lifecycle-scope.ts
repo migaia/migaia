@@ -15,7 +15,7 @@ import { createOwnedEntryList } from './owned-entries.js'
 import { createTerminalController } from './terminal-controller.js'
 import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
 import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
-import { captureAbortControllerFactory } from './abort-factory.js'
+import { captureAbortControllerFactory, createLazyAbortController } from './abort-factory.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { resolveSchedulerOption } from './scheduler.js'
 
@@ -78,7 +78,10 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
   const scheduler = resolveSchedulerOption(options)
   const terminal = createTerminalController()
   const createController = captureAbortControllerFactory()
-  const closingController = createController()
+  /** Closing signal source; created only when a release transaction actually reads it (LC-P3). */
+  const closingController = createLazyAbortController(createController)
+  /** Whether `close()` already aborted the closing signal; avoids rebuilding the reason. */
+  let closingAborted = false
   /** Immutable owner-bound capability shared by this scope's release callbacks. */
   const disposerContext = createDisposerContext()
   /** Live owned resources in registration order with O(1) release lookup (LC-P1). */
@@ -227,7 +230,8 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
 
   const close = (): void => {
     terminal.close()
-    if (closingController.signal.aborted) return
+    if (closingAborted) return
+    closingAborted = true
     closingController.abort(
       createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
     )
@@ -254,7 +258,8 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
           report: options.report,
           deadlineAt: options.deadlineAt,
           scheduler,
-          signal: closingController.signal,
+          // An empty snapshot runs no item, so it never needs the closing signal materialized.
+          signal: snapshot.length > 0 ? closingController.signal : undefined,
           disposer: disposerContext
         }
       )
