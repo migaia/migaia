@@ -77,9 +77,8 @@ export const CapabilityErrorCode = {
 
   /**
    * Reserved for diagnostics or events when the gate denies activation. No current throw site uses
-   * it. `enable()` returns `{ status: 'gated' }` for a denied activation
-   * without throwing. Reserving this code for an `onError` or event channel does not change that
-   * behavior.
+   * it. `enable()` returns `{ status: 'gated' }` for a denied activation without throwing.
+   * Reserving this code for an `onError` or event channel does not change that behavior.
    *
    * Enforces `docs/lifecycle/migration.sdd.md` §3.7.3. `gated` differs from graph availability
    * `blocked`. Branch on the return value instead of catching an error.
