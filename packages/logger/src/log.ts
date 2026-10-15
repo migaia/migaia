@@ -147,6 +147,12 @@ class LoggerCore {
 
   #sinks: ICanonicalEventChannel<ILogEntry, void> = createEventChannel()
   #hooks: Map<string, ICanonicalEventChannel<ILogEntry, void>> = new Map()
+  /**
+   * One channel listener per hook function. Hook channels use `listener-all` removal, which matches
+   * by listener identity, so registering the same function twice must reuse the same listener for a
+   * release to remove every registration of that function.
+   */
+  #hookListeners = new WeakMap<ILogHookFn, (event: { readonly value: ILogEntry }) => void>()
   #flushers: ICanonicalEventChannel<undefined, void> = createEventChannel()
   #shutdownHandlers: ICanonicalEventChannel<IShutdownReason, void> = createEventChannel()
   #failureHooks: ICanonicalEventChannel<ILogFailure, void> = createEventChannel()
@@ -313,7 +319,13 @@ class LoggerCore {
   hook(name: string, fn: ILogHookFn): () => void {
     const channel = this.#hooks.get(name) ?? createEventChannel({ removalPolicy: 'listener-all' })
     this.#hooks.set(name, channel)
-    const admission = channel.subscribe((event) => fn(event.value))
+    /** Stable listener for `fn`; a fresh wrapper per call would defeat `listener-all` removal. */
+    let listener = this.#hookListeners.get(fn)
+    if (!listener) {
+      listener = (event) => fn(event.value)
+      this.#hookListeners.set(fn, listener)
+    }
+    const admission = channel.subscribe(listener)
     return () => {
       admission()
       if (channel.size === 0 && this.#hooks.get(name) === channel) this.#hooks.delete(name)
