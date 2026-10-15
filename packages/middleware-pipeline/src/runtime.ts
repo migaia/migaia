@@ -291,20 +291,31 @@ export const runSyncMiddleware = <TValue>(
   let current = value
   for (let index = 0; index < stageSnapshot.length; index += 1) {
     const stage = stageSnapshot[index]
+    /** Sync stages commit one value locally; no per-stage guard object is needed. */
     let nextValue = current
-    const guard = createNextGuard<TValue, void>(
-      onViolation,
-      () => undefined,
-      (valueAfter) => {
-        nextValue = valueAfter
+    /** Each captured next retains its stage's identity so later calls remain detectable. */
+    let called = false
+    /** Closed only after a normal stage return, preserving the existing throw path. */
+    let returned = false
+    /** Accepts at most one value before the stage returns; it never executes downstream. */
+    const next = (valueAfter: TValue): void => {
+      if (returned) {
+        onViolation(MiddlewarePipelineViolation.late)
+        return
       }
-    )
+      if (called) {
+        onViolation(MiddlewarePipelineViolation.duplicate)
+        return
+      }
+      called = true
+      nextValue = valueAfter
+    }
     check(context)
-    invokeWithContext(stage, [current, guard.next], context)
-    guard.returned()
+    invokeWithContext(stage, [current, next], context)
+    returned = true
     check(context)
     assertActive?.()
-    if (!guard.called()) return
+    if (!called) return
     current = nextValue
   }
   check(context)
@@ -431,11 +442,14 @@ export const runAsyncMiddleware = async <TValue>(
   const drainSpill = (): void => {
     if (drainingSpill) return
     drainingSpill = true
-    while (spill.length > 0) {
-      const request = spill.shift()!
+    /** Requests appended by nested steps join this pass without shifting the remaining queue. */
+    let readIndex = 0
+    while (readIndex < spill.length) {
+      const request = spill[readIndex++]!
       const result = step(request.value, request.parentControlPath)
       void result.then(request.resolve, request.reject)
     }
+    spill.length = 0
     drainingSpill = false
   }
   invokeStep = (current, parentControlPath) => {
