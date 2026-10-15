@@ -28,9 +28,10 @@ export const LifecycleErrorCode = {
   scopeReentrantDispose: 'SCOPE_REENTRANT_DISPOSE',
 
   /**
-   * Reports a disposer calling its own scope's `own()`. The error belongs to the triggering
-   * disposer, as with reentrant disposal. The container is already `closing`. It cannot take
-   * ownership of new resources during release.
+   * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the
+   * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot
+   * take ownership of new resources during release. Outside that synchronous callback frame, a
+   * caller observes `SCOPE_CLOSED` while teardown is pending.
    */
   scopeReentrantOwn: 'SCOPE_REENTRANT_OWN',
 
