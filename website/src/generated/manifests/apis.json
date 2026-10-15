@@ -158070,7 +158070,7 @@
           "name": "IHydrationStatus",
           "kind": "type",
           "signature": "export type IHydrationStatus =\n  | typeof PersistState.loading\n  | typeof PersistState.success\n  | typeof PersistState.error;",
-          "declarationLine": 20,
+          "declarationLine": 21,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IHydrationStatus is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IHydrationStatus.",
@@ -158263,7 +158263,7 @@
           "name": "IPersistHandle",
           "kind": "type",
           "signature": "export type IPersistHandle = {\n  status: IReactiveComputed<IPersistStatus>;\n  error: IReactiveComputed<unknown>;\n  hydrated: IReactiveComputed<boolean>;\n  hydrationStatus: IReadonlyPersistValue<IHydrationStatus>;\n  hydrationError: IReadonlyPersistValue<unknown>;\n  writeStatus: IReadonlyPersistValue<IWriteStatus>;\n  writeError: IReadonlyPersistValue<unknown>;\n  /** Resolves when hydration succeeds and rejects when hydration fails. */ ready: Promise<void>;\n  /** Resolves after hydration, whether it succeeds or fails. */ settled: Promise<void>;\n  /** Reads the archive again after failure. Only successful hydration reopens the write gate. */ retryHydrate(): Promise<void>;\n  /** * Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with * `AbortError`. */ flush(): Promise<void>;\n  /** Queues archive removal. Disposal during the wait ends it with `AbortError`. */ clear(): Promise<void>;\n  readonly disposed: boolean;\n  dispose(): void;\n};",
-          "declarationLine": 25,
+          "declarationLine": 26,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IPersistHandle is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistHandle.",
@@ -158275,8 +158275,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistHandle.",
           "examples": [
             "type IPersistUnit<TState> = {\n  snapshot(): TState; // 同步读当前可持久化状态\n  restore(state: TState): void; // 同步写回一份状态（hydrate 用）\n  subscribe(onChange: () => void): IDisposer; // 注册变化通知\n};\n\nfunction persistUnit<TState>(\n  unit: IPersistUnit<TState>,\n  options: IPersistUnitOptions<TState>\n): IPersistHandle;",
-            "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n};",
-            "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n};"
+            "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};",
+            "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
           ],
           "members": [],
           "aliasOf": "IPersistHandle",
@@ -158460,7 +158460,7 @@
           "name": "IPersistStatus",
           "kind": "type",
           "signature": "export type IPersistStatus =\n  | typeof PersistState.loading\n  | typeof PersistState.ready\n  | typeof PersistState.error\n  | typeof PersistState.disposed;",
-          "declarationLine": 19,
+          "declarationLine": 20,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IPersistStatus is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistStatus.",
@@ -158589,7 +158589,7 @@
           "name": "IPersistUnit",
           "kind": "type",
           "signature": "export type IPersistUnit<TState> = {\n  /** Reads the current persistable state synchronously. */ snapshot(): TState;\n  /** Restores state synchronously during hydration. */ restore(state: TState): void;\n  /** Registers change notifications and returns an unsubscribe function. */ subscribe(\n    onChange: () => void,\n  ): IDisposer;\n};",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "Defines the minimal persistence boundary for synchronous snapshots, restoration, and change subscriptions. `persist()` for `store-light`, `persistCollection()` for `store-indexed`, and each keyed unit from `persistKeyed()` implement this contract. All use the same `persistUnit()` engine.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistUnit.",
@@ -158719,8 +158719,8 @@
         {
           "name": "IPersistUnitOptions",
           "kind": "type",
-          "signature": "export type IPersistUnitOptions<TState> = {\n  key: string;\n  /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime;\n  storage: IPersistStorage;\n  /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n};",
-          "declarationLine": 49,
+          "signature": "export type IPersistUnitOptions<TState> = {\n  key: string;\n  /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime;\n  storage: IPersistStorage;\n  /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  /** Quiet interval before enqueueing a write; zero writes without debounce. */ debounceMs?: number;\n  /** Maximum debounce-window duration after hydration; does not bound storage or queue latency. */ maxWaitMs?: number;\n  /** Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler. */ scheduler?: IScheduler;\n};",
+          "declarationLine": 50,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IPersistUnitOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistUnitOptions.",
@@ -158737,7 +158737,7 @@
           "aliasOf": "IPersistUnitOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IPersistUnitOptions<TState> = { key: string; /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime; storage: IPersistStorage; /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };"
+            "export type IPersistUnitOptions<TState> = { key: string; /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime; storage: IPersistStorage; /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; /** Quiet interval before enqueueing a write; zero writes without debounce. */ debounceMs?: number; /** Maximum debounce-window duration after hydration; does not bound storage or queue latency. */ maxWaitMs?: number; /** Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler. */ scheduler?: IScheduler; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -158776,7 +158776,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistUnitOptions:export type IPersistUnitOptions<TState> = { key: string; /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime; storage: IPersistStorage; /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };",
+          "identity": "packages/store-persist/dist/core/types.d.ts:IPersistUnitOptions:export type IPersistUnitOptions<TState> = { key: string; /** * Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep * them in one graph. */ runtime: IRuntime; storage: IPersistStorage; /** * Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize * on the state type. */ codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; /** Quiet interval before enqueueing a write; zero writes without debounce. */ debounceMs?: number; /** Maximum debounce-window duration after hydration; does not bound storage or queue latency. */ maxWaitMs?: number; /** Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler. */ scheduler?: IScheduler; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -158786,7 +158786,7 @@
           "name": "IReadonlyPersistValue",
           "kind": "type",
           "signature": "export type IReadonlyPersistValue<T> = { readonly value: T };",
-          "declarationLine": 22,
+          "declarationLine": 23,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IReadonlyPersistValue is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IReadonlyPersistValue.",
@@ -158848,7 +158848,7 @@
           "name": "IWriteStatus",
           "kind": "type",
           "signature": "export type IWriteStatus =\n  | typeof PersistState.idle\n  | typeof PersistState.writing\n  | typeof PersistState.error\n  | typeof PersistState.disposed;",
-          "declarationLine": 21,
+          "declarationLine": 22,
           "source": "packages/store-persist/dist/core/types.d.ts",
           "purpose": "IWriteStatus is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWriteStatus.",
@@ -159620,7 +159620,7 @@
               ]
             }
           ],
-          "usageScore": 46,
+          "usageScore": 50,
           "configuration": [],
           "fragment": "store-persist-index--persistUnit"
         },
@@ -160323,7 +160323,7 @@
           "errors": ["No documented errors are declared for IPersistableCollection."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistableCollection.",
           "examples": [
-            "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n};"
+            "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
           ],
           "members": [],
           "aliasOf": "IPersistableCollection",
@@ -160377,7 +160377,7 @@
         {
           "name": "IPersistCollectionOptions",
           "kind": "type",
-          "signature": "export type IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IPersistStorage;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n};",
+          "signature": "export type IPersistCollectionOptions<TState> = Pick<\n  IPersistUnitOptions<TState>,\n  'debounceMs' | 'maxWaitMs' | 'scheduler'\n> & {\n  key: string;\n  storage: IPersistStorage;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n};",
           "declarationLine": 15,
           "source": "packages/store-persist/dist/indexed/persist-collection.d.ts",
           "purpose": "IPersistCollectionOptions is part of this module's public type contract.",
@@ -160389,13 +160389,13 @@
           "errors": ["No documented errors are declared for IPersistCollectionOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistCollectionOptions.",
           "examples": [
-            "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n};"
+            "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
           ],
           "members": [],
           "aliasOf": "IPersistCollectionOptions",
           "exportPath": "./indexed",
           "overloadSignatures": [
-            "export type IPersistCollectionOptions<TState> = { key: string; storage: IPersistStorage; codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };"
+            "export type IPersistCollectionOptions<TState> = Pick<IPersistUnitOptions<TState>, 'debounceMs' | 'maxWaitMs' | 'scheduler'> & { key: string; storage: IPersistStorage; codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -160434,7 +160434,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/indexed/persist-collection.d.ts:IPersistCollectionOptions:export type IPersistCollectionOptions<TState> = { key: string; storage: IPersistStorage; codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; debounceMs?: number; };",
+          "identity": "packages/store-persist/dist/indexed/persist-collection.d.ts:IPersistCollectionOptions:export type IPersistCollectionOptions<TState> = Pick<IPersistUnitOptions<TState>, 'debounceMs' | 'maxWaitMs' | 'scheduler'> & { key: string; storage: IPersistStorage; codec?: ICodec; version?: number; migrate?: (persisted: TState, fromVersion: number) => TState; partialize?: (state: TState) => Partial<TState>; merge?: (persisted: Partial<TState>, current: TState) => TState; };",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -160444,7 +160444,7 @@
           "name": "persistCollection",
           "kind": "function",
           "signature": "export declare function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>,\n): IPersistHandle;",
-          "declarationLine": 25,
+          "declarationLine": 24,
           "source": "packages/store-persist/dist/indexed/persist-collection.d.ts",
           "purpose": "persistCollection is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for persistCollection.",
@@ -160625,7 +160625,7 @@
           "name": "clearFamily",
           "kind": "function",
           "signature": "export declare function clearFamily(\n  storage: IPersistStorage,\n  namespace: string,\n): Promise<number>;",
-          "declarationLine": 34,
+          "declarationLine": 33,
           "source": "packages/store-persist/dist/keyed/persist-keyed.d.ts",
           "purpose": "Removes all persisted records whose keys start with `${namespace}:`. `AtomStore` does not inventory live keyed instances or clear their memory state here. Existing `persistKeyed()` handles keep their in-memory values after removal. Removing records does not trigger a write. Their next change notification writes a new record.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for clearFamily.",
@@ -160718,7 +160718,7 @@
           "name": "IPersistKeyedHandle",
           "kind": "type",
           "signature": "export type IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T };",
-          "declarationLine": 17,
+          "declarationLine": 16,
           "source": "packages/store-persist/dist/keyed/persist-keyed.d.ts",
           "purpose": "IPersistKeyedHandle is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPersistKeyedHandle.",
@@ -160729,7 +160729,7 @@
           "errors": ["No documented errors are declared for IPersistKeyedHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistKeyedHandle.",
           "examples": [
-            "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\ntype IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };"
+            "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\ntype IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };"
           ],
           "members": [],
           "aliasOf": "IPersistKeyedHandle",
@@ -160783,7 +160783,7 @@
         {
           "name": "IPersistKeyedOptions",
           "kind": "type",
-          "signature": "export type IPersistKeyedOptions<T> = {\n  /** * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the * prefix. */ namespace: string;\n  storage: IPersistStorage;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};",
+          "signature": "export type IPersistKeyedOptions<T> = Pick<\n  IPersistUnitOptions<T>,\n  'debounceMs' | 'maxWaitMs' | 'scheduler'\n> & {\n  /** * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the * prefix. */ namespace: string;\n  storage: IPersistStorage;\n  codec?: ICodec;\n  version?: number;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};",
           "declarationLine": 4,
           "source": "packages/store-persist/dist/keyed/persist-keyed.d.ts",
           "purpose": "IPersistKeyedOptions is part of this module's public type contract.",
@@ -160795,13 +160795,13 @@
           "errors": ["No documented errors are declared for IPersistKeyedOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistKeyedOptions.",
           "examples": [
-            "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\ntype IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };"
+            "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\ntype IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };"
           ],
           "members": [],
           "aliasOf": "IPersistKeyedOptions",
           "exportPath": "./keyed",
           "overloadSignatures": [
-            "export type IPersistKeyedOptions<T> = { /** * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the * prefix. */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; debounceMs?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };"
+            "export type IPersistKeyedOptions<T> = Pick<IPersistUnitOptions<T>, 'debounceMs' | 'maxWaitMs' | 'scheduler'> & { /** * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the * prefix. */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -160840,7 +160840,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/keyed/persist-keyed.d.ts:IPersistKeyedOptions:export type IPersistKeyedOptions<T> = { /** * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the * prefix. */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; debounceMs?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };",
+          "identity": "packages/store-persist/dist/keyed/persist-keyed.d.ts:IPersistKeyedOptions:export type IPersistKeyedOptions<T> = Pick<IPersistUnitOptions<T>, 'debounceMs' | 'maxWaitMs' | 'scheduler'> & { /** * Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the * prefix. */ namespace: string; storage: IPersistStorage; codec?: ICodec; version?: number; partialize?: (value: T) => Partial<T>; merge?: (persisted: Partial<T>, current: T) => T; };",
           "guidance": [],
           "usageScore": 18,
           "configuration": [],
@@ -160850,7 +160850,7 @@
           "name": "persistKeyed",
           "kind": "function",
           "signature": "export declare function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>,\n): IPersistKeyedHandle<T>;",
-          "declarationLine": 26,
+          "declarationLine": 25,
           "source": "packages/store-persist/dist/keyed/persist-keyed.d.ts",
           "purpose": "Persists one keyed definition in an `AtomStore`. `AtomStore` and `familyDef` do not inventory currently existing keys, so the persistence unit is one key rather than a whole family (SDD §3.4). Each call creates an independent `persistUnit()` instance. Disposal affects only that key.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for persistKeyed.",
@@ -161154,7 +161154,7 @@
           "errors": ["No documented errors are declared for IPersistableStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistableStore.",
           "examples": [
-            "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n};"
+            "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
           ],
           "members": [],
           "aliasOf": "IPersistableStore",
@@ -161208,7 +161208,7 @@
         {
           "name": "IPersistOptions",
           "kind": "type",
-          "signature": "export type IPersistOptions = {\n  key: string;\n  storage: IPersistStorage;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (\n    persisted: Record<string, unknown>,\n    fromVersion: number,\n  ) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n};",
+          "signature": "export type IPersistOptions = Pick<\n  IPersistUnitOptions<Record<string, unknown>>,\n  'debounceMs' | 'maxWaitMs' | 'scheduler'\n> & {\n  key: string;\n  storage: IPersistStorage;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (\n    persisted: Record<string, unknown>,\n    fromVersion: number,\n  ) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n};",
           "declarationLine": 21,
           "source": "packages/store-persist/dist/light/persist.d.ts",
           "purpose": "IPersistOptions is part of this module's public type contract.",
@@ -161220,13 +161220,13 @@
           "errors": ["No documented errors are declared for IPersistOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistOptions.",
           "examples": [
-            "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n};"
+            "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
           ],
           "members": [],
           "aliasOf": "IPersistOptions",
           "exportPath": "./light",
           "overloadSignatures": [
-            "export type IPersistOptions = { key: string; storage: IPersistStorage; codec?: ICodec; version?: number; migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>; partialize?: (state: Record<string, unknown>) => Record<string, unknown>; debounceMs?: number; };"
+            "export type IPersistOptions = Pick<IPersistUnitOptions<Record<string, unknown>>, 'debounceMs' | 'maxWaitMs' | 'scheduler'> & { key: string; storage: IPersistStorage; codec?: ICodec; version?: number; migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>; partialize?: (state: Record<string, unknown>) => Record<string, unknown>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -161265,7 +161265,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-persist/dist/light/persist.d.ts:IPersistOptions:export type IPersistOptions = { key: string; storage: IPersistStorage; codec?: ICodec; version?: number; migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>; partialize?: (state: Record<string, unknown>) => Record<string, unknown>; debounceMs?: number; };",
+          "identity": "packages/store-persist/dist/light/persist.d.ts:IPersistOptions:export type IPersistOptions = Pick<IPersistUnitOptions<Record<string, unknown>>, 'debounceMs' | 'maxWaitMs' | 'scheduler'> & { key: string; storage: IPersistStorage; codec?: ICodec; version?: number; migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>; partialize?: (state: Record<string, unknown>) => Record<string, unknown>; };",
           "guidance": [],
           "usageScore": 20,
           "configuration": [],
@@ -161275,7 +161275,7 @@
           "name": "persist",
           "kind": "function",
           "signature": "export declare function persist(\n  store: IPersistableStore,\n  options: IPersistOptions,\n): IPersistHandle;",
-          "declarationLine": 30,
+          "declarationLine": 29,
           "source": "packages/store-persist/dist/light/persist.d.ts",
           "purpose": "persist is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for persist.",

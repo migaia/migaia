@@ -24678,6 +24678,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "每次水合只读取一次这两个选项；未知字段复用同一个回调及原 options receiver。选项 getter 失败会以 `INVALID_OPTION` 保留原始 cause，并在写入任何字段前拒绝。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "`store.$own(resource)`｜5 秒上手 —— 把外部资源纳入本 Store 的所有权作用域，`$dispose()` 时一并释放："
                 },
                 {
@@ -26779,7 +26783,9 @@
                     "`version?: number` —— 默认 `0`，必须是安全非负整数",
                     "`migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>` —— `version` 与存档不一致时的转换函数，不提供则版本不一致直接 hydrate 失败",
                     "`partialize?: (state: Record<string, unknown>) => Record<string, unknown>` —— 默认恒等函数，写入前裁剪",
-                    "`debounceMs?: number` —— 默认 `0`（不防抖），必须是 `[0, 2147483647]` 内的有限数"
+                    "`debounceMs?: number` —— 默认 `0`（不防抖），必须是 `[0, 2147483647]` 内的有限数",
+                    "`maxWaitMs?: number` —— 可选，同一范围；从成功水合后的首次变更起限制防抖窗口，持续变更也在上限到达时请求入队；省略保持仅等待安静间隔，`0` 表示下一次 0ms 调度入队",
+                    "`scheduler?: IScheduler` —— 可选，默认 system scheduler；注入的单调时钟和可取消任务统一拥有防抖计时，接口来自 `@migaia/utils/scheduler`"
                   ]
                 },
                 {
@@ -26817,7 +26823,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`key: string`（必填）、`storage: IPersistStorage`（必填）、`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）",
+                    "`key: string`（必填）、`storage: IPersistStorage`（必填）、`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）",
                     "`migrate?: (persisted: TState, fromVersion: number) => TState`",
                     "`partialize?: (state: TState) => Partial<TState>` —— 默认恒等函数",
                     "`merge?: (persisted: Partial<TState>, current: TState) => TState` —— 默认对 plain object 做启动快照三向合并，数组/Map/Set 等非 plain 形状整体替换；一旦自定义 `partialize` 只存部分字段，且状态本身是数组/Map/Set，必须提供匹配的 `merge`，否则默认合并会丢数据"
@@ -26856,7 +26862,7 @@
                   "items": [
                     "`namespace: string`（必填）—— storage key 前缀，`clearFamily()` 靠它过滤",
                     "`storage: IPersistStorage`（必填）",
-                    "`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）",
+                    "`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）",
                     "`partialize?: (value: T) => Partial<T>` —— 默认恒等函数",
                     "`merge?: (persisted: Partial<T>, current: T) => T` —— 语义同 `persistCollection` 的 `merge`"
                   ]
@@ -26953,6 +26959,10 @@
                   "type": "code",
                   "language": "bash",
                   "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test && pnpm run build"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`maxWaitMs` 限制防抖后请求写入的时间，不限制串行队列或存储适配器的实际完成时间。`flush()`、`clear()`、`dispose()` 都取消当前防抖窗口；卸载前尚未触发的最新快照仍会发起最终写入，最终失败保留在 `writeError`，即使状态已是 disposed。计时和取消能力分别复用 scheduler 与 lifecycle 的原生 controller 工厂；原生 signal、默认 AbortError reason 与持久化失败的原始 cause 保持不变。"
                 }
               ]
             }
@@ -27072,7 +27082,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n};"
+                  "code": "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
                 },
                 {
                   "type": "paragraph",
@@ -27104,7 +27114,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n};"
+                  "code": "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
                 },
                 {
                   "type": "paragraph",
@@ -27138,7 +27148,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\ntype IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };"
+                  "code": "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\ntype IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };"
                 }
               ]
             },
@@ -27501,6 +27511,10 @@
                 {
                   "type": "paragraph",
                   "text": "仓库根目录：`pnpm --filter @migaia/store-persist fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。hydrate 失败检查 `handle.ready`/`hydrationError`；写入失败检查 `writeError`，并确认 codec output 与后端能力匹配。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。"
                 }
               ]
             }
