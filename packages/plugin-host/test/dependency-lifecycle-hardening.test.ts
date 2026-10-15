@@ -175,6 +175,64 @@ describe('hot replacement transaction', () => {
     expect(previousDispose).toHaveBeenCalledTimes(1)
   })
 
+  it('PHP-T1 drains every retired snapshot containing the same owner', async () => {
+    /** Executes two versions while their common plugin remains in flight. */
+    class PipelineHost extends PluginHost<Record<string, never>, number> {
+      run(value: number): Promise<void> {
+        return this.runPipeline(value, () => undefined) as Promise<void>
+      }
+    }
+    /** Exact host uses the normal public stage mutation and unregister paths. */
+    const host = new PipelineHost({ execution, pipeline: { mode: MiddlewarePipelineMode.async } })
+    /** Each run can leave its version independently. */
+    const releases = new Map<number, () => void>()
+    /** Disposal must wait for both versions, even after the cached version changes. */
+    const disposed = vi.fn()
+    await host.use(
+      definePlugin({
+        name: 'A',
+        install: (core: any) => {
+          core.useAsyncPipeline(async (value: number, next: (value: number) => unknown) => {
+            await new Promise<void>((resolve) => {
+              releases.set(value, resolve)
+            })
+            return next(value)
+          })
+          return {}
+        },
+        dispose: disposed
+      }) as never
+    )
+    /** First version becomes retired while this run is held. */
+    const first = host.run(1)
+    await vi.waitFor(() => expect(releases.has(1)).toBe(true))
+    await host.use(
+      definePlugin({
+        name: 'B',
+        install: (core: any) => {
+          core.useAsyncPipeline(async (value: number, next: (value: number) => unknown) =>
+            next(value)
+          )
+          return {}
+        }
+      }) as never
+    )
+    /** New version contains the same plugin and a newly published plugin stage. */
+    const second = host.run(2)
+    await vi.waitFor(() => expect(releases.has(2)).toBe(true))
+    /** Unregister retires the second version and waits for both owner pins. */
+    const removing = host.unUse('A')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    releases.get(1)!()
+    await first
+    expect(disposed).not.toHaveBeenCalled()
+    releases.get(2)!()
+    await second
+    await removing
+    expect(disposed).toHaveBeenCalledTimes(1)
+    await host.dispose()
+  })
+
   it('A23 keeps the previous lease key while a replace candidate stages before publication', async () => {
     class PipelineHost extends PluginHost<Record<string, never>, number> {
       run(): Promise<void> {

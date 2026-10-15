@@ -35,12 +35,10 @@ import {
   createMutationQueue,
   createAbortController,
   createPendingTracker,
-  createQuiescenceTracker,
   createTerminalController,
   snapshotScheduler,
   type IMutationQueue,
   type IAbortController,
-  type IQuiescenceTracker,
   type IPendingTracker,
   type ITerminalController,
   LifecycleState
@@ -56,7 +54,11 @@ export {
   type IPluginHostDisposalNodeKind,
   type IPluginHostDisposalProvenance
 } from './cleanup-runtime.js'
-import { executePluginHostPipeline } from './pipeline-runtime.js'
+import {
+  executePluginHostPipeline,
+  type IPluginHostPipelineExecutionPort
+} from './pipeline-runtime.js'
+import type { IStageSnapshot } from './stage-lanes.js'
 import { PluginHostRemovalRuntime } from './removal-runtime.js'
 import { PluginHostReplaceRuntime } from './replace-runtime.js'
 import { PluginHostResumeRuntime } from './resume-runtime.js'
@@ -175,7 +177,6 @@ export class PluginHost<
   #terminal: ITerminalController = createTerminalController()
   #executionController: IAbortController = createAbortController()
   #operationRuntime: PluginHostOperationRuntime
-  #pipelineLeases: IQuiescenceTracker<object> = createQuiescenceTracker<object>()
   #pending: IPendingTracker = createPendingTracker()
   #pipelineKey: object = {}
   /**
@@ -221,6 +222,8 @@ export class PluginHost<
   #pipelineMode: IMiddlewarePipelineMode
   /** Canonical stateless runner that owns mode dispatch, lifting, and violation semantics. */
   #pipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
+  /** Stable execution policy avoids rebuilding four Host closures for every log/stage run. */
+  readonly #pipelineExecution: IPluginHostPipelineExecutionPort<TValue>
   #diagnostic: IPluginHostDiagnostic
   /** Real lifecycle signal shared by active pipeline stages and disposal cancellation. */
   #liveSignal: IAbortSignal = this.#executionController.signal as unknown as IAbortSignal
@@ -311,6 +314,19 @@ export class PluginHost<
           PluginHostErrorCode.pipelineFailed
         )
     })
+    this.#pipelineExecution = {
+      mode: this.#pipelineMode,
+      runner: this.#pipeline,
+      assertActive: () => this.#assertActive(),
+      retainLease: (snapshot) => this.#retainPipelineLease(snapshot),
+      enter: () => {
+        this.#pipelineDepth += 1
+      },
+      leave: () => {
+        this.#pipelineDepth -= 1
+      },
+      pending: this.#pending
+    }
     // 时间策略统一走 lifecycle scheduler / 可配置阈值（AF-10）。负数/NaN/Infinity 立即 INVALID_OPTION。
     for (const [label, value] of [
       ['queueAdmissionTimeoutMs', options.queueAdmissionTimeoutMs],
@@ -375,7 +391,7 @@ export class PluginHost<
     })
     this.#removalRuntime = new PluginHostRemovalRuntime({
       invokeHook: this.#invokeHook,
-      pipelineLeases: this.#pipelineLeases,
+      pipelineLeases: this.#state.lanes.leases,
       executionSignal: this.#executionController.signal,
       cleanupRuntime: this.#cleanupRuntime,
       scheduler: this.#scheduler,
@@ -593,7 +609,7 @@ export class PluginHost<
     this.#hostDisposalRuntime = new PluginHostDisposalRuntime({
       terminal: this.#terminal,
       executionController: this.#executionController,
-      pipelineLeases: this.#pipelineLeases,
+      pipelineLeases: this.#state.lanes.leases,
       pending: this.#pending,
       pipelineKey: this.#pipelineKey,
       scheduler: this.#scheduler,
@@ -700,9 +716,9 @@ export class PluginHost<
   }
 
   /** Retains global and owner leases for the exact stage snapshot about to execute. */
-  #retainPipelineLease(ownerKeys: readonly object[]): () => void {
+  #retainPipelineLease(snapshot: IStageSnapshot<TValue>): () => void {
     this.#assertActive()
-    return this.#state.lanes.retainLeases(this.#pipelineLeases, this.#pipelineKey, ownerKeys)
+    return this.#state.lanes.retainLeases(this.#pipelineKey, snapshot)
   }
 
   #assertMutationAllowed(): void {
@@ -797,22 +813,12 @@ export class PluginHost<
 
   protected runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void> {
     try {
-      return executePluginHostPipeline({
-        mode: this.#pipelineMode,
-        snapshot: this.#state.lanes.snapshot(),
+      return executePluginHostPipeline(
+        this.#pipelineExecution,
+        this.#state.lanes.snapshot(),
         value,
-        done,
-        runner: this.#pipeline,
-        assertActive: () => this.#assertActive(),
-        retainLease: (ownerKeys) => this.#retainPipelineLease(ownerKeys),
-        enter: () => {
-          this.#pipelineDepth += 1
-        },
-        leave: () => {
-          this.#pipelineDepth -= 1
-        },
-        pending: this.#pending
-      })
+        done
+      )
     } catch (error) {
       this.#rethrowWithIdentity(error)
     }
@@ -1029,9 +1035,9 @@ export class PluginHost<
 
   /** Seals one registration's pipeline owner and waits for its active leases to drain. */
   async #drainRegistrationLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void> {
-    this.#state.lanes.retireLeaseOwner(registration, this.#pipelineLeases)
+    this.#state.lanes.retireLeaseOwner(registration, this.#state.lanes.leases)
     await drainPipelineLeases({
-      leases: this.#pipelineLeases,
+      leases: this.#state.lanes.leases,
       key: registration.pipelineOwnerKey,
       drainTimeoutMs: this.#pipelineDrainTimeoutMs,
       scheduler: this.#scheduler
@@ -1074,7 +1080,7 @@ export class PluginHost<
     registration: IRegistration<TDomainCore, TValue>,
     rollbackErrors: unknown[] = []
   ): void {
-    this.#state.lanes.retireLeaseOwner(registration, this.#pipelineLeases)
+    this.#state.lanes.retireLeaseOwner(registration, this.#state.lanes.leases)
     for (const detach of [...registration.pipelineDisposers].reverse()) {
       try {
         detach()

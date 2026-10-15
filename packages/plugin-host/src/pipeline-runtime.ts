@@ -46,14 +46,11 @@ export const createPluginHostPipelineViolationHandler =
     )
   }
 
-type IPluginHostPipelineExecutionOptions<TValue> = Readonly<{
+export type IPluginHostPipelineExecutionPort<TValue> = Readonly<{
   readonly mode: IMiddlewarePipelineMode
-  readonly snapshot: IStageSnapshot<TValue>
-  readonly value: TValue
-  readonly done: (value: TValue) => void
   readonly runner: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
   readonly assertActive: () => void
-  readonly retainLease: (ownerKeys: readonly object[]) => () => void
+  readonly retainLease: (snapshot: IStageSnapshot<TValue>) => () => void
   readonly enter: () => void
   readonly leave: () => void
   readonly pending: IPendingTracker
@@ -102,9 +99,12 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
 
 /** Executes the single host-mode lane and owns lease/depth/pending cleanup. */
 export const executePluginHostPipeline = <TValue>(
-  options: IPluginHostPipelineExecutionOptions<TValue>
+  options: IPluginHostPipelineExecutionPort<TValue>,
+  snapshot: IStageSnapshot<TValue>,
+  value: TValue,
+  done: (value: TValue) => void
 ): void | Promise<void> => {
-  const stages = [...options.snapshot.stages]
+  const stages = snapshot.stages
   const asynchronous =
     options.mode === MiddlewarePipelineMode.async ||
     options.mode === MiddlewarePipelineMode.asyncGenerator
@@ -114,21 +114,19 @@ export const executePluginHostPipeline = <TValue>(
     } catch (error) {
       return Promise.reject(error)
     }
-    const release = options.retainLease(options.snapshot.ownerKeys)
+    const release = options.retainLease(snapshot)
     options.enter()
-    const task = (options.runner.run(stages, options.value, options.done) as Promise<void>).finally(
-      () => {
-        options.leave()
-        release()
-      }
-    )
+    const task = (options.runner.run(stages, value, done) as Promise<void>).finally(() => {
+      options.leave()
+      release()
+    })
     return options.pending.track(task)
   }
   options.assertActive()
-  const release = options.retainLease(options.snapshot.ownerKeys)
+  const release = options.retainLease(snapshot)
   options.enter()
   try {
-    return options.runner.run(stages, options.value, options.done)
+    return options.runner.run(stages, value, done)
   } finally {
     options.leave()
     release()
