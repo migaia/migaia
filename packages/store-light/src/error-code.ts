@@ -48,10 +48,10 @@ export const StoreLightErrorCode = {
   identityRequired: 'IDENTITY_REQUIRED',
 
   /**
-   * `storeReady()` is called for a store without asynchronous initialization, such as a synchronous
-   * `createStore()` store.
+   * `storeReady()` receives an object with no initialization Promise registered by this package
+   * instance. Both synchronous `createStore()` and `createAsyncStore()` register readiness.
    *
-   * Use `createAsyncStore()` for asynchronous fields or omit the `storeReady()` call.
+   * Pass the actual constructed Store instead of an unrelated or foreign object.
    */
   noAsyncInit: 'NO_ASYNC_INIT',
 
