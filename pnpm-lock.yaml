@@ -695,6 +695,9 @@ importers:
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive
+      '@migaia/resource':
+        specifier: workspace:^
+        version: link:../resource
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils

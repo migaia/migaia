@@ -405,3 +405,7 @@ pnpm run typecheck:e2e && pnpm run test:e2e
 Store Actions keep their original return value or Promise outside the synchronous mutation callback. Only writes before the first await share that batch; use `$batch()` for continuation writes. Mutation-policy callbacks remain synchronous. With `warnAsyncActions`, the first thenable result reports `ACTION_BATCH_BOUNDARY` through the Store Runtime.
 
 StoreResource uses its captured Runtime for idle cleanup and diagnostics, and its admitted scheduler for cache TTL and the 4000ms provisional capture window. `keepAliveMs: 0` still evicts synchronously. Missing `onError` forwards the original failure to Runtime; if a user reporter throws or rejects, both the primary and reporter failure reach that sink by identity. No host console or global reportError fallback is used.
+
+### Canonical async resource ownership
+
+`createStoreResource` is a value-ownership adapter over `@migaia/resource`: one owner for requests/data/Promise/cancellation, with StoreLight render captures, version leases and exactly-once disposal layered above it. Pending reads share the original canonical Promise<T>. Retry immediately rejects a superseded Promise with Resource REQUEST_ABORTED/native AbortError, including ignored-abort loaders; their eventual owned values still get cleaned. Failed refresh retains stale data. StoreResourceDataKind is removed along with the duplicate controller. See USEGUIDE for migration and lease behavior. Runtime defaults stay lazy on import.

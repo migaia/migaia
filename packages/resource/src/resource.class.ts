@@ -1,12 +1,8 @@
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IDisposable, IReactiveSignal, IRuntime } from '@migaia/reactive'
 import {
   ReactiveErrorPhase,
-  type IDisposable,
-  type IReactiveSignal,
-  type IRuntime
-} from '@migaia/reactive'
-import {
   internalRuntimeOf,
   createTrackedObserver,
   type ITrackedObserverBinding,
@@ -20,7 +16,8 @@ import {
   createTerminalController,
   snapshotScheduler,
   LifecycleState,
-  type IGenerationToken
+  type IGenerationToken,
+  type IGenerationRequest
 } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { observeAbortSubscription } from '@migaia/lifecycle/abort'
@@ -45,7 +42,13 @@ export type IResourceState<T> =
    */
   | { status: typeof ResourceStatus.cancelled; error: Error }
 
-export type IResourceFetcher<T> = (ctx: { signal: IAbortSignal }) => T | PromiseLike<T>
+/**
+ * Readonly canonical lifecycle request: signal aborts on replacement/reset/disposal, generation
+ * advances monotonically, and the opaque token is retained across retry attempts.
+ */
+export type IResourceFetchContext = IGenerationRequest
+
+export type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>
 
 export type IResourceCacheSnapshot<T> = {
   readonly version: 1
@@ -542,6 +545,28 @@ export class Resource<T> implements IObserver, IDisposable {
     return this.#materialize(this.#stateSignal.peek())
   }
 
+  /** Inspects the canonical state without tracking, starting work or revalidating TTL. */
+  peekState(): IResourceState<T> {
+    this.#assertUsable()
+    return this.#stateSignal.peek()
+  }
+
+  /** Cancels this generation and drops its cache; the same Resource can start again from idle. */
+  reset(): void {
+    this.#assertUsable()
+    this.#requests.supersede()
+    this.#requestPending = false
+    this.#paused = false
+    this.#refreshScheduled = false
+    this.#forceRefresh = false
+    this.#settlementExpiry = undefined
+    this.#currentPromise = undefined
+    this.#expiresAt = 0
+    this.#updatedAt = 0
+    this.#tracking.clear()
+    this.#stateSignal.value = { status: ResourceStatus.idle }
+  }
+
   /**
    * Force a new request. Explicit refetches do not reuse a fresh cache entry; passive
    * `promise`/`read()` consumers do.
@@ -760,7 +785,10 @@ export class Resource<T> implements IObserver, IDisposable {
       this.#stateSignal.value = { status: ResourceStatus.pending }
     }
 
-    const request = this.#withAbort(this.#executeFetcher({ signal }, 0), signal).then((data) => {
+    const request = this.#withAbort(
+      this.#executeFetcher({ signal, generation: requestToken.generation, token }, 0),
+      signal
+    ).then((data) => {
       if (this.#requests.isCurrent(token)) {
         const updatedAt = this.#readSchedulerNow()
         this.#settlementExpiry = {
@@ -776,7 +804,7 @@ export class Resource<T> implements IObserver, IDisposable {
   }
 
   /** Reuses one completion Promise across Suspense wakeups instead of retaining a recursive chain. */
-  #executeFetcher(controller: { signal: IAbortSignal }, failureCount: number): Promise<T> {
+  #executeFetcher(controller: IResourceFetchContext, failureCount: number): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       /** Ordinary failures retain the existing retry policy and exact final rejection. */
       const failed = (error: unknown): void => {
@@ -791,7 +819,7 @@ export class Resource<T> implements IObserver, IDisposable {
         /** The fetcher's synchronous reads participate in the same dependency frame. */
         let fetched: T | PromiseLike<T>
         try {
-          fetched = this.#tracking.runTracked(() => this.#fetcher({ signal: controller.signal }))
+          fetched = this.#tracking.runTracked(() => this.#fetcher({ ...controller }))
         } catch (error) {
           /** Capture a thrown thenable once, preserving getter failures and the original value. */
           const probe = probeThenable(error)
@@ -823,7 +851,7 @@ export class Resource<T> implements IObserver, IDisposable {
 
   #retryFailure(
     error: unknown,
-    controller: { signal: IAbortSignal },
+    controller: IResourceFetchContext,
     failureCount: number
   ): Promise<T> {
     if (controller.signal.aborted) return Promise.reject(abortError())

@@ -34,49 +34,46 @@
 ## 4. 五分钟上手
 
 ```ts
-import { Resource, ResourceStatus } from '@migaia/resource';
-import { createRuntime } from '@migaia/reactive';
+import { Resource, ResourceStatus } from '@migaia/resource'
+import { createRuntime } from '@migaia/reactive'
 
-type IUser = { id: string; name: string };
+type IUser = { id: string; name: string }
 
 class UserRequestError extends Error {
-  readonly code = 'USER_REQUEST_FAILED';
+  readonly code = 'USER_REQUEST_FAILED'
 
   constructor(readonly status: number) {
-    super(`GET /api/user failed: ${status}`);
+    super(`GET /api/user failed: ${status}`)
   }
 }
 
-const runtime = createRuntime();
+const runtime = createRuntime()
 
-const user = new Resource<IUser>(
-  async ({ signal }) => {
-    const response = await fetch('/api/user', { signal });
-    if (!response.ok) throw new UserRequestError(response.status);
-    return (await response.json()) as IUser;
-  },
-  runtime
-);
+const user = new Resource<IUser>(async ({ signal }) => {
+  const response = await fetch('/api/user', { signal })
+  if (!response.ok) throw new UserRequestError(response.status)
+  return (await response.json()) as IUser
+}, runtime)
 
 switch (user.state.status) {
   case ResourceStatus.idle:
   case ResourceStatus.pending:
-    console.log('loading...');
-    break;
+    console.log('loading...')
+    break
   case ResourceStatus.success:
-    console.log(user.state.data);
-    break;
+    console.log(user.state.data)
+    break
   case ResourceStatus.error:
   case ResourceStatus.cancelled:
-    console.error(user.state.error);
-    break;
+    console.error(user.state.error)
+    break
 }
 
 try {
-  const freshUser = await user.refetch();
-  console.log('refetched user', freshUser);
+  const freshUser = await user.refetch()
+  console.log('refetched user', freshUser)
 } finally {
-  user.dispose();
+  user.dispose()
 }
 ```
 
@@ -89,39 +86,39 @@ try {
 依赖某个响应式输入、自动刷新的写法：
 
 ```ts
-import { Resource, ResourceStatus } from '@migaia/resource';
-import { createRuntime } from '@migaia/reactive';
-import { fetchUser } from './user-api.js';
+import { Resource, ResourceStatus } from '@migaia/resource'
+import { createRuntime } from '@migaia/reactive'
+import { fetchUser } from './user-api.js'
 
-const runtime = createRuntime();
-const userId = runtime.signal('1');
+const runtime = createRuntime()
+const userId = runtime.signal('1')
 
 const user = new Resource(
   ({ signal }) => {
-    const id = userId.value; // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边
-    return fetchUser(id, { signal });
+    const id = userId.value // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边
+    return fetchUser(id, { signal })
   },
   runtime,
   { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }
-);
+)
 
 const stopRendering = runtime.effect(() => {
-  const state = user.state; // 建立 user.state → 当前渲染任务的依赖边
-  if (state.status === ResourceStatus.pending) console.log('loading user');
-  if (state.status === ResourceStatus.success) console.log('render', state.data);
-  if (state.status === ResourceStatus.error) console.error(state.error);
-});
+  const state = user.state // 建立 user.state → 当前渲染任务的依赖边
+  if (state.status === ResourceStatus.pending) console.log('loading user')
+  if (state.status === ResourceStatus.success) console.log('render', state.data)
+  if (state.status === ResourceStatus.error) console.error(state.error)
+})
 
 export function selectUser(id: string): void {
-  userId.value = id;
+  userId.value = id
 }
 
-selectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'
+selectUser('2') // 标脏 Resource；当前请求被替换，新请求使用 id = '2'
 
 export function disposeUserPanel(): void {
-  stopRendering.dispose();
-  user.dispose();
-  userId.dispose();
+  stopRendering.dispose()
+  user.dispose()
+  userId.dispose()
 }
 ```
 
@@ -160,8 +157,10 @@ pnpm add @migaia/resource
 
 更完整的配置项、每个 API 的精确语义、错误与异常的完整表格、生产级示例，见 **[USEGUIDE.md](./USEGUIDE.md)**。
 
-
 同一请求在所有 Suspense 等待阶段复用同一个 pending Promise。fetcher 抛出的 thenable 完成后，经注入 scheduler 的 0ms 任务继续执行；Suspense 不计入 retry 次数，也不设计数上限。即使 fetcher 连续抛立即完成的 thenable，取消任务仍可执行，cancel/dispose 会停止后续调用。
 
-
 状态类型迁移：`ResourceStatus.fetching` 改为 `ResourceFetchStatus.fetching`；旧 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` key union。运行时的状态字符串与 SWR 数据/传输语义保持不变。
+
+### Canonical request owner for adapters
+
+`peekState()` inspects the state union without starting work or tracking. `reset()` cancels the current request and clears the cache to reusable idle state; the old shared Promise immediately rejects with Resource `REQUEST_ABORTED`/native `AbortError`. `IResourceFetchContext` carries readonly signal/generation/token from lifecycle; retries share identity, resets/replacements advance generation. Loaded-value disposal and rendered-version leases remain adapter responsibilities. See USEGUIDE for the complete reset example.
