@@ -1,5 +1,17 @@
 /** Stable resource diagnostics for scheduler admission and cleanup failures. */
 export const ResourceErrorText = {
+  /** Native cancellation name used by DOMException consumers across package boundaries. */
+  abortName: 'AbortError',
+  /** Request execution stopped after the current generation lost its authority. */
+  requestAborted: 'resource request aborted',
+  /** Explicit cancel stores this native AbortError in the stable cancelled state. */
+  requestCancelled: 'resource request cancelled',
+  /** Passive Promise/read access has neither a running request nor a settled cached result. */
+  noActivePromise: 'resource has no active or cached promise',
+  /** Terminal resources reject all new cache and request operations. */
+  resourceDisposed: 'cannot use a disposed resource',
+  /** Suspense probing failed; its aggregate preserves the thrown value and getter error. */
+  suspenseProbeFailed: 'resource fetcher threw a value whose then getter failed',
   /** Explains that a public constructor option could not be read before Resource admission. */
   optionsSnapshotFailed: 'resource options snapshot failed',
   /** Explains that reading the construction-time initial snapshot option failed before admission. */
