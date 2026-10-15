@@ -105,7 +105,7 @@ type IReleaseDescriptor = {
 - `graceful?` —— 优雅释放；超时**只放弃等待**（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。同步返回的 `graceful` 视为已完成释放：即使超过预算也不再跑 `force`，只通过 `context.report` 上报一条 `DEADLINE_EXCEEDED` 诊断。
 - `gracefulTimeoutMs?: number` —— 优雅阶段自己的预算，会被事务共享的绝对 `deadlineAt` 进一步封顶（取两者较小值）。
 - `force: (context) => void | PromiseLike<void>`（**必填**）—— 必须无条件完成，不得依赖任何前置条件。
-- `gcFallback?: boolean` —— 置为 `true` 时向内部 `FinalizationRegistry` 注册一个不强引用 `resource`/闭包 target 的兜底；显式释放（`dispose()`/`release()`）会自动 unregister 它。
+- `gcFallback?: boolean` —— 异步 scope 可注册尽力而为的 `FinalizationRegistry` 兜底，显式释放（`dispose()`/`release()`）会 unregister。存活的 scope 强引用其资源，因此不会单独回收某个仍被 scope 拥有的资源；它只能作为遗忘整个 owner 后的兜底，不能替代显式 dispose。同步 scope 接受此共享 descriptor 字段，但不注册 finalizer。
 - `custom?` —— 逃生舱：一旦提供，完全接管释放，`graceful`/`force` 被忽略。
 
 `IReleaseContext`（回调收到的第一参数）：`signal: IAbortSignal`（容器进入 closing 时中止）、`deadlineAt: number | undefined`、`scheduler?: IScheduler`（产出 `deadlineAt` 的时间域，缺省 `systemScheduler`）、`report(error: unknown): void`（诊断通道，自身抛错被吞掉）、`disposer?: IDisposerContext`。由 `LifecycleScope` 驱动的 disposer 才有 `disposer.join()`；该显式 owner self-join operation 在同步调用及任意 await、microtask、Promise chain、nested helper 或 timer 后都立即抛 `SCOPE_REENTRANT_DISPOSE`，不返回 outer disposal Promise。没有 scope owner 的 generic `createDisposeTransaction()` 不伪造此 capability；不要捕获 scope 后在 disposer 中直接调用 `scope.dispose()` 绕过 context。

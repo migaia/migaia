@@ -91,8 +91,10 @@ export type IReleaseDescriptor = {
   /** Forced release. Must complete unconditionally; must not throw a recoverable error. */
   readonly force: (context: IReleaseContext) => void | PromiseLike<void>
   /**
-   * GC fallback. When set, the core registers a `FinalizationRegistry` entry that unregisters on
-   * explicit release.
+   * Best-effort fallback for a forgotten asynchronous scope, unregistered on explicit release. A
+   * live scope strongly owns its resources, so this cannot collect an individual resource while its
+   * scope is reachable. It never replaces explicit disposal. SyncLifecycleScope accepts this shared
+   * descriptor field but does not register a finalizer.
    */
   readonly gcFallback?: boolean
   /**
