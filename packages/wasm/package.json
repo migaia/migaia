@@ -7,7 +7,9 @@
     "src/wasm_provider.d.ts",
     "src/wasm_provider_bg.wasm",
     "src/wasm_provider_bg.wasm.d.ts",
-    "rust",
+    "rust/src",
+    "rust/Cargo.toml",
+    "rust/Cargo.lock",
     "README.md",
     "USEGUIDE.md"
   ],
