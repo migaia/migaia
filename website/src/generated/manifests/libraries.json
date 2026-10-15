@@ -2643,11 +2643,6 @@
                       "搜索联想、路由加载、刷新覆盖、重连"
                     ],
                     [
-                      "管理 start/restart 的 idle/loading/loaded/failed",
-                      "`createLifecycleUnit`",
-                      "服务初始化、懒加载模块、配置加载"
-                    ],
-                    [
                       "等所有在途 Promise 真正排空",
                       "`createPendingTracker`",
                       "flush、close、批处理 drain、SSR request completion"
@@ -2713,12 +2708,12 @@
                   "type": "list",
                   "items": [
                     "作用域与释放：`createLifecycleScope`、`createSyncLifecycleScope`、`executeReleaseDescriptor`、`createDisposeTransaction`、`createSyncStartedDisposalLedger`",
-                    "单元与代数：`createLifecycleUnit`、`createGenerationController`",
-                    "静默追踪与租约：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`",
+                    "单元与代数：`createGenerationController`",
+                    "静默追踪与租约：`createQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`",
                     "事务性所有权：`createProvisionalScope`",
                     "变更队列：`createMutationQueue`",
-                    "调度器、中止与有界等待：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`",
-                    "错误基础设施：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`",
+                    "调度器、中止与有界等待：`snapshotScheduler`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`",
+                    "错误基础设施：`LIFECYCLE_SOURCE`、`createLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`",
                     "状态常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                     "按需导入与 tree-shaking",
                     "高阶组合示例",
@@ -2863,20 +2858,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createLifecycleUnit, createGenerationController } from '@migaia/lifecycle'"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createLifecycleUnit`｜10 秒上手 —— 单元装载轴的状态机（`idle`/`loading`/`loaded`/`failed`），内部用一个 `GenerationController` 丢弃过期结果："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const unit = createLifecycleUnit<Config>()\nunit.start(() => fetchConfig()) // thenable → 先进 'loading'，settle 后进 'loaded'/'failed'\nunit.state // 'loading'\nunit.value // undefined（settle 前）\nunit.restart(() => fetchConfig()) // 新 generation，旧一次的迟到结果被静默丢弃"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "全部选项（`ILifecycleUnitOptions`）：`report?: (error: unknown) => void` —— `start()` 的 factory 同步抛出或 thenable reject 时，除了把原始错误存进 `unit.error`（原样、不打标签），还会额外把一份打上 `UNIT_START_FAILED` 标签的错误发给 `report`。`start`/`restart` 是同一函数的两个别名；同步非 thenable 返回直接落 `loaded`（跳过 `loading`）。`close()` 同步；`dispose()` 同步（单元本身不持有需要等待的资源，只是终结 generation controller）。"
+                  "code": "import { createGenerationController } from '@migaia/lifecycle'"
                 },
                 {
                   "type": "paragraph",
@@ -2916,16 +2898,16 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createQuiescenceTracker,\n  createStringQuiescenceTracker,\n  createObjectLeaseRegistry,\n  createStringLeaseRegistry,\n  createPendingTracker\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  createQuiescenceTracker,\n  createStringLeaseRegistry,\n  createObjectLeaseRegistry,\n  createPendingTracker\n} from '@migaia/lifecycle'"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createQuiescenceTracker` / `createStringQuiescenceTracker`｜10 秒上手 —— 按 key 计数的租约追踪，`WeakMap`（对象键，自动 GC）或 `Map`（字符串键，归零后自动清理未 seal 的条目）："
+                  "text": "`createQuiescenceTracker` / `createStringLeaseRegistry`｜10 秒上手 —— 按 key 计数的租约追踪，`WeakMap`（对象键，自动 GC）或 `Map`（字符串键，归零后自动清理未 seal 的条目）："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const tracker = createQuiescenceTracker<object>() // 或 createStringQuiescenceTracker()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT"
+                  "code": "const tracker = createQuiescenceTracker<object>() // 或 createStringLeaseRegistry()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT"
                 },
                 {
                   "type": "paragraph",
@@ -3031,7 +3013,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController\n} from '@migaia/lifecycle'\nimport { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'"
+                  "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController\n} from '@migaia/lifecycle'\nimport { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'"
                 },
                 {
                   "type": "paragraph",
@@ -3049,19 +3031,6 @@
                 {
                   "type": "paragraph",
                   "text": "单参数 `value: unknown`，无选项；`now`/`schedule` 都不是函数时返回 `undefined`；读取 `now`/`schedule` 属性本身抛错时抛 `TypeError`（`INVALID_OPTION`）。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`validateSchedulerDelay` / `validateSchedulerTime` / `addSchedulerTime`｜3 秒上手 —— 本包内部用来校验时间值和安全相加的公开工具，自定义 scheduler 实现也可复用："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 两个有限数相加；溢出 Infinity 时抛 RangeError"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`validateSchedulerTime(value, label)`：`label: string` 必填，仅用于错误信息里标注字段名。`validateSchedulerDelay(value, label?)`：`label` 可选，默认 `'delayMs'`。`addSchedulerTime(base, delta, label)` 只从 `/scheduler` leaf 导出，验证两端及结果都是有限数。三者返回校验后的数值。"
                 },
                 {
                   "type": "paragraph",
@@ -3095,7 +3064,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createTerminalController`｜5 秒上手 —— 独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope`/`createLifecycleUnit` 内部都基于它："
+                  "text": "`createTerminalController`｜5 秒上手 —— 独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope` 内部都基于它："
                 },
                 {
                   "type": "code",
@@ -3138,7 +3107,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -3168,38 +3137,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -3424,6 +3367,30 @@
                   "text": "`boundedWait(task, deadlineAt, { scheduler, reportCleanup? })` 仍负责绝对截止时间与任务竞争，不会取消 task。 它的默认清理失败行为不变；可选 `reportCleanup` 允许 logger flush 把 timer 清理失败作为诊断，保留任务或 deadline winner。 批处理 debounce、health 周期调度与预算授予定时器不等同于一次性相对延时，不强行转换其 owner 语义。"
                 }
               ]
+            },
+            {
+              "id": "scope-入口边界",
+              "heading": "Scope 入口边界",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/lifecycle/scope` 是异步 `createLifecycleScope` 的窄入口；同步与 provisional scope 从 root 导入 `createSyncLifecycleScope` / `createProvisionalScope`。包不提供第二套 scope 实现。generation/quiescence 子路径直接映射各自 canonical owner，未构建的同名 barrel 已删除。"
+                }
+              ]
+            },
+            {
+              "id": "已收回内部的辅助-api",
+              "heading": "已收回内部的辅助 API",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createLifecycleUnit` 及其 option/result types 不再从 module 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay`、`tagLifecycleError`、`createLifecycleRangeError` 只供包内部使用，root 与 leaf 均不再暴露。`/scheduler` 的 snapshot/resolve/addSchedulerTime 与 `/errors` 的其它既有公开构造器保持可用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。"
+                }
+              ]
             }
           ]
         },
@@ -3448,12 +3415,12 @@
                   "items": [
                     "公共基础类型：owner/state/disposer/error 的共享结构",
                     "作用域与释放模块：`createLifecycleScope`、`createSyncLifecycleScope`、`executeReleaseDescriptor`、`createDisposeTransaction`、`createSyncStartedDisposalLedger`、`IReleaseDescriptor`、`IReleaseContext`",
-                    "单元与代数模块：`createLifecycleUnit`、`createGenerationController`",
-                    "静默追踪与租约模块：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`",
+                    "单元与代数模块：`createGenerationController`",
+                    "静默追踪与租约模块：`createQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`",
                     "事务性所有权模块：`createProvisionalScope`",
                     "变更队列模块：`createMutationQueue`",
-                    "调度器、中止与有界等待模块：`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`",
-                    "错误基础设施模块：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`createLifecycleTypeError`、`createLifecycleFailure`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`",
+                    "调度器、中止与有界等待模块：`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`addSchedulerTime`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`",
+                    "错误基础设施模块：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleTypeError`、`createLifecycleFailure`、`containAsyncRejection`、`createErrorCollector`",
                     "状态常量模块：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                     "按需导入与 tree-shaking",
                     "错误码：`LifecycleErrorCode`（22 个码）逐条语义",
@@ -3740,40 +3707,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'"
-                }
-              ]
-            },
-            {
-              "id": "createlifecycleunit",
-              "heading": "createLifecycleUnit",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>\n\ntype ILifecycleUnitOptions = { readonly report?: (error: unknown) => void }\n\ntype ILifecycleUnit<T> = {\n  readonly state: 'idle' | 'loading' | 'loaded' | 'failed'\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly value: T | undefined\n  readonly error: unknown\n  start(factory: () => T | PromiseLike<T>): void\n  restart(factory: () => T | PromiseLike<T>): void // start 的别名\n  close(): void\n  dispose(): void // 永远同步\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "单元装载轴的状态机，内部用一个 `GenerationController` 丢弃过期结果："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const unit = createLifecycleUnit<Config>()\nunit.start(() => fetchConfig()) // thenable → 先进 'loading'，settle 后进 'loaded'/'failed'\nunit.state // 'loading'\nunit.value // undefined（settle 前）\nunit.restart(() => fetchConfig()) // 新 generation，旧一次的迟到结果被静默丢弃"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "边界行为："
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`factory()` 只读一次其返回值的 `.then`（探测语义同 `probeThenable`）：同步非 thenable 返回直接落 `loaded`（跳过 `loading`）；`factory()` 同步抛出或 thenable reject 时进入 `failed`，`unit.error` 存原始错误（不打标签），同时额外把一份打上 `UNIT_START_FAILED` 标签的错误发给 `options.report`（若提供）。",
-                    "每次 `start()`/`restart()` 隐式开启新 generation；旧 generation 的迟到 settle 结果被静默丢弃（不写入 `state`/`value`/`error`）。",
-                    "`lifecycle` 是容器存活轴（`close()`/`dispose()` 驱动），与 `state`（装载轴）是两个独立读值。",
-                    "`dispose()` 永远同步——单元本身不持有需要等待的资源，只是终结内部 generation controller（超过一次调用幂等）。"
-                  ]
+                  "code": "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'"
                 }
               ]
             },
@@ -3820,18 +3754,18 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createQuiescenceTracker,\n  createStringQuiescenceTracker,\n  createObjectLeaseRegistry,\n  createStringLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'"
+                  "code": "import {\n  createQuiescenceTracker,\n  createStringLeaseRegistry,\n  createObjectLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'"
                 }
               ]
             },
             {
-              "id": "createquiescencetracker-createstringquiescencetracker",
-              "heading": "createQuiescenceTracker / createStringQuiescenceTracker",
+              "id": "createquiescencetracker-createstringleaseregistry",
+              "heading": "createQuiescenceTracker / createStringLeaseRegistry",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringQuiescenceTracker(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}"
+                  "code": "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringLeaseRegistry(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}"
                 },
                 {
                   "type": "paragraph",
@@ -3840,7 +3774,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const tracker = createQuiescenceTracker<object>() // 或 createStringQuiescenceTracker()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT"
+                  "code": "const tracker = createQuiescenceTracker<object>() // 或 createStringLeaseRegistry()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT"
                 },
                 {
                   "type": "paragraph",
@@ -3870,7 +3804,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "与上面完全同一引擎的别名（内部就是分别调用 `createQuiescenceTracker()`/`createStringQuiescenceTracker()`），供领域友好命名的调用点使用；无构造参数。"
+                  "text": "与上面完全同一引擎的别名（内部就是分别调用 `createQuiescenceTracker()`/`createStringLeaseRegistry()`），供领域友好命名的调用点使用；无构造参数。"
                 }
               ]
             },
@@ -3885,7 +3819,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "只暴露 `track`/`drain`/`size` 的窄接口，用于追踪并排空在途 Promise（内部基于一个字符串键 `createStringQuiescenceTracker()`）："
+                  "text": "只暴露 `track`/`drain`/`size` 的窄接口，用于追踪并排空在途 Promise（内部基于一个字符串键 `createStringLeaseRegistry()`）："
                 },
                 {
                   "type": "code",
@@ -3994,7 +3928,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'"
+                  "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'"
                 },
                 {
                   "type": "paragraph",
@@ -4046,30 +3980,6 @@
                 {
                   "type": "paragraph",
                   "text": "内部/自定义 scheduler 实现复用的边界解析函数：`resolveScheduler(value)` 对非法值抛 `SCHEDULER_INVALID` 文案的 `INVALID_OPTION` 错误（而不是像 `snapshotScheduler` 那样返回 `undefined`）；`resolveSchedulerOption(options, fallback?)` 读取 `options.scheduler`，未提供时返回 `fallback`（若调用形态未传 `fallback` 则返回 `undefined`），读取该属性本身抛错时抛 `TypeError`（`INVALID_OPTION`）。"
-                }
-              ]
-            },
-            {
-              "id": "validateschedulerdelay-validateschedulertime-addschedulertime",
-              "heading": "validateSchedulerDelay / validateSchedulerTime / addSchedulerTime",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function validateSchedulerTime(value: unknown, label: string): number\nfunction validateSchedulerDelay(value: unknown, label?: string): number // label 默认 'delayMs'\nfunction addSchedulerTime(base: number, delta: number, label: string): number"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "本包内部用来校验时间值的公开工具，自定义 scheduler 实现也可复用："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 结果溢出为 Infinity 时抛 RangeError"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`validateSchedulerTime`：`label` 必填，仅用于错误信息里标注字段名；非 `number` 抛贴 `INVALID_OPTION` 码的 `TypeError`，非有限（`NaN`/`Infinity`）抛贴同码的 `RangeError`。`validateSchedulerDelay`：`label` 可选；在上面基础上额外要求 `>= 0`，否则抛 `RangeError`。`addSchedulerTime` 校验 `base`、`delta` 和相加结果均为有限数；它只从 `/scheduler` leaf 导出。三者校验通过时返回数值。"
                 }
               ]
             },
@@ -4150,7 +4060,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope`/`createLifecycleUnit` 内部都基于它："
+                  "text": "独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope` 内部都基于它："
                 },
                 {
                   "type": "code",
@@ -4169,7 +4079,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "根入口 `@migaia/lifecycle` 保持完整兼容；对 bundle retained graph敏感的消费者可使用以下稳定 subpath："
+                  "text": "根入口 `@migaia/lifecycle` 提供维护中的公开原语；对 bundle retained graph敏感的消费者可使用以下稳定 subpath："
                 },
                 {
                   "type": "table",
@@ -4179,7 +4089,7 @@
                       "`@migaia/lifecycle/abort`",
                       "`createAbortController`、`observeAbortSubscription`、`IAbortController`、`IObservedAbortSubscription`、`IObservedAbortFailureSink`（结构化 signal 类型 `IAbortSignal` 由 `@migaia/utils` 提供）"
                     ],
-                    ["`@migaia/lifecycle/scheduler`", "scheduler、snapshot与时间校验"],
+                    ["`@migaia/lifecycle/scheduler`", "snapshot、resolve 与安全时间相加"],
                     ["`@migaia/lifecycle/quiescence`", "quiescence/lease/pending trackers"],
                     ["`@migaia/lifecycle/scope`", "`createLifecycleScope`"],
                     ["`@migaia/lifecycle/generation`", "`createGenerationController`"],
@@ -4213,7 +4123,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -4257,30 +4167,6 @@
               ]
             },
             {
-              "id": "createlifecyclerangeerror",
-              "heading": "createLifecycleRangeError",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function createLifecycleRangeError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }\n): RangeError"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`code`、`message` 均必填。"
-                }
-              ]
-            },
-            {
               "id": "createlifecycletypeerror-createlifecyclefailure",
               "heading": "createLifecycleTypeError / createLifecycleFailure",
               "blocks": [
@@ -4296,30 +4182,6 @@
                 {
                   "type": "paragraph",
                   "text": "`createLifecycleTypeError` 创建保留原生 `TypeError` runtime type 的附码错误，并可携带 `cause`/`detail`。`createLifecycleFailure` 用在捕获边界：可扩展的原生 `Error` 会尽量原位附码并保持 `===` identity；primitive、冻结对象或不可重标记错误会被包装，原始抛出物仍可从 `cause` 到达。两者都不改写原始 `stack`。"
-                }
-              ]
-            },
-            {
-              "id": "taglifecycleerror",
-              "heading": "tagLifecycleError",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function tagLifecycleError<E extends Error>(error: E, code: string): E"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`error`、`code` 均必填。返回同一个对象（原地修改，保留原生类型如 `AggregateError`）。"
                 }
               ]
             },
@@ -4728,7 +4590,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`abortableDelay`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
+                    "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`createLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`abortableDelay`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createGenerationController`、`createQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
                     "常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。",
                     "类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。"
                   ]
@@ -4788,6 +4650,30 @@
                 {
                   "type": "paragraph",
                   "text": "`boundedWait(task, deadlineAt, { scheduler, reportCleanup? })` 仍负责绝对截止时间与任务竞争，不会取消 task。 它的默认清理失败行为不变；可选 `reportCleanup` 允许 logger flush 把 timer 清理失败作为诊断，保留任务或 deadline winner。 批处理 debounce、health 周期调度与预算授予定时器不等同于一次性相对延时，不强行转换其 owner 语义。"
+                }
+              ]
+            },
+            {
+              "id": "scope-入口边界",
+              "heading": "Scope 入口边界",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/lifecycle/scope` 是异步 `createLifecycleScope` 的窄入口；同步与 provisional scope 从 root 导入 `createSyncLifecycleScope` / `createProvisionalScope`。包不提供第二套 scope 实现。generation/quiescence 子路径直接映射各自 canonical owner，未构建的同名 barrel 已删除。"
+                }
+              ]
+            },
+            {
+              "id": "已收回内部的辅助-api",
+              "heading": "已收回内部的辅助 API",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`createLifecycleUnit` 及其 option/result types 不再从 module 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay`、`tagLifecycleError`、`createLifecycleRangeError` 只供包内部使用，root 与 leaf 均不再暴露。`/scheduler` 的 snapshot/resolve/addSchedulerTime 与 `/errors` 的其它既有公开构造器保持可用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。"
                 }
               ]
             }
