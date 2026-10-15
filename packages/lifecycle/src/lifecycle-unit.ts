@@ -1,10 +1,6 @@
+import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
 import type { ILifecycleState, IUnitState } from './types.js'
-import {
-  assimilateCapturedThen,
-  containAsyncRejection,
-  createLifecycleError,
-  probeThenable
-} from './errors.js'
+import { containAsyncRejection, createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createTerminalController } from './terminal-controller.js'

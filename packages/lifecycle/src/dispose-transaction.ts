@@ -1,15 +1,10 @@
+import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
 import { defaultLifecycleScheduler } from './default-scheduler.js'
 import { assertErrorPolicyReporter, attachLifecycleSecondaryErrors } from './error-boundary.js'
 import { safeReport } from './report-boundary.js'
 import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
 import type { IDisposerContext } from './disposer-context.js'
-import {
-  assimilateCapturedThen,
-  createErrorCollector,
-  createLifecycleError,
-  createLifecycleTypeError,
-  probeThenable
-} from './errors.js'
+import { createErrorCollector, createLifecycleError, createLifecycleTypeError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { boundedWait } from './bounded-wait.js'

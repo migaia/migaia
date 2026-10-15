@@ -1,10 +1,11 @@
+import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
 import { invokeCaptured } from './invocation.js'
 import ERROR_TEXT, { createPluginHostTypeError, PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { isFeatureReference, readDefinedFeature, snapshotFeatureRecord } from './define-feature.js'
 import type { IFeature, IFeatureInspection, IFeatureRecord } from './feature-types.js'
 import { buildCapabilityTopology } from '@migaia/capability/graph/topology'
-import { assimilateCapturedThen, containAsyncRejection, probeThenable } from '@migaia/lifecycle'
+import { containAsyncRejection } from '@migaia/lifecycle'
 import { reportTerminalFailure } from './diagnostic-report.js'
 
 /** One canonical identity-to-topology compilation shared by preflight and registration execution. */

@@ -1,11 +1,9 @@
+import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
-  assimilateCapturedThen,
   createGenerationController,
   createLifecycleScope,
   createProvisionalScope,
-  probeThenable,
-  ThenableProbeKind,
   type IGenerationController,
   type IGenerationToken,
   type IReleaseContext,

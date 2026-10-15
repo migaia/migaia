@@ -112,6 +112,8 @@ const packedPackages: readonly IPackageDefinition[] = [
 const expectedRetainedModules = [
   '@migaia/event-subscriber/dist/channel-[chunk].js',
   '@migaia/lifecycle/dist/error-code.js',
+  // Lifecycle errors use the package-owned canonical text after the L1 migration.
+  '@migaia/lifecycle/dist/error-text.js',
   '@migaia/lifecycle/dist/errors.js',
   '@migaia/lifecycle/dist/quiescence-tracker.js',
   '@migaia/storage-contract/dist/index.js',
@@ -127,6 +129,8 @@ const expectedRetainedModules = [
   '@migaia/utils/dist/bytes.js',
   // 0741596c: bytes imports attachErrorIdentity, sharing the unchanged utils error chunk.
   '@migaia/utils/dist/error-[chunk].js',
+  // Host contracts capture thenables through their canonical utils owner.
+  '@migaia/utils/dist/function.js',
   '@migaia/utils/dist/object-path.js',
   '@migaia/utils/dist/scheduler.js',
   '@migaia/utils/dist/promise.js',

@@ -1,11 +1,10 @@
+import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
-  assimilateCapturedThen,
   createAbortController,
   createPendingTracker,
   createLifecycleScope,
-  createProvisionalScope,
-  probeThenable
+  createProvisionalScope
 } from '@migaia/lifecycle'
 import { observeAbortSubscription } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'

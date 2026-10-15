@@ -79,7 +79,7 @@ type IAtomDefinition<T> =
 
 `debugLabel` 只用于调试展示（会被底层 Signal/Computed 当作 `debugName`），不参与相等性判断，也不是 key——两个 `debugLabel` 相同的 `atomDef` 依然是两个独立的定义 token。
 
-同步 Atom 禁止 Promise/thenable 初值。守卫覆盖 object 与 function thenable，并通过 lifecycle probe（`@migaia/lifecycle` 的 `probeThenable`）只读取一次 `then`；hostile getter 失败同步转换为 Store Keyed tagged `INVALID_OPTION`，原异常保留在 `cause`。Factory 定义在首次 `get`/`peek`/`preview` 执行返回值时应用同一守卫。
+同步 Atom 禁止 Promise/thenable 初值。守卫覆盖 object 与 function thenable，并通过 utils probe（`@migaia/utils/function` 的 `probeThenable`）只读取一次 `then`；hostile getter 失败同步转换为 Store Keyed tagged `INVALID_OPTION`，原异常保留在 `cause`。Factory 定义在首次 `get`/`peek`/`preview` 执行返回值时应用同一守卫。
 
 ---
 
