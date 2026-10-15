@@ -1,6 +1,6 @@
-import { defaultLifecycleScheduler } from './default-scheduler.js'
+import { defaultLifecycleScheduler } from './scheduler.js'
 import { attachLifecycleSecondaryErrors } from './error-boundary.js'
-import { safeReport } from './report-boundary.js'
+import { safeReport } from './errors.js'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
   containAsyncRejection,

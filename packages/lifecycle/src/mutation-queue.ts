@@ -1,4 +1,4 @@
-import { defaultLifecycleScheduler } from './default-scheduler.js'
+import { defaultLifecycleScheduler } from './scheduler.js'
 import { attachLifecycleSecondaryErrors } from './error-boundary.js'
 import { containAsyncRejection, createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'

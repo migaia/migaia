@@ -1,6 +1,6 @@
-import { defaultLifecycleScheduler } from './default-scheduler.js'
+import { defaultLifecycleScheduler } from './scheduler.js'
 import { captureCleanupReporter } from './abortable-delay.js'
-import { safeReport } from './report-boundary.js'
+import { safeReport } from './errors.js'
 import { tryReadProperty } from '@migaia/utils/error'
 import { createLifecycleTypeError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
