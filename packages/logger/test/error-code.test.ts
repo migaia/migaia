@@ -645,33 +645,41 @@ describe('logger error-code contract (E-T9)', () => {
     await second.shutdown('manual')
   })
 
-  it('BATCH_OVERFLOW rejects a non-immediate submission on a saturated bounded batcher', async () => {
+  it('BATCH_OVERFLOW reports the dropped oldest batch on a saturated bounded batcher', async () => {
     const logger = new Logger({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    const failures: unknown[] = []
+    logger.onFailure((failure) => {
+      failures.push(failure.error)
     })
     const [batchHandle] = await logger.use(batch())
     // maxSize 1 turns every push into a full batch; maxPendingBatches 1 is the minimal upper
     // bound, and asyncOutput keeps the first batch queued behind the defer boundary, so the
     // pending window is still saturated when the second push is admitted.
     const { createBatcher } = batchHandle.getFeature('batch')
+    const delivered: string[][] = []
     const batcher = createBatcher<string>(
       { maxSize: 1, maxPendingBatches: 1, asyncOutput: true, maxWaitMs: 5 },
-      () => undefined
+      (entries) => {
+        delivered.push([...entries])
+      }
     )
 
     batcher.push('saturate')
-    let failure: unknown
-    try {
-      batcher.push('overflow')
-    } catch (error) {
-      failure = error
-    }
+    // Overflow drops the oldest queued batch and reports it; the producer never sees a throw.
+    expect(() => batcher.push('overflow')).not.toThrow()
+    await batcher.flush()
 
-    expect(failure).toBeInstanceOf(Error)
-    expect(failure).toMatchObject({ source: LOGGER_SOURCE, code: LoggerErrorCode.batchOverflow })
-    // The immediate path bypasses the pending bound, so flushing the restored buffer must not
-    // throw even while the window is full.
-    await expect(batcher.flush()).resolves.toBeUndefined()
+    expect(delivered).toEqual([['overflow']])
+    // The overflow report crosses the logger defer boundary before reaching onFailure.
+    await vi.waitFor(() => expect(failures).toHaveLength(1))
+    expect(failures[0]).toBeInstanceOf(Error)
+    expect(failures[0]).toMatchObject({
+      source: LOGGER_SOURCE,
+      code: LoggerErrorCode.batchOverflow,
+      detail: { dropped: 1 }
+    })
     await logger.shutdown('manual')
   })
 })
