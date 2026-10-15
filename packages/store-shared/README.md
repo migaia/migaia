@@ -1,6 +1,6 @@
 # `@migaia/store-shared`
 
-基于 `SharedArrayBuffer` + `Atomics` 的跨线程响应式整数状态：把一段共享内存包装成 `@migaia/reactive` 认识的 `IObservable`（seqlock 保证并发读写正确，脏页 bitmap 保证大数组稀疏同步不掉性能），让主线程与 Worker、或多个独立的 `Runtime`，可以直接共享同一份数据而不必靠 `postMessage` 做结构化克隆。
+基于 `SharedArrayBuffer` + `Atomics` 的跨线程响应式整数状态：把一段共享内存包装成 `@migaia/reactive` 认识的 `IObservable`（seqlock 保证并发读写正确，每个读者保留独立版本游标），让主线程与 Worker、或多个独立的 `Runtime`，可以直接共享同一份数据而不必靠 `postMessage` 做结构化克隆。
 
 ## 适用与不适用场景
 
@@ -25,7 +25,7 @@ pnpm add @migaia/store-shared
 - [高阶组合示例](#高阶组合示例)
 - [构建门禁](#构建门禁)
 
-完整签名、seqlock/脏页 bitmap 的内部机制、错误一览表，见 [USEGUIDE.md](./USEGUIDE.md)。
+完整签名、seqlock/独立版本游标的内部机制、错误一览表，见 [USEGUIDE.md](./USEGUIDE.md)。
 
 ---
 
@@ -118,7 +118,7 @@ positions.dispose()
 | `get(index)`                            | `(index: number) => number`                                       | 读取下标；在依赖追踪上下文（`Effect`/`Computed` 内）中会为该下标物化响应式 cell 并登记依赖，上下文外走轻量直读路径 |
 | `set(index, value)`                     | `(index: number, value: number) => void`                          | 写入合法 `int32`；值未变则跳过写入与通知                                                                           |
 | `update(index, updater)`                | `(index: number, updater: (current: number) => number) => number` | 读-改-写：`updater` 在锁外执行、CAS 提交，冲突自动重试；返回写入后的新值                                           |
-| `sync(index?)`                          | `(index?: number) => number`                                      | 不传 `index`：批量扫描脏页，返回本轮实际变化的下标个数；传 `index`：只检查该下标，返回 `0`/`1`                     |
+| `sync(index?)`                          | `(index?: number) => number`                                      | 不传 `index`：generation 变化后扫描全部格，返回本轮实际变化的下标个数；传 `index`：只检查该下标，返回 `0`/`1`      |
 | `watch()`                               | `() => IDisposer`                                                 | 起一条覆盖整个数组的 `Atomics.waitAsync` 唤醒回路；重复调用返回同一个停止函数                                      |
 | `snapshot()`                            | `() => Int32Array`                                                | 一次性读出全部下标当前值，返回一个新分配的、非共享的 `Int32Array` 拷贝                                             |
 | `dispose()`                             | `() => void`                                                      | 停止 `watch()`、断开全部已物化 cell；幂等；之后调用其他成员会抛 `Error`（`arrayDisposed`）                         |

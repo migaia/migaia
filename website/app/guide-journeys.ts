@@ -2340,7 +2340,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: '脏页与稀疏同步', path: 'dirty-pages-and-sparse-sync' },
+        { label: '独立游标与同步成本', path: 'dirty-pages-and-sparse-sync' },
         { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
       ]
     },
@@ -2378,39 +2378,39 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
         ]
       },
       next: [
-        { label: 'Dirty pages and sparse Sync', path: 'dirty-pages-and-sparse-sync' },
+        { label: 'Independent cursors and sync cost', path: 'dirty-pages-and-sparse-sync' },
         { label: 'SharedInt32Array API', path: 'docs/store-shared/SharedInt32Array-class' }
       ]
     }
   },
   'store-shared:dirty-pages-and-sparse-sync': {
     zh: {
-      title: '用 Epoch 与脏页 Bitmap 收敛稀疏更新',
-      lede: '数组级 sync 不扫描所有下标：先比较 epoch，再交换 bitmap，只对命中的 32 格页验证真实 seqlock 版本。',
+      title: '用独立版本游标同步共享数组',
+      lede: '数组级 sync 先比较 generation，变化后逐格比较 seqlock；每个读者保留自己的版本游标。',
       document: {
         sections: [
           {
             id: 'layout',
-            heading: 'Bitmap 是候选索引，不是正确性来源',
+            heading: 'Generation 唤醒与每格版本比较',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  '任意写入推进全局 epoch 并点亮所属页 bit。',
-                  'epoch 未变时 sync 直接返回 0。',
-                  'Atomics.exchange 取走并清零 bitmap word，并发 or 留给本轮或下轮。',
-                  '命中页仍逐格比较 seq，真正变化才通知。'
+                  '任意完整写入推进全局 64 位 generation。',
+                  'generation 未变时 sync 直接返回 0。',
+                  '每个读者比较自己的 generation，不清除其他读者的变化。',
+                  '扫描全部格的 seq，统计所有变化，只通知已有观察者。'
                 ]
               }
             ]
           },
           {
             id: 'cost',
-            heading: '成本随变化页数增长',
+            heading: '变化后的完整同步成本为 O(length)',
             blocks: [
               {
                 type: 'paragraph',
-                text: '每页 32 格，每个 bitmap word 覆盖 32 页。百万格数组只改几个分散下标时，sync 只访问对应页；同轮多个变化包进一个 runtime.batch，避免下游重复调度。'
+                text: 'ABI v2 没有共享清位 bitmap。完整 sync 在 generation 变化后扫描 length 格，保留无观察格的变化计数与多个读者的独立性；已知目标下标可用 sync(index)。同轮通知放在一个 runtime.batch。'
               }
             ]
           }
@@ -2422,32 +2422,32 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       ]
     },
     en: {
-      title: 'Converge sparse updates with Epoch and dirty-page Bitmap',
-      lede: 'Array sync avoids scanning every index. It compares epoch, exchanges bitmap words, and verifies real Seqlock versions only in matching 32-cell pages.',
+      title: 'Synchronize arrays with independent version cursors',
+      lede: 'Array sync compares generation, then scans every Seqlock after a change. Each reader owns independent version cursors.',
       document: {
         sections: [
           {
             id: 'layout',
-            heading: 'Bitmap is a candidate index, not the source of correctness',
+            heading: 'Generation wakeups and per-cell version comparisons',
             blocks: [
               {
                 type: 'list',
                 items: [
-                  'Any write advances global epoch and lights its page bit.',
-                  'Unchanged epoch lets sync return zero immediately.',
-                  'Atomics.exchange takes and clears a bitmap word while concurrent or remains in this or the next round.',
-                  'Matching pages still compare every seq and notify only real changes.'
+                  'Any completed write advances the global 64-bit generation.',
+                  'Unchanged generation lets sync return zero immediately.',
+                  'Each reader compares its own generation without consuming other readers’ changes.',
+                  'Scan all cell versions, count every change, and notify existing observers.'
                 ]
               }
             ]
           },
           {
             id: 'cost',
-            heading: 'Cost grows with changed pages',
+            heading: 'Changed full sync costs O(length)',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'A page holds 32 cells and a bitmap word covers 32 pages. A million-cell array with a few scattered changes touches only those pages. One runtime.batch contains all notifications from the round.'
+                text: 'ABI v2 has no shared clearing bitmap. Full sync scans length cells after generation changes, including unobserved cells, and preserves independent readers. Use sync(index) for a known target. One runtime.batch contains the round notifications.'
               }
             ]
           }
