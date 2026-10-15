@@ -196,7 +196,7 @@ type ITrayEntryDefinition<T> = {
 - `key`：必填、trim 后非空、全 Tray 唯一。
 - `kind`：必填；用于 Graph 诊断和拓扑语义，不改变 `value` 的 TypeScript 类型。
 - `requires`：可选；每个 key 必须存在于同一次 `createTrayGraph()` 的 entry 数组，不能引用自身。
-- `readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。它在首次 `ready()` 时读取一次并缓存结果。
+- `readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。首次使用 admission 捕获的快照；只有 blocked 后的显式 ready() 才重新读取 entry.readiness。要取得新事实时提供 getter。
 - `start`：必填；Graph 在依赖就绪后调用。返回值必须包含 `value` 与可调用的 `release`。
 
 `ITrayEntryContext` 提供：
@@ -226,7 +226,7 @@ declare function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>
 - state 非法：以 `TRAY_INVALID_ENTRY` reject，不再读取该 snapshot 的 `error`。
 - getter 抛错：保留原错误身份和原生类型，并尽可能附加 `TRAY_GATE_READ_FAILED`。
 
-同一 Tray 的重复 `ready()` 返回同一个稳定 Promise，不会重读 gate 或重复启动。gate 失败时 `state === 'failed'`，`error` 暴露缓存的原始原因。
+只有外部门状态为 `blocked` 时，下一次显式 `ready()` 才重新读取每个 entry 的 readiness 属性及其 state/error。`failed`、非法快照、getter 失败和 Graph 启动结果继续缓存同一个 Promise；成功后也不再重读。gate 拒绝时 `state === 'failed'`，`error` 保留本次原因；重试通过后交给 Graph。固定的 blocked 快照仍会 blocked；例如使用 `get readiness() { return provider.readiness }` 获取 provider 新发布的不可变事实。dispose 后不会重试或访问外部门。
 
 ## 5. `ITrayGraph` API
 

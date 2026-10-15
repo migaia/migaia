@@ -24265,13 +24265,13 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'tray:index:createTrayGraph': {
     en: {
       purpose:
-        'Creates a static dependency graph when the complete capability set is fixed before startup.',
+        'Creates a static dependency graph when the complete capability set is fixed before startup. Only blocked external readiness is sampled again on a later explicit ready(); failed results remain cached. Supply a readiness getter for fresh provider snapshots.',
       quickStart:
         "import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** The provider starts before the service that reads this config. */\nconst configKey = 'config' as ITrayKey\n/** The consumer exposes the greeting created from that config. */\nconst greetingKey = 'greeting' as ITrayKey\n/** Node 24 or Bun ESM owns this fixed set of startup entries. */\nconst graph = createTrayGraph([\n  {\n    key: configKey, kind: 'value',\n    start: () => ({ value: { prefix: 'Hello' }, release: () => undefined })\n  },\n  {\n    key: greetingKey, kind: 'service', requires: [configKey],\n    start: ({ get }) => {\n      /** Read the provider after it is ready. */\n      const config = get<{ prefix: string }>(configKey)\n      return {\n        value: { greet: (name: string) => `${config.prefix}, ${name}` },\n        release: () => undefined\n      }\n    }\n  }\n])\ntry {\n  await graph.ready()\n  /** Consume the service rather than discarding its result. */\n  const greeting = graph.get<{ greet(name: string): string }>(greetingKey)\n  console.assert(greeting.greet('Migaia') === 'Hello, Migaia')\n} finally {\n  await graph.dispose()\n}",
       scenarios: [
         'The complete set of configuration, services, resources, and derived values is known before startup.',
         'Entries must start after their declared dependencies and release in reverse dependency order.',
-        'A readiness gate must fail before any entry starts and repeated ready() calls must share one Promise.'
+        'A readiness gate must reject before any entry starts; failed and started results share one Promise while blocked permits an explicit retry.'
       ],
       avoidWhen: [
         'Definitions must be added, replaced, or removed after startup; use the managed Host path instead.',
@@ -24322,11 +24322,12 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         {
           name: 'entries[].readiness',
           description:
-            'Optional external gate read once during the first ready() call. blocked or failed rejects before the graph starts.',
+            'Optional external gate captured at admission. A later explicit ready() reacquires it only after blocked; failed/getter-invalid results and Graph startup remain cached. Use a getter for fresh snapshots.',
           defaultValue: 'undefined',
           type: 'IGraphReadinessSnapshot',
           whenToUse: 'Provide it when startup depends on an externally owned readiness decision.',
-          example: "{ key, kind: 'service', readiness: { state: 'ready' }, start }"
+          example:
+            "{ key, kind: 'service', readiness: { state: 'ready', error: undefined }, start }"
         },
         {
           name: 'entries[].start',
@@ -24343,13 +24344,14 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ]
     },
     zh: {
-      purpose: '能力集合在启动前固定时，创建静态 dependency graph。',
+      purpose:
+        '能力集合在启动前固定时，创建静态 dependency graph。只有 blocked 外部门会在下一次显式 ready() 时重新采样；failed 结果继续缓存。通过 readiness getter 获取 provider 新快照。',
       quickStart:
         "import { createTrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** The provider starts before the service that reads this config. */\nconst configKey = 'config' as ITrayKey\n/** The consumer exposes the greeting created from that config. */\nconst greetingKey = 'greeting' as ITrayKey\n/** Node 24 or Bun ESM owns this fixed set of startup entries. */\nconst graph = createTrayGraph([\n  {\n    key: configKey, kind: 'value',\n    start: () => ({ value: { prefix: 'Hello' }, release: () => undefined })\n  },\n  {\n    key: greetingKey, kind: 'service', requires: [configKey],\n    start: ({ get }) => {\n      /** Read the provider after it is ready. */\n      const config = get<{ prefix: string }>(configKey)\n      return {\n        value: { greet: (name: string) => `${config.prefix}, ${name}` },\n        release: () => undefined\n      }\n    }\n  }\n])\ntry {\n  await graph.ready()\n  /** Consume the service rather than discarding its result. */\n  const greeting = graph.get<{ greet(name: string): string }>(greetingKey)\n  console.assert(greeting.greet('Migaia') === 'Hello, Migaia')\n} finally {\n  await graph.dispose()\n}",
       scenarios: [
         '配置、服务、资源与派生值的完整集合在启动前已经确定。',
         'entry 必须在声明依赖后启动，并按依赖逆序释放。',
-        'readiness gate 必须在任何 entry 启动前失败，重复 ready() 必须共享同一 Promise。'
+        'readiness gate 在任何 entry 启动前拒绝；failed 与启动结果共享 Promise，blocked 允许显式重试。'
       ],
       avoidWhen: [
         'definition 需要在启动后增加、替换或删除；应使用托管 Host 路径。',
@@ -24396,11 +24398,12 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
         {
           name: 'entries[].readiness',
           description:
-            '首次 ready() 时读取一次的可选外部 gate；blocked 或 failed 会在 Graph 启动前拒绝。',
+            'admission 捕获的可选外部门；只有 blocked 后的显式 ready() 会重新取得快照。failed、getter/非法快照和 Graph 启动结果继续缓存；通过 getter 获取新事实。',
           defaultValue: 'undefined',
           type: 'IGraphReadinessSnapshot',
           whenToUse: '启动依赖外部所有者的 readiness 决策时提供。',
-          example: "{ key, kind: 'service', readiness: { state: 'ready' }, start }"
+          example:
+            "{ key, kind: 'service', readiness: { state: 'ready', error: undefined }, start }"
         },
         {
           name: 'entries[].start',
