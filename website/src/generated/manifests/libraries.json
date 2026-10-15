@@ -627,6 +627,20 @@
                   "text": "reject/cascade`， 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建， 既有错误文案、native TypeError 和 code 保持原契约。"
                 }
               ]
+            },
+            {
+              "id": "static-graph-value-reads",
+              "heading": "Static graph value reads",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`graph.readValue<T>(id)` reads the same payload as `graph.nodeState(id).value` without constructing a diagnostic snapshot. It returns the original object, and only exposes data while the whole graph is ready. An existing node may legitimately hold `undefined`; inspect `graph.state` to distinguish availability. An unknown identifier still throws `GRAPH_UNKNOWN_NODE`."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Inside a node's `start`, keep using `context.get(provider)` and declared dependencies. The unscoped read is for an external composition root after startup. Custom implementations or mocks of the public `ICapabilityGraph` type must add `readValue`; factory callers receive the method automatically."
+                }
+              ]
             }
           ]
         },
@@ -1318,6 +1332,25 @@
                 {
                   "type": "paragraph",
                   "text": "reject/cascade`， 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建， 既有错误文案、native TypeError 和 code 保持原契约。"
+                }
+              ]
+            },
+            {
+              "id": "直接读取静态-graph-的结果",
+              "heading": "直接读取静态 Graph 的结果",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "完整启动后，组合层可用 `readValue` 取得原 payload，避免为每次读取创建冻结的诊断对象。它与 `nodeState(id).value` 使用同一可见性规则：启动前、启动失败和关闭后均不可见。诊断本身继续是不可变的时间点快照；返回的业务对象仍保留自己的身份与可变性。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst serviceId = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph()\ngraph.register({\n  id: serviceId, kind: 'service', dependencies: [],\n  start: () => ({ value: { read: () => 42 }, release: () => undefined })\n})\ntry {\n  await graph.ready()\n  console.log(graph.readValue<{ read(): number }>(serviceId)?.read()) // 42\n} finally {\n  await graph.dispose()\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "这不改变 `get(consumer, provider)` 和启动 context 的依赖约束。手写 `ICapabilityGraph` 替代实现需要实现新方法；缺失 id 的错误仍为 `GRAPH_UNKNOWN_NODE`，不能把 undefined 当作不存在的标记。"
                 }
               ]
             }
@@ -33718,6 +33751,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 USEGUIDE.md。"
                 }
               ]
@@ -34088,7 +34125,7 @@
                     "`key`：必填、trim 后非空、全 Tray 唯一。",
                     "`kind`：必填；用于 Graph 诊断和拓扑语义，不改变 `value` 的 TypeScript 类型。",
                     "`requires`：可选；每个 key 必须存在于同一次 `createTrayGraph()` 的 entry 数组，不能引用自身。",
-                    "`readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。它在首次 `ready()` 时读取一次并缓存结果。",
+                    "`readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。首次使用 admission 捕获的快照；只有 blocked 后的显式 ready() 才重新读取 entry.readiness。要取得新事实时提供 getter。",
                     "`start`：必填；Graph 在依赖就绪后调用。返回值必须包含 `value` 与可调用的 `release`。"
                   ]
                 },
@@ -34144,7 +34181,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "同一 Tray 的重复 `ready()` 返回同一个稳定 Promise，不会重读 gate 或重复启动。gate 失败时 `state === 'failed'`，`error` 暴露缓存的原始原因。"
+                  "text": "只有外部门状态为 `blocked` 时，下一次显式 `ready()` 才重新读取每个 entry 的 readiness 属性及其 state/error。`failed`、非法快照、getter 失败和 Graph 启动结果继续缓存同一个 Promise；成功后也不再重读。gate 拒绝时 `state === 'failed'`，`error` 保留本次原因；重试通过后交给 Graph。固定的 blocked 快照仍会 blocked；例如使用 `get readiness() { return provider.readiness }` 获取 provider 新发布的不可变事实。dispose 后不会重试或访问外部门。"
                 }
               ]
             },
@@ -34481,6 +34518,14 @@
                 {
                   "type": "paragraph",
                   "text": "A rejected delivery send is reported on the parent, and a failed delivery handler is reported on the child. Neither failure rejects the publisher."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "静态组合的 `get(key)` 直接读取 Capability Graph 自己的可见 value；没有第二份 Tray value 表。调用方仍须先等待 ready，关闭后和启动失败后均以 `TRAY_UNAVAILABLE` 拒绝。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "路由选择仍按同一记录表的 spawn 顺序扫描，传给自定义 policy 的快照每次独立冻结，反映当次 inFlight，不缓存旧计数。"
                 }
               ]
             }

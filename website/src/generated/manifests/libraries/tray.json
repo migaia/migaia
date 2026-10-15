@@ -86,6 +86,10 @@
               },
               {
                 "type": "paragraph",
+                "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
+              },
+              {
+                "type": "paragraph",
                 "text": "完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 USEGUIDE.md。"
               }
             ]
@@ -452,7 +456,7 @@
                   "`key`：必填、trim 后非空、全 Tray 唯一。",
                   "`kind`：必填；用于 Graph 诊断和拓扑语义，不改变 `value` 的 TypeScript 类型。",
                   "`requires`：可选；每个 key 必须存在于同一次 `createTrayGraph()` 的 entry 数组，不能引用自身。",
-                  "`readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。它在首次 `ready()` 时读取一次并缓存结果。",
+                  "`readiness`：可选的外部门状态快照，只接受 `ready | blocked | failed`。首次使用 admission 捕获的快照；只有 blocked 后的显式 ready() 才重新读取 entry.readiness。要取得新事实时提供 getter。",
                   "`start`：必填；Graph 在依赖就绪后调用。返回值必须包含 `value` 与可调用的 `release`。"
                 ]
               },
@@ -508,7 +512,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "同一 Tray 的重复 `ready()` 返回同一个稳定 Promise，不会重读 gate 或重复启动。gate 失败时 `state === 'failed'`，`error` 暴露缓存的原始原因。"
+                "text": "只有外部门状态为 `blocked` 时，下一次显式 `ready()` 才重新读取每个 entry 的 readiness 属性及其 state/error。`failed`、非法快照、getter 失败和 Graph 启动结果继续缓存同一个 Promise；成功后也不再重读。gate 拒绝时 `state === 'failed'`，`error` 保留本次原因；重试通过后交给 Graph。固定的 blocked 快照仍会 blocked；例如使用 `get readiness() { return provider.readiness }` 获取 provider 新发布的不可变事实。dispose 后不会重试或访问外部门。"
               }
             ]
           },
@@ -843,6 +847,14 @@
               {
                 "type": "paragraph",
                 "text": "A rejected delivery send is reported on the parent, and a failed delivery handler is reported on the child. Neither failure rejects the publisher."
+              },
+              {
+                "type": "paragraph",
+                "text": "静态组合的 `get(key)` 直接读取 Capability Graph 自己的可见 value；没有第二份 Tray value 表。调用方仍须先等待 ready，关闭后和启动失败后均以 `TRAY_UNAVAILABLE` 拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "路由选择仍按同一记录表的 spawn 顺序扫描，传给自定义 policy 的快照每次独立冻结，反映当次 inFlight，不缓存旧计数。"
               }
             ]
           }
@@ -1886,6 +1898,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 USEGUIDE.md。"
                 }
               ]
@@ -2331,7 +2347,7 @@
           "name": "ITrayEntryContext",
           "kind": "type",
           "signature": "export type ITrayEntryContext = { readonly signal: IAbortSignal; get<T>(key: ITrayKey): T; own<T>(resource: T, descriptor: IReleaseDescriptor): T; };",
-          "declarationLine": 11,
+          "declarationLine": 12,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryContext.",
@@ -2397,8 +2413,8 @@
         {
           "name": "ITrayEntryDefinition",
           "kind": "type",
-          "signature": "export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };",
-          "declarationLine": 16,
+          "signature": "export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; /** * Initial fact is captured at admission. Only a blocked ready() may reacquire this property; * supply a getter for fresh provider snapshots. Failed results remain cached permanently. */ readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };",
+          "declarationLine": 17,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryDefinition is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryDefinition.",
@@ -2418,7 +2434,7 @@
           "aliasOf": "ITrayEntryDefinition",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };"
+            "export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; /** * Initial fact is captured at admission. Only a blocked ready() may reacquire this property; * supply a getter for fresh provider snapshots. Failed results remain cached permanently. */ readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2457,7 +2473,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryDefinition:export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };",
+          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryDefinition:export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; /** * Initial fact is captured at admission. Only a blocked ready() may reacquire this property; * supply a getter for fresh provider snapshots. Failed results remain cached permanently. */ readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };",
           "guidance": [],
           "usageScore": 44,
           "configuration": [],
@@ -2467,7 +2483,7 @@
           "name": "ITrayEntryInstance",
           "kind": "type",
           "signature": "export type ITrayEntryInstance<T> = { readonly value: T; readonly release: (context: IGraphReleaseContext) => void | PromiseLike<void>; };",
-          "declarationLine": 7,
+          "declarationLine": 8,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryInstance is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryInstance.",
@@ -2533,8 +2549,8 @@
         {
           "name": "ITrayEntryKind",
           "kind": "type",
-          "signature": "export type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service';",
-          "declarationLine": 6,
+          "signature": "export type ITrayEntryKind = TrayEntryKind;",
+          "declarationLine": 7,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryKind is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryKind.",
@@ -2551,9 +2567,7 @@
           "members": [],
           "aliasOf": "ITrayEntryKind",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service';"
-          ],
+          "overloadSignatures": ["export type ITrayEntryKind = TrayEntryKind;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use ITrayEntryKind when its type contract and declared inputs match the result you need.",
@@ -2591,7 +2605,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryKind:export type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service';",
+          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryKind:export type ITrayEntryKind = TrayEntryKind;",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -2730,7 +2744,7 @@
           "name": "ITrayGraph",
           "kind": "type",
           "signature": "export type ITrayGraph = { readonly keys: readonly ITrayKey[]; readonly state: ITrayState; readonly error: unknown | undefined; ready(): Promise<void>; get<T>(key: ITrayKey): T; entryState(key: ITrayKey): IGraphNodeState; dispose(): Promise<void>; };",
-          "declarationLine": 24,
+          "declarationLine": 29,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayGraph is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayGraph.",
@@ -2803,6 +2817,10 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
                 },
                 {
                   "type": "paragraph",
@@ -3273,7 +3291,7 @@
           "name": "ITrayKey",
           "kind": "type",
           "signature": "export type ITrayKey = string & { readonly __trayKey: unique symbol; };",
-          "declarationLine": 3,
+          "declarationLine": 4,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayKey is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayKey.",
@@ -3348,6 +3366,10 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
                 },
                 {
                   "type": "paragraph",
@@ -4412,8 +4434,8 @@
         {
           "name": "ITrayState",
           "kind": "type",
-          "signature": "export type ITrayState = 'open' | ICapabilityGraphState;",
-          "declarationLine": 23,
+          "signature": "export type ITrayState = ICapabilityGraphState;",
+          "declarationLine": 28,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayState is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayState.",
@@ -4430,7 +4452,7 @@
           "members": [],
           "aliasOf": "ITrayState",
           "exportPath": ".",
-          "overloadSignatures": ["export type ITrayState = 'open' | ICapabilityGraphState;"],
+          "overloadSignatures": ["export type ITrayState = ICapabilityGraphState;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use ITrayState when its type contract and declared inputs match the result you need.",
@@ -4468,7 +4490,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/contract.d.ts:ITrayState:export type ITrayState = 'open' | ICapabilityGraphState;",
+          "identity": "packages/tray/dist/contract.d.ts:ITrayState:export type ITrayState = ICapabilityGraphState;",
           "guidance": [],
           "usageScore": 24,
           "configuration": [],
@@ -5248,6 +5270,10 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 USEGUIDE.md。"
                 }
               ]
@@ -5442,6 +5468,10 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { TRAY_SOURCE, TrayErrorCode, type ITrayGraph, type ITrayKey } from '@migaia/tray'\n\n/** 读取已有 Graph 的值，并按公开错误码处理不可用状态。 */\nfunction readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {\n  try {\n    return tray.get(apiKey)\n  } catch (error) {\n    const diagnostic = error as { source?: string; code?: string }\n    if (diagnostic.source === TRAY_SOURCE && diagnostic.code === TrayErrorCode.unavailable) {\n      // 等待 ready()，或处理启动/就绪门失败。\n      return undefined\n    }\n    throw error\n  }\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。"
                 },
                 {
                   "type": "paragraph",
@@ -6121,13 +6151,13 @@
             },
             {
               "name": "shutdown",
-              "type": "Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>",
+              "type": "Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>",
               "optional": false,
               "description": "Selects bounded shutdown or a strict drain that waits for physical completion."
             },
             {
               "name": "shutdown.mode",
-              "type": "'bounded' | 'strict-drain'",
+              "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes."
             },
@@ -6176,7 +6206,7 @@
             },
             {
               "name": "shutdown",
-              "type": "Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>",
+              "type": "Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>",
               "optional": false,
               "description": "Selects bounded shutdown or a strict drain that waits for physical completion.",
               "descriptionEn": "Selects bounded shutdown or a strict drain that waits for physical completion.",
@@ -6184,7 +6214,7 @@
             },
             {
               "name": "shutdown.mode",
-              "type": "'bounded' | 'strict-drain'",
+              "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes.",
               "descriptionEn": "Uses a bounded wait or waits strictly until every physical plugin release completes.",
@@ -6205,7 +6235,7 @@
           "name": "ICanResolveReadyDefinitions",
           "kind": "type",
           "signature": "export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? false : string extends ITrayDefinitionNames<TDefinitions> ? false : IReadyInferenceExceeded<TDefinitions> extends true ? false : IHasWidenedProviders<TDefinitions> extends true ? false : true;",
-          "declarationLine": 56,
+          "declarationLine": 57,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Whether the public resolver may safely retain an exact finite readiness tuple.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICanResolveReadyDefinitions.",
@@ -6268,8 +6298,8 @@
         {
           "name": "ICreateHostOptions",
           "kind": "type",
-          "signature": "export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
-          "declarationLine": 172,
+          "signature": "export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
+          "declarationLine": 173,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Host creation options.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICreateHostOptions.",
@@ -6286,7 +6316,7 @@
           "aliasOf": "ICreateHostOptions",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;"
+            "export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6325,7 +6355,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:ICreateHostOptions:export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: 'bounded' | 'strict-drain'; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
+          "identity": "packages/tray/dist/host/typing.d.ts:ICreateHostOptions:export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
           "guidance": [],
           "usageScore": 10,
           "configuration": [],
@@ -6335,7 +6365,7 @@
           "name": "IHostBaselinePlugins",
           "kind": "type",
           "signature": "export type IHostBaselinePlugins<THost extends PluginHost<any, any, any>> = IPluginHostInstalledPlugins<THost> extends readonly IPluginConstraint<any>[] ? IPluginHostInstalledPlugins<THost> : readonly [];",
-          "declarationLine": 6,
+          "declarationLine": 7,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Constructor-installed plugins remain part of every exact and dynamic Tray view.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IHostBaselinePlugins.",
@@ -6399,7 +6429,7 @@
           "name": "IPluginWithSynchronousShared",
           "kind": "type",
           "signature": "export type IPluginWithSynchronousShared<TPlugin> = TPlugin & { readonly shared?: (core: unknown) => Record<PropertyKey, unknown>; };",
-          "declarationLine": 68,
+          "declarationLine": 69,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Awaitable values accepted at lifecycle boundaries.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginWithSynchronousShared.",
@@ -6463,7 +6493,7 @@
           "name": "IResolveReadyTrayPlugins",
           "kind": "type",
           "signature": "export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? readonly [] : string extends ITrayDefinitionNames<TDefinitions> ? readonly [] : IReadyInferenceExceeded<TDefinitions> extends true ? readonly [] : IAllDefinitionsIndependent<TDefinitions> extends true ? TDefinitions : IHasWidenedProviders<TDefinitions> extends true ? readonly [] : IResolveReadyWithFuel<TDefinitions>;",
-          "declarationLine": 66,
+          "declarationLine": 67,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Exact readiness is selected only for finite, literal, at-most-128 definition tuples.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResolveReadyTrayPlugins.",
@@ -6527,7 +6557,7 @@
           "name": "ITrayHost",
           "kind": "type",
           "signature": "export type ITrayHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<IResolveReadyTrayPlugins<TDefinitions>, readonly ITrayPluginConstraint<THost>[]>> = Readonly<{ readonly plugins: readonly string[]; readonly readyPlugins: readonly string[]; readonly state: ITrayHostState; readonly isActive: boolean; readonly error: unknown | undefined; readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>; readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>; pluginState(name: string): string; on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe; use<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayResolvedHost<THost, readonly [...TDefinitions, TPlugin]>, ITrayHostDynamic<THost>>>; unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; replace<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayMutationView<THost, TDefinitions, TReady, TPlugin>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; dispose(): Promise<ITrayHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }>;",
-          "declarationLine": 151,
+          "declarationLine": 152,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Public managed Host surface.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHost.",
@@ -6667,7 +6697,7 @@
           "name": "ITrayHostCreationError",
           "kind": "type",
           "signature": "export type ITrayHostCreationError = Error & Readonly<{ readonly detail: ITrayHostCreationFailureDetail; }>;",
-          "declarationLine": 200,
+          "declarationLine": 201,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostCreationError is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostCreationError.",
@@ -6731,7 +6761,7 @@
           "name": "ITrayHostCreationFailureDetail",
           "kind": "type",
           "signature": "export type ITrayHostCreationFailureDetail = ICleanupResult & Readonly<{ readonly phase: 'factory' | 'admission' | 'graph' | 'setup' | 'commit'; readonly cleanupComplete: boolean; }>;",
-          "declarationLine": 196,
+          "declarationLine": 197,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostCreationFailureDetail is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostCreationFailureDetail.",
@@ -6795,7 +6825,7 @@
           "name": "ITrayHostDisposalResult",
           "kind": "type",
           "signature": "export type ITrayHostDisposalResult = ICleanupResult & Readonly<{ readonly state: 'terminal'; readonly termination: 'managed' | 'external-host'; readonly cleanupComplete: boolean; readonly error?: Error; }>;",
-          "declarationLine": 190,
+          "declarationLine": 191,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostDisposalResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDisposalResult.",
@@ -6859,7 +6889,7 @@
           "name": "ITrayHostDynamic",
           "kind": "type",
           "signature": "export type ITrayHostDynamic<THost extends PluginHost<any, any, any>, TManagedBaseline extends object = object> = Omit<ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, 'extensions'> & Readonly<{ readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>; }>;",
-          "declarationLine": 168,
+          "declarationLine": 169,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Conservative dynamic view returned after widened or committed-failure mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDynamic.",
@@ -6923,7 +6953,7 @@
           "name": "ITrayHostEventMap",
           "kind": "type",
           "signature": "export type ITrayHostEventMap = { readonly use: Readonly<Record<string, unknown>>; readonly unUse: Readonly<Record<string, unknown>>; readonly replace: Readonly<Record<string, unknown>>; /** Settled lifecycle aliases describe the logical operation without exposing Graph authority. */ readonly registered: Readonly<Record<string, unknown>>; readonly removed: Readonly<Record<string, unknown>>; readonly replaced: Readonly<Record<string, unknown>>; readonly mutationFailed: Readonly<{ readonly operation: 'use' | 'unUse' | 'replace'; readonly name: string; readonly error: Error; }>; readonly disposing: Readonly<{ readonly state: 'closing'; }>; readonly disposed: Readonly<{ readonly state: 'terminal'; readonly cleanupComplete: boolean; }>; };",
-          "declarationLine": 80,
+          "declarationLine": 81,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Event payloads published after settled managed mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostEventMap.",
@@ -6987,7 +7017,7 @@
           "name": "ITrayHostState",
           "kind": "type",
           "signature": "export type ITrayHostState = (typeof TrayHostState)[keyof typeof TrayHostState];",
-          "declarationLine": 78,
+          "declarationLine": 79,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostState is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostState.",
@@ -7051,7 +7081,7 @@
           "name": "ITrayPluginConstraint",
           "kind": "type",
           "signature": "export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost>;",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Plugin descriptor accepted by the managed Tray Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginConstraint.",
@@ -7115,7 +7145,7 @@
           "name": "ITrayPluginMutationObservation",
           "kind": "type",
           "signature": "export type ITrayPluginMutationObservation<TView> = ICleanupResult & Readonly<{ readonly operation: 'use' | 'replace'; readonly name: string; readonly affected: readonly string[]; readonly topologyChanged: boolean; readonly view: TView; readonly cleanupComplete: boolean; }>;",
-          "declarationLine": 105,
+          "declarationLine": 106,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginMutationObservation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginMutationObservation.",
@@ -7179,7 +7209,7 @@
           "name": "ITrayPluginMutationResult",
           "kind": "type",
           "signature": "export type ITrayPluginMutationResult<TPreviousView, TSuccessView, TCommittedFailureView> = (ITrayPluginMutationObservation<TSuccessView> & Readonly<{ readonly ok: true; readonly committed: true; }>) | (ITrayPluginMutationObservation<TPreviousView> & Readonly<{ readonly ok: false; readonly committed: false; readonly error: Error; }>) | (ITrayPluginMutationObservation<TCommittedFailureView> & Readonly<{ readonly ok: false; readonly committed: true; readonly error: Error; }>);",
-          "declarationLine": 113,
+          "declarationLine": 114,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginMutationResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginMutationResult.",
@@ -7243,7 +7273,7 @@
           "name": "ITrayPluginPhysicalCleanupResult",
           "kind": "type",
           "signature": "export type ITrayPluginPhysicalCleanupResult = ICleanupResult;",
-          "declarationLine": 104,
+          "declarationLine": 105,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Cleanup observation returned by managed mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginPhysicalCleanupResult.",
@@ -7305,7 +7335,7 @@
           "name": "ITrayPluginRemovalObservation",
           "kind": "type",
           "signature": "export type ITrayPluginRemovalObservation<TView> = ICleanupResult & Readonly<{ readonly name: string; readonly affected: readonly string[]; readonly view: TView; readonly cleanupComplete: boolean; }>;",
-          "declarationLine": 125,
+          "declarationLine": 126,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginRemovalObservation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginRemovalObservation.",
@@ -7369,7 +7399,7 @@
           "name": "ITrayPluginRemovalResult",
           "kind": "type",
           "signature": "export type ITrayPluginRemovalResult<TPreviousView, TCommittedView> = (ITrayPluginRemovalObservation<TPreviousView> & Readonly<{ readonly ok: true; readonly committed: false; readonly removed: false; }>) | (ITrayPluginRemovalObservation<TCommittedView> & Readonly<{ readonly ok: true; readonly committed: true; readonly removed: true; }>) | (ITrayPluginRemovalObservation<TPreviousView> & Readonly<{ readonly ok: false; readonly committed: false; readonly removed: false; readonly error: Error; }>) | (ITrayPluginRemovalObservation<TCommittedView> & Readonly<{ readonly ok: false; readonly committed: true; readonly removed: true; readonly error: Error; }>);",
-          "declarationLine": 131,
+          "declarationLine": 132,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginRemovalResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginRemovalResult.",
@@ -7433,7 +7463,7 @@
           "name": "ITrayResolvedHost",
           "kind": "type",
           "signature": "export type ITrayResolvedHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[]> = ICanResolveReadyDefinitions<TDefinitions> extends true ? ITrayHost<THost, TDefinitions> : ITrayHostDynamic<THost>;",
-          "declarationLine": 189,
+          "declarationLine": 190,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayResolvedHost is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayResolvedHost.",
@@ -7499,7 +7529,7 @@
           "name": "IUnsubscribe",
           "kind": "type",
           "signature": "export type IUnsubscribe = () => void;",
-          "declarationLine": 102,
+          "declarationLine": 103,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Minimal unsubscribe contract shared with event-subscriber without a runtime dependency.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUnsubscribe.",
@@ -7561,7 +7591,7 @@
           "name": "TrayHostState",
           "kind": "const",
           "signature": "export declare const TrayHostState: { readonly active: \"active\"; readonly closing: \"closing\"; readonly terminal: \"terminal\"; readonly failed: \"failed\"; };",
-          "declarationLine": 72,
+          "declarationLine": 73,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Public lifecycle states for a managed Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for TrayHostState.",
@@ -8338,7 +8368,7 @@
           "declaredConfiguration": [
             {
               "name": "mode",
-              "type": "'bounded' | 'strict-drain'",
+              "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes."
             },
@@ -8355,7 +8385,7 @@
           "configuration": [
             {
               "name": "mode",
-              "type": "'bounded' | 'strict-drain'",
+              "type": "TrayShutdownMode",
               "optional": false,
               "description": "Uses a bounded wait or waits strictly until every physical plugin release completes.",
               "descriptionEn": "Uses a bounded wait or waits strictly until every physical plugin release completes.",
@@ -8376,7 +8406,7 @@
           "name": "IRuntime",
           "kind": "type",
           "signature": "export type IRuntime<TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ readonly state: 'active' | 'closing' | 'terminal'; readonly activeRuns: number; run<TName extends string, TResult>(name: TName, options: IRuntimeRunOptions, execute: (context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>>) => TResult | PromiseLike<TResult>): Promise<TResult>; dispose(): Promise<IRuntimeDisposalResult>; readonly [Symbol.asyncDispose]: () => Promise<void>; }>;",
-          "declarationLine": 46,
+          "declarationLine": 47,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Public Runtime lifecycle and exact-generation execution surface.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntime.",
@@ -8442,7 +8472,7 @@
           "name": "IRuntimeDisposalResult",
           "kind": "type",
           "signature": "export type IRuntimeDisposalResult = Readonly<{ readonly state: 'terminal'; readonly cleanupComplete: boolean; }>;",
-          "declarationLine": 41,
+          "declarationLine": 42,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Physical runtime disposal observation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeDisposalResult.",
@@ -8506,7 +8536,7 @@
           "name": "IRuntimeExtensionsFor",
           "kind": "type",
           "signature": "export type IRuntimeExtensionsFor<TReady extends readonly IPluginConstraint<any>[], TName extends string> = string extends TName ? Readonly<Record<PropertyKey, unknown>> : [Extract<TReady[number], { readonly name: TName; }>] extends [never] ? Readonly<Record<PropertyKey, unknown>> : IExtractPluginExt<Extract<TReady[number], { readonly name: TName; }>>;",
-          "declarationLine": 4,
+          "declarationLine": 5,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Resolves exact extension types for literal ready plugin names and stays unknown when widened.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeExtensionsFor.",
@@ -8570,7 +8600,7 @@
           "name": "IRuntimeRunContext",
           "kind": "type",
           "signature": "export type IRuntimeRunContext<TExtensions = Readonly<Record<PropertyKey, unknown>>> = Readonly<{ readonly runId: number; readonly plugin: string; readonly extensions: TExtensions; readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; readonly self: IRuntimeSelfMutation; }>;",
-          "declarationLine": 10,
+          "declarationLine": 11,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Context exposed to one callback with an exact plugin-generation extension snapshot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeRunContext.",
@@ -8634,7 +8664,7 @@
           "name": "IRuntimeRunOptions",
           "kind": "type",
           "signature": "export type IRuntimeRunOptions = Readonly<{ readonly signal?: IAbortSignal; readonly timeoutMs: number | false; }>;",
-          "declarationLine": 31,
+          "declarationLine": 32,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Caller cancellation and callback admission deadline.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeRunOptions.",
@@ -8698,7 +8728,7 @@
           "name": "IRuntimeSelfMutation",
           "kind": "type",
           "signature": "export type IRuntimeSelfMutation = Readonly<{ /** Schedules removal of the callback's exact plugin generation after settlement. */ readonly unUse: () => IRuntimeSelfMutationTicket; /** Schedules replacement of the callback's exact plugin generation after settlement. */ readonly replace: (plugin: IPluginConstraint<any>) => IRuntimeSelfMutationTicket; }>;",
-          "declarationLine": 24,
+          "declarationLine": 25,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Runtime-neutral self-mutation capability bound to the current callback generation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeSelfMutation.",
@@ -8762,7 +8792,7 @@
           "name": "IRuntimeSelfMutationTicket",
           "kind": "type",
           "signature": "export type IRuntimeSelfMutationTicket<TResult = unknown> = Readonly<{ /** Resolves only after callback settlement and canonical Host mutation completion. */ readonly completion: Promise<TResult>; }>;",
-          "declarationLine": 19,
+          "declarationLine": 20,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Deferred exact-generation mutation result exposed by a Runtime callback.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeSelfMutationTicket.",
@@ -8825,8 +8855,8 @@
         {
           "name": "IRuntimeShutdownOptions",
           "kind": "type",
-          "signature": "export type IRuntimeShutdownOptions = Readonly<{ readonly mode: 'bounded' | 'strict-drain'; readonly quiescenceMs?: number; }>;",
-          "declarationLine": 36,
+          "signature": "export type IRuntimeShutdownOptions = Readonly<{ readonly mode: TrayShutdownMode; readonly quiescenceMs?: number; }>;",
+          "declarationLine": 37,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Runtime shutdown policy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeShutdownOptions.",
@@ -8841,7 +8871,7 @@
           "aliasOf": "IRuntimeShutdownOptions",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IRuntimeShutdownOptions = Readonly<{ readonly mode: 'bounded' | 'strict-drain'; readonly quiescenceMs?: number; }>;"
+            "export type IRuntimeShutdownOptions = Readonly<{ readonly mode: TrayShutdownMode; readonly quiescenceMs?: number; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8880,7 +8910,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntimeShutdownOptions:export type IRuntimeShutdownOptions = Readonly<{ readonly mode: 'bounded' | 'strict-drain'; readonly quiescenceMs?: number; }>;",
+          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntimeShutdownOptions:export type IRuntimeShutdownOptions = Readonly<{ readonly mode: TrayShutdownMode; readonly quiescenceMs?: number; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

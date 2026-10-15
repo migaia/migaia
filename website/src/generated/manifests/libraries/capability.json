@@ -626,6 +626,20 @@
                 "text": "reject/cascade`， 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建， 既有错误文案、native TypeError 和 code 保持原契约。"
               }
             ]
+          },
+          {
+            "id": "static-graph-value-reads",
+            "heading": "Static graph value reads",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`graph.readValue<T>(id)` reads the same payload as `graph.nodeState(id).value` without constructing a diagnostic snapshot. It returns the original object, and only exposes data while the whole graph is ready. An existing node may legitimately hold `undefined`; inspect `graph.state` to distinguish availability. An unknown identifier still throws `GRAPH_UNKNOWN_NODE`."
+              },
+              {
+                "type": "paragraph",
+                "text": "Inside a node's `start`, keep using `context.get(provider)` and declared dependencies. The unscoped read is for an external composition root after startup. Custom implementations or mocks of the public `ICapabilityGraph` type must add `readValue`; factory callers receive the method automatically."
+              }
+            ]
           }
         ]
       },
@@ -1317,6 +1331,25 @@
               {
                 "type": "paragraph",
                 "text": "reject/cascade`， 不接受该规划器的 `suspend` 策略。Host 的注册、查找、disposed 错误统一从私有 error-text owner 创建， 既有错误文案、native TypeError 和 code 保持原契约。"
+              }
+            ]
+          },
+          {
+            "id": "直接读取静态-graph-的结果",
+            "heading": "直接读取静态 Graph 的结果",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "完整启动后，组合层可用 `readValue` 取得原 payload，避免为每次读取创建冻结的诊断对象。它与 `nodeState(id).value` 使用同一可见性规则：启动前、启动失败和关闭后均不可见。诊断本身继续是不可变的时间点快照；返回的业务对象仍保留自己的身份与可变性。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst serviceId = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph()\ngraph.register({\n  id: serviceId, kind: 'service', dependencies: [],\n  start: () => ({ value: { read: () => 42 }, release: () => undefined })\n})\ntry {\n  await graph.ready()\n  console.log(graph.readValue<{ read(): number }>(serviceId)?.read()) // 42\n} finally {\n  await graph.dispose()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "这不改变 `get(consumer, provider)` 和启动 context 的依赖约束。手写 `ICapabilityGraph` 替代实现需要实现新方法；缺失 id 的错误仍为 `GRAPH_UNKNOWN_NODE`，不能把 undefined 当作不存在的标记。"
               }
             ]
           }
@@ -5015,7 +5048,7 @@
         {
           "name": "CapabilityGraphErrorCode",
           "kind": "const",
-          "signature": "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
+          "signature": "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
           "declarationLine": 4,
           "source": "packages/capability/dist/graph/error-code.d.ts",
           "purpose": "Stable error codes owned by `@migaia/capability/graph`.",
@@ -5033,7 +5066,7 @@
           "aliasOf": "CapabilityGraphErrorCode",
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };"
+            "export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5072,7 +5105,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/error-code.d.ts:CapabilityGraphErrorCode:export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostics query names a node absent from the registry. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
+          "identity": "packages/capability/dist/graph/error-code.d.ts:CapabilityGraphErrorCode:export declare const CapabilityGraphErrorCode: { /** Graph mutation/query reaches terminal state; create a new graph. */ readonly graphDisposed: \"GRAPH_DISPOSED\"; /** Registration is attempted after readiness froze the static registry. */ readonly graphFrozen: \"GRAPH_FROZEN\"; /** A node, dependency, or start result fails structural admission. */ readonly invalidNode: \"GRAPH_INVALID_NODE\"; /** A second node uses an already registered ID. */ readonly duplicateNode: \"GRAPH_DUPLICATE_NODE\"; /** A dependency names a provider absent from the frozen registry. */ readonly unknownProvider: \"GRAPH_UNKNOWN_PROVIDER\"; /** A consumer repeats the same provider edge. */ readonly duplicateEdge: \"GRAPH_DUPLICATE_EDGE\"; /** The required dependency graph contains a self-loop or cycle. */ readonly dependencyCycle: \"GRAPH_DEPENDENCY_CYCLE\"; /** A direct provider lookup is not declared and ready. */ readonly providerUnavailable: \"GRAPH_PROVIDER_UNAVAILABLE\"; /** A node start failed and the graph entered failed state. */ readonly startFailed: \"GRAPH_START_FAILED\"; /** Release of one or more graph-owned node resources failed. */ readonly disposeFailed: \"GRAPH_DISPOSE_FAILED\"; /** Startup or new work is rejected while the graph is quiescing. */ readonly admissionClosed: \"GRAPH_ADMISSION_CLOSED\"; /** Diagnostic or direct value query names an absent node; correct the id before retrying. */ readonly unknownNode: \"GRAPH_UNKNOWN_NODE\"; /** A lifecycle callback synchronously re-enters the same graph operation. */ readonly reentrantOperation: \"GRAPH_REENTRANT_OPERATION\"; /** * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership * failures retain the lifecycle native error on cause rather than reporting a closed graph. */ readonly invalidOption: \"GRAPH_INVALID_OPTION\"; /** A reject-policy mutation targets a node that still has required dependents. */ readonly nodeHasDependents: \"GRAPH_NODE_HAS_DEPENDENTS\"; /** * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck * predecessor (start that never settles, leaked binding lease) or raise the budget. */ readonly mutationAdmissionTimeout: \"GRAPH_MUTATION_ADMISSION_TIMEOUT\"; /** * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad * option: suspend the node first, or skip the call when the node is already running. */ readonly nodeNotSuspended: \"GRAPH_NODE_NOT_SUSPENDED\"; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -5210,7 +5243,7 @@
           "name": "createCapabilityGraph",
           "kind": "function",
           "signature": "export declare function createCapabilityGraph(options?: ICapabilityGraphOptions): ICapabilityGraph;",
-          "declarationLine": 78,
+          "declarationLine": 84,
           "source": "packages/capability/dist/graph/index.d.ts",
           "purpose": "Creates a runtime-neutral static capability dependency graph.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createCapabilityGraph.",
@@ -5227,6 +5260,7 @@
           "errors": ["No documented errors are declared for createCapabilityGraph."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createCapabilityGraph.",
           "examples": [
+            "import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst serviceId = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph()\ngraph.register({\n  id: serviceId, kind: 'service', dependencies: [],\n  start: () => ({ value: { read: () => 42 }, release: () => undefined })\n})\ntry {\n  await graph.ready()\n  console.log(graph.readValue<{ read(): number }>(serviceId)?.read()) // 42\n} finally {\n  await graph.dispose()\n}",
             "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
           ],
           "members": [],
@@ -5288,7 +5322,7 @@
           ],
           "identity": "packages/capability/dist/graph/index.d.ts:createCapabilityGraph:export declare function createCapabilityGraph(options?: ICapabilityGraphOptions): ICapabilityGraph;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 38,
           "configuration": [
             {
               "name": "onError",
@@ -5369,7 +5403,7 @@
         {
           "name": "ICapabilityGraph",
           "kind": "type",
-          "signature": "export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };",
+          "signature": "export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; /** * Read the same value projection as nodeState without allocating a diagnostic. Existing nodes * return undefined until the whole graph is ready and after disposal; undefined is valid data. An * unknown id retains GRAPH_UNKNOWN_NODE. Payload identity and mutability stay caller-owned. */ readValue<T = unknown>(id: IGraphNodeId): T | undefined; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };",
           "declarationLine": 63,
           "source": "packages/capability/dist/graph/index.d.ts",
           "purpose": "Public Graph contract.",
@@ -5384,7 +5418,7 @@
           "members": [],
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };"
+            "export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; /** * Read the same value projection as nodeState without allocating a diagnostic. Existing nodes * return undefined until the whole graph is ready and after disposal; undefined is valid data. An * unknown id retains GRAPH_UNKNOWN_NODE. Payload identity and mutability stay caller-owned. */ readValue<T = unknown>(id: IGraphNodeId): T | undefined; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5423,9 +5457,9 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/index.d.ts:ICapabilityGraph:export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };",
+          "identity": "packages/capability/dist/graph/index.d.ts:ICapabilityGraph:export type ICapabilityGraph = { register<T>(node: IGraphNodeDefinition<T>): void; ready(): Promise<void>; nodeState(id: IGraphNodeId): IGraphNodeDiagnostic; /** * Read the same value projection as nodeState without allocating a diagnostic. Existing nodes * return undefined until the whole graph is ready and after disposal; undefined is valid data. An * unknown id retains GRAPH_UNKNOWN_NODE. Payload identity and mutability stay caller-owned. */ readValue<T = unknown>(id: IGraphNodeId): T | undefined; readonly nodes: readonly IGraphNodeId[]; readonly state: ICapabilityGraphState; readonly error: unknown | undefined; dispose(): Promise<void>; get<T = unknown>(consumer: IGraphNodeId, provider: IGraphNodeId): T; };",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 6,
           "configuration": [],
           "fragment": "capability-graph--ICapabilityGraph"
         },
@@ -5625,7 +5659,7 @@
           "name": "ICapabilityGraphOptions",
           "kind": "type",
           "signature": "export type ICapabilityGraphOptions = { readonly onError?: (error: unknown) => void; };",
-          "declarationLine": 74,
+          "declarationLine": 80,
           "source": "packages/capability/dist/graph/index.d.ts",
           "purpose": "Factory options are snapshotted before any lifecycle object is constructed.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICapabilityGraphOptions.",
@@ -5958,6 +5992,7 @@
           "examples": [
             "import {\n  createCapabilityGraph,\n  CapabilityGraphErrorCode,\n  type IGraphNodeId,\n  type IGraphNodeDefinition,\n  type IGraphStartContext,\n  type IGraphNodeInstance\n} from '@migaia/capability/graph'",
             "type IGraphNodeDefinition<T> = {\n  readonly id: IGraphNodeId\n  readonly kind: string\n  readonly dependencies: readonly { readonly provider: IGraphNodeId; readonly required: true }[]\n  readonly start: (\n    context: IGraphStartContext\n  ) => IGraphNodeInstance<T> | PromiseLike<IGraphNodeInstance<T>>\n}",
+            "import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst serviceId = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph()\ngraph.register({\n  id: serviceId, kind: 'service', dependencies: [],\n  start: () => ({ value: { read: () => 42 }, release: () => undefined })\n})\ntry {\n  await graph.ready()\n  console.log(graph.readValue<{ read(): number }>(serviceId)?.read()) // 42\n} finally {\n  await graph.dispose()\n}",
             "import {\n  createCapabilityGraph,\n  type IGraphNodeId,\n  type IGraphNodeDefinition\n} from '@migaia/capability/graph'",
             "const graph = createCapabilityGraph({ onError: (error) => console.error(error) })\nconst provider = 'provider' as IGraphNodeId\ngraph.register({\n  id: provider,\n  kind: 'service',\n  dependencies: [],\n  start: () => ({ value: { ready: true }, release: () => undefined })\n})\nconst consumer = 'consumer' as IGraphNodeId\ngraph.register({\n  id: consumer,\n  kind: 'consumer',\n  dependencies: [{ provider, required: true }],\n  start: ({ get }) => ({ value: get(provider), release: () => undefined })\n})\nawait graph.ready()\nconst service = graph.get<{ readonly ready: boolean }>(consumer, provider)\nawait graph.dispose()"
           ],
@@ -6005,7 +6040,7 @@
           "declaredConfiguration": [],
           "identity": "packages/capability/dist/graph/index.d.ts:IGraphNodeId:export type IGraphNodeId = string & { readonly __graphNodeId: unique symbol; };",
           "guidance": [],
-          "usageScore": 30,
+          "usageScore": 44,
           "configuration": [],
           "fragment": "capability-graph--IGraphNodeId"
         },
