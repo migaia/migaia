@@ -313,7 +313,7 @@ throw createStoreSharedRangeError(
 - **偶数** = 空闲，值稳定，`value` 有效
 - **奇数** = 有写者正在写，此刻 `value` 可能处于半写状态，不能读
 
-### 6.1 读：一致性校验 + 有限自旋
+### 6.1 读：一致性校验 + 有界自旋退避
 
 ```
 读 before = seq
@@ -324,7 +324,7 @@ throw createStoreSharedRangeError(
 否则 → 重试
 ```
 
-只要 `before === after` 且为偶数，就能保证这次读到的 `value` 和 `version` 出自同一次已完成的写入。自旋次数上限是 **65536（`1 << 16`）次**；超限说明可能有写者在持锁期间异常终止（线程被杀、页面崩溃），此时无限自旋会把当前线程也拖死，所以到限直接抛 `Error`（`contentionLimit`，消息含 `did not settle before the contention limit`），把"共享内存可能已经写坏"暴露出来，而不是静默卡死。
+只要 `before === after` 且为偶数，就能保证这次读到的 `value` 和 `version` 出自同一次已完成的写入。每轮最多自旋 **65536（`1 << 16`）次**；一轮用完后先退避：worker 线程用 `Atomics.wait` 阻塞至多 1 ms 等 seq 变化，不允许阻塞的线程（浏览器主线程）直接再自旋一轮。写者只是被操作系统抢占时，很快就会放锁，读者随之成功。持续争用满 **约 1 秒**（`CONTENTION_TIMEOUT_MS`）仍未 settle，才判定可能有写者在持锁期间异常终止（线程被杀、页面崩溃）；此时无限等待会把当前线程也拖死，所以抛 `Error`（`contentionLimit`，消息含 `did not settle before the contention limit`），把"共享内存可能已经写坏"暴露出来，而不是静默卡死。
 
 <a id="62-写占锁--写值--放锁"></a>
 
@@ -339,7 +339,7 @@ CAS(seq, seq, seq+1) 成功即获锁，失败重试
 seq 推进为 seq+2（committed）
 ```
 
-获锁同样有 65536 次自旋上限，超限抛 `Error`（`contentionLimit`，消息含 `lock was not acquired before the contention limit`）。写入过程中**不会调用任何用户代码**——`update()` 的用户回调在锁外执行，所以持锁期间不存在"回调抛错导致锁卡在奇数"的问题。
+获锁使用同样的自旋退避与约 1 秒的持续争用上限，超限抛 `Error`（`contentionLimit`，消息含 `lock was not acquired before the contention limit`）。写入过程中**不会调用任何用户代码**——`update()` 的用户回调在锁外执行，所以持锁期间不存在"回调抛错导致锁卡在奇数"的问题。
 
 这一版设计修复的是更早期"`Atomics.exchange(value)` 然后 `Atomics.add(version)`"两步式实现的缺陷：两步之间没有互斥，并发写者会导致读者看到"新值配旧版本号"，从而误判自己没有变化、漏掉一次通知——这类问题在跨线程共享状态里几乎无法用常规手段排查，因为它不报错，只是"有一帧数据没更新"。
 
@@ -394,7 +394,7 @@ seq 推进为 seq+2（committed）
 | `ARRAY_DISPOSED`     | `SharedInt32Array` 已 `dispose()` 后继续访问 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`prune`/`assertActive`                                                                                    | `Error`                                  |
 | `BUFFER_TOO_SMALL`   | 传入的 `buffer` 小于 `SharedInt32Signal`（8 字节）或按 `SharedInt32Array` 的 `length` 推算出的所需大小                                                                                                | `RangeError`，构造时                     |
 | `INDEX_OUT_OF_RANGE` | `SharedInt32Array` 的 `get`/`set`/`update`/`sync(index)` 下标越界或非整数                                                                                                                             | `RangeError`，调用时                     |
-| `CONTENTION_LIMIT`   | 一致读自旋 65536 次未 settle，或获取写锁自旋 65536 次未成功，或 `update()` 的 CAS 重试自旋 65536 次仍未写入                                                                                           | `Error`                                  |
+| `CONTENTION_LIMIT`   | 一致读持续约 1 秒未 settle，或获取写锁持续约 1 秒未成功（两者均按轮自旋并退避），或 `update()` 的 CAS 重试自旋 65536 次仍未写入                                                                                           | `Error`                                  |
 | `ENV_UNSUPPORTED`    | 当前运行环境不支持 `Atomics.waitAsync`，却调用了 `.watch()`                                                                                                                                           | `Error`，`watch()` 调用时                |
 | `INVALID_OPTION`     | 构造/写入口参非法：`buffer` 类型不对、`options` 不是对象、`options` 读取失败、`length` 非法、`initialValues` 物化失败、`length` 换算出的 slot 数超限、写入值不是合法 int32、`update()` 的回调不是函数 | `TypeError` 或 `RangeError`，构造/调用时 |
 
