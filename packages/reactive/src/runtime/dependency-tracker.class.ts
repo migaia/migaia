@@ -22,6 +22,14 @@ function mutableSubs(observable: IObservable): Set<IObserver> {
   return mutableNodeSubs(observable, observable.subs)
 }
 
+/** Snapshots nonempty subscribers before callbacks can reconnect edges under a synchronous flush. */
+export function markSubscribers(observable: IObservable): void {
+  /** Read metadata once; an idle source needs neither an iterator nor a snapshot allocation. */
+  const subscribers = observable.subs
+  if (subscribers.size === 0) return
+  for (const subscriber of Array.from(subscribers)) subscriber.markDirty()
+}
+
 // 一次追踪的临时帧：fn 执行期间读到的依赖先攒在 nextDeps，不碰正式依赖边。
 type ITrackingFrame =
   | {
