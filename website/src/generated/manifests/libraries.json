@@ -21491,7 +21491,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -21500,7 +21500,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const user = new ObservableObject({ name: 'Ada', age: 30 });\nuser.get('name'); // 追踪读：处在 effect/computed 内时只订阅 'name' 这个 cell\nuser.set('age', 31); // 值变化：触发修订信号，已建 cell 的 'age' 同步更新\nuser.snapshot(); // 冻结的、Object.create(null) 起始的浅拷贝快照\nuser.dispose(); // 用完必须释放，级联 dispose 全部内部 Signal"
+                  "code": "const user = new ObservableObject({ name: 'Ada', age: 30 })\nuser.get('name') // 追踪读：处在 effect/computed 内时只订阅 'name' 这个 cell\nuser.set('age', 31) // 值变化：触发修订信号，已建 cell 的 'age' 同步更新\nuser.snapshot() // 冻结的、Object.create(null) 起始的浅拷贝快照\nuser.dispose() // 用完必须释放，级联 dispose 全部内部 Signal"
                 },
                 {
                   "type": "paragraph",
@@ -21516,12 +21516,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ObservableArray`｜10 秒上手 —— 索引数组，`at`/`length`/`peek`/`snapshot`/`set`/`push`/`pop`/`splice`/`replace`/`clear`/`prune`/`dispose`："
+                  "text": "`ObservableArray`｜10 秒上手 —— 索引数组，`at`/`length`/`peek`/`snapshot`/`set`/`push`/`pop`/`splice`/`replace`/`clear`/`dispose`："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);\nrows.at(1); // 只读了索引 1，只订阅索引 1\nrows.set(1, { id: 'b2' }); // 触发依赖索引 1 的订阅者\nrows.push({ id: 'd' }); // 改变 length，触发依赖 length/结构 的订阅者\nrows.dispose();"
+                  "code": "const rows = new ObservableArray([{ id: 'a' }, { id: 'b' }, { id: 'c' }])\nrows.at(1) // 只读了索引 1，只订阅索引 1\nrows.set(1, { id: 'b2' }) // 触发依赖索引 1 的订阅者\nrows.push({ id: 'd' }) // 改变 length，触发依赖 length/结构 的订阅者\nrows.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -21542,7 +21542,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const users = new ObservableMap<string, { name: string }>();\nusers.set('u1', { name: 'Ann' }); // 键不存在，触发结构信号 + 迭代信号\nusers.get('u1'); // 追踪读，惰性建 'u1' 的 cell\nusers.dispose();"
+                  "code": "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' }) // 键不存在，触发结构信号 + 迭代信号\nusers.get('u1') // 追踪读，惰性建 'u1' 的 cell\nusers.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -21563,7 +21563,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const tags = new ObservableSet(['a', 'b']);\ntags.has('a'); // 追踪读，惰性建 'a' 的 membership cell\ntags.add('c'); // 触发结构信号\ntags.dispose();"
+                  "code": "const tags = new ObservableSet(['a', 'b'])\ntags.has('a') // 追踪读，惰性建 'a' 的 membership cell\ntags.add('c') // 触发结构信号\ntags.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -21595,7 +21595,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { observableArray } from '@migaia/store-indexed';\n\nconst rows = observableArray([{ id: 'a' }], {}, myRuntime);"
+                  "code": "import { observableArray } from '@migaia/store-indexed'\n\nconst rows = observableArray([{ id: 'a' }], {}, myRuntime)"
                 },
                 {
                   "type": "paragraph",
@@ -21622,7 +21622,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed';"
+                  "code": "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -21631,7 +21631,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "if (event.operation === IndexedOperation.write) reportMutation(event);"
+                  "code": "if (event.operation === IndexedOperation.write) reportMutation(event)"
                 },
                 {
                   "type": "paragraph",
@@ -21646,7 +21646,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -21655,7 +21655,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  collection.at(-1);\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
+                  "code": "try {\n  collection.at(-1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreIndexedErrorCode.collectionDisposed) {\n    // ...\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -21668,7 +21668,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "STORE_INDEXED_SOURCE; // '@migaia/store-indexed'"
+                  "code": "STORE_INDEXED_SOURCE // '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -21677,7 +21677,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n);"
+                  "code": "throw createStoreIndexedTypeError(\n  StoreIndexedErrorCode.invalidOption,\n  'custom guard rejected the mutation'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -21698,13 +21698,13 @@
               ]
             },
             {
-              "id": "高阶组合示例-1-表格行细粒度订阅-定期-prune",
-              "heading": "高阶组合示例 · 1. 表格行细粒度订阅 + 定期 prune()",
+              "id": "高阶组合示例-1-表格行细粒度订阅与自动回收",
+              "heading": "高阶组合示例 · 1. 表格行细粒度订阅与自动回收",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ObservableArray } from '@migaia/store-indexed';\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n);\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map(\n  (index) => rows.runtime.effect(() => render(index, rows.at(index)))\n);\n\nrows.splice(0, 1); // 索引语义整体后移一位\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\nfor (const effect of watched) effect.dispose();\nrows.dispose();"
+                  "code": "import { ObservableArray } from '@migaia/store-indexed'\n\nconst rows = new ObservableArray<{ id: string; name: string }>(\n  Array.from({ length: 100_000 }, (_, i) => ({ id: String(i), name: `row-${i}` }))\n)\n\n// 只有被订阅的 5 行才会实体化 cell，其余 99995 行不占用任何 Signal\nconst watched = [0, 1, 2, 3, 4].map((index) =>\n  rows.runtime.effect(() => render(index, rows.at(index)))\n)\n\nrows.splice(0, 1) // 索引语义整体后移一位\n// 释放订阅后，索引 cell 会通过 onUnobserved 自动回收。\n\nfor (const effect of watched) effect.dispose()\nrows.dispose()"
                 }
               ]
             },
@@ -21715,7 +21715,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ObservableMap } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n);\n\ntry {\n  users.set('u1', { name: 'Ann' }); // 抛错：不在 action 内\n} catch {\n  guard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功\n}"
+                  "code": "import { ObservableMap } from '@migaia/store-indexed'\nimport { MutationPolicy } from '@migaia/store-middleware'\n\nconst guard = new MutationPolicy('actions-only')\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n)\n\ntry {\n  users.set('u1', { name: 'Ann' }) // 抛错：不在 action 内\n} catch {\n  guard.runInAction(() => users.set('u1', { name: 'Ann' })) // 成功\n}"
                 }
               ]
             },
@@ -21726,7 +21726,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive';\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nconst runtimeA = createRuntime();\nconst runtimeB = createRuntime();\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA);\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a'); // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n});"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { ObservableSet, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nconst runtimeA = createRuntime()\nconst runtimeB = createRuntime()\nconst tagsInA = new ObservableSet(['a', 'b'], runtimeA)\n\nruntimeB.effect(() => {\n  try {\n    tagsInA.has('a') // 当前 effect 属于 runtimeB，读了 runtimeA 的集合\n  } catch (error) {\n    if ((error as { code?: string }).code === StoreIndexedErrorCode.crossRuntime) {\n      // 预期内的跨 Runtime 保护\n    }\n  }\n})"
                 }
               ]
             },
@@ -21737,7 +21737,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed';\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    );\n  }\n}"
+                  "code": "import { createStoreIndexedError, StoreIndexedErrorCode } from '@migaia/store-indexed'\n\nfunction assertNonEmptyName(name: string): void {\n  if (name.length === 0) {\n    throw createStoreIndexedError(\n      StoreIndexedErrorCode.invalidOption,\n      '[store] name must not be empty'\n    )\n  }\n}"
                 }
               ]
             },
@@ -21748,7 +21748,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ObservableObject } from '@migaia/store-indexed';\n\nconst bigTable = new ObservableObject(\n  Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`k${i}`, i]))\n);\n\n// peek() 不建 cell，适合一次性批量导出\nlet sum = 0;\nfor (const key of bigTable.keys()) sum += bigTable.peek(key);\nbigTable.dispose();"
+                  "code": "import { ObservableObject } from '@migaia/store-indexed'\n\nconst bigTable = new ObservableObject(\n  Object.fromEntries(Array.from({ length: 100_000 }, (_, i) => [`k${i}`, i]))\n)\n\n// peek() 不建 cell，适合一次性批量导出\nlet sum = 0\nfor (const key of bigTable.keys()) sum += bigTable.peek(key)\nbigTable.dispose()"
                 }
               ]
             },
@@ -21827,7 +21827,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const users = new ObservableMap<string, { name: string }>();\nusers.set('u1', { name: 'Ann' });\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1'); // 现在为 'u1' 创建了 cell"
+                  "code": "const users = new ObservableMap<string, { name: string }>()\nusers.set('u1', { name: 'Ann' })\n\n// 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它\nusers.get('u1') // 现在为 'u1' 创建了 cell"
                 },
                 {
                   "type": "paragraph",
@@ -21912,7 +21912,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  ObservableObject,\n  ObservableArray,\n  ObservableMap,\n  ObservableSet,\n  observableObject,\n  observableArray,\n  observableMap,\n  observableSet,\n  type IObservableCollectionOptions\n} from '@migaia/store-indexed'"
                 }
               ]
             },
@@ -21932,7 +21932,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IObservableCollectionOptions = {\n  readonly mutationGuard?: IMutationGuard; // 来自 @migaia/store-light\n  readonly debugName?: string;\n};"
+                  "code": "type IObservableCollectionOptions = {\n  readonly mutationGuard?: IMutationGuard // 来自 @migaia/store-light\n  readonly debugName?: string\n}"
                 },
                 {
                   "type": "table",
@@ -21985,7 +21985,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class ObservableObject<T extends Record<string, unknown>> implements IDisposable {\n  readonly runtime: IRuntime;\n  get disposed(): boolean;\n  get<K extends keyof T & string>(key: K): T[K];\n  peek<K extends keyof T & string>(key: K): T[K];\n  has(key: keyof T & string): boolean;\n  set<K extends keyof T & string>(key: K, value: T[K]): void;\n  update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void;\n  delete(key: keyof T & string): boolean;\n  keys(): readonly (keyof T & string)[];\n  snapshot(): Readonly<T>;\n  replace(next: T): void;\n  prune(): number;\n  dispose(): void;\n}"
+                  "code": "class ObservableObject<T extends Record<string, unknown>> implements IDisposable {\n  readonly runtime: IRuntime\n  get disposed(): boolean\n  get<K extends keyof T & string>(key: K): T[K]\n  peek<K extends keyof T & string>(key: K): T[K]\n  has(key: keyof T & string): boolean\n  set<K extends keyof T & string>(key: K, value: T[K]): void\n  update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void\n  delete(key: keyof T & string): boolean\n  keys(): readonly (keyof T & string)[]\n  snapshot(): Readonly<T>\n  replace(next: T): void\n  prune(): number\n  dispose(): void\n}"
                 },
                 {
                   "type": "table",
@@ -22065,7 +22065,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class ObservableArray<T> implements IDisposable {\n  readonly runtime: IRuntime;\n  get disposed(): boolean;\n  get length(): number;\n  at(index: number): T | undefined;\n  snapshot(): readonly T[];\n  peek(): readonly T[];\n  set(index: number, value: T): void;\n  push(...values: readonly T[]): number;\n  pop(): T | undefined;\n  splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[];\n  replace(values: Iterable<T>): void;\n  clear(): void;\n  prune(): number;\n  dispose(): void;\n}"
+                  "code": "class ObservableArray<T> implements IDisposable {\n  readonly runtime: IRuntime\n  get disposed(): boolean\n  get length(): number\n  at(index: number): T | undefined\n  snapshot(): readonly T[]\n  peek(): readonly T[]\n  set(index: number, value: T): void\n  push(...values: readonly T[]): number\n  pop(): T | undefined\n  splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]\n  replace(values: Iterable<T>): void\n  clear(): void\n  dispose(): void\n}"
                 },
                 {
                   "type": "table",
@@ -22118,13 +22118,6 @@
                       "见下方 `#replaceInternal` 说明"
                     ],
                     ["`clear()`", "无", "`void`", "写", "等价于 `replace([])`"],
-                    [
-                      "`prune()`",
-                      "无",
-                      "本次回收的 cell 数",
-                      "—",
-                      "对全部已物化 cell 无条件尝试 tombstone，不只是越界的 cell——`splice`/`pop` 之后\"索引\"这个身份本身就不再稳定，任何一个既存 cell 都可能对应错的位置，因此凡是无订阅者的都值得回收"
-                    ],
                     ["`dispose()`", "无", "`void`", "—", "释放全部拥有的 Signal"]
                   ]
                 },
@@ -22141,7 +22134,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class ObservableMap<K, V> implements IDisposable {\n  readonly runtime: IRuntime;\n  get disposed(): boolean;\n  get size(): number;\n  get(key: K): V | undefined;\n  peek(key: K): V | undefined;\n  has(key: K): boolean;\n  set(key: K, value: V): this;\n  delete(key: K): boolean;\n  clear(): void;\n  replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void;\n  keys(): readonly K[];\n  valuesArray(): readonly V[];\n  entries(): readonly (readonly [K, V])[];\n  snapshot(): ReadonlyMap<K, V>;\n  prune(): number;\n  dispose(): void;\n}"
+                  "code": "class ObservableMap<K, V> implements IDisposable {\n  readonly runtime: IRuntime\n  get disposed(): boolean\n  get size(): number\n  get(key: K): V | undefined\n  peek(key: K): V | undefined\n  has(key: K): boolean\n  set(key: K, value: V): this\n  delete(key: K): boolean\n  clear(): void\n  replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void\n  keys(): readonly K[]\n  valuesArray(): readonly V[]\n  entries(): readonly (readonly [K, V])[]\n  snapshot(): ReadonlyMap<K, V>\n  prune(): number\n  dispose(): void\n}"
                 },
                 {
                   "type": "table",
@@ -22219,7 +22212,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class ObservableSet<T> implements IDisposable {\n  readonly runtime: IRuntime;\n  get disposed(): boolean;\n  get size(): number;\n  has(value: T): boolean;\n  add(value: T): this;\n  delete(value: T): boolean;\n  clear(): void;\n  replace(next: Iterable<T>): void;\n  valuesArray(): readonly T[];\n  snapshot(): ReadonlySet<T>;\n  prune(): number;\n  dispose(): void;\n}"
+                  "code": "class ObservableSet<T> implements IDisposable {\n  readonly runtime: IRuntime\n  get disposed(): boolean\n  get size(): number\n  has(value: T): boolean\n  add(value: T): this\n  delete(value: T): boolean\n  clear(): void\n  replace(next: Iterable<T>): void\n  valuesArray(): readonly T[]\n  snapshot(): ReadonlySet<T>\n  prune(): number\n  dispose(): void\n}"
                 },
                 {
                   "type": "table",
@@ -22286,7 +22279,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function observableObject<T extends Record<string, unknown>>(\n  initial: T,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableObject<T>;\n\nfunction observableArray<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableArray<T>;\n\nfunction observableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableMap<K, V>;\n\nfunction observableSet<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableSet<T>;"
+                  "code": "function observableObject<T extends Record<string, unknown>>(\n  initial: T,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableObject<T>\n\nfunction observableArray<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableArray<T>\n\nfunction observableMap<K, V>(\n  initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableMap<K, V>\n\nfunction observableSet<T>(\n  initial?: Iterable<T>,\n  options?: IObservableCollectionOptions,\n  runtime?: IRuntime\n): ObservableSet<T>"
                 },
                 {
                   "type": "paragraph",
@@ -22295,7 +22288,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime); // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime);\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime);"
+                  "code": "// 错误示范：把 runtime 当成第二个参数传给工厂函数\nobservableArray([1, 2, 3], myRuntime) // myRuntime 被当成了 options！\n\n// 正确写法\nobservableArray([1, 2, 3], {}, myRuntime)\n// 或者直接用类构造函数，参数顺序是 (initial, runtime, options)\nnew ObservableArray([1, 2, 3], myRuntime)"
                 },
                 {
                   "type": "paragraph",
@@ -22310,12 +22303,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed';"
+                  "code": "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const;\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];"
+                  "code": "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]"
                 },
                 {
                   "type": "paragraph",
@@ -22330,12 +22323,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed';"
+                  "code": "import {\n  StoreIndexedErrorCode,\n  type IStoreIndexedErrorCode,\n  STORE_INDEXED_SOURCE,\n  createStoreIndexedError,\n  createStoreIndexedRangeError,\n  createStoreIndexedTypeError\n} from '@migaia/store-indexed'"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const;\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed';"
+                  "code": "const StoreIndexedErrorCode = {\n  invalidOption: 'INVALID_OPTION',\n  collectionDisposed: 'COLLECTION_DISPOSED',\n  indexOutOfRange: 'INDEX_OUT_OF_RANGE',\n  invalidIndex: 'INVALID_INDEX',\n  crossRuntime: 'CROSS_RUNTIME'\n} as const\ntype IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]\n\nconst STORE_INDEXED_SOURCE: '@migaia/store-indexed'"
                 },
                 {
                   "type": "paragraph",
@@ -22344,7 +22337,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;"
+                  "code": "function createStoreIndexedError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError\n\nfunction createStoreIndexedTypeError(\n  code: IStoreIndexedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError"
                 },
                 {
                   "type": "paragraph",
@@ -22445,11 +22438,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "多数场景下这个自动路径已经够用。但高频增删的场景（比如一个数组频繁 `splice`），如果想在某个明确的时间点（例如一轮渲染结束后）主动确保\"已经不在集合里、也没有订阅者\"的 cell 被清空，而不是继续依赖不确定何时触发的 `onUnobserved`，就调用 `prune()`。它返回本次实际回收的 cell 数，可用于监控/调试内存占用。"
+                  "text": "Object/Map/Set 的 `prune()` 是按已删除 key/member 进行显式整理与计数的 owner API，保留该领域谓词；它不会释放仍有订阅者的 cell。数组仅使用自动路径。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`ObservableArray.prune()` 是个特例：它对全部已物化 cell 无条件尝试回收，而不只是\"索引越界\"的那些——`splice`/`pop` 之后，一个 cell 挂着的索引位置和它最初对应的语义实体之间的关系已经不再可靠，继续保留一个恰好落在新长度以内、但语义已经对不上的 cell 没有意义。"
+                  "text": "`ObservableArray` 仅使用既有观察者生命周期自动回收无观察 cell，不再提供手动 `prune()`。Object/Map/Set 的 `prune()` 保留各自已删除 key/member 的整理规则。"
                 }
               ]
             },
@@ -22464,7 +22457,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { MutationPolicy } from '@migaia/store-middleware';\nimport { ObservableMap } from '@migaia/store-indexed';\n\nconst guard = new MutationPolicy('actions-only');\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n);\n\nusers.set('u1', { name: 'Ann' }); // 抛错：不在 action 内\nguard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功"
+                  "code": "import { MutationPolicy } from '@migaia/store-middleware'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst guard = new MutationPolicy('actions-only')\nconst users = new ObservableMap<string, { name: string }>(\n  [],\n  undefined, // 使用默认 Runtime\n  { mutationGuard: guard, debugName: 'users' }\n)\n\nusers.set('u1', { name: 'Ann' }) // 抛错：不在 action 内\nguard.runInAction(() => users.set('u1', { name: 'Ann' })) // 成功"
                 },
                 {
                   "type": "paragraph",
@@ -22483,7 +22476,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive';\nimport { ObservableArray } from '@migaia/store-indexed';\n\nconst runtime = createRuntime();\nconst rows = new ObservableArray([1, 2, 3], runtime);"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst rows = new ObservableArray([1, 2, 3], runtime)"
                 },
                 {
                   "type": "paragraph",
@@ -22492,17 +22485,17 @@
               ]
             },
             {
-              "id": "组合工作流示例-细粒度订阅-prune-mutationguard",
-              "heading": "组合工作流示例：细粒度订阅 + prune() + mutationGuard",
+              "id": "组合工作流示例-细粒度订阅与-mutationguard",
+              "heading": "组合工作流示例：细粒度订阅与 mutationGuard",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { ObservableArray } from '@migaia/store-indexed';\nimport { MutationPolicy } from '@migaia/store-middleware';\n\nconst guard = new MutationPolicy('actions-only');\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n);\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)));\n\nguard.runInAction(() => {\n  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号\n});\nrows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell\n\neffect.dispose();\nrows.dispose();"
+                  "code": "import { ObservableArray } from '@migaia/store-indexed'\nimport { MutationPolicy } from '@migaia/store-middleware'\n\nconst guard = new MutationPolicy('actions-only')\nconst rows = new ObservableArray<{ id: string }>(\n  [{ id: 'a' }, { id: 'b' }, { id: 'c' }],\n  undefined,\n  { mutationGuard: guard, debugName: 'rows' }\n)\n\n// 只订阅索引 0：改其余索引不会让这个 effect 重算\nconst effect = rows.runtime.effect(() => console.log('row0', rows.at(0)))\n\nguard.runInAction(() => {\n  rows.splice(0, 1) // 删除首行，触发结构信号与修订信号\n})\n// 释放订阅后，索引 cell 会通过 onUnobserved 自动回收。\n\neffect.dispose()\nrows.dispose()"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`mutationGuard` 把\"只能在 `runInAction` 内写\"这条策略下沉到集合层，写方法在真正生效前统一调用一次 `assertMutationAllowed`；`prune()` 在高频结构变更（如 `splice`）后主动回收\"索引身份已经对不上\"的僵尸 cell，避免依赖不确定何时触发的 `onUnobserved`。"
+                  "text": "`mutationGuard` 把\"只能在 `runInAction` 内写\"这条策略下沉到集合层，写方法在真正生效前统一调用一次 `assertMutationAllowed`；索引 cell 在最后一个观察者退订后通过 `onUnobserved` 自动回收。"
                 }
               ]
             },
@@ -28797,7 +28790,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "基于 `SharedArrayBuffer` + `Atomics` 的跨线程响应式整数状态：把一段共享内存包装成 `@migaia/reactive` 认识的 `IObservable`（seqlock 保证并发读写正确，脏页 bitmap 保证大数组稀疏同步不掉性能），让主线程与 Worker、或多个独立的 `Runtime`，可以直接共享同一份数据而不必靠 `postMessage` 做结构化克隆。"
+                  "text": "基于 `SharedArrayBuffer` + `Atomics` 的跨线程响应式整数状态：把一段共享内存包装成 `@migaia/reactive` 认识的 `IObservable`（seqlock 保证并发读写正确，每个读者保留独立版本游标），让主线程与 Worker、或多个独立的 `Runtime`，可以直接共享同一份数据而不必靠 `postMessage` 做结构化克隆。"
                 }
               ]
             },
@@ -28847,7 +28840,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "完整签名、seqlock/脏页 bitmap 的内部机制、错误一览表，见 USEGUIDE.md。"
+                  "text": "完整签名、seqlock/独立版本游标的内部机制、错误一览表，见 USEGUIDE.md。"
                 }
               ]
             },
@@ -28858,7 +28851,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';\nimport { createRuntime } from '@migaia/reactive';"
+                  "code": "import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared'\nimport { createRuntime } from '@migaia/reactive'"
                 },
                 {
                   "type": "paragraph",
@@ -28867,7 +28860,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\n\nconst stop = runtime.effect(() => console.log('counter =', counter.value));\ncounter.value = 1; // 本地写入，Effect 自动重跑\n\nstop.dispose();\ncounter.dispose();"
+                  "code": "const runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\n\nconst stop = runtime.effect(() => console.log('counter =', counter.value))\ncounter.value = 1 // 本地写入，Effect 自动重跑\n\nstop.dispose()\ncounter.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -28937,7 +28930,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';\nimport { createRuntime } from '@migaia/reactive';"
+                  "code": "import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared'\nimport { createRuntime } from '@migaia/reactive'"
                 },
                 {
                   "type": "paragraph",
@@ -28946,7 +28939,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });\n\nconst render = runtime.effect(() => {\n  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标\n});\n\npositions.set(0, 10); // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试\n\nrender.dispose();\npositions.dispose();"
+                  "code": "const runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] })\n\nconst render = runtime.effect(() => {\n  drawEntity(positions.get(0), positions.get(1)) // 只追踪被读取的下标\n})\n\npositions.set(0, 10) // 只惊动依赖下标 0 的观察者\npositions.update(1, (y) => y + 1) // 读-改-写，内部 CAS 重试\n\nrender.dispose()\npositions.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -28992,7 +28985,7 @@
                     [
                       "`sync(index?)`",
                       "`(index?: number) => number`",
-                      "不传 `index`：批量扫描脏页，返回本轮实际变化的下标个数；传 `index`：只检查该下标，返回 `0`/`1`"
+                      "不传 `index`：generation 变化后扫描全部格，返回本轮实际变化的下标个数；传 `index`：只检查该下标，返回 `0`/`1`"
                     ],
                     [
                       "`watch()`",
@@ -29003,11 +28996,6 @@
                       "`snapshot()`",
                       "`() => Int32Array`",
                       "一次性读出全部下标当前值，返回一个新分配的、非共享的 `Int32Array` 拷贝"
-                    ],
-                    [
-                      "`prune()`",
-                      "`() => number`",
-                      "释放当前没有任何观察者的已物化响应式 cell，返回释放个数"
                     ],
                     [
                       "`dispose()`",
@@ -29055,7 +29043,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';"
+                  "code": "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared'"
                 },
                 {
                   "type": "paragraph",
@@ -29064,7 +29052,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function describeWaitMode(mode: ISharedWaitMode): string {\n  return mode === SharedWaitMode.async ? '基于 Atomics.waitAsync 的异步唤醒' : mode;\n}"
+                  "code": "function describeWaitMode(mode: ISharedWaitMode): string {\n  return mode === SharedWaitMode.async ? '基于 Atomics.waitAsync 的异步唤醒' : mode\n}"
                 },
                 {
                   "type": "paragraph",
@@ -29079,7 +29067,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared'"
                 },
                 {
                   "type": "paragraph",
@@ -29088,7 +29076,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "try {\n  counter.value = 1;\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.signalDisposed) {\n    // 信号已释放，需要重新 attach 到同一个 buffer 创建新实例\n  }\n}"
+                  "code": "try {\n  counter.value = 1\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.signalDisposed) {\n    // 信号已释放，需要重新 attach 到同一个 buffer 创建新实例\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -29117,7 +29105,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "STORE_SHARED_SOURCE; // '@migaia/store-shared'"
+                  "code": "STORE_SHARED_SOURCE // '@migaia/store-shared'"
                 },
                 {
                   "type": "paragraph",
@@ -29126,7 +29114,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreSharedError(\n  StoreSharedErrorCode.invalidOption,\n  'entity slot must be preallocated'\n);"
+                  "code": "throw createStoreSharedError(StoreSharedErrorCode.invalidOption, 'entity slot must be preallocated')"
                 },
                 {
                   "type": "paragraph",
@@ -29139,7 +29127,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');"
+                  "code": "throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0')"
                 },
                 {
                   "type": "paragraph",
@@ -29154,12 +29142,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\nconst render = runtime.effect(() => drawEntity(0, positions.get(0), positions.get(1)));\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
+                  "code": "// main.ts\nimport { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 1000) // 500 个实体的 x/y\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch() // worker 的写入自动推送进来\nconst render = runtime.effect(() => drawEntity(0, positions.get(0), positions.get(1)))\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose()\n  stopWatch()\n  positions.dispose()\n  worker.terminate()\n})"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime();\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });\n  setInterval(() => positions.update(0, (x) => x + 1), 16);\n};"
+                  "code": "// worker.ts\nimport { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime()\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer })\n  setInterval(() => positions.update(0, (x) => x + 1), 16)\n}"
                 }
               ]
             },
@@ -29170,7 +29158,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared';\n\nconst positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nlet stopWatch: (() => void) | undefined;\ntry {\n  stopWatch = positions.watch();\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.envUnsupported) {\n    const timer = setInterval(() => {\n      const changed = positions.sync();\n      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n    }, 100);\n    stopWatch = () => clearInterval(timer);\n  } else {\n    throw error;\n  }\n}"
+                  "code": "import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared'\n\nconst positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer })\n\nlet stopWatch: (() => void) | undefined\ntry {\n  stopWatch = positions.watch()\n} catch (error) {\n  if ((error as { code?: string }).code === StoreSharedErrorCode.envUnsupported) {\n    const timer = setInterval(() => {\n      const changed = positions.sync()\n      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`)\n    }, 100)\n    stopWatch = () => clearInterval(timer)\n  } else {\n    throw error\n  }\n}"
                 }
               ]
             },
@@ -29181,18 +29169,18 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive';\nimport { sharedInt32 } from '@migaia/store-shared';\n\nconst mainRuntime = createRuntime();\nconst shared = sharedInt32(mainRuntime, 0);\nworker.postMessage({ buffer: shared.buffer }); // SharedArrayBuffer 可以直接传递，不会被拷贝\n\n// worker 内\nconst workerRuntime = createRuntime();\nconst mirror = sharedInt32(workerRuntime, 0, receivedBuffer); // initialValue 被忽略，附着已有数据\nmirror.watch();"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\n\nconst mainRuntime = createRuntime()\nconst shared = sharedInt32(mainRuntime, 0)\nworker.postMessage({ buffer: shared.buffer }) // SharedArrayBuffer 可以直接传递，不会被拷贝\n\n// worker 内\nconst workerRuntime = createRuntime()\nconst mirror = sharedInt32(workerRuntime, 0, receivedBuffer) // initialValue 被忽略，附着已有数据\nmirror.watch()"
                 }
               ]
             },
             {
-              "id": "高阶组合示例-4-高频轮换下标读取-prune-主动回收响应式-cell",
-              "heading": "高阶组合示例 · 4. 高频轮换下标读取：prune() 主动回收响应式 cell",
+              "id": "高阶组合示例-4-高频轮换下标读取-自动回收响应式-cell",
+              "heading": "高阶组合示例 · 4. 高频轮换下标读取：自动回收响应式 cell",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const probe = runtime.effect(() => {\n  for (let index = 0; index < positions.length; index += 37) {\n    positions.get(index); // 遍历式探测，每次命中不同下标\n  }\n});\n\nsetInterval(() => {\n  const removed = positions.prune(); // 清理已无订阅者的 cell，避免累积\n  if (removed > 0) console.log(`released ${removed} idle cells`);\n}, 5000);"
+                  "code": "const probe = runtime.effect(() => {\n  for (let index = 0; index < positions.length; index += 37) positions.get(index)\n})\nprobe.dispose() // 最后一个观察者退订时自动回收 cell"
                 }
               ]
             },
@@ -29203,7 +29191,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared';\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    );\n  }\n  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格\n}"
+                  "code": "import {\n  StoreSharedErrorCode,\n  createStoreSharedRangeError,\n  sharedInt32Array\n} from '@migaia/store-shared'\n\nfunction createEntityGrid(runtime: IRuntime, entityCount: number) {\n  if (entityCount <= 0) {\n    throw createStoreSharedRangeError(\n      StoreSharedErrorCode.invalidOption,\n      'entityCount must be a positive integer'\n    )\n  }\n  return sharedInt32Array(runtime, entityCount * 2) // 每个实体占 [x, y] 两格\n}"
                 }
               ]
             },
@@ -29238,7 +29226,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 导入与前置条件 2. `SharedInt32Signal` / `sharedInt32` 完整参考 3. `SharedInt32Array` / `sharedInt32Array` 完整参考 4. `SharedWaitMode` 完整参考 5. 错误身份：`StoreSharedErrorCode` / `STORE_SHARED_SOURCE` / `createStoreSharedError` / `createStoreSharedRangeError` 6. Seqlock：并发读写的正确性保证 7. 跨线程同步：`sync()` 与 `watch()` 8. 脏页 bitmap：`SharedInt32Array` 的稀疏同步 9. 响应式集成细节 10. 错误一览表 11. 生产环境完整示例 12. 常见问题排查 13. 构建、格式化与测试"
+                  "text": "1. 导入与前置条件 2. `SharedInt32Signal` / `sharedInt32` 完整参考 3. `SharedInt32Array` / `sharedInt32Array` 完整参考 4. `SharedWaitMode` 完整参考 5. 错误身份：`StoreSharedErrorCode` / `STORE_SHARED_SOURCE` / `createStoreSharedError` / `createStoreSharedRangeError` 6. Seqlock：并发读写的正确性保证 7. 跨线程同步：`sync()` 与 `watch()` 8. 每读者独立的完整同步 9. 响应式集成细节 10. 错误一览表 11. 生产环境完整示例 12. 常见问题排查 13. 构建、格式化与测试"
                 }
               ]
             },
@@ -29249,7 +29237,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createRuntime } from '@migaia/reactive';\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                  "code": "import { createRuntime } from '@migaia/reactive'\nimport {\n  sharedInt32,\n  SharedInt32Signal,\n  sharedInt32Array,\n  SharedInt32Array,\n  SharedWaitMode,\n  type ISharedWaitMode,\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared'"
                 },
                 {
                   "type": "paragraph",
@@ -29272,7 +29260,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function sharedInt32(\n  runtime: IRuntime,\n  initialValue?: number,\n  buffer?: SharedArrayBuffer\n): SharedInt32Signal;\n\nclass SharedInt32Signal implements IObservable, IDisposable {\n  constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer);\n}"
+                  "code": "function sharedInt32(\n  runtime: IRuntime,\n  initialValue?: number,\n  buffer?: SharedArrayBuffer\n): SharedInt32Signal\n\nclass SharedInt32Signal implements IObservable, IDisposable {\n  constructor(runtime: IRuntime, initialValue?: number, buffer?: SharedArrayBuffer)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -29326,7 +29314,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class SharedInt32Signal implements IObservable, IDisposable {\n  readonly runtime: IRuntime;\n  readonly buffer: SharedArrayBuffer;\n  readonly subs: ReadonlySet<IObserver>;\n  get version(): number;\n  get disposed(): boolean;\n  get value(): number;\n  set value(next: number);\n  peek(): number;\n  sync(): boolean;\n  watch(): IDisposer;\n  onObserved(): void;\n  onUnobserved(): void;\n  isStale(): boolean;\n  dispose(): void;\n}"
+                  "code": "class SharedInt32Signal implements IObservable, IDisposable {\n  readonly runtime: IRuntime\n  readonly buffer: SharedArrayBuffer\n  readonly subs: ReadonlySet<IObserver>\n  get version(): number\n  get disposed(): boolean\n  get value(): number\n  set value(next: number)\n  peek(): number\n  sync(): boolean\n  watch(): IDisposer\n  onObserved(): void\n  onUnobserved(): void\n  isStale(): boolean\n  dispose(): void\n}"
                 },
                 {
                   "type": "list",
@@ -29349,7 +29337,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\nconst counter = sharedInt32(runtime, 0);\ncounter.value; // 0\ncounter.value = 5;\ncounter.peek(); // 5，不触发追踪\ncounter.dispose();\ncounter.value; // 抛 Error（code: 'SIGNAL_DISPOSED'）"
+                  "code": "const runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\ncounter.value // 0\ncounter.value = 5\ncounter.peek() // 5，不触发追踪\ncounter.dispose()\ncounter.value // 抛 Error（code: 'SIGNAL_DISPOSED'）"
                 }
               ]
             },
@@ -29360,7 +29348,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function sharedInt32Array(\n  runtime: IRuntime,\n  length: number,\n  options?: {\n    readonly buffer?: SharedArrayBuffer;\n    readonly initialValues?: Iterable<number>;\n  }\n): SharedInt32Array;\n\nclass SharedInt32Array implements IDisposable {\n  constructor(\n    runtime: IRuntime,\n    length: number,\n    options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number> }\n  );\n}"
+                  "code": "function sharedInt32Array(\n  runtime: IRuntime,\n  length: number,\n  options?: {\n    readonly buffer?: SharedArrayBuffer\n    readonly initialValues?: Iterable<number>\n  }\n): SharedInt32Array\n\nclass SharedInt32Array implements IDisposable {\n  constructor(\n    runtime: IRuntime,\n    length: number,\n    options?: { readonly buffer?: SharedArrayBuffer; readonly initialValues?: Iterable<number> }\n  )\n}"
                 },
                 {
                   "type": "table",
@@ -29398,15 +29386,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "未传 `buffer` 且提供了 `initialValues`：遍历该 iterable，逐个用 `asInt32` 校验并收集，达到 `length` 个就停止；遍历或校验中途抛错 → 抛 `RangeError`（`invalidOption`，消息 `[store] shared array initialValues could not be materialized safely`，`cause` 为原始错误）。 6."
+                  "text": "未传 `buffer` 且提供了 `initialValues`：遍历该 iterable，逐个用 `asInt32` 校验并收集，达到 `length` 个就停止；遍历或校验中途抛错 → 抛 `RangeError`（`invalidOption`，消息 `[store] shared array initialValues could not be materialized safely`，`cause` 为原始错误）。 6. ABI v2：header 与 generation 占 32 bytes，后接 `length` 个 int32 value，按 8 bytes 对齐后接 `length` 个 int64 seq。所需字节数 `requiredBytes = align8(32 + length * 4) + length * 8`；容量溢出抛 `RangeError`（`invalidOption`）。 7."
                 },
                 {
                   "type": "paragraph",
-                  "text": "按 `length` 推算所需 slot 数：`headerSlots = 1(epoch) + ceil(ceil(length / 32) / 32)(脏页 bitmap words)`，`slots = headerSlots + length * 2`；若该结果不是安全整数或超过 `0xffffffff`（`Int32Array` 下标空间上限）→ 抛 `RangeError`（`invalidOption`，消息 `[store] shared array length exceeds the Int32Array capacity`）。 7. `buffer = options.buffer ? new SharedArrayBuffer(slots * Int32Array.BYTES_PER_ELEMENT)`；若提供的 `buffer."
-                },
-                {
-                  "type": "paragraph",
-                  "text": "byteLength` 小于所需字节数 → 抛 `RangeError`（`bufferTooSmall`，消息 `[store] shared array buffer is too small`）。 8. 若第 5 步收集到了 `initialValues`，逐个 `Atomics.store` 写入对应 value slot（不经过 seqlock 写入路径——全新 buffer 的 seq 天然是偶数 0，构造期直接写值即安全）。 9. 构造函数不扫描任何格子的 seqlock 来建立版本基线——每个下标的响应式基线在该下标第一次被追踪读取时才建立（见 `SharedInt32ArrayCell` 构造逻辑），数组级 `sync()` 依赖 epoch 判断要不要扫描（见 §8）。"
+                  "text": "`buffer = options.buffer ? new SharedArrayBuffer(requiredBytes)`；过小的 buffer 抛 `RangeError`（`bufferTooSmall`）。已有 buffer 必须通过 magic、ABI version、kind、ready 与 length 校验。 8. 若第 5 步收集到了 `initialValues`，逐个 `Atomics.store` 写入对应 value slot（不经过 seqlock 写入路径——全新 buffer 的 seq 天然是偶数 0，构造期直接写值即安全）。 9. 构造函数不扫描任何格子的 seqlock 来建立版本基线——每个下标的响应式基线在该下标第一次被追踪读取时才建立（见 `SharedInt32ArrayCell` 构造逻辑），数组级 `sync()` 依赖 epoch 判断要不要扫描（见 §8）。"
                 }
               ]
             },
@@ -29417,7 +29401,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class SharedInt32Array implements IDisposable {\n  readonly runtime: IRuntime;\n  readonly buffer: SharedArrayBuffer;\n  readonly length: number;\n  get disposed(): boolean;\n  get(index: number): number;\n  set(index: number, value: number): void;\n  update(index: number, update: (current: number) => number): number;\n  sync(index?: number): number;\n  watch(): IDisposer;\n  snapshot(): Int32Array;\n  prune(): number;\n  dispose(): void;\n  assertActive(): void;\n  readCell(index: number): { readonly value: number; readonly version: number };\n  writeCell(index: number, value: number, expected?: number): number | undefined;\n  notifyWaiters(): void;\n  recordObservedVersion(index: number, version: number): void;\n}"
+                  "code": "class SharedInt32Array implements IDisposable {\n  readonly runtime: IRuntime\n  readonly buffer: SharedArrayBuffer\n  readonly length: number\n  get disposed(): boolean\n  get(index: number): number\n  set(index: number, value: number): void\n  update(index: number, update: (current: number) => number): number\n  sync(index?: number): number\n  watch(): IDisposer\n  snapshot(): Int32Array\n  dispose(): void\n  assertActive(): void\n  readCell(index: number): { readonly value: number; readonly version: number }\n  writeCell(index: number, value: number, expected?: number): bigint | undefined\n  notifyWaiters(): void\n  recordObservedVersion(index: number, version: number): void\n}"
                 },
                 {
                   "type": "list",
@@ -29429,14 +29413,13 @@
                     "`update(index, updater): number` —— `updater` 必须是函数，否则抛 `TypeError`（`invalidOption`，消息 `[store] shared array update callback must be a function`）。执行顺序（详见 §6.2）：一致读当前值 → 锁外调用 `updater(current)` → 校验结果为合法 `int32` → 若与当前值相同直接返回（不写入）→ 否则以 CAS（期望值 = 读到的 `current`）尝试写入，失败则从头重来，最多重试 `1 << 16`（65536）次；超限抛 `Error`（`contentionLimit`，消息 `[store] shared array update at <index> kept losing the race; another writer never settled`）。写入成功后同步更新本地记账、若下标已物化 cell 则调用其 `commitWrite`，否则直接 `notifyWaiters()`。`updater` 必须是纯函数、可安全重复调用——冲突时会被重跑，不要在里面产生不可逆副作用；`updater` 抛错会原样向上抛出，且不会留下任何脏锁状态（回调在锁外执行）。",
                     "`sync(index?): number`",
                     "传 `index`：先做下标校验；比较该下标的一致读版本号与本地记录，未变返回 `0`；变了则更新记录、若已物化 cell 则调用其 `sync()`（触发通知），返回 `1`。",
-                    "不传：整体扫描。先比较头部 epoch 与本地记录的 `#observedEpoch`，未变直接返回 `0`（连脏页 bitmap 都不碰）；变了则在 `runtime.batch()` 内逐 word `Atomics.exchange` 读出并清零脏页 bitmap，对每个置位的页逐格重新一致读、与本地记录比较，真正变化的下标才更新记录并调用其已物化 cell 的 `sync()`，最终返回本轮实际变化的下标个数（可能为 `0`，即 epoch 变了但没有格子真正稳定下来变化，理论上不会发生但代码按此语义实现）。整个批处理包在一次 `runtime.batch()` 内，多处变化只会让下游重跑一轮而不是逐个通知。",
+                    "不传：先比较 64 位 generation；未变返回 0，变化后在一次 `runtime.batch()` 内扫描全部格的 seqlock。每个读者使用独立版本游标，统计所有变化下标（含无观察者格），只通知已物化 cell。",
                     "`watch(): IDisposer` —— 语义与 `SharedInt32Signal.watch()` 一致，但监听的是头部 epoch slot 而不是逐格 seq（一格一个 waiter 在长数组上不可行）；唤醒后调用整体 `sync()`（不带 `index`）。已在 watch 时重复调用返回同一停止函数；环境不支持 `waitAsync` 抛 `Error`（`envUnsupported`）。",
                     "`snapshot(): Int32Array` —— `assertActive()` 后遍历 `[0, length)`，对每个下标 `readCell(i).value`，写入一个新分配的 `Int32Array(length)` 并返回。返回值是普通、非共享的数组，修改它不会影响共享内存。",
-                    "`prune(): number` —— `assertActive()` 后遍历所有已物化的 cell，`subs.size === 0`（没有任何观察者）的从追踪器断开并从内部 `Map` 移除，返回移除个数。用于\"高频轮换访问不同下标\"场景下主动清理，弥补自动回收（见下）的粒度不够及时。",
-                    "`dispose(): void` —— 幂等；停止 `watch()`、把所有已物化 cell 从追踪器断开。释放之后调用 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`prune` 等会抛 `Error`（`arrayDisposed`）。",
+                    "`dispose(): void` —— 幂等；停止 `watch()`、把所有已物化 cell 从追踪器断开。释放之后调用 `get`/`set`/`update`/`sync`/`watch`/`snapshot` 等会抛 `Error`（`arrayDisposed`）。",
                     "`assertActive(): void` —— 已释放则抛 `Error`（`arrayDisposed`，消息 `[store] shared array is disposed`）；公开方法，正常业务代码不需要直接调用，供组合式底层用法（如包装类）复用同一校验。",
                     "`readCell(index): { value; version }` —— 一致读某一格的原始 value/version（复用 seqlock 读协议），不做下标范围校验、不检查是否已释放，是最底层的读原语；`get()`/`sync()` 等内部都基于它实现，调用方若直接使用需自行保证 `index` 合法。",
-                    "`writeCell(index, value, expected?): number | undefined` —— 最底层的写原语（`set`/`update` 都基于它），语义见 §6.2：`expected` 省略即无条件写；提供则是 CAS；成功返回新版本并标记对应脏页，未写入（值未变或 CAS 失败）返回 `undefined`。同样不做下标校验。",
+                    "`writeCell(index, value, expected?): bigint | undefined` —— 最底层的写原语（`set`/`update` 都基于它），语义见 §6.2：`expected` 省略即无条件写；提供则是 CAS；成功返回新 64 位版本，未写入（值未变或 CAS 失败）返回 `undefined`。同样不做下标校验。",
                     "`notifyWaiters(): void` —— 把头部 epoch 原子 `+1` 并 `Atomics.notify`，用于在绕开 `set`/`update` 自行调用 `writeCell` 之后手动唤醒 `watch()` 回路。",
                     "`recordObservedVersion(index, version): void` —— 更新数组级\"已观察版本\"记账（`#observedVersions[index]`），供自行组合 `readCell`/`writeCell` 实现自定义写入路径时，保持与内建 `sync()`/`get()` 的记账一致，避免下一次 `sync()` 误判该下标\"仍未变化\"或重复上报。"
                   ]
@@ -29448,7 +29431,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const runtime = createRuntime();\nconst grid = sharedInt32Array(runtime, 4, { initialValues: [0, 0, 0, 0] });\ngrid.set(0, 10);\ngrid.get(0); // 10\ngrid.update(1, (v) => v + 1); // 1\ngrid.snapshot(); // Int32Array [10, 1, 0, 0]\ngrid.dispose();\ngrid.get(0); // 抛 Error（code: 'ARRAY_DISPOSED'）"
+                  "code": "const runtime = createRuntime()\nconst grid = sharedInt32Array(runtime, 4, { initialValues: [0, 0, 0, 0] })\ngrid.set(0, 10)\ngrid.get(0) // 10\ngrid.update(1, (v) => v + 1) // 1\ngrid.snapshot() // Int32Array [10, 1, 0, 0]\ngrid.dispose()\ngrid.get(0) // 抛 Error（code: 'ARRAY_DISPOSED'）"
                 }
               ]
             },
@@ -29459,7 +29442,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const SharedWaitMode: { readonly async: 'async' };\ntype ISharedWaitMode = 'async';"
+                  "code": "const SharedWaitMode: { readonly async: 'async' }\ntype ISharedWaitMode = 'async'"
                 },
                 {
                   "type": "paragraph",
@@ -29468,7 +29451,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';\n\nconst currentMode: ISharedWaitMode = SharedWaitMode.async;"
+                  "code": "import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared'\n\nconst currentMode: ISharedWaitMode = SharedWaitMode.async"
                 }
               ]
             },
@@ -29479,7 +29462,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared';"
+                  "code": "import {\n  StoreSharedErrorCode,\n  type IStoreSharedErrorCode,\n  STORE_SHARED_SOURCE,\n  createStoreSharedError,\n  createStoreSharedRangeError\n} from '@migaia/store-shared'"
                 }
               ]
             },
@@ -29490,7 +29473,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreSharedErrorCode: {\n  readonly arrayDisposed: 'ARRAY_DISPOSED';\n  readonly signalDisposed: 'SIGNAL_DISPOSED';\n  readonly bufferTooSmall: 'BUFFER_TOO_SMALL';\n  readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE';\n  readonly contentionLimit: 'CONTENTION_LIMIT';\n  readonly envUnsupported: 'ENV_UNSUPPORTED';\n  readonly invalidOption: 'INVALID_OPTION';\n};\ntype IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode];"
+                  "code": "const StoreSharedErrorCode: {\n  readonly arrayDisposed: 'ARRAY_DISPOSED'\n  readonly signalDisposed: 'SIGNAL_DISPOSED'\n  readonly bufferTooSmall: 'BUFFER_TOO_SMALL'\n  readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'\n  readonly contentionLimit: 'CONTENTION_LIMIT'\n  readonly envUnsupported: 'ENV_UNSUPPORTED'\n  readonly invalidOption: 'INVALID_OPTION'\n}\ntype IStoreSharedErrorCode = (typeof StoreSharedErrorCode)[keyof typeof StoreSharedErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -29505,7 +29488,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const STORE_SHARED_SOURCE: '@migaia/store-shared';"
+                  "code": "const STORE_SHARED_SOURCE: '@migaia/store-shared'"
                 },
                 {
                   "type": "paragraph",
@@ -29520,7 +29503,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createStoreSharedError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreSharedRangeError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError;"
+                  "code": "function createStoreSharedError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreSharedRangeError(\n  code: IStoreSharedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError"
                 },
                 {
                   "type": "paragraph",
@@ -29533,7 +29516,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreSharedRangeError(\n  StoreSharedErrorCode.invalidOption,\n  'entityCount must be a positive integer'\n);"
+                  "code": "throw createStoreSharedRangeError(\n  StoreSharedErrorCode.invalidOption,\n  'entityCount must be a positive integer'\n)"
                 }
               ]
             },
@@ -29628,24 +29611,16 @@
               ]
             },
             {
-              "id": "8-脏页-bitmap-sharedint32array-的稀疏同步",
-              "heading": "8. 脏页 bitmap：SharedInt32Array 的稀疏同步",
+              "id": "8-每读者独立的完整同步",
+              "heading": "8. 每读者独立的完整同步",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`SharedInt32Array` 的共享内存布局是：`[epoch, .bitmap words, value0, seq0, value1, seq1, .]`，每页 32 格（`DIRTY_PAGE_SIZE = 32`），每个 bitmap word 覆盖 32 页（`DIRTY_BITS_PER_WORD = 32`）。"
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "epoch：每次任意下标完成一次落盘写入，写者都会把 epoch 原子 `+1`。`sync()` 不传 `index` 时，第一步就是比较本地记录的 epoch 和共享内存里的当前 epoch——完全没变就直接返回 `0`，连 bitmap 都不用碰。这一步是为了让一条 `watch()` 唤醒回路就能覆盖整个数组，不需要给上万个下标各起一个 waiter。",
-                    "脏页 bitmap：每次写入用 `Atomics.or` 点亮自己所在页的 bit（`Atomics.or` 是无损操作，多个写者并发点同一个 bit 不会互相覆盖或丢失标记）。`sync()` 发现 epoch 变化后，用 `Atomics.exchange` 逐 word 读出 bitmap 并清零（`exchange` 是单次原子读改写，不存在\"清零期间丢失一次并发 `or`\"的时间窗口：并发的 `or` 要么完整发生在 `exchange` 之前，已经反映在读出的旧值里；要么完整发生在之后，作用在刚清零的 0 上，正确地留给下一轮 `sync()` 发现）。",
-                    "逐格确认：命中的每一页仍然要逐格读 seqlock 版本号，和本地记录比较，真正变了才会通知该下标的观察者。也就是说 bitmap/epoch 只是\"可能变了\"的提示，不是正确性来源——即便某个 bit 因为极端时序被提前清零、写入方的 `or` 恰好卡在那之前完成，页内逐格版本比较仍会在下一轮 `sync()` 里补上这次变化，不会真正漏掉。"
-                  ]
+                  "text": "ABI v2 包含版本化 header、一个 64 位 generation，以及每格 value/seq。写者完成一次提交后递增 generation 并唤醒 waiter；每个 JS array 实例保留自己的 generation 和每格已读版本。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "效果：百万格的数组里只改动几个分散的下标，`sync()` 的开销只和\"变化的页数\"相关，而不是和数组长度 `length` 相关。一次 `sync()` 扫描到的多个变化会被包在同一个 `runtime.batch()` 里，避免下游因为一次同步里的多处变化而被唤醒多轮。"
+                  "text": "`sync()` 先比较 generation；未变化直接返回 0。变化后扫描全部 `length` 个 seqlock，与本实例的版本游标逐格比较，返回所有变化下标数（包括没有观察者的下标），在一次 `runtime.batch()` 中通知本地观察者。`sync(index)` 只比较指定格。完整扫描为 O(length)，当前没有共享清位的 dirty bitmap；一个读者不会消费另一个读者的变化。"
                 }
               ]
             },
@@ -29659,8 +29634,7 @@
                     "两者都是 `IObservable`：通过 `@migaia/reactive/extension` 的 `createSourceBinding` 绑定原节点身份与只读版本/订阅者元数据，用受控source操作接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。",
                     "单一归属：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。",
                     "`SharedInt32Array` 的按需物化：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。",
-                    "cell 的自动回收：`Effect`/`Computed` 可能在提交观察之前就放弃一次\"投机读\"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。",
-                    "手动 `prune()`：如果访问模式是\"高频轮换读取不同下标\"（比如遍历式的探测），自动回收的微任务粒度可能不够及时，可以定期调用 `array.prune()` 主动清理当前没有任何订阅者的 cell，返回本次清理掉的个数。"
+                    "cell 的自动回收：最后一个观察者退订时，canonical `onUnobserved` 立即回收该 cell。`Effect`/`Computed` 可能在提交观察之前就放弃一次\"投机读\"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。"
                   ]
                 }
               ]
@@ -29680,7 +29654,7 @@
                     ],
                     [
                       "`ARRAY_DISPOSED`",
-                      "`SharedInt32Array` 已 `dispose()` 后继续访问 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`prune`/`assertActive`",
+                      "`SharedInt32Array` 已 `dispose()` 后继续访问 `get`/`set`/`update`/`sync`/`watch`/`snapshot`/`assertActive`",
                       "`Error`"
                     ],
                     [
@@ -29727,12 +29701,12 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// main.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nconst runtime = createRuntime();\nconst positions = sharedInt32Array(runtime, 1000);\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });\nworker.postMessage({ buffer: positions.buffer });\n\nconst stopWatch = positions.watch(); // worker 的写入自动推送进来\n\nconst render = runtime.effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1));\n});\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose();\n  stopWatch();\n  positions.dispose();\n  worker.terminate();\n});"
+                  "code": "// main.ts\nimport { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst positions = sharedInt32Array(runtime, 1000)\n\nconst worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })\nworker.postMessage({ buffer: positions.buffer })\n\nconst stopWatch = positions.watch() // worker 的写入自动推送进来\n\nconst render = runtime.effect(() => {\n  drawEntity(0, positions.get(0), positions.get(1))\n})\n\nwindow.addEventListener('beforeunload', () => {\n  render.dispose()\n  stopWatch()\n  positions.dispose()\n  worker.terminate()\n})"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// worker.ts\nimport { createRuntime } from '@migaia/reactive';\nimport { sharedInt32Array } from '@migaia/store-shared';\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime();\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });\n\n  setInterval(() => {\n    positions.update(0, (x) => x + 1); // 每帧推进实体 0 的 x 坐标\n  }, 16);\n};"
+                  "code": "// worker.ts\nimport { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nself.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {\n  const runtime = createRuntime()\n  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer })\n\n  setInterval(() => {\n    positions.update(0, (x) => x + 1) // 每帧推进实体 0 的 x 坐标\n  }, 16)\n}"
                 },
                 {
                   "type": "paragraph",
@@ -29741,7 +29715,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });\n\nsetInterval(() => {\n  const changed = positions.sync(); // 返回本轮实际变化的下标个数\n  if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);\n}, 100);"
+                  "code": "const positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer })\n\nsetInterval(() => {\n  const changed = positions.sync() // 返回本轮实际变化的下标个数\n  if (changed > 0) console.log(`${changed} 个下标发生了远端变化`)\n}, 100)"
                 }
               ]
             },
@@ -29767,7 +29741,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`SharedInt32Array` 里成千上万个下标，`sync()` 会不会很慢？ 不会。`sync()` 先比较头部 epoch，完全没变直接返回；有变化时只扫描被脏页 bitmap 标记过的页，不是整个数组，见 §8。"
+                  "text": "Q：`SharedInt32Array` 里成千上万个下标，`sync()` 会不会很慢？ 未变时比较 generation 后直接返回 0；有变化时为 O(length) 的全数组扫描。已知目标下标时可用 `sync(index)` 限定工作量；完整 `sync()` 保持每读者独立的所有变化计数，见 §8。"
                 },
                 {
                   "type": "paragraph",
