@@ -27,6 +27,7 @@ import { createCapabilityError, tagCapabilityError } from './errors.js'
 import { CapabilityEnableStatus, CapabilityState } from './state-constants.js'
 export * from './state-constants.js'
 export {
+  GraphReadinessState,
   snapshotGraphReadiness,
   type ICapabilityReadinessSource,
   type IGraphReadinessSnapshot,
@@ -269,7 +270,10 @@ export function createCapabilityHost<Context>(
 
   const assertUsable = (): void => {
     if (disposed)
-      throw createCapabilityError(CapabilityErrorCode.hostDisposed, 'capability host is disposed')
+      throw createCapabilityError(
+        CapabilityErrorCode.hostDisposed,
+        CapabilityErrorText.hostDisposed
+      )
   }
 
   const assertNotTransitioning = (): void => {
@@ -308,7 +312,7 @@ export function createCapabilityHost<Context>(
     if (!entry) {
       throw createCapabilityError(
         CapabilityErrorCode.notRegistered,
-        `capability "${name}" is not registered`
+        CapabilityErrorText.notRegistered(name)
       )
     }
     return entry
@@ -638,19 +642,19 @@ export function createCapabilityHost<Context>(
           // hostile Proxy getter on definition — surface with (source, code) + cause reachable (AF-09).
           throw createCapabilityError(
             CapabilityErrorCode.invalidOption,
-            'capability definition snapshot failed',
+            CapabilityErrorText.definitionSnapshotFailed,
             { cause: error }
           )
         }
         if (typeof name !== 'string' || name.trim().length === 0) {
           throw tagCapabilityError(
-            new TypeError('capability name must be a non-empty string'),
+            new TypeError(CapabilityErrorText.invalidName),
             CapabilityErrorCode.invalidName
           )
         }
         if (typeof activate !== 'function') {
           throw tagCapabilityError(
-            new TypeError(`capability "${name}" activate must be a function`),
+            new TypeError(CapabilityErrorText.invalidActivate(name)),
             CapabilityErrorCode.invalidActivate
           )
         }
@@ -670,7 +674,7 @@ export function createCapabilityHost<Context>(
       if (entries.has(snapshot.name)) {
         throw createCapabilityError(
           CapabilityErrorCode.alreadyRegistered,
-          `capability "${snapshot.name}" is already registered`
+          CapabilityErrorText.alreadyRegistered(snapshot.name)
         )
       }
       entries.set(snapshot.name, {

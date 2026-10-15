@@ -9,7 +9,19 @@ export type ICapabilityReadinessSource = {
 }
 
 /** Graph availability states admitted by the readiness snapshot contract. */
-export type IGraphReadinessState = 'ready' | 'blocked' | 'failed'
+export const GraphReadinessState = {
+  /** Admission may proceed using the current readiness snapshot. */
+  ready: 'ready',
+  /** Admission is unavailable without declaring a terminal startup failure. */
+  blocked: 'blocked',
+  /** Admission failed; the paired snapshot error explains why. */
+  failed: 'failed'
+} as const
+
+export type GraphReadinessState = keyof typeof GraphReadinessState
+
+/** Existing named readiness type retains the canonical availability domain. */
+export type IGraphReadinessState = GraphReadinessState
 
 /** Immutable, one-time readiness fact passed to Graph and direct consumers. */
 export type IGraphReadinessSnapshot = {
@@ -30,7 +42,11 @@ export function snapshotGraphReadiness(
   } catch (error) {
     throw normalizeReadinessGetterFailure(error)
   }
-  if (state !== 'ready' && state !== 'blocked' && state !== 'failed') {
+  if (
+    state !== GraphReadinessState.ready &&
+    state !== GraphReadinessState.blocked &&
+    state !== GraphReadinessState.failed
+  ) {
     throw createCapabilityError(
       CapabilityErrorCode.invalidOption,
       CapabilityErrorText.invalidReadinessState

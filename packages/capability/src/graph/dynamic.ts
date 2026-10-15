@@ -4,7 +4,14 @@ import {
   type ITopologySnapshotFailure
 } from './topology-admission.js'
 import type { ICapabilityGraphNodeState, ICapabilityGraphState } from './state-constants.js'
-import { CapabilityGraphNodeState, CapabilityGraphState } from './state-constants.js'
+import {
+  CapabilityGraphNodeState,
+  CapabilityGraphState,
+  GraphBlockedReason,
+  GraphBindingReleaseReason
+} from './state-constants.js'
+
+export { GraphBindingReleaseReason } from './state-constants.js'
 import { CapabilityGraphErrorCode } from './error-code.js'
 import { graphFailure, graphMessageFor } from './errors.js'
 import {
@@ -40,7 +47,10 @@ export type IGraphMutationResult = Readonly<{
 }>
 
 /** Policy used when a node still has required dependents. */
-export type IGraphDependencyMutationPolicy = 'reject' | 'cascade'
+export type IGraphDependencyMutationPolicy = Exclude<
+  DependencyPolicy,
+  typeof DependencyPolicy.suspend
+>
 
 export type { IGraphDependents } from './topology.js'
 
@@ -94,7 +104,7 @@ export type IDynamicCapabilityGraphOptions<TBinding = unknown> = Readonly<{
 }>
 
 /** Identifies why one exact graph binding generation left the graph. */
-export type IGraphBindingReleaseReason = 'remove' | 'replace' | 'dispose'
+export type IGraphBindingReleaseReason = GraphBindingReleaseReason
 
 /** Exact binding custody released after graph-owned instance cleanup. */
 export type IGraphBindingReleaseEntry<TBinding> = Readonly<{
@@ -158,7 +168,7 @@ type IStoredNode<TBinding> = {
   state: ICapabilityGraphNodeState
   value?: unknown
   error?: unknown
-  blockedReason?: 'missing' | 'suspended' | 'removed' | 'failed'
+  blockedReason?: GraphBlockedReason
   generation: number
   instance?: IGraphNodeInstance<unknown>
   leaseKey: object
@@ -412,12 +422,15 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   /** Preserves the nearest supported provider failure reason in blocked diagnostics. */
   const readBlockedReason = (provider: string): IStoredNode<TBinding>['blockedReason'] => {
     const entry = definitions.get(provider)
-    if (entry?.state === CapabilityGraphNodeState.suspended) return 'suspended'
-    if (entry?.state === CapabilityGraphNodeState.failed || entry?.blockedReason === 'failed')
-      return 'failed'
-    if (entry?.blockedReason === 'removed') return 'removed'
-    if (entry?.blockedReason === 'suspended') return 'suspended'
-    return 'missing'
+    if (entry?.state === CapabilityGraphNodeState.suspended) return GraphBlockedReason.suspended
+    if (
+      entry?.state === CapabilityGraphNodeState.failed ||
+      entry?.blockedReason === GraphBlockedReason.failed
+    )
+      return GraphBlockedReason.failed
+    if (entry?.blockedReason === GraphBlockedReason.removed) return GraphBlockedReason.removed
+    if (entry?.blockedReason === GraphBlockedReason.suspended) return GraphBlockedReason.suspended
+    return GraphBlockedReason.missing
   }
 
   /** Starts only blocked/registered/failed nodes in deterministic dependency order. */
@@ -464,7 +477,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           ? CapabilityGraphNodeState.failed
           : CapabilityGraphNodeState.blocked
         entry.error = error
-        entry.blockedReason = attributable ? undefined : 'failed'
+        entry.blockedReason = attributable ? undefined : GraphBlockedReason.failed
       }
       throw graphFailure(CapabilityGraphErrorCode.startFailed, error, {
         nodes: startable.map((entry) => entry.definition.id)
@@ -535,7 +548,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         const target = definitions.get(id)
         if (!target) throw fail(CapabilityGraphErrorCode.unknownNode)
         const affected = readOrderedEntries(planMutation(id, options))
-        await release(affected, new Set([id]), 'remove')
+        await release(affected, new Set([id]), GraphBindingReleaseReason.remove)
         topologyIndex.remove(id)
         invalidateDiagnostics()
         definitions.delete(id)
@@ -544,7 +557,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           if (affectedIds.has(entry.definition.id)) {
             entry.state = CapabilityGraphNodeState.blocked
             entry.error = undefined
-            entry.blockedReason = 'removed'
+            entry.blockedReason = GraphBlockedReason.removed
           }
         graphGeneration += 1
         return {
@@ -564,7 +577,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         for (const entry of affected) {
           if (entry === target) continue
           entry.state = CapabilityGraphNodeState.blocked
-          entry.blockedReason = 'suspended'
+          entry.blockedReason = GraphBlockedReason.suspended
         }
         graphGeneration += 1
         return {
@@ -640,7 +653,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
         )
         if (options?.restartDependents === false) {
           const targetOnly = [previous]
-          await release(targetOnly, new Set([node.id]), 'replace')
+          await release(targetOnly, new Set([node.id]), GraphBindingReleaseReason.replace)
           previous.binding = binding
           previous.state = CapabilityGraphNodeState.registered
           previous.error = undefined
@@ -665,7 +678,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
           }
           if (restart.size > 0) {
             const restartEntries = readOrderedEntries(restart)
-            await release(restartEntries, new Set(), 'replace')
+            await release(restartEntries, new Set(), GraphBindingReleaseReason.replace)
             await start(restartEntries)
           }
           return {
@@ -674,7 +687,7 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
             generation: graphGeneration
           }
         }
-        await release(affected, new Set([node.id]), 'replace')
+        await release(affected, new Set([node.id]), GraphBindingReleaseReason.replace)
         previous.binding = binding
         previous.state = CapabilityGraphNodeState.registered
         previous.error = undefined
@@ -730,7 +743,11 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
       disposePromise = schedule(async () => {
         try {
           const entries = readOrderedEntries()
-          await release(entries, new Set(entries.map((entry) => entry.definition.id)), 'dispose')
+          await release(
+            entries,
+            new Set(entries.map((entry) => entry.definition.id)),
+            GraphBindingReleaseReason.dispose
+          )
         } finally {
           definitions.clear()
           for (const id of topologyIndex.order()) topologyIndex.remove(id)
