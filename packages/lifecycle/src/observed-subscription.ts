@@ -55,11 +55,10 @@ export function observeAbortSubscription(
     if (!attempted || (removed && !force)) return
     removed = true
     try {
-      Reflect['apply'](
-        removeEventListener as (type: string, listener: () => void) => void,
-        signal,
-        ['abort', listener]
-      )
+      Reflect.apply(removeEventListener as (type: string, listener: () => void) => void, signal, [
+        'abort',
+        listener
+      ])
     } catch (error) {
       failures.push(error)
       try {
@@ -101,7 +100,7 @@ export function observeAbortSubscription(
   attempted = true
   registrationInProgress = true
   try {
-    Reflect['apply'](
+    Reflect.apply(
       addEventListener as (type: string, listener: () => void, options?: unknown) => void,
       signal,
       ['abort', listener, { once: true }]
