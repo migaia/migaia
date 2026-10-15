@@ -78,7 +78,10 @@ describe('L-T56 Round18 LifecycleScope descriptor admission boundary', () => {
       const calls: string[] = []
       const report = vi.fn()
       const hostile = { order: 0 } as Record<string, unknown>
-      const forceGetter = vi.fn(() => {
+      // own() validates the shape once at registration; the getter fails only on the dispose-time
+      // snapshot read, which must still reach the error policy.
+      const forceGetter = vi.fn((): unknown => {
+        if (forceGetter.mock.calls.length === 1) return () => undefined
         throw admissionError
       })
       Object.defineProperty(hostile, 'force', { get: forceGetter })
@@ -98,7 +101,7 @@ describe('L-T56 Round18 LifecycleScope descriptor admission boundary', () => {
         }
       })
 
-      expect(forceGetter).not.toHaveBeenCalled()
+      expect(forceGetter).toHaveBeenCalledTimes(1)
       const promise = scope.dispose()
 
       if (errorPolicy === 'collect') {
@@ -110,7 +113,7 @@ describe('L-T56 Round18 LifecycleScope descriptor admission boundary', () => {
         await expect(promise).rejects.toBe(admissionError)
       }
 
-      expect(forceGetter).toHaveBeenCalledTimes(1)
+      expect(forceGetter).toHaveBeenCalledTimes(2)
       expect(calls).toEqual(['high', 'low'])
       expect(scope.lifecycle).toBe('terminal')
     }
