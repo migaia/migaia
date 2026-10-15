@@ -8,7 +8,7 @@ import type {
 } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
 import { createDisposerContext } from './disposer-context.js'
-import { containAsyncRejection, createLifecycleError } from './errors.js'
+import { assertErrorPolicyReporter, containAsyncRejection, createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createTerminalController } from './terminal-controller.js'
@@ -32,6 +32,11 @@ const finalizationRegistry: FinalizationRegistry<() => void> | undefined =
 
 export type ILifecycleScopeOptions = {
   readonly errorPolicy?: IErrorPolicy
+  /**
+   * Reporter for failures the error policy does not throw or collect. Required when `errorPolicy`
+   * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field:
+   * 'report'`.
+   */
   readonly report?: (error: unknown) => void
   /** Shared absolute deadline forwarded to every owned resource's release (L-T32). */
   readonly deadlineAt?: number
@@ -68,6 +73,7 @@ export type ILifecycleScope = ILifecycleOwner & {
  */
 export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILifecycleScope {
   const errorPolicy = options.errorPolicy ?? 'throw'
+  assertErrorPolicyReporter(errorPolicy, options.report)
   const scheduler = resolveSchedulerOption(options)
   const terminal = createTerminalController()
   const createController = captureAbortControllerFactory()

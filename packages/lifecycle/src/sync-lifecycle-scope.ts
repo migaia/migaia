@@ -6,7 +6,12 @@ import type {
   ILifecycleState
 } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
-import { createLifecycleError, createErrorCollector, probeThenable } from './errors.js'
+import {
+  assertErrorPolicyReporter,
+  createLifecycleError,
+  createErrorCollector,
+  probeThenable
+} from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createTerminalController } from './terminal-controller.js'
@@ -21,6 +26,11 @@ export type ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: t
 
 export type ISyncLifecycleScopeOptions = {
   readonly errorPolicy?: IErrorPolicy
+  /**
+   * Reporter for failures the error policy does not throw or collect. Required when `errorPolicy`
+   * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field:
+   * 'report'`.
+   */
   readonly report?: (error: unknown) => void
 }
 
@@ -93,6 +103,7 @@ export function createSyncLifecycleScope(
 ): ISyncLifecycleScope {
   const createController = captureAbortControllerFactory()
   const errorPolicy = options.errorPolicy ?? 'throw'
+  assertErrorPolicyReporter(errorPolicy, options.report)
   const terminal = createTerminalController()
   const entries: Array<{
     readonly resource: unknown

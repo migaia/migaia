@@ -1,6 +1,7 @@
 import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
 import type { IDisposerContext } from './disposer-context.js'
 import {
+  assertErrorPolicyReporter,
   assimilateCapturedThen,
   attachLifecycleSecondaryErrors,
   createErrorCollector,
@@ -280,6 +281,11 @@ export type IDisposeTransactionMode =
 
 export type IDisposeTransactionOptions = {
   readonly errorPolicy?: IErrorPolicy
+  /**
+   * Reporter for failures the error policy does not throw or collect. Required when `errorPolicy`
+   * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field:
+   * 'report'`.
+   */
   readonly report?: (error: unknown) => void
   /** Absolute deadline shared, unchanged, across every item in this run (L-T32). */
   readonly deadlineAt?: number
@@ -416,6 +422,7 @@ export function createDisposeTransaction(
   const errorPolicy = options.errorPolicy ?? 'throw'
   const scheduler = resolveSchedulerOption(options)
   const report = options.report
+  assertErrorPolicyReporter(errorPolicy, report)
   const deadlineAt = options.deadlineAt
   const signalOption = options.signal
   const pending = options.pending

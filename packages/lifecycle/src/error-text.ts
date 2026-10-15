@@ -43,6 +43,13 @@ export const LifecycleErrorText = {
   schedulerDelayRange: '[lifecycle] scheduler delay must be non-negative',
   /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */
   schedulerTimeOverflow: '[lifecycle] scheduler time arithmetic must remain finite',
+  /**
+   * Explains that the `report`/`firstError` error policy was chosen without a `report` callback.
+   * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and
+   * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later.
+   */
+  errorPolicyReporterMissing:
+    '[lifecycle] errorPolicy "report" and "firstError" require a report callback',
   /** Explains that a generation timeout option could not be read at its admission boundary. */
   generationTimeoutAccessorFailed: '[lifecycle] generation timeout option getter failed'
 } as const
