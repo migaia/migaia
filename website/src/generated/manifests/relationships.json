@@ -31293,36 +31293,6 @@
     },
     {
       "from": "/en/docs/resource/api",
-      "to": "/en/docs/resource/api#resource-index--IResourceFetchStatus",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/resource/api#resource-index--IResourceFetchStatus",
-      "to": "/en/docs/resource/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/resource/api#resource-index--IResourceFetchStatus",
-      "to": "/en/docs/resource/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/resource/getting-started",
-      "to": "/en/docs/resource/api#resource-index--IResourceFetchStatus",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/resource/api#resource-index--IResourceFetchStatus",
-      "to": "/en/docs/resource",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/resource",
-      "to": "/en/docs/resource/api#resource-index--IResourceFetchStatus",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/resource/api",
       "to": "/en/docs/resource/api#resource-index--IResourceOptions",
       "type": "api-symbol"
     },
@@ -31413,36 +31383,6 @@
     },
     {
       "from": "/en/docs/resource/api",
-      "to": "/en/docs/resource/api#resource-index--IResourceStatus",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/resource/api#resource-index--IResourceStatus",
-      "to": "/en/docs/resource/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/resource/api#resource-index--IResourceStatus",
-      "to": "/en/docs/resource/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/resource/getting-started",
-      "to": "/en/docs/resource/api#resource-index--IResourceStatus",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/resource/api#resource-index--IResourceStatus",
-      "to": "/en/docs/resource",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/resource",
-      "to": "/en/docs/resource/api#resource-index--IResourceStatus",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/resource/api",
       "to": "/en/docs/resource/api#resource-index--Resource",
       "type": "api-symbol"
     },
@@ -31529,6 +31469,36 @@
     {
       "from": "/en/docs/resource",
       "to": "/en/docs/resource/api#resource-index--ResourceErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/resource/api",
+      "to": "/en/docs/resource/api#resource-index--ResourceFetchStatus",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/resource/api#resource-index--ResourceFetchStatus",
+      "to": "/en/docs/resource/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/resource/api#resource-index--ResourceFetchStatus",
+      "to": "/en/docs/resource/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/resource/getting-started",
+      "to": "/en/docs/resource/api#resource-index--ResourceFetchStatus",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/resource/api#resource-index--ResourceFetchStatus",
+      "to": "/en/docs/resource",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/resource",
+      "to": "/en/docs/resource/api#resource-index--ResourceFetchStatus",
       "type": "architecture-symbol"
     },
     {
@@ -31703,36 +31673,6 @@
     },
     {
       "from": "/zh/docs/resource/api",
-      "to": "/zh/docs/resource/api#resource-index--IResourceFetchStatus",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/resource/api#resource-index--IResourceFetchStatus",
-      "to": "/zh/docs/resource/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/resource/api#resource-index--IResourceFetchStatus",
-      "to": "/zh/docs/resource/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/resource/getting-started",
-      "to": "/zh/docs/resource/api#resource-index--IResourceFetchStatus",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/resource/api#resource-index--IResourceFetchStatus",
-      "to": "/zh/docs/resource",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/resource",
-      "to": "/zh/docs/resource/api#resource-index--IResourceFetchStatus",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/resource/api",
       "to": "/zh/docs/resource/api#resource-index--IResourceOptions",
       "type": "api-symbol"
     },
@@ -31823,36 +31763,6 @@
     },
     {
       "from": "/zh/docs/resource/api",
-      "to": "/zh/docs/resource/api#resource-index--IResourceStatus",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/resource/api#resource-index--IResourceStatus",
-      "to": "/zh/docs/resource/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/resource/api#resource-index--IResourceStatus",
-      "to": "/zh/docs/resource/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/resource/getting-started",
-      "to": "/zh/docs/resource/api#resource-index--IResourceStatus",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/resource/api#resource-index--IResourceStatus",
-      "to": "/zh/docs/resource",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/resource",
-      "to": "/zh/docs/resource/api#resource-index--IResourceStatus",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/resource/api",
       "to": "/zh/docs/resource/api#resource-index--Resource",
       "type": "api-symbol"
     },
@@ -31939,6 +31849,36 @@
     {
       "from": "/zh/docs/resource",
       "to": "/zh/docs/resource/api#resource-index--ResourceErrorCode",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/resource/api",
+      "to": "/zh/docs/resource/api#resource-index--ResourceFetchStatus",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/resource/api#resource-index--ResourceFetchStatus",
+      "to": "/zh/docs/resource/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/resource/api#resource-index--ResourceFetchStatus",
+      "to": "/zh/docs/resource/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/resource/getting-started",
+      "to": "/zh/docs/resource/api#resource-index--ResourceFetchStatus",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/resource/api#resource-index--ResourceFetchStatus",
+      "to": "/zh/docs/resource",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/resource",
+      "to": "/zh/docs/resource/api#resource-index--ResourceFetchStatus",
       "type": "architecture-symbol"
     },
     {
