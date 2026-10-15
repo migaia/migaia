@@ -1227,6 +1227,12 @@
       "library": "lifecycle"
     },
     {
+      "path": "/en/docs/lifecycle/api/disposal/ICleanupResult",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
       "path": "/en/docs/lifecycle/api/disposal/IDisposeItem",
       "locale": "en",
       "domain": "docs",
@@ -1276,6 +1282,12 @@
     },
     {
       "path": "/en/docs/lifecycle/api/disposal/executeReleaseDescriptor",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/api/disposal/mergeCleanupResults",
       "locale": "en",
       "domain": "docs",
       "library": "lifecycle"
@@ -16791,6 +16803,12 @@
       "library": "lifecycle"
     },
     {
+      "path": "/zh/docs/lifecycle/api/disposal/ICleanupResult",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
       "path": "/zh/docs/lifecycle/api/disposal/IDisposeItem",
       "locale": "zh",
       "domain": "docs",
@@ -16840,6 +16858,12 @@
     },
     {
       "path": "/zh/docs/lifecycle/api/disposal/executeReleaseDescriptor",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/api/disposal/mergeCleanupResults",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"

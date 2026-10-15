@@ -10512,6 +10512,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/lifecycle/api#ICleanupResult",
+      "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "to": "/en/docs/lifecycle/api#ICleanupResult",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/lifecycle/api#IDisposeItem",
       "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--IDisposeItem",
       "type": "symbol-alias"
@@ -10689,6 +10699,16 @@
     {
       "from": "/en/docs/lifecycle/api/errors#lifecycle-errors--LIFECYCLE_SOURCE",
       "to": "/en/docs/lifecycle/api#LIFECYCLE_SOURCE",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/lifecycle/api#mergeCleanupResults",
+      "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "to": "/en/docs/lifecycle/api#mergeCleanupResults",
       "type": "alias-symbol"
     },
     {
@@ -11942,6 +11962,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/zh/docs/lifecycle/api#ICleanupResult",
+      "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "to": "/zh/docs/lifecycle/api#ICleanupResult",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/zh/docs/lifecycle/api#IDisposeItem",
       "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--IDisposeItem",
       "type": "symbol-alias"
@@ -12119,6 +12149,16 @@
     {
       "from": "/zh/docs/lifecycle/api/errors#lifecycle-errors--LIFECYCLE_SOURCE",
       "to": "/zh/docs/lifecycle/api#LIFECYCLE_SOURCE",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api#mergeCleanupResults",
+      "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "to": "/zh/docs/lifecycle/api#mergeCleanupResults",
       "type": "alias-symbol"
     },
     {
@@ -12583,6 +12623,36 @@
     },
     {
       "from": "/en/docs/lifecycle/api/disposal",
+      "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "to": "/en/docs/lifecycle/api/disposal",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "to": "/en/docs/lifecycle/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/lifecycle/getting-started",
+      "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "to": "/en/docs/lifecycle",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/lifecycle",
+      "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal",
       "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--IDisposeItem",
       "type": "api-symbol"
     },
@@ -12759,6 +12829,36 @@
     {
       "from": "/en/docs/lifecycle",
       "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--ISyncStartedDisposalOutcome",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal",
+      "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "to": "/en/docs/lifecycle/api/disposal",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "to": "/en/docs/lifecycle/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/lifecycle/getting-started",
+      "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "to": "/en/docs/lifecycle",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/lifecycle",
+      "to": "/en/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
       "type": "architecture-symbol"
     },
     {
@@ -12873,6 +12973,36 @@
     },
     {
       "from": "/zh/docs/lifecycle/api/disposal",
+      "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "to": "/zh/docs/lifecycle/api/disposal",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "to": "/zh/docs/lifecycle/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/lifecycle/getting-started",
+      "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "to": "/zh/docs/lifecycle",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/lifecycle",
+      "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--ICleanupResult",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal",
       "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--IDisposeItem",
       "type": "api-symbol"
     },
@@ -13049,6 +13179,36 @@
     {
       "from": "/zh/docs/lifecycle",
       "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--ISyncStartedDisposalOutcome",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal",
+      "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "to": "/zh/docs/lifecycle/api/disposal",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "to": "/zh/docs/lifecycle/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/lifecycle/getting-started",
+      "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
+      "to": "/zh/docs/lifecycle",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/lifecycle",
+      "to": "/zh/docs/lifecycle/api/disposal#lifecycle-disposal--mergeCleanupResults",
       "type": "architecture-symbol"
     },
     {

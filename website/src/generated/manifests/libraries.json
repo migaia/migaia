@@ -2860,11 +2860,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\n\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close()) // callback 在当前 stack 立即执行\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal() // open → closing；之后不再接受 start()\nif (outcome.synchronousErrors.length > 0) {\n  // 领域层决定 throw、report、firstError 或 AggregateError 投影。\n}\nconst allErrors = await outcome.completion // 永远 resolve raw error ledger，不因 item failure reject\nawait ledger.whenTerminal()"
+                  "code": "import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close()) // callback 在当前 stack 立即执行\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal() // open → closing；之后不再接受 start()\nif (outcome.cleanupErrors.length > 0) {\n  // 领域层决定 throw、report、firstError 或 AggregateError 投影。\n}\nconst { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])\nawait ledger.whenTerminal()"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Ledger 不决定 disposer 顺序、不拥有领域资源、也不制造领域错误。`start()` 捕获 callback 同步失败与 hostile then getter；thenable 只读一次并保持 receiver。`seal()`/`completion` identity 稳定；pending 全部 settle 后才进入 `terminal`。永不 settle 的合法 thenable 会让 ledger 保持 `closing`，本原语不自造 timeout 或 cancellation。"
+                  "text": "Ledger 不决定 disposer 顺序、不拥有领域资源、也不制造领域错误。`start()` 捕获 callback 同步失败与 hostile then getter；thenable 只读一次并保持 receiver。`seal()`/`physicalCompletion` identity 稳定；pending 全部 settle 后才进入 `terminal`。永不 settle 的合法 thenable 会让 ledger 保持 `closing`，本原语不自造 timeout 或 cancellation。"
                 }
               ]
             },
@@ -3105,7 +3105,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/utils/function'"
+                  "code": "import {\n  createAbortController,\n  observeAbortSubscription,\n  type IObservedAbortFailureSink,\n  type IObservedAbortSubscription\n} from '@migaia/lifecycle/abort'\nimport { snapshotScheduler } from '@migaia/lifecycle/scheduler'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createLifecycleScope } from '@migaia/lifecycle/scope'\nimport { createGenerationController } from '@migaia/lifecycle/generation'\nimport { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'\nimport { probeThenable } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -3656,13 +3656,36 @@
               ]
             },
             {
+              "id": "mergecleanupresults",
+              "heading": "mergeCleanupResults",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`mergeCleanupResults(values)` 接受 cleanup result 或其 PromiseLike 数组，等待每个结果的 `physicalCompletion` 链，返回冻结的 `{ cleanupErrors }`。错误按输入顺序及各输入的当前/迟到顺序归并；源 Promise 拒绝也保留为原错误，不会丢弃其它分支。不使用 realm-local `instanceof Promise`，跨 realm Promise 与 thenable 都可用。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`ICleanupResult<TError>` 是 lifecycle、PluginHost 与 Tray 的共同边界：当前 `cleanupErrors` 与后续 `physicalCompletion` 不重复包含同一轮错误。领域的 logical terminal、ok、cleanupComplete 等标志仍归各调用方。不要把全量错误列表放进 physical continuation，否则会重复计数。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst first = new Error('flush')\nconst late = new Error('socket close')\nconst result = await mergeCleanupResults([{\n  cleanupErrors: [first],\n  physicalCompletion: Promise.resolve({ cleanupErrors: [late] })\n}])\n// result.cleanupErrors === [first, late]，两个 error 身份不变。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`mergeCleanupResults` observes current cleanup snapshots and their later physical continuations. Each continuation contains only newly observed errors. It accepts PromiseLike values across realms, retains original rejection identities, and merges branches in input order without discarding successful or failed siblings. Domain state stays with its owner."
+                }
+              ]
+            },
+            {
               "id": "createsyncstarteddisposalledger",
               "heading": "createSyncStartedDisposalLedger",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ISyncStartedDisposalOutcome = Readonly<{\n  synchronousErrors: readonly ICollectedError[]\n  completion: Promise<readonly ICollectedError[]>\n}>"
+                  "code": "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>"
                 },
                 {
                   "type": "paragraph",
@@ -3671,7 +3694,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'\n\nconst ledger = createSyncStartedDisposalLedger()\n\n// 调用顺序由领域层决定；每个 callback 在 start() 的当前 stack 执行。\nledger.start('connection', () => connection.close())\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal()\nif (outcome.synchronousErrors.length === 1) {\n  throw outcome.synchronousErrors[0].error\n}\n\nconst finalErrors = await outcome.completion\n// completion 永远 resolve；领域层在这里决定是否 reject/aggregate/report。"
+                  "code": "import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'\n\nconst ledger = createSyncStartedDisposalLedger()\n\n// 调用顺序由领域层决定；每个 callback 在 start() 的当前 stack 执行。\nledger.start('connection', () => connection.close())\nledger.start('cache', () => cache.flush())\n\nconst outcome = ledger.seal()\nif (outcome.cleanupErrors.length === 1) {\n  throw outcome.cleanupErrors[0].error\n}\n\nconst { cleanupErrors: finalErrors } = await mergeCleanupResults([outcome])\n// 合并当前快照与迟到增量；领域层决定是否 throw/aggregate/report。"
                 },
                 {
                   "type": "paragraph",
@@ -3681,7 +3704,7 @@
                   "type": "list",
                   "items": [
                     "初始 `open`；`start()` 不改变 lifecycle。",
-                    "首次 `seal()` 同步进入 `closing`，冻结当时全部 synchronous errors，并返回唯一 outcome；重复 `seal()` 返回同一对象，`outcome.completion` 也保持同一 Promise。",
+                    "首次 `seal()` 同步进入 `closing`，冻结当时已经观察到的全部错误，并返回唯一 outcome；重复 `seal()` 返回同一对象，`outcome.physicalCompletion` 也保持同一 Promise。",
                     "已 seal 且 `pending === 0` 时进入 `terminal`；否则最后一个 thenable settle 后进入 `terminal`。`whenTerminal()` 只表达 terminal 等待，不承诺 Promise 对象 identity。",
                     "合法 thenable 永不 settle 时保持 `closing`；Ledger 不自造 timeout、abort、retry 或强制 terminal。"
                   ]
@@ -3694,9 +3717,9 @@
                   "type": "list",
                   "items": [
                     "`start()` 先校验 `source` 为 string、`callback` 为 function；非法输入同步抛 `INVALID_OPTION`，且不调用 callback。",
-                    "callback 同步 throw 或读取 `.then` getter throw：记录进 `synchronousErrors` 与最终 ledger；`start()` 不重抛 item failure，因此调用方仍能启动后续 item。",
+                    "callback 同步 throw 或读取 `.then` getter throw：记录进 seal 时的 `cleanupErrors` 快照；`start()` 不重抛 item failure，因此调用方仍能启动后续 item。",
                     "thenable 的 `.then` 只读取一次，并以原 thenable 为 receiver 调用；resolve/reject first-settlement-wins。Rejection按 settlement observation order进入最终 ledger。",
-                    "每条错误是冻结的 `{ source, error }`；原始 `error` identity不被 Ledger替换。`completion` 因 item failure也不会 reject，避免 Ledger抢走领域错误政策。"
+                    "每条错误是冻结的 `{ source, error }`；原始 `error` identity不被 Ledger替换。`physicalCompletion` 因 item failure也不会 reject，避免 Ledger抢走领域错误政策。"
                   ]
                 },
                 {
@@ -4117,7 +4140,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createAbortController } from '@migaia/lifecycle/abort'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'"
+                  "code": "import { createAbortController } from '@migaia/lifecycle/abort'\nimport { createPendingTracker } from '@migaia/lifecycle/quiescence'\nimport { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'"
                 },
                 {
                   "type": "paragraph",
@@ -4573,11 +4596,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createSyncStartedDisposalLedger } from '@migaia/lifecycle'\n\nconst ledger = createSyncStartedDisposalLedger()\n\nfunction disposeRegistry(): void {\n  ledger.start('cache', () => cache.dispose())\n  ledger.start('worker', () => worker.dispose())\n  ledger.seal()\n}\n\ndisposeRegistry()\nconst { synchronousErrors, completion } = ledger.seal()\nconst allErrors = await completion"
+                  "code": "import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle'\n\nconst ledger = createSyncStartedDisposalLedger()\n\nfunction disposeRegistry(): void {\n  ledger.start('cache', () => cache.dispose())\n  ledger.start('worker', () => worker.dispose())\n  ledger.seal()\n}\n\ndisposeRegistry()\nconst outcome = ledger.seal()\nconst { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`synchronousErrors` 只含启动阶段立即失败；`completion` 归并同步与异步失败，并且永远 resolve raw errors，错误投影留给 Registry 的公开契约。"
+                  "text": "`cleanupErrors` 是 seal 当时的错误快照；`physicalCompletion` 只返回之后新增的错误。`mergeCleanupResults([outcome])` 等待并归并两部分；原始错误投影留给 Registry 的公开契约。"
                 }
               ]
             },
@@ -4609,7 +4632,7 @@
                   "items": [
                     "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`createLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`abortableDelay`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createGenerationController`、`createQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
                     "常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。",
-                    "类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。"
+                    "类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ICleanupResult`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。"
                   ]
                 },
                 {
@@ -6439,11 +6462,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "托管卸载分两步。第一步先让新请求看不到待卸载插件，这叫“逻辑撤销”；排空期间发起的新 pipeline 运行不含该插件 stage，仍可正常完成。第二步等待已经拿到旧插件的请求和正在执行的 pipeline 全部结束，再真正调用插件与资源的 `dispose()`，这叫“物理完成”。如果等待时间达到调用方设置的上限，接口会先返回 `cleanupComplete: false`；这不代表资源已经释放，调用方仍须等待返回的 `physicalCompletion` Promise。超时只允许调用方先拿回控制权，不会跳过或打乱清理顺序。 managed cleanup 的物理链不设强制截止时间，`execution."
+                  "text": "托管卸载分两步。第一步先让新请求看不到待卸载插件，这叫“逻辑撤销”；排空期间发起的新 pipeline 运行不含该插件 stage，仍可正常完成。第二步等待已经拿到旧插件的请求和正在执行的 pipeline 全部结束，再真正调用插件与资源的 `dispose()`，这叫“物理完成”。如果等待时间达到调用方设置的上限，接口会先返回 `cleanupComplete: false`；这不代表资源已经释放，调用方仍须等待返回的 `physicalCompletion` Promise。`execution.pipelineDrainTimeoutMs` 必填、无默认值：数值为 managed cleanup 各项共享的排空预算，耗尽后继续后续清理；显式 `false` 才逐项等待真实完成，且不受普通步骤预算截断。`beforeCleanup` fence 始终先完成。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "pipelineDrainTimeoutMs` 仅限制本次观察等待（`false` 为无限等待）；普通 `unUse()`/`dispose()` 仍按 `disposeStepTimeoutMs` 对每项清理作有界退化。"
+                  "text": "数值预算不会取消仍执行的 lease 或 disposer，它们及迟到错误继续由 `physicalCompletion` 观察。普通 `unUse()`/`dispose()` 使用 `disposeStepTimeoutMs`（默认 5000ms）。"
                 }
               ]
             },
@@ -6530,7 +6553,7 @@
                     "`scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。",
                     "`queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。默认 `undefined`：只诊断、不拒绝（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。",
                     "`queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。",
-                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。"
+                    "`disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。"
                   ]
                 },
                 {
@@ -7537,11 +7560,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "managed cleanup 的物理链不设强制截止时间；`execution.pipelineDrainTimeoutMs` 是观察上限，`false` 代表无限等待。普通 `unUse()`/`dispose()` 的逐项 `disposeStepTimeoutMs` 不会截断这条 managed 物理链。"
+                  "text": "managed cleanup 使用必填的 `execution.pipelineDrainTimeoutMs`，没有隐式默认值。数值预算由本批次所有 lease 与清理步骤共享；到期后继续后续清理，即使普通 `disposeStepTimeoutMs` 为 `false`。显式 `pipelineDrainTimeoutMs: false` 才逐项等待真实完成，并绕过普通步骤预算。`beforeCleanup` fence 始终先完成。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "managed cleanup 的 `physicalCompletion` 是全批次共享的严格链：前一 provider/resource 未真实 settle 时， 后一项不会开始。`pipelineDrainTimeoutMs` 只决定何时向调用方返回逻辑 incomplete，不取消 lease 或 disposer。排空开始时先解除旧代的 stage 可见性，再封存租约 key；此后新运行不含该 stage，也不会因 `QUIESCENCE_SEALED` 失败。 因此不要把 `cleanupComplete: false` 当成已释放；应 await `physicalCompletion`，或由 realm owner 在更外层执行 可证明的强制终止。"
+                  "text": "预算不会取消已经执行的 lease 或 disposer。`cleanupErrors` 是当前错误快照，`physicalCompletion` 只含之后新增错误，可能继续携带下一层 continuation。需要完整最终错误时使用 `@migaia/lifecycle` 的 `mergeCleanupResults([result])`；不要只读取第一层物理结果。排空开始时先解除旧代 stage 可见性，再封存租约 key；新运行不含该 stage。 不要把 `cleanupComplete: false` 当成已释放；需要真实释放时观察全部 `physicalCompletion`，或由 realm owner 执行可证明的强制终止。"
                 }
               ]
             },
@@ -33571,7 +33594,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "同名 `replace()` 与 provider 恢复会复用该 definition 的 Host ordering slot；真正 `unUse()` 删除 definition 后 slot 永久退休，之后同名 `use()` 获得新的单调 slot。逻辑 bounded 结果可能先返回 `cleanupComplete: false`，但 `physicalCompletion` 严格等待 Graph binding lease、 pipeline lease、插件 disposer 与资源 disposer，未完成前不会启动后项。不能使用 `await using` 的编译目标可用 `try/finally { await host.dispose() }`。"
+                  "text": "同名 `replace()` 与 provider 恢复会复用该 definition 的 Host ordering slot；真正 `unUse()` 删除 definition 后 slot 永久退休，之后同名 `use()` 获得新的单调 slot。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "逻辑 bounded 结果可能先返回 `cleanupComplete: false`。Graph binding fence 始终先完成；PluginHost 使用必填的 `execution.pipelineDrainTimeoutMs`：数值预算耗尽后推进后续清理，显式 `false` 才逐项等待真实完成。 未结束工作与迟到错误由 `physicalCompletion` 继续观察。共同结果 `ICleanupResult` 与 `mergeCleanupResults([result])` 来自 `@migaia/lifecycle`；后者合并当前及所有后续增量错误。不能使用 `await using` 的编译目标可用 `try/finally { await host.dispose() }`。"
                 }
               ]
             },
@@ -34146,7 +34173,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`cleanupComplete: false` 表示逻辑 mutation 已提交、物理清理仍在进行。此时必须保留并观察同一个 `physicalCompletion`。Graph 在释放 exact generation 前 seal binding lease；PluginHost 严格等待该 fence 与正在执行的 pipeline snapshot，然后按 consumer/provider、plugin/resource 的既定顺序清理。bounded 只缩短调用方等待，不授权提前启动 disposer，也不取消仍在运行的 Promise。"
+                  "text": "`cleanupComplete: false` 表示逻辑 mutation 已提交、物理清理仍在进行。此时必须保留并观察同一个 `physicalCompletion`。Graph 在释放 exact generation 前 seal binding lease；PluginHost 先等待该 fence， 然后按 consumer/provider、plugin/resource 顺序清理。必填 `execution.pipelineDrainTimeoutMs` 为数值时， 本批共享预算到期后推进后续清理；显式 `false` 才逐项等待真实完成。预算不取消仍在运行的 Promise。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "共同结果 `ICleanupResult` 的 `cleanupErrors` 是当前快照，`physicalCompletion` 仅包含后续增量； 使用 `@migaia/lifecycle` 的 `mergeCleanupResults([result])` 可保留所有当前及迟到错误，包括跨 realm Promise。"
                 },
                 {
                   "type": "paragraph",
