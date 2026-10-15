@@ -1,4 +1,3 @@
-import { defaultRuntime, ReactiveErrorPhase } from '@migaia/reactive'
 import type {
   IDisposable,
   IDisposer,
@@ -16,6 +15,8 @@ import {
   type IRaw
 } from './store-protocol.js'
 import {
+  getDefaultRuntime,
+  ReactiveErrorPhase,
   assertOwnedBy,
   claimOwnership,
   ownerOf,
@@ -226,12 +227,13 @@ function createStoreCore<S extends Record<string, unknown>>(
   /** Internal descriptor snapshot; prevents Proxy TOCTOU during strict creation. */
   _descriptors?: Record<string, PropertyDescriptor>
 ): IReactiveStore<S> {
-  let runtime: IRuntime = defaultRuntime
+  /** Resolve an explicit owner first; cold imports and custom runtimes never request the default. */
+  let runtime: IRuntime
   let warnAsyncActions = false
   let mutationPolicy: IMutationPolicy | undefined
   let debugName = 'Store'
   try {
-    runtime = options?.runtime ?? defaultRuntime
+    runtime = options?.runtime ?? getDefaultRuntime()
     warnAsyncActions = options?.warnAsyncActions ?? false
     mutationPolicy = options?.mutationPolicy
     debugName = options?.debugName ?? 'Store'
