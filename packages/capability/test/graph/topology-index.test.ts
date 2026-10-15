@@ -172,6 +172,25 @@ describe('incremental topology index', () => {
     )
   })
 
+  it('CAP-P2 retains ordinal edge order and kind across rewiring and transactions', () => {
+    const index = createTestIndex()
+    index.add({ id: 'p', dependencies: [] })
+    index.add({ id: 'older', dependencies: [{ provider: 'p', required: true }] })
+    index.add({ id: 'newer', dependencies: [{ provider: 'p', required: true }] })
+    index.setDependencies('older', [])
+    index.setDependencies('older', [{ provider: 'p', required: true }])
+    expect(index.dependents('p')).toEqual({ required: ['older', 'newer'], optional: [] })
+    const transaction = index.begin()
+    transaction.setDependencies('older', [{ provider: 'p', required: false }])
+    expect(transaction.dependents('p')).toEqual({ required: ['newer'], optional: ['older'] })
+    expect(transaction.closure(['p'])).toEqual(['p', 'newer'])
+    expect(index.closure(['p'])).toEqual(['p', 'older', 'newer'])
+    transaction.commit()
+    expect(index.dependents('p')).toEqual({ required: ['newer'], optional: ['older'] })
+    index.remove('newer')
+    expect(index.dependents('p')).toEqual({ required: [], optional: ['older'] })
+  })
+
   it('A2 matches independent and static canonical order across 200 operation sequences', () => {
     for (let sequence = 0; sequence < 200; sequence += 1) {
       const random = createRandom(0x9e3779b9 ^ sequence)
