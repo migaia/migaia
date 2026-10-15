@@ -168,9 +168,6 @@ export async function createPool(
   }
   /** Choose only empty pool slots; native readiness and terminal errors stay with the Peer. */
   const select = (): IPoolMember | undefined => {
-    /** Every free member has zero client in-flight, so round-robin resolves the least-load tie. */
-    const available = [...members].filter((member) => !member.retiring && !member.busy)
-    if (available.length === 0) return undefined
     /** Rotation is over the held member order, rather than resetting when busy members disappear. */
     const ordered = [...members]
     for (let offset = 0; offset < ordered.length; offset++) {
