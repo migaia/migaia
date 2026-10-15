@@ -142620,7 +142620,7 @@
               ]
             }
           ],
-          "usageScore": 66,
+          "usageScore": 68,
           "configuration": [
             {
               "name": "maxSize",
@@ -142913,7 +142913,7 @@
               ]
             }
           ],
-          "usageScore": 116,
+          "usageScore": 118,
           "configuration": [
             {
               "name": "maxSize",
@@ -148060,7 +148060,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-keyed/dist/atom/store.d.ts:createAtomStore:export declare function createAtomStore(runtime: IRuntime): IAtomStore;",
           "guidance": [],
-          "usageScore": 100,
+          "usageScore": 102,
           "configuration": [],
           "fragment": "store-keyed-atom/store--createAtomStore"
         },
