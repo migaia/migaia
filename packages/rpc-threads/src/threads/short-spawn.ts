@@ -14,6 +14,7 @@ import type {
   IRuntimeThreadShortSpawn,
   IRuntimeThreadSpawn
 } from './runtime-peer.js'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** Only entry shorthand is expanded; full deployment objects and callbacks keep their old path. */
 export function isShortThreadSpawn(spawn: IRuntimeThreadPeerOptions['spawn']): boolean {
@@ -83,7 +84,7 @@ export async function expandThreadSpawn(
     selfAllowed: Boolean(bun || deno || node)
   })
   /** Background failures retain reporting even when the caller needs only an entry. */
-  const report = source.report ?? options.report ?? console.error
+  const report = source.report ?? options.report ?? defaultRpcReporter
   /** One scheduler owns budget timing and the default channel factory. */
   const scheduler = source.scheduler ?? systemScheduler
   /** Different entries retain loader/runtime flags while dropping the parent's entry controller. */

@@ -9,6 +9,7 @@ import { createProcessResilience } from './resilience/index.js'
 import type { IProcessResilience } from './resilience/types.js'
 import { resolveNativeProcessRuntimeOffer } from './offer.js'
 import { captureProcessTask, type IProcessAdapterTask } from './adapter.js'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** Native ingress keeps its caller-selected governor while Core owns runtime session assembly. */
 export type IRuntimeProcessListen = IProcessServeListenerIngress &
@@ -27,7 +28,7 @@ export async function createProcessListenerPeer(
    * Native sessions always retain an actual reporter while the original options carry Host
    * identity.
    */
-  const report = options.report ?? console.error
+  const report = options.report ?? defaultRpcReporter
   /** Direct native listeners obtain the same opaque Core owner as the deployed source path. */
   const captured = task ?? captureProcessTask(options)
   /** Listener/session assembly remains with this captured SDK task's original private owner. */

@@ -54,7 +54,7 @@ export function createAdapterProcessPeer(
   if (!loaded)
     return preparation.peer({
       ...options,
-      report: options.report ?? console.error
+      report: options.report ?? defaultRpcReporter
     } as IRuntimePeerOptions)
   return loaded.then((module) => {
     validateAdapterPeerTimeout(options)
@@ -70,7 +70,7 @@ export function createAdapterProcessPeer(
         (resolved) => createProcessSourcePeer(resolved, discovery.runtime, task)
       )
     return createAutomaticProcessPeer(
-      { ...options, report: options.report ?? console.error } as IRuntimePeerOptions,
+      { ...options, report: options.report ?? defaultRpcReporter } as IRuntimePeerOptions,
       {
         marker: discovery.marker,
         runtime: discovery.runtime,
@@ -82,6 +82,7 @@ export function createAdapterProcessPeer(
 }
 
 import { NativeProcessRuntimeLoader } from './runtime-loader.js'
+import { defaultRpcReporter } from '@migaia/rpc-core'
 
 /** Discover this platform's actual I/O while Core owns the peer and its preparation resources. */
 export function createProcessPeer<TRemote = Record<never, never>>(
