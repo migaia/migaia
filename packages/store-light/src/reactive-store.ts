@@ -25,7 +25,11 @@ import {
   type IObservable,
   type IObserver
 } from '@migaia/reactive/extension'
-import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle'
+import {
+  createAbortController,
+  createLifecycleScope,
+  type ILifecycleScope
+} from '@migaia/lifecycle'
 import {
   createStoreLightAggregateError,
   createStoreLightError,
@@ -179,13 +183,13 @@ export type IReactiveStoreApi<S> = {
    */
   $own<T extends IDisposable>(resource: T): T
   /**
-   * Always asynchronous (`docs/lifecycle/migration.sdd.md` §5.1 — the underlying
-   * `@migaia/lifecycle` `LifecycleScope.dispose()` has no synchronous form). Resolves once every
-   * owned Signal/Computed/Effect/wasm field has finished releasing. Callers that need "started" is
-   * enough (fire React `useEffect` cleanup, tear down a request scope) may call this without
-   * awaiting; `$disposed` already flips to `true` synchronously before any owned resource is
-   * touched, so read-path guards observe the disposed state immediately regardless of whether the
-   * caller awaits.
+   * Always returns a Promise. Native reactive nodes release synchronously in LIFO segments;
+   * external fields and owned resources drain through lifecycle. Resolves once every owned
+   * Signal/Computed/Effect/wasm field has finished releasing. Callers that need "started" is enough
+   * (fire React `useEffect` cleanup, tear down a request scope) may call this without awaiting;
+   * `$disposed` already flips to `true` synchronously before any owned resource is touched, so
+   * read-path guards observe the disposed state immediately regardless of whether the caller
+   * awaits.
    */
   $dispose(): Promise<void>
 }
@@ -259,12 +263,47 @@ function createStoreCore<S extends Record<string, unknown>>(
     )
   }
   const nodeRuntime = internalRuntimeOf(runtime)
-  // Store 内部 Computed/Effect/wasm 字段的所有权作用域。混装纯 reactive 节点与 wasm 字段（真实外部
-  // 资源），按 D-6 必须用异步 LifecycleScope，不能用 SyncLifecycleScope（migration.sdd.md §4.2）。
-  const scope: ILifecycleScope = createLifecycleScope()
-  const ownReactiveNode = <T extends IDisposable>(resource: T): T =>
-    scope.own(resource, { syncSafe: true, force: () => resource.dispose() })
-  const initAbort = new AbortController() // $dispose 时中止在途的异步字段初始化
+  /** Generic release machinery exists only once a field, subscription or external owner needs it. */
+  let scope: ILifecycleScope | undefined
+  /** Consecutive native nodes share one synchronous release entry, preserving mixed-owner order. */
+  let pureNodes: IDisposable[] = []
+  /** Native nodes contain their lifecycle callbacks and release synchronously in registration LIFO. */
+  const releasePureNodes = (nodes: IDisposable[]): void => {
+    for (let index = nodes.length - 1; index >= 0; index--) nodes[index].dispose()
+    nodes.length = 0
+  }
+  /** Fields acquire their scope before starting initialization so late registration stays closed. */
+  const ensureScope = (): ILifecycleScope => (scope ??= createLifecycleScope())
+  /** Seals the previous pure segment before a different kind of resource is registered. */
+  const flushPureNodes = (): void => {
+    if (pureNodes.length === 0) return
+    const nodes = pureNodes
+    ensureScope().own(nodes, { syncSafe: true, force: () => releasePureNodes(nodes) })
+    pureNodes = []
+  }
+  /** Only library-owned Signal/Computed nodes belong in a pure segment. */
+  const ownPureNode = <T extends IDisposable>(resource: T): T => {
+    pureNodes.push(resource)
+    return resource
+  }
+  /** Capabilities and subscriptions retain individually releasable canonical scope ownership. */
+  const ownReactiveNode = <T extends IDisposable>(resource: T): T => {
+    flushPureNodes()
+    return ensureScope().own(resource, { syncSafe: true, force: () => resource.dispose() })
+  }
+  /** Pure stores release directly; mixed stores drain the original interleaved registration order. */
+  const disposeOwned = (): ReturnType<ILifecycleScope['dispose']> | Promise<void> => {
+    if (scope === undefined) {
+      releasePureNodes(pureNodes)
+      return Promise.resolve()
+    }
+    flushPureNodes()
+    return scope.dispose()
+  }
+  /** Cancellation is required only by builders, never by plain reactive fields. */
+  let initAbort: ReturnType<typeof createAbortController> | undefined
+  /** The shared native signal belongs to this Store's one initialization generation. */
+  const initSignal = () => (initAbort ??= createAbortController()).signal
   const store = {} as Record<string, unknown>
   const contextMembers = new Set<PropertyKey>()
 
@@ -303,7 +342,8 @@ function createStoreCore<S extends Record<string, unknown>>(
     }
     try {
       // wasm 字段持有真实外部资源，不是纯 reactive 节点：syncSafe: false + gcFallback（§4.2）。
-      scope.own(field, { syncSafe: false, gcFallback: true, force: () => field.dispose() })
+      flushPureNodes()
+      ensureScope().own(field, { syncSafe: false, gcFallback: true, force: () => field.dispose() })
     } catch (error) {
       try {
         field.dispose()
@@ -348,10 +388,10 @@ function createStoreCore<S extends Record<string, unknown>>(
     }
   } catch (error) {
     disposed = true
-    initAbort.abort()
-    void scope
-      .dispose()
-      .catch((cleanupError: unknown) => reportSynchronousCleanupFailure(runtime, cleanupError))
+    initAbort?.abort()
+    void disposeOwned().catch((cleanupError: unknown) =>
+      reportSynchronousCleanupFailure(runtime, cleanupError)
+    )
     throw createStoreLightError(
       StoreLightErrorCode.invalidOption,
       StoreLightErrorText.shapeInvalid,
@@ -368,7 +408,7 @@ function createStoreCore<S extends Record<string, unknown>>(
         const contextKey = Symbol(key)
         Object.defineProperty(store, contextKey, { configurable: true, get: getter })
         contextMembers.add(contextKey)
-        const node = ownReactiveNode(
+        const node = ownPureNode(
           nodeRuntime.computed(() => (store as Record<PropertyKey, unknown>)[contextKey], {
             debugName: `${debugName}.${key}`
           })
@@ -388,7 +428,7 @@ function createStoreCore<S extends Record<string, unknown>>(
 
       // raw(x) → 普通值字段（即使 x 是函数也不当 action）。必须在方法检查之前解包。
       if (isRaw(value)) {
-        const node = ownReactiveNode(
+        const node = ownPureNode(
           nodeRuntime.signal(value.value, {
             debugName: `${debugName}.${key}`
           })
@@ -450,11 +490,14 @@ function createStoreCore<S extends Record<string, unknown>>(
       }
 
       if (isFieldBuilder(value)) {
+        ensureScope()
+        /** Capture before later siblings can fail and abort this generation. */
+        const signal = initSignal()
         if ('mode' in value && value.mode === StoreFieldMode.sync) {
           const field = adoptField(
             value.create({
               runtime,
-              signal: initAbort.signal,
+              signal,
               createSource: createTrackedFieldSource
             })
           )
@@ -475,7 +518,7 @@ function createStoreCore<S extends Record<string, unknown>>(
             .then(() =>
               value.create({
                 runtime,
-                signal: initAbort.signal,
+                signal,
                 createSource: (debugName) =>
                   // Store owns every capability it signs, not only
                   // the final Field object. A rejected builder or a
@@ -496,7 +539,7 @@ function createStoreCore<S extends Record<string, unknown>>(
               // A disposed or synchronously failed store no longer has a caller
               // waiting for this builder. Observe cancellation rejections here so
               // a late abort cannot become an unhandled rejection.
-              if (disposed || initializationFailed || initAbort.signal.aborted) return
+              if (disposed || initializationFailed || initAbort?.signal.aborted) return
               throw error
             })
         )
@@ -511,9 +554,8 @@ function createStoreCore<S extends Record<string, unknown>>(
         continue
       }
 
-      // 普通值 → Signal：读订阅、写触发。必须进 scope——否则 $dispose 只拆派生/订阅，
-      // 源节点带着 version/subs 常驻，与「释放后不留半死图」的契约矛盾。
-      const node = ownReactiveNode(
+      // 普通值 → Signal：读订阅、写触发。Store 的纯节点段在 dispose 时同步断开所有边。
+      const node = ownPureNode(
         nodeRuntime.signal(value, {
           debugName: `${debugName}.${key}`
         })
@@ -538,14 +580,14 @@ function createStoreCore<S extends Record<string, unknown>>(
     initializationFailed = true
     disposed = true
     status = StoreInitializationStatus.failed
-    initAbort.abort()
+    initAbort?.abort()
     // `createStoreCore()` itself is synchronous (D-1 gives LifecycleScope no sync dispose()), so
     // this cleanup cannot be awaited here — it runs fire-and-forget and any failure goes through
     // `runtime.reportError()`, the same diagnostic channel used elsewhere in this module, instead
     // of being attached as `error.cause` (which required a *synchronous* cleanup failure).
-    void scope
-      .dispose()
-      .catch((cleanupError: unknown) => reportSynchronousCleanupFailure(runtime, cleanupError))
+    void disposeOwned().catch((cleanupError: unknown) =>
+      reportSynchronousCleanupFailure(runtime, cleanupError)
+    )
     signals.clear()
     computeds.clear()
     wasmFields.clear()
@@ -564,12 +606,12 @@ function createStoreCore<S extends Record<string, unknown>>(
       status = StoreInitializationStatus.failed
       initializationFailed = true
       disposed = true
-      initAbort.abort()
+      initAbort?.abort()
       // 初始化失败即回收已创建资源。清理错误不能替换原始初始化错误。这里已经在异步延续里，可以
-      // 真正 await scope.dispose()（D-1：LifecycleScope 没有同步 dispose()），因此仍能像迁移前
+      // 真正 await disposeOwned()（D-1：LifecycleScope 没有同步 dispose()），因此仍能像迁移前
       // 一样把 cleanup 失败原样附加到原始错误的 cause 上，不需要退化成 fire-and-forget。
       try {
-        await scope.dispose()
+        await disposeOwned()
       } catch (cleanupError) {
         // 保留原始初始化 Error 身份，同时附加清理失败用于诊断。
         if (error instanceof Error) {
@@ -659,7 +701,7 @@ function createStoreCore<S extends Record<string, unknown>>(
       // 单独退订同时从 scope 解除登记，避免反复订阅/退订造成 scope 滞留泄漏
       return () => {
         e.dispose()
-        scope.release(e)
+        scope!.release(e)
       }
     },
     $batch(recipe) {
@@ -774,18 +816,17 @@ function createStoreCore<S extends Record<string, unknown>>(
       assertOwnedBy(resource, runtime, 'resource')
       if (!ownerOf(resource)) claimOwnership(resource, runtime)
       // 外部资源（典型：collections），来源不明，保守按 syncSafe: false 处理（§4.2）。
-      return scope.own(resource, { syncSafe: false, force: () => resource.dispose() })
+      flushPureNodes()
+      return ensureScope().own(resource, { syncSafe: false, force: () => resource.dispose() })
     },
     $dispose() {
       disposePromise ??= (async () => {
         disposed = true
-        initAbort.abort() // 中止在途异步字段初始化
-        // scope 释放 Signal / Computed / $subscribe Effect / 已登记的 wasm 字段。总是异步
-        // （D-1：LifecycleScope 没有同步 dispose()）；失败时按 scope 的错误策略（默认 'throw'）
-        // 拒绝，与迁移前 scope.dispose() 同步抛错时 $dispose() 直接抛穿的行为一致，只是现在是
-        // 一个 rejected Promise 而不是同步 throw。
+        initAbort?.abort() // 中止在途异步字段初始化
+        // Pure nodes release synchronously; mixed entries retain canonical scope ordering and
+        // failure policy. The public completion remains one stable Promise in both cases.
         try {
-          await scope.dispose()
+          await disposeOwned()
         } finally {
           // 丢掉强引用，避免「已 dispose 仍被 store 地图钉住」的假性常驻
           signals.clear()
