@@ -756,7 +756,19 @@ class LoggerCore {
   #processAfterBefore(entry: ILogEntry): void {
     try {
       const pipeline = this.runPipeline(entry, (finalEntry) => {
-        const committedEntry = finalEntry && finalEntry.time instanceof Date ? finalEntry : entry
+        /** Invalid replacements retain the original delivery while exposing the lost update. */
+        const validEntry = finalEntry && finalEntry.time instanceof Date
+        if (!validEntry) {
+          this.#reportFailure(
+            'pipeline',
+            createLoggerTypeError(
+              LoggerErrorCode.pipelineEntryInvalid,
+              LoggerErrorText.pipelineEntryInvalid
+            )
+          )
+        }
+        /** Sinks and after hooks must observe the same selected entry. */
+        const committedEntry = validEntry ? finalEntry : entry
         withSnapshotEntries(this.#sinks, committedEntry, (entries) => {
           for (const invocation of entries) {
             try {

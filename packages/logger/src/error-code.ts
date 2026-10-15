@@ -16,6 +16,12 @@ export const LoggerErrorCode = {
   invalidOption: 'INVALID_OPTION',
 
   /**
+   * A pipeline supplied a replacement without a current-realm Date time. Dispatch reports this
+   * native TypeError and keeps delivering the original entry; the plugin must preserve its Date.
+   */
+  pipelineEntryInvalid: 'PIPELINE_ENTRY_INVALID',
+
+  /**
    * Process plugin/logger installation is attempted while runtime shutdown is already in progress.
    * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller
    * must wait for shutdown to settle or install the logger without the process plugin.

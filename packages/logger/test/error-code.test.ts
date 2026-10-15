@@ -7,11 +7,53 @@ import { process as processPlugin } from '../src/plugins/process.js'
 import { LoggerErrorText } from '../src/error-text.js'
 
 describe('logger error-code contract (E-T9)', () => {
-  it('declares 16 unique codes under the package source', () => {
+  it('declares 17 unique codes under the package source', () => {
     const codes = Object.values(LoggerErrorCode)
-    expect(codes).toHaveLength(16)
-    expect(new Set(codes).size).toBe(16)
+    expect(codes).toHaveLength(17)
+    expect(new Set(codes).size).toBe(17)
     expect(LOGGER_SOURCE).toBe('@migaia/logger')
+  })
+
+  it('PIPELINE_ENTRY_INVALID reports a replacement while preserving original delivery', async () => {
+    /** Keeps the expected diagnostic local without writing to the host console. */
+    const restore = setLoggerRuntimeManager({
+      randomUUID: () => 'pipeline-invalid',
+      defer: (task) => task(),
+      write: () => undefined
+    })
+    /** Captures the diagnostic and selected sink entry through public interfaces. */
+    const failures: unknown[] = []
+    /** Original entry remains observable after an invalid replacement. */
+    const messages: string[] = []
+    /** The supported logger facade owns pipeline and reporting admission. */
+    const log = new Logger({
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    try {
+      log.onFailure((failure) => failures.push(failure))
+      log.useSink((entry) => {
+        messages.push(entry.message)
+      })
+      log.usePipeline((entry, next) =>
+        next({ ...entry, message: 'replacement', time: 'serialized' as unknown as Date })
+      )
+      log.log('info', 'original')
+      expect(messages).toEqual(['original'])
+      expect(failures).toHaveLength(1)
+      expect(failures[0]).toMatchObject({
+        source: 'pipeline',
+        error: {
+          source: LOGGER_SOURCE,
+          code: LoggerErrorCode.pipelineEntryInvalid,
+          name: 'TypeError',
+          message: LoggerErrorText.pipelineEntryInvalid,
+          stack: expect.any(String)
+        }
+      })
+      await log.shutdown('manual')
+    } finally {
+      restore()
+    }
   })
 
   it('INVALID_OPTION preserves TypeError and scheduler accessor cause', () => {

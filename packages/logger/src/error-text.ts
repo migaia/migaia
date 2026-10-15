@@ -1,5 +1,7 @@
 /** Stable logger failure text consumed by failure reporting and tests. */
 export const LoggerErrorText = {
+  /** Invalid pipeline replacements fall back to the original entry with this diagnostic. */
+  pipelineEntryInvalid: 'pipeline replacement time must be a current-realm Date',
   /** Public logger option admission failed before any plugin side effect was allowed. */
   invalidOption: 'logger option admission failed',
   /** Deadline reached while draining logger work. */

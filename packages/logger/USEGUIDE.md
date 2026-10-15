@@ -402,3 +402,5 @@ pnpm --filter @migaia/logger test
 
 **Q：TypeScript 提示某个插件方法不存在。**
 只有插件真正被装上（无论是构造参数里还是 `await log.use(plugin)`），对应方法才会出现在类型上。异步安装的插件如果是根据运行时条件动态选择的，TypeScript 无法静态推导，需要手动标注类型。
+
+Pipeline replacements must retain a current-realm `Date` in `entry.time`. An invalid replacement (including serialized timestamps or a foreign-realm Date) reports `PIPELINE_ENTRY_INVALID` through `onFailure` with source `pipeline`, then delivers the original entry. Dispatch remains non-throwing.

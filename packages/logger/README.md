@@ -152,3 +152,5 @@ try {
 ## 10. 深入参考
 
 完整构造选项、全部 API 精确签名、pipeline 四种模式的执行顺序差异、每个内置插件的完整配置项、`flush`/`shutdown` 的精确语义与边界情况、自定义 runtime manager（替换底层能力用于测试/特殊宿主）、以及更多组合示例，见 **[USEGUIDE.md](./USEGUIDE.md)**。
+
+Pipeline replacements must retain a current-realm `Date` in `entry.time`. An invalid replacement (including serialized timestamps or a foreign-realm Date) reports `PIPELINE_ENTRY_INVALID` through `onFailure` with source `pipeline`, then delivers the original entry. Dispatch remains non-throwing.
