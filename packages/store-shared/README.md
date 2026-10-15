@@ -34,21 +34,21 @@ pnpm add @migaia/store-shared
 ## 共享信号：`SharedInt32Signal` / `sharedInt32`
 
 ```ts
-import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared';
-import { createRuntime } from '@migaia/reactive';
+import { sharedInt32, SharedInt32Signal } from '@migaia/store-shared'
+import { createRuntime } from '@migaia/reactive'
 ```
 
 **`sharedInt32`｜5 秒上手** —— 新建一个单值共享 int32，像普通 `Signal` 一样在 `Effect` 里被自动追踪：
 
 ```ts
-const runtime = createRuntime();
-const counter = sharedInt32(runtime, 0);
+const runtime = createRuntime()
+const counter = sharedInt32(runtime, 0)
 
-const stop = runtime.effect(() => console.log('counter =', counter.value));
-counter.value = 1; // 本地写入，Effect 自动重跑
+const stop = runtime.effect(() => console.log('counter =', counter.value))
+counter.value = 1 // 本地写入，Effect 自动重跑
 
-stop.dispose();
-counter.dispose();
+stop.dispose()
+counter.dispose()
 ```
 
 全部参数（等价于 `new SharedInt32Signal(runtime, initialValue?, buffer?)`）：
@@ -78,25 +78,25 @@ counter.dispose();
 ## 共享数组：`SharedInt32Array` / `sharedInt32Array`
 
 ```ts
-import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared';
-import { createRuntime } from '@migaia/reactive';
+import { sharedInt32Array, SharedInt32Array } from '@migaia/store-shared'
+import { createRuntime } from '@migaia/reactive'
 ```
 
 **`sharedInt32Array`｜10 秒上手** —— 定长共享 int32 数组，每个下标独立追踪、独立通知：
 
 ```ts
-const runtime = createRuntime();
-const positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] });
+const runtime = createRuntime()
+const positions = sharedInt32Array(runtime, 1000, { initialValues: [0, 0] })
 
 const render = runtime.effect(() => {
-  drawEntity(positions.get(0), positions.get(1)); // 只追踪被读取的下标
-});
+  drawEntity(positions.get(0), positions.get(1)) // 只追踪被读取的下标
+})
 
-positions.set(0, 10); // 只惊动依赖下标 0 的观察者
-positions.update(1, (y) => y + 1); // 读-改-写，内部 CAS 重试
+positions.set(0, 10) // 只惊动依赖下标 0 的观察者
+positions.update(1, (y) => y + 1) // 读-改-写，内部 CAS 重试
 
-render.dispose();
-positions.dispose();
+render.dispose()
+positions.dispose()
 ```
 
 全部参数（等价于 `new SharedInt32Array(runtime, length, options?)`）：
@@ -121,7 +121,6 @@ positions.dispose();
 | `sync(index?)`                          | `(index?: number) => number`                                      | 不传 `index`：批量扫描脏页，返回本轮实际变化的下标个数；传 `index`：只检查该下标，返回 `0`/`1`                     |
 | `watch()`                               | `() => IDisposer`                                                 | 起一条覆盖整个数组的 `Atomics.waitAsync` 唤醒回路；重复调用返回同一个停止函数                                      |
 | `snapshot()`                            | `() => Int32Array`                                                | 一次性读出全部下标当前值，返回一个新分配的、非共享的 `Int32Array` 拷贝                                             |
-| `prune()`                               | `() => number`                                                    | 释放当前没有任何观察者的已物化响应式 cell，返回释放个数                                                            |
 | `dispose()`                             | `() => void`                                                      | 停止 `watch()`、断开全部已物化 cell；幂等；之后调用其他成员会抛 `Error`（`arrayDisposed`）                         |
 | `assertActive()`                        | `() => void`                                                      | 已释放则抛 `Error`（`arrayDisposed`）；一般不需要业务代码直接调用                                                  |
 | `readCell(index)`                       | `(index: number) => { value: number; version: number }`           | 一致读某一格的原始 value/version，绕过响应式追踪与下标校验；供组合式底层用法使用                                   |
@@ -138,14 +137,14 @@ positions.dispose();
 ## 等待模式常量：`SharedWaitMode`
 
 ```ts
-import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared';
+import { SharedWaitMode, type ISharedWaitMode } from '@migaia/store-shared'
 ```
 
 **`SharedWaitMode`｜3 秒上手** —— 稳定的等待模式标识常量，供类型标注/比较使用（单参数，无调用形式，是一个常量对象）：
 
 ```ts
 function describeWaitMode(mode: ISharedWaitMode): string {
-  return mode === SharedWaitMode.async ? '基于 Atomics.waitAsync 的异步唤醒' : mode;
+  return mode === SharedWaitMode.async ? '基于 Atomics.waitAsync 的异步唤醒' : mode
 }
 ```
 
@@ -164,14 +163,14 @@ import {
   STORE_SHARED_SOURCE,
   createStoreSharedError,
   createStoreSharedRangeError
-} from '@migaia/store-shared';
+} from '@migaia/store-shared'
 ```
 
 **`StoreSharedErrorCode`｜3 秒上手** —— 稳定错误码表，用于 `switch`/比较（无调用形式，是一个常量对象）：
 
 ```ts
 try {
-  counter.value = 1;
+  counter.value = 1
 } catch (error) {
   if ((error as { code?: string }).code === StoreSharedErrorCode.signalDisposed) {
     // 信号已释放，需要重新 attach 到同一个 buffer 创建新实例
@@ -194,16 +193,13 @@ try {
 **`STORE_SHARED_SOURCE`｜3 秒上手** —— 本包所有错误统一携带的 `source` 值（字符串常量，无调用形式）：
 
 ```ts
-STORE_SHARED_SOURCE; // '@migaia/store-shared'
+STORE_SHARED_SOURCE // '@migaia/store-shared'
 ```
 
 **`createStoreSharedError`｜5 秒上手** —— 构造一个带 `(source, code)` 身份标记的 `Error`（用于组合本包之上的自定义封装时，抛出与本包同一套身份契约的错误）：
 
 ```ts
-throw createStoreSharedError(
-  StoreSharedErrorCode.invalidOption,
-  'entity slot must be preallocated'
-);
+throw createStoreSharedError(StoreSharedErrorCode.invalidOption, 'entity slot must be preallocated')
 ```
 
 全部参数：`code: IStoreSharedErrorCode`（必填）、`message: string`（必填）、`options?: { readonly cause?: unknown }`（可选，透传给 `Error` 构造函数的 `cause`）。
@@ -211,7 +207,7 @@ throw createStoreSharedError(
 **`createStoreSharedRangeError`｜5 秒上手** —— 与上面相同，但构造 `RangeError`（本包自身校验入参失败时用的就是它）：
 
 ```ts
-throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0');
+throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length must be >= 0')
 ```
 
 参数与 `createStoreSharedError` 完全一致，唯一区别是返回的运行时类型是 `RangeError`。
@@ -226,57 +222,57 @@ throw createStoreSharedRangeError(StoreSharedErrorCode.invalidOption, 'length mu
 
 ```ts
 // main.ts
-import { createRuntime } from '@migaia/reactive';
-import { sharedInt32Array } from '@migaia/store-shared';
+import { createRuntime } from '@migaia/reactive'
+import { sharedInt32Array } from '@migaia/store-shared'
 
-const runtime = createRuntime();
-const positions = sharedInt32Array(runtime, 1000); // 500 个实体的 x/y
+const runtime = createRuntime()
+const positions = sharedInt32Array(runtime, 1000) // 500 个实体的 x/y
 
-const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
-worker.postMessage({ buffer: positions.buffer });
+const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+worker.postMessage({ buffer: positions.buffer })
 
-const stopWatch = positions.watch(); // worker 的写入自动推送进来
-const render = runtime.effect(() => drawEntity(0, positions.get(0), positions.get(1)));
+const stopWatch = positions.watch() // worker 的写入自动推送进来
+const render = runtime.effect(() => drawEntity(0, positions.get(0), positions.get(1)))
 
 window.addEventListener('beforeunload', () => {
-  render.dispose();
-  stopWatch();
-  positions.dispose();
-  worker.terminate();
-});
+  render.dispose()
+  stopWatch()
+  positions.dispose()
+  worker.terminate()
+})
 ```
 
 ```ts
 // worker.ts
-import { createRuntime } from '@migaia/reactive';
-import { sharedInt32Array } from '@migaia/store-shared';
+import { createRuntime } from '@migaia/reactive'
+import { sharedInt32Array } from '@migaia/store-shared'
 
 self.onmessage = (event: MessageEvent<{ buffer: SharedArrayBuffer }>) => {
-  const runtime = createRuntime();
-  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer });
-  setInterval(() => positions.update(0, (x) => x + 1), 16);
-};
+  const runtime = createRuntime()
+  const positions = sharedInt32Array(runtime, 1000, { buffer: event.data.buffer })
+  setInterval(() => positions.update(0, (x) => x + 1), 16)
+}
 ```
 
 ### 2. 不支持 `Atomics.waitAsync` 的环境：手动轮询 + 错误码分支
 
 ```ts
-import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared';
+import { StoreSharedErrorCode, sharedInt32Array } from '@migaia/store-shared'
 
-const positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer });
+const positions = sharedInt32Array(runtime, 1000, { buffer: sharedBuffer })
 
-let stopWatch: (() => void) | undefined;
+let stopWatch: (() => void) | undefined
 try {
-  stopWatch = positions.watch();
+  stopWatch = positions.watch()
 } catch (error) {
   if ((error as { code?: string }).code === StoreSharedErrorCode.envUnsupported) {
     const timer = setInterval(() => {
-      const changed = positions.sync();
-      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`);
-    }, 100);
-    stopWatch = () => clearInterval(timer);
+      const changed = positions.sync()
+      if (changed > 0) console.log(`${changed} 个下标发生了远端变化`)
+    }, 100)
+    stopWatch = () => clearInterval(timer)
   } else {
-    throw error;
+    throw error
   }
 }
 ```
@@ -284,32 +280,26 @@ try {
 ### 3. 单信号跨线程握手：`postMessage` 只传 buffer，不传对象
 
 ```ts
-import { createRuntime } from '@migaia/reactive';
-import { sharedInt32 } from '@migaia/store-shared';
+import { createRuntime } from '@migaia/reactive'
+import { sharedInt32 } from '@migaia/store-shared'
 
-const mainRuntime = createRuntime();
-const shared = sharedInt32(mainRuntime, 0);
-worker.postMessage({ buffer: shared.buffer }); // SharedArrayBuffer 可以直接传递，不会被拷贝
+const mainRuntime = createRuntime()
+const shared = sharedInt32(mainRuntime, 0)
+worker.postMessage({ buffer: shared.buffer }) // SharedArrayBuffer 可以直接传递，不会被拷贝
 
 // worker 内
-const workerRuntime = createRuntime();
-const mirror = sharedInt32(workerRuntime, 0, receivedBuffer); // initialValue 被忽略，附着已有数据
-mirror.watch();
+const workerRuntime = createRuntime()
+const mirror = sharedInt32(workerRuntime, 0, receivedBuffer) // initialValue 被忽略，附着已有数据
+mirror.watch()
 ```
 
-### 4. 高频轮换下标读取：`prune()` 主动回收响应式 cell
+### 4. 高频轮换下标读取：自动回收响应式 cell
 
 ```ts
 const probe = runtime.effect(() => {
-  for (let index = 0; index < positions.length; index += 37) {
-    positions.get(index); // 遍历式探测，每次命中不同下标
-  }
-});
-
-setInterval(() => {
-  const removed = positions.prune(); // 清理已无订阅者的 cell，避免累积
-  if (removed > 0) console.log(`released ${removed} idle cells`);
-}, 5000);
+  for (let index = 0; index < positions.length; index += 37) positions.get(index)
+})
+probe.dispose() // 最后一个观察者退订时自动回收 cell
 ```
 
 ### 5. 用 `createStoreSharedRangeError` 包装上层校验，保持同一套错误身份
@@ -319,16 +309,16 @@ import {
   StoreSharedErrorCode,
   createStoreSharedRangeError,
   sharedInt32Array
-} from '@migaia/store-shared';
+} from '@migaia/store-shared'
 
 function createEntityGrid(runtime: IRuntime, entityCount: number) {
   if (entityCount <= 0) {
     throw createStoreSharedRangeError(
       StoreSharedErrorCode.invalidOption,
       'entityCount must be a positive integer'
-    );
+    )
   }
-  return sharedInt32Array(runtime, entityCount * 2); // 每个实体占 [x, y] 两格
+  return sharedInt32Array(runtime, entityCount * 2) // 每个实体占 [x, y] 两格
 }
 ```
 

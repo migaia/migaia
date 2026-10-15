@@ -16469,7 +16469,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates an ordered reactive collection with lazy per-index dependencies plus separate length, structure, and snapshot revision tracking. Bulk replace and splice notify only materialized index cells.',
-      quickStart: `import { createRuntime, observableArray } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.prune()\nrows.dispose()`,
+      quickStart: `import { createRuntime, observableArray } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.dispose()`,
       scenarios: [
         'A large list has only a small number of observed indices.',
         'Length and whole-list iteration must react independently from unrelated indexed reads.',
@@ -16485,7 +16485,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建有序 reactive collection：惰性 per-index dependency，并分离 length、structure 与 snapshot revision tracking。bulk replace/splice 只通知已 materialize 的 index cell。',
-      quickStart: `import { createRuntime, observableArray } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.prune()\nrows.dispose()`,
+      quickStart: `import { createRuntime, observableArray } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.dispose()`,
       scenarios: [
         '大型 list 只有少量 observed index。',
         'length 与 whole-list iteration 必须和无关 indexed read 独立响应。',
@@ -22415,11 +22415,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'store-shared:index:SharedInt32Array': {
     en: {
       purpose:
-        'Constructs the class form of the fixed shared int32 array. It exposes high-level get, set, update, sync, watch, snapshot, prune, and disposal plus low-level cell primitives for an explicit composition owner.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n  array.prune()\n} finally {\n  array.dispose()\n}`,
+        'Constructs the class form of the fixed shared int32 array. It exposes high-level get, set, update, sync, watch, snapshot, automatic cell reclamation, and disposal plus low-level cell primitives for an explicit composition owner.',
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n} finally {\n  array.dispose()\n}`,
       scenarios: [
         'A framework requires direct class construction and lifecycle identity.',
-        'High-frequency rotating index access needs explicit prune of unobserved cells.',
+        'High-frequency rotating index access reclaims cells after their final observer leaves.',
         'A trusted composition owner needs readCell, writeCell, version bookkeeping, and waiter notification.'
       ],
       avoidWhen: [
@@ -22431,11 +22431,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose:
-        '构造定长共享 int32 数组的 class 形式。它同时暴露高层 get、set、update、sync、watch、snapshot、prune、dispose，以及供明确组合 owner 使用的底层 cell 原语。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n  array.prune()\n} finally {\n  array.dispose()\n}`,
+        '构造定长共享 int32 数组的 class 形式。它同时暴露高层 get、set、update、sync、watch、snapshot、自动 cell 回收、dispose，以及供明确组合 owner 使用的底层 cell 原语。',
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n} finally {\n  array.dispose()\n}`,
       scenarios: [
         '框架要求直接 class 构造与生命周期 identity。',
-        '高频轮换访问下标，需要显式 prune 无 observer cell。',
+        '高频轮换访问下标，最后一个 observer 退订后自动回收 cell。',
         '可信组合 owner 需要 readCell、writeCell、版本记账与 waiter notification。'
       ],
       avoidWhen: [

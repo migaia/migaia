@@ -539,8 +539,11 @@ class SharedInt32ArrayCell implements IObservable {
   #owner: SharedInt32Array
   #index: number
   #observedSharedVersion: bigint
+  /** Releases this private cell only after its last graph observer leaves. */
+  readonly #releaseDormant: () => void
 
-  constructor(owner: SharedInt32Array, index: number) {
+  constructor(owner: SharedInt32Array, index: number, releaseDormant: () => void) {
+    this.#releaseDormant = releaseDormant
     this.#owner = owner
     this.runtime = owner.runtime
     this.#index = index
@@ -585,6 +588,11 @@ class SharedInt32ArrayCell implements IObservable {
 
   isStale(): boolean {
     return this.#owner.readCell(this.#index).version !== this.#observedSharedVersion
+  }
+
+  /** The canonical tracker calls this when the final downstream edge disconnects. */
+  onUnobserved(): void {
+    this.#releaseDormant()
   }
 
   /** Releases the cell's graph source when its owning array evicts or disposes it. */
@@ -857,19 +865,6 @@ export class SharedInt32Array implements IDisposable {
     return result
   }
 
-  /** Release cells that no longer have observers after high-churn access. */
-  prune(): number {
-    this.assertActive()
-    let removed = 0
-    for (const [index, cell] of this.#cells) {
-      if (cell.subs.size !== 0) continue
-      cell.dispose()
-      this.#cells.delete(index)
-      removed++
-    }
-    return removed
-  }
-
   dispose(): void {
     if (this.#disposed) return
     this.#disposed = true
@@ -927,16 +922,17 @@ export class SharedInt32Array implements IDisposable {
     this.#assertIndex(index)
     let cell = this.#cells.get(index)
     if (!cell) {
-      cell = new SharedInt32ArrayCell(this, index)
-      this.#cells.set(index, cell)
-      const created = cell
-      // React/Computed may abandon a speculative read before committing an
-      // observer. Reclaim that cell instead of retaining it until array dispose.
-      queueMicrotask(() => {
-        if (this.#disposed || created.subs.size !== 0) return
+      /** Both committed and abandoned observations release only this exact private cell. */
+      const releaseDormant = (): void => {
+        if (this.#disposed || created.subs.size !== 0 || this.#cells.get(index) !== created) return
+        this.#cells.delete(index)
         created.dispose()
-        if (this.#cells.get(index) === created) this.#cells.delete(index)
-      })
+      }
+      const created = new SharedInt32ArrayCell(this, index, releaseDormant)
+      cell = created
+      this.#cells.set(index, created)
+      // Abandoned speculative reads never reach an onUnobserved transition.
+      queueMicrotask(releaseDormant)
     }
     return cell
   }

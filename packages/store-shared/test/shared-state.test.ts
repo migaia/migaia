@@ -34,12 +34,29 @@ describeShared('Shared buffer runtime input boundary', () => {
 })
 
 describeShared('SharedInt32Signal：跨 Runtime 共享一段内存', () => {
-  it('prunes unobserved array cells after a high-churn observer is released', () => {
+  it('reclaims a cell on final unsubscription while preserving live cell identity', () => {
     const runtime = syncRuntime()
     const array = sharedInt32Array(runtime, 2)
-    const observer = runtime.effect(() => void array.get(0))
-    observer.dispose()
-    expect(array.prune()).toBe(1)
+    /** Read-only graph identities prove reclamation without exposing the private cell table. */
+    const identities: string[] = []
+    const stopTrace = runtime.subscribeTrace((event) => {
+      if (event.type === 'dependency' && event.phase === 'connect')
+        identities.push(event.observable.id)
+    })
+    const first = runtime.effect(() => void array.get(0))
+    const second = runtime.effect(() => void array.get(0))
+    expect(identities[1]).toBe(identities[0])
+    first.dispose()
+    const third = runtime.effect(() => void array.get(0))
+    expect(identities[2]).toBe(identities[0])
+    second.dispose()
+    third.dispose()
+    const replacement = runtime.effect(() => void array.get(0))
+    expect(identities[3]).not.toBe(identities[0])
+    array.set(0, 7)
+    expect(array.get(0)).toBe(7)
+    replacement.dispose()
+    stopTrace()
     array.dispose()
   })
 
@@ -383,7 +400,6 @@ describeShared('SharedInt32Array：逐下标失效', () => {
     expect(() => array.sync()).toThrow('shared array is disposed')
     expect(() => array.watch()).toThrow('shared array is disposed')
     expect(() => array.snapshot()).toThrow('shared array is disposed')
-    expect(() => array.prune()).toThrow('shared array is disposed')
     expect(() => array.dispose()).not.toThrow()
   })
 })

@@ -29,11 +29,11 @@ Proxy 拦截读写虽然写起来像原生对象/数组，但拦截粒度是"整
 每个集合内部维护两样东西：一份普通的 JS 存储（`Map`/数组/`Set`），和一个内部的键 → `Signal` 池。**只有第一次以"追踪方式"读某个 key/索引时，才会为它创建一个 `Signal`（cell）**：
 
 ```ts
-const users = new ObservableMap<string, { name: string }>();
-users.set('u1', { name: 'Ann' });
+const users = new ObservableMap<string, { name: string }>()
+users.set('u1', { name: 'Ann' })
 
 // 到这里，'u1' 还没有 cell —— 没人以追踪方式读过它
-users.get('u1'); // 现在为 'u1' 创建了 cell
+users.get('u1') // 现在为 'u1' 创建了 cell
 ```
 
 cell 的生命周期完全自动：
@@ -81,7 +81,7 @@ import {
   observableMap,
   observableSet,
   type IObservableCollectionOptions
-} from '@migaia/store-indexed';
+} from '@migaia/store-indexed'
 ```
 
 ### 构造参考
@@ -106,9 +106,9 @@ new ObservableSet<T>(
 
 ```ts
 type IObservableCollectionOptions = {
-  readonly mutationGuard?: IMutationGuard; // 来自 @migaia/store-light
-  readonly debugName?: string;
-};
+  readonly mutationGuard?: IMutationGuard // 来自 @migaia/store-light
+  readonly debugName?: string
+}
 ```
 
 | 参数                    | 类型                                           | 必填性                            | 默认值                                      | 说明                                                                     |
@@ -126,19 +126,19 @@ Iterable 输入采用统一的前置物化契约：`Symbol.iterator` getter 与�
 
 ```ts
 class ObservableObject<T extends Record<string, unknown>> implements IDisposable {
-  readonly runtime: IRuntime;
-  get disposed(): boolean;
-  get<K extends keyof T & string>(key: K): T[K];
-  peek<K extends keyof T & string>(key: K): T[K];
-  has(key: keyof T & string): boolean;
-  set<K extends keyof T & string>(key: K, value: T[K]): void;
-  update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void;
-  delete(key: keyof T & string): boolean;
-  keys(): readonly (keyof T & string)[];
-  snapshot(): Readonly<T>;
-  replace(next: T): void;
-  prune(): number;
-  dispose(): void;
+  readonly runtime: IRuntime
+  get disposed(): boolean
+  get<K extends keyof T & string>(key: K): T[K]
+  peek<K extends keyof T & string>(key: K): T[K]
+  has(key: keyof T & string): boolean
+  set<K extends keyof T & string>(key: K, value: T[K]): void
+  update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void
+  delete(key: keyof T & string): boolean
+  keys(): readonly (keyof T & string)[]
+  snapshot(): Readonly<T>
+  replace(next: T): void
+  prune(): number
+  dispose(): void
 }
 ```
 
@@ -162,37 +162,35 @@ class ObservableObject<T extends Record<string, unknown>> implements IDisposable
 
 ```ts
 class ObservableArray<T> implements IDisposable {
-  readonly runtime: IRuntime;
-  get disposed(): boolean;
-  get length(): number;
-  at(index: number): T | undefined;
-  snapshot(): readonly T[];
-  peek(): readonly T[];
-  set(index: number, value: T): void;
-  push(...values: readonly T[]): number;
-  pop(): T | undefined;
-  splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[];
-  replace(values: Iterable<T>): void;
-  clear(): void;
-  prune(): number;
-  dispose(): void;
+  readonly runtime: IRuntime
+  get disposed(): boolean
+  get length(): number
+  at(index: number): T | undefined
+  snapshot(): readonly T[]
+  peek(): readonly T[]
+  set(index: number, value: T): void
+  push(...values: readonly T[]): number
+  pop(): T | undefined
+  splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]
+  replace(values: Iterable<T>): void
+  clear(): void
+  dispose(): void
 }
 ```
 
-| 方法                                    | 参数类型                                                   | 返回值                                   | 追踪读/写                                             | 副作用                                                                                                                                                                             |
-| --------------------------------------- | ---------------------------------------------------------- | ---------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `length`                                | —                                                          | `number`                                 | 追踪读（依赖结构信号）                                | 无                                                                                                                                                                                 |
-| `at(index)`                             | `index: number`（支持负数，从末尾数）                      | `T \| undefined`                         | 追踪读，惰性建 cell；越界或负索引都会额外依赖结构信号 | 无。非整数索引抛 `TypeError`（`INVALID_INDEX`）                                                                                                                                    |
-| `snapshot()`                            | 无                                                         | 冻结数组                                 | 追踪读（依赖修订信号）                                | 无                                                                                                                                                                                 |
-| `peek()`                                | 无                                                         | 冻结数组                                 | 非追踪读                                              | 无，不建 cell                                                                                                                                                                      |
-| `set(index, value)`                     | `index: number, value: T`                                  | `void`                                   | 写                                                    | 越界抛 `RangeError`（`INDEX_OUT_OF_RANGE`）；值与旧值 `Object.is` 相等时直接跳过（不触发任何信号）；否则更新已建的 cell 并触发修订信号                                             |
-| `push(...values)`                       | `values: readonly T[]`（rest 参数）                        | 追加后的新长度                           | 写                                                    | 空参数直接返回当前长度、不触发信号；否则为已建 cell 的新增位置同步值，触发结构信号与修订信号，整体在一次 `batch()` 内完成                                                          |
-| `pop()`                                 | 无                                                         | 被移除的最后一项，或空数组时 `undefined` | 写                                                    | 空数组不触发任何信号；否则把末位 cell 置为缺失，触发结构信号与修订信号                                                                                                             |
-| `splice(start, deleteCount?, ...items)` | `start: number, deleteCount?: number, items: readonly T[]` | 被删除项组成的冻结数组                   | 写                                                    | 内部构造出新数组后整体走 `replace` 逻辑                                                                                                                                            |
-| `replace(values)`                       | `values: Iterable<T>`                                      | `void`                                   | 写                                                    | 见下方 `#replaceInternal` 说明                                                                                                                                                     |
-| `clear()`                               | 无                                                         | `void`                                   | 写                                                    | 等价于 `replace([])`                                                                                                                                                               |
-| `prune()`                               | 无                                                         | 本次回收的 cell 数                       | —                                                     | **对全部已物化 cell 无条件尝试 tombstone**，不只是越界的 cell——`splice`/`pop` 之后"索引"这个身份本身就不再稳定，任何一个既存 cell 都可能对应错的位置，因此凡是无订阅者的都值得回收 |
-| `dispose()`                             | 无                                                         | `void`                                   | —                                                     | 释放全部拥有的 Signal                                                                                                                                                              |
+| 方法                                    | 参数类型                                                   | 返回值                                   | 追踪读/写                                             | 副作用                                                                                                                                 |
+| --------------------------------------- | ---------------------------------------------------------- | ---------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `length`                                | —                                                          | `number`                                 | 追踪读（依赖结构信号）                                | 无                                                                                                                                     |
+| `at(index)`                             | `index: number`（支持负数，从末尾数）                      | `T \| undefined`                         | 追踪读，惰性建 cell；越界或负索引都会额外依赖结构信号 | 无。非整数索引抛 `TypeError`（`INVALID_INDEX`）                                                                                        |
+| `snapshot()`                            | 无                                                         | 冻结数组                                 | 追踪读（依赖修订信号）                                | 无                                                                                                                                     |
+| `peek()`                                | 无                                                         | 冻结数组                                 | 非追踪读                                              | 无，不建 cell                                                                                                                          |
+| `set(index, value)`                     | `index: number, value: T`                                  | `void`                                   | 写                                                    | 越界抛 `RangeError`（`INDEX_OUT_OF_RANGE`）；值与旧值 `Object.is` 相等时直接跳过（不触发任何信号）；否则更新已建的 cell 并触发修订信号 |
+| `push(...values)`                       | `values: readonly T[]`（rest 参数）                        | 追加后的新长度                           | 写                                                    | 空参数直接返回当前长度、不触发信号；否则为已建 cell 的新增位置同步值，触发结构信号与修订信号，整体在一次 `batch()` 内完成              |
+| `pop()`                                 | 无                                                         | 被移除的最后一项，或空数组时 `undefined` | 写                                                    | 空数组不触发任何信号；否则把末位 cell 置为缺失，触发结构信号与修订信号                                                                 |
+| `splice(start, deleteCount?, ...items)` | `start: number, deleteCount?: number, items: readonly T[]` | 被删除项组成的冻结数组                   | 写                                                    | 内部构造出新数组后整体走 `replace` 逻辑                                                                                                |
+| `replace(values)`                       | `values: Iterable<T>`                                      | `void`                                   | 写                                                    | 见下方 `#replaceInternal` 说明                                                                                                         |
+| `clear()`                               | 无                                                         | `void`                                   | 写                                                    | 等价于 `replace([])`                                                                                                                   |
+| `dispose()`                             | 无                                                         | `void`                                   | —                                                     | 释放全部拥有的 Signal                                                                                                                  |
 
 `#replaceInternal`（`replace`/`splice`/`clear` 共用）的精确行为：只遍历**已经物化的 cell**（而不是全部索引）逐个更新值——未物化的索引没有任何订阅者需要通知，等真的被读到时会直接从新数组里取值；只有当新旧长度不同，或存在任意一处值变化（`Object.is` 逐项比较）时才触发修订信号；只有长度变化才触发结构信号。这个设计避免了"replace 一个十万项数组，只有 5 个索引被订阅"时做十万次无意义的 diff。
 
@@ -200,22 +198,22 @@ class ObservableArray<T> implements IDisposable {
 
 ```ts
 class ObservableMap<K, V> implements IDisposable {
-  readonly runtime: IRuntime;
-  get disposed(): boolean;
-  get size(): number;
-  get(key: K): V | undefined;
-  peek(key: K): V | undefined;
-  has(key: K): boolean;
-  set(key: K, value: V): this;
-  delete(key: K): boolean;
-  clear(): void;
-  replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void;
-  keys(): readonly K[];
-  valuesArray(): readonly V[];
-  entries(): readonly (readonly [K, V])[];
-  snapshot(): ReadonlyMap<K, V>;
-  prune(): number;
-  dispose(): void;
+  readonly runtime: IRuntime
+  get disposed(): boolean
+  get size(): number
+  get(key: K): V | undefined
+  peek(key: K): V | undefined
+  has(key: K): boolean
+  set(key: K, value: V): this
+  delete(key: K): boolean
+  clear(): void
+  replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void
+  keys(): readonly K[]
+  valuesArray(): readonly V[]
+  entries(): readonly (readonly [K, V])[]
+  snapshot(): ReadonlyMap<K, V>
+  prune(): number
+  dispose(): void
 }
 ```
 
@@ -242,18 +240,18 @@ class ObservableMap<K, V> implements IDisposable {
 
 ```ts
 class ObservableSet<T> implements IDisposable {
-  readonly runtime: IRuntime;
-  get disposed(): boolean;
-  get size(): number;
-  has(value: T): boolean;
-  add(value: T): this;
-  delete(value: T): boolean;
-  clear(): void;
-  replace(next: Iterable<T>): void;
-  valuesArray(): readonly T[];
-  snapshot(): ReadonlySet<T>;
-  prune(): number;
-  dispose(): void;
+  readonly runtime: IRuntime
+  get disposed(): boolean
+  get size(): number
+  has(value: T): boolean
+  add(value: T): this
+  delete(value: T): boolean
+  clear(): void
+  replace(next: Iterable<T>): void
+  valuesArray(): readonly T[]
+  snapshot(): ReadonlySet<T>
+  prune(): number
+  dispose(): void
 }
 ```
 
@@ -279,37 +277,37 @@ function observableObject<T extends Record<string, unknown>>(
   initial: T,
   options?: IObservableCollectionOptions,
   runtime?: IRuntime
-): ObservableObject<T>;
+): ObservableObject<T>
 
 function observableArray<T>(
   initial?: Iterable<T>,
   options?: IObservableCollectionOptions,
   runtime?: IRuntime
-): ObservableArray<T>;
+): ObservableArray<T>
 
 function observableMap<K, V>(
   initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>,
   options?: IObservableCollectionOptions,
   runtime?: IRuntime
-): ObservableMap<K, V>;
+): ObservableMap<K, V>
 
 function observableSet<T>(
   initial?: Iterable<T>,
   options?: IObservableCollectionOptions,
   runtime?: IRuntime
-): ObservableSet<T>;
+): ObservableSet<T>
 ```
 
 **参数顺序是 `(initial, options, runtime)`**，而对应的类构造函数是 `(initial, runtime, options)`——两者故意不一致，混着用最容易踩坑：
 
 ```ts
 // 错误示范：把 runtime 当成第二个参数传给工厂函数
-observableArray([1, 2, 3], myRuntime); // myRuntime 被当成了 options！
+observableArray([1, 2, 3], myRuntime) // myRuntime 被当成了 options！
 
 // 正确写法
-observableArray([1, 2, 3], {}, myRuntime);
+observableArray([1, 2, 3], {}, myRuntime)
 // 或者直接用类构造函数，参数顺序是 (initial, runtime, options)
-new ObservableArray([1, 2, 3], myRuntime);
+new ObservableArray([1, 2, 3], myRuntime)
 ```
 
 `options`/`runtime` 结构不同（一个是 `{ mutationGuard?, debugName? }`，一个是 Runtime 实例），TypeScript 通常会在传入具体值时报类型错误；但如果两者都省略、或用 `undefined`/宽泛类型变量传递，编译期不一定能拦住，务必按签名顺序传参。
@@ -321,7 +319,7 @@ new ObservableArray([1, 2, 3], myRuntime);
 ## 操作常量模块
 
 ```ts
-import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed';
+import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'
 ```
 
 ```ts
@@ -329,8 +327,8 @@ const IndexedOperation = {
   read: 'read',
   write: 'write',
   delete: 'delete'
-} as const;
-type IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];
+} as const
+type IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]
 ```
 
 一个稳定的操作名词表，供诊断/日志/中间件按"这次是读、写还是删"分类使用。本包自身的方法实现不引用这个常量——集合内部用的是各方法名字符串（如 `` `${debugName}.set(key)` `` 传给 `mutationGuard`），`IndexedOperation` 是暴露给消费方（例如构建在 `store-indexed` 之上的调试面板、中间件）统一分类操作类型的公共词表，无调用参数、无边界行为需要注意。
@@ -349,7 +347,7 @@ import {
   createStoreIndexedError,
   createStoreIndexedRangeError,
   createStoreIndexedTypeError
-} from '@migaia/store-indexed';
+} from '@migaia/store-indexed'
 ```
 
 ```ts
@@ -359,10 +357,10 @@ const StoreIndexedErrorCode = {
   indexOutOfRange: 'INDEX_OUT_OF_RANGE',
   invalidIndex: 'INVALID_INDEX',
   crossRuntime: 'CROSS_RUNTIME'
-} as const;
-type IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];
+} as const
+type IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode]
 
-const STORE_INDEXED_SOURCE: '@migaia/store-indexed';
+const STORE_INDEXED_SOURCE: '@migaia/store-indexed'
 ```
 
 码值是公开 API 的一部分，改名等同破坏性变更。`STORE_INDEXED_SOURCE` 是每个本包边界错误 `source` 字段的固定值。
@@ -372,15 +370,15 @@ function createStoreIndexedError(
   code: IStoreIndexedErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): Error;
+): Error
 
-function createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;
+function createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError
 
 function createStoreIndexedTypeError(
   code: IStoreIndexedErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): TypeError;
+): TypeError
 ```
 
 三个工厂函数分别构造原生 `Error`/`RangeError`/`TypeError` 实例（保留 `instanceof` 身份，不做子类化），并在其上附加不可写的 `source: '@migaia/store-indexed'` 与 `code` 字段。`createStoreIndexedRangeError` 不接受 `cause` 选项（第三参数）；`createStoreIndexedError`/`createStoreIndexedTypeError` 若提供 `options.cause`，会转发给原生构造函数的 `{ cause }` 选项，因而反映在错误的 `.cause` 与 `.stack` 里。本包内部用它们构造全部抛出的错误；调用方也可以在扩展本包行为时（例如自定义 `mutationGuard` 的 `assertMutationAllowed` 实现）复用同一套 `(source, code)` 身份约定，让上层错误处理代码可以用统一的方式识别"这是一个 store-indexed 语义错误"。
@@ -419,9 +417,9 @@ function createStoreIndexedTypeError(
 
 cell 的自动回收是"事件驱动"的：一个 cell 的最后一个订阅者取消订阅时立即触发回收；一个从未被订阅过的 cell 在创建后的当前微任务尾部被回收。但存在一种中间状态：一个 key 被 `delete()` 时，如果它的 cell **当时仍有订阅者**，这个 cell 不会被摘除（要保证订阅者能看到它变成"缺失"），而是留在原地，直到订阅者自己解除订阅才会经由 `onUnobserved` 钩子回收。
 
-多数场景下这个自动路径已经够用。但高频增删的场景（比如一个数组频繁 `splice`），如果想在某个明确的时间点（例如一轮渲染结束后）主动确保"已经不在集合里、也没有订阅者"的 cell 被清空，而不是继续依赖不确定何时触发的 `onUnobserved`，就调用 `prune()`。它返回本次实际回收的 cell 数，可用于监控/调试内存占用。
+Object/Map/Set 的 `prune()` 是按已删除 key/member 进行显式整理与计数的 owner API，保留该领域谓词；它不会释放仍有订阅者的 cell。数组仅使用自动路径。
 
-`ObservableArray.prune()` 是个特例：它对**全部**已物化 cell 无条件尝试回收，而不只是"索引越界"的那些——`splice`/`pop` 之后，一个 cell 挂着的索引位置和它最初对应的语义实体之间的关系已经不再可靠，继续保留一个恰好落在新长度以内、但语义已经对不上的 cell 没有意义。
+`ObservableArray` 仅使用既有观察者生命周期自动回收无观察 cell，不再提供手动 `prune()`。Object/Map/Set 的 `prune()` 保留各自已删除 key/member 的整理规则。
 
 ---
 
@@ -432,18 +430,18 @@ cell 的自动回收是"事件驱动"的：一个 cell 的最后一个订阅者�
 `IObservableCollectionOptions.mutationGuard` 接受任何实现 `@migaia/store-light` 的 `IMutationGuard` 接口（`{ assertMutationAllowed(operation?: string): void }`）的对象。例如接入 `@migaia/store-middleware` 提供的 `MutationPolicy`，实现"只能在 action 内变更集合"的策略：
 
 ```ts
-import { MutationPolicy } from '@migaia/store-middleware';
-import { ObservableMap } from '@migaia/store-indexed';
+import { MutationPolicy } from '@migaia/store-middleware'
+import { ObservableMap } from '@migaia/store-indexed'
 
-const guard = new MutationPolicy('actions-only');
+const guard = new MutationPolicy('actions-only')
 const users = new ObservableMap<string, { name: string }>(
   [],
   undefined, // 使用默认 Runtime
   { mutationGuard: guard, debugName: 'users' }
-);
+)
 
-users.set('u1', { name: 'Ann' }); // 抛错：不在 action 内
-guard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功
+users.set('u1', { name: 'Ann' }) // 抛错：不在 action 内
+guard.runInAction(() => users.set('u1', { name: 'Ann' })) // 成功
 ```
 
 具体如何进入"action 作用域"（`MutationPolicy.runInAction` 的计数如何递增）属于 `@migaia/store-middleware` 自己的机制，参见该包文档；`store-indexed` 这边只负责在每次写操作前调用一次 `assertMutationAllowed(operation)`，`operation` 参数形如 `` `${debugName}.set(key)` ``，便于错误信息定位到具体是哪个集合的哪次调用。
@@ -457,11 +455,11 @@ guard.runInAction(() => users.set('u1', { name: 'Ann' })); // 成功
 默认情况下所有集合共用 `@migaia/reactive` 的 `defaultRuntime`。需要隔离依赖图的场景（比如测试之间互不干扰、SSR 请求级别隔离）可以显式传入独立的 Runtime：
 
 ```ts
-import { createRuntime } from '@migaia/reactive';
-import { ObservableArray } from '@migaia/store-indexed';
+import { createRuntime } from '@migaia/reactive'
+import { ObservableArray } from '@migaia/store-indexed'
 
-const runtime = createRuntime();
-const rows = new ObservableArray([1, 2, 3], runtime);
+const runtime = createRuntime()
+const rows = new ObservableArray([1, 2, 3], runtime)
 ```
 
 **同一个集合实例只能属于它构造时绑定的那一个 Runtime**。如果在另一个 Runtime 的 effect/computed 求值过程中读了这个集合，会抛出跨 Runtime 错误（见[错误模块](#错误模块)）——这不是可配置行为，是刻意的保护，防止两张本应独立的依赖图被意外接在一起。
@@ -470,32 +468,32 @@ const rows = new ObservableArray([1, 2, 3], runtime);
 
 <a id="组合工作流示例"></a>
 
-## 组合工作流示例：细粒度订阅 + `prune()` + `mutationGuard`
+## 组合工作流示例：细粒度订阅与 `mutationGuard`
 
 ```ts
-import { ObservableArray } from '@migaia/store-indexed';
-import { MutationPolicy } from '@migaia/store-middleware';
+import { ObservableArray } from '@migaia/store-indexed'
+import { MutationPolicy } from '@migaia/store-middleware'
 
-const guard = new MutationPolicy('actions-only');
+const guard = new MutationPolicy('actions-only')
 const rows = new ObservableArray<{ id: string }>(
   [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
   undefined,
   { mutationGuard: guard, debugName: 'rows' }
-);
+)
 
 // 只订阅索引 0：改其余索引不会让这个 effect 重算
-const effect = rows.runtime.effect(() => console.log('row0', rows.at(0)));
+const effect = rows.runtime.effect(() => console.log('row0', rows.at(0)))
 
 guard.runInAction(() => {
-  rows.splice(0, 1); // 删除首行，触发结构信号与修订信号
-});
-rows.prune(); // 主动回收 splice 后失去语义意义的僵尸 cell
+  rows.splice(0, 1) // 删除首行，触发结构信号与修订信号
+})
+// 释放订阅后，索引 cell 会通过 onUnobserved 自动回收。
 
-effect.dispose();
-rows.dispose();
+effect.dispose()
+rows.dispose()
 ```
 
-`mutationGuard` 把"只能在 `runInAction` 内写"这条策略下沉到集合层，写方法在真正生效前统一调用一次 `assertMutationAllowed`；`prune()` 在高频结构变更（如 `splice`）后主动回收"索引身份已经对不上"的僵尸 cell，避免依赖不确定何时触发的 `onUnobserved`。
+`mutationGuard` 把"只能在 `runInAction` 内写"这条策略下沉到集合层，写方法在真正生效前统一调用一次 `assertMutationAllowed`；索引 cell 在最后一个观察者退订后通过 `onUnobserved` 自动回收。
 
 ---
 

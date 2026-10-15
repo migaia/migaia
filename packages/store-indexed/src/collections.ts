@@ -538,15 +538,6 @@ export class ObservableArray<T> extends ObservableCollectionBase {
     this.replace([])
   }
 
-  /** Release unobserved cells left behind by removals/high churn. */
-  prune(): number {
-    this.assertActive()
-    // Index identity is less meaningful than object/map key identity once
-    // splice/pop have run — any dormant cell is fair to reclaim, not just
-    // ones past the current bounds.
-    return this.#cells.pruneStale(() => false)
-  }
-
   /** Obtains the owned per-index node without losing observations beyond the current bounds. */
   #cell(index: number): IReactiveSignal<T | typeof ABSENT> & IObservable {
     return this.#cells.getOrCreate(index, () =>
