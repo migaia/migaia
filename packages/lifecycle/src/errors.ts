@@ -1,12 +1,9 @@
 import { safeReport } from './report-boundary.js'
 import type { ICollectedError, IErrorPolicy } from './types.js'
 import { attachErrorIdentity, attachSecondaryErrors } from '@migaia/utils/error'
-import { assimilateCapturedThen, probeThenable, type IThenableProbe } from '@migaia/utils/function'
 import { LifecycleErrorCode } from './error-code.js'
 
 export { containAsyncRejection } from './report-boundary.js'
-export { assimilateCapturedThen, probeThenable }
-export type { IThenableProbe }
 
 /** `source` value stamped onto every error this package throws. */
 export const LIFECYCLE_SOURCE = '@migaia/lifecycle'

@@ -73,7 +73,6 @@ export {
 } from '@migaia/middleware-pipeline'
 export { PluginHostErrorCode } from './typing.js'
 export { default as ERROR_TEXT, PluginHostError } from './error-text.js'
-export type { ILocaleKey } from './error-text.js'
 export type {
   IExtractPluginExt,
   IExtractPluginConfig,

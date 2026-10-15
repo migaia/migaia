@@ -21,14 +21,6 @@ export const LifecycleErrorPolicy = {
   firstError: 'firstError'
 } as const
 
-/** Internal thenable probe outcomes; getter failures remain distinct from plain values. */
-export const ThenableProbeKind = {
-  notThenable: 'not-thenable',
-  thenable: 'thenable',
-  failed: 'failed',
-  promise: 'promise'
-} as const
-
 /** Disposal transaction planning modes. */
 export const DisposeTransactionKind = { order: 'order', plan: 'plan' } as const
 
@@ -42,7 +34,6 @@ export const ProvisionalScopeState = {
 export type ILifecycleStateValue = (typeof LifecycleState)[keyof typeof LifecycleState]
 export type ILifecycleUnitStateValue = (typeof LifecycleUnitState)[keyof typeof LifecycleUnitState]
 export type ILifecycleErrorPolicy = (typeof LifecycleErrorPolicy)[keyof typeof LifecycleErrorPolicy]
-export type IThenableProbeKind = (typeof ThenableProbeKind)[keyof typeof ThenableProbeKind]
 export type IDisposeTransactionKind =
   (typeof DisposeTransactionKind)[keyof typeof DisposeTransactionKind]
 export type IProvisionalScopeState =

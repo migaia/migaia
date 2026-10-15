@@ -3,8 +3,6 @@ import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js'
 import { readHostIdentity } from './host-identity.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
-export type ILocaleKey = 'en' | 'zh'
-
 export class PluginHostError<TDetail = IPluginHostErrorDetail> extends Error {
   /**
    * The `source` component of `(source, code)`, always `'@migaia/plugin-host'`
