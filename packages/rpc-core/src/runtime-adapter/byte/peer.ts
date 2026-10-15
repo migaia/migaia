@@ -15,7 +15,7 @@ import { createRuntimeByteConnection } from './handshake.js'
 import { readRuntimeByteBootstrapSnapshot } from './bootstrap.js'
 import { deferRuntimeByteReceive } from './carrier.js'
 import type { IRuntimeByteIO, IRuntimeByteDiagnostics, IRuntimeConnectionOptions } from './types.js'
-import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
+import { defaultRpcReporter } from '../../core/default-reporter.js'
 
 /** Local presentation/configuration cannot supply decoded launch or accepted capability facts. */
 export type IAdapterBytePeerOptions = Readonly<{

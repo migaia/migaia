@@ -50,7 +50,7 @@ import type { IAdapterInitialMessageResource } from './message/types.js'
 import type { IRemoteChannel } from '../remote/types.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from './data.js'
-import { defaultRpcReporter } from '../core/internal/diagnostic-reporter.js'
+import { defaultRpcReporter } from '../core/default-reporter.js'
 
 /**
  * Definition identity retains physical operations without accepting an external Peer/channel

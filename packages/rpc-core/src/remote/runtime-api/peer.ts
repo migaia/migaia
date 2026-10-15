@@ -118,7 +118,7 @@ import {
   RUNTIME_API_BASE_CAPABILITIES
 } from './constants.js'
 import { RUNTIME_PEER_DEFAULT_NAME } from './constants.js'
-import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
+import { defaultRpcReporter } from '../../core/default-reporter.js'
 
 export type { IRuntimePeerProvide, IRuntimePeerMethod } from './catalog.js'
 export type { IRuntimePeerIdentity } from './description.js'
