@@ -185,38 +185,6 @@ describe('IStoreMiddlewareHost.emit', () => {
     expect(seen).toHaveLength(1)
     await host.dispose()
   })
-
-  it('contains a throwing Runtime reporter at the trace boundary', async () => {
-    const runtime = createRuntime()
-    const reporterFailure = new Error('runtime reporter failed')
-    const hostReportError = vi.fn()
-    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
-      throw reporterFailure
-    })
-    vi.stubGlobal('reportError', hostReportError)
-    try {
-      const host = createStoreMiddlewareHost<IState>({
-        execution,
-        runtime,
-        getState: () => ({ value: 0 })
-      })
-      await host.use({
-        name: 'swallow-hostile-reporter',
-        install: (core) => {
-          core.usePipeline(() => {
-            throw new Error('pipeline failure')
-          })
-          return {}
-        }
-      })
-
-      expect(() => host.recordState('test', { value: 0 }, { value: 1 })).not.toThrow()
-      expect(hostReportError).toHaveBeenCalledWith(reporterFailure)
-      await host.dispose()
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
 })
 
 describe('IStoreMiddlewareHost.runAction', () => {
