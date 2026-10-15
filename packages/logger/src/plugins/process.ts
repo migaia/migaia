@@ -1,5 +1,5 @@
 import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
-import { getLoggerRuntimeManager, type ILoggerProcess } from '../runtime-manager.js'
+import type { ILoggerRuntimeManager, ILoggerProcess } from '../runtime-manager.js'
 import {
   createLoggerAggregateError,
   createLoggerCleanupError,
@@ -72,7 +72,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
         LoggerErrorCode.runtimeShuttingDown,
         LoggerErrorText.processRuntimeShuttingDown
       )
-    const runtimeProcess = getLoggerRuntimeManager().process
+    const runtimeProcess = core.runtimeManager.process
     if (!runtimeProcess) return {}
     if (ProcessPlugin.#installed && ProcessPlugin.#runtimeProcess !== runtimeProcess)
       throw createLoggerError(
@@ -89,7 +89,8 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
         shutdownTimeoutMs: config.shutdownTimeoutMs ?? 3000,
         interceptProcessExit: config.interceptProcessExit ?? false
       },
-      core.scheduler
+      core.scheduler,
+      core.runtimeManager
     )
     ProcessPlugin.#cores.add(core)
     core.onDispose(() => {
@@ -100,7 +101,11 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
   }
 
   /** 只有第一次调用会真正生效；后续实例复用同一套监听器和配置。 */
-  static #installOnce(config: Required<IProcessPluginConfig>, scheduler: IScheduler): void {
+  static #installOnce(
+    config: Required<IProcessPluginConfig>,
+    scheduler: IScheduler,
+    runtime: ILoggerRuntimeManager
+  ): void {
     if (ProcessPlugin.#installed) {
       const previous = ProcessPlugin.#config!
       const schedulerDomain = getLoggerSchedulerDomain(scheduler)
@@ -115,15 +120,18 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
       }
       return
     }
+    /** Late process failures retain the first installer's reporter even after final uninstall. */
+    const reportRuntimeFailure = (error: unknown): void =>
+      ProcessPlugin.#reportRuntimeFailure(runtime, error)
     ProcessPlugin.#scheduler = scheduler
     ProcessPlugin.#schedulerDomain = getLoggerSchedulerDomain(scheduler)
     const onSigint = () =>
       void ProcessPlugin.#gracefulShutdown(LoggerProcessReason.signal, 0, config).catch((error) =>
-        ProcessPlugin.#reportRuntimeFailure(error)
+        reportRuntimeFailure(error)
       )
     const onSigterm = () =>
       void ProcessPlugin.#gracefulShutdown(LoggerProcessReason.signal, 0, config).catch((error) =>
-        ProcessPlugin.#reportRuntimeFailure(error)
+        reportRuntimeFailure(error)
       )
     const runtimeProcess = ProcessPlugin.#runtimeProcess!
     const listeners: Array<[string, (...args: any[]) => void]> = []
@@ -137,7 +145,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
         // beforeExit 支持异步：事件循环即将自然耗尽时触发，此时 flush 是安全的，
         // 不需要我们自己调用 exit，进程会在异步任务完成后自然退出
         void ProcessPlugin.#flushAllWithTimeout(config.shutdownTimeoutMs).catch((error) =>
-          ProcessPlugin.#reportRuntimeFailure(error)
+          reportRuntimeFailure(error)
         )
       }
       listeners.push(['beforeExit', onBeforeExit])
@@ -152,7 +160,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
           LoggerProcessReason.uncaughtException,
           1,
           config
-        ).catch((error) => ProcessPlugin.#reportRuntimeFailure(error))
+        ).catch((error) => reportRuntimeFailure(error))
       }
       listeners.push(['uncaughtException', onUncaughtException])
       runtimeProcess.on('uncaughtException', onUncaughtException)
@@ -168,7 +176,7 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
           LoggerProcessReason.unhandledRejection,
           1,
           config
-        ).catch((error) => ProcessPlugin.#reportRuntimeFailure(error))
+        ).catch((error) => reportRuntimeFailure(error))
       }
       listeners.push(['unhandledRejection', onUnhandledRejection])
       runtimeProcess.on('unhandledRejection', onUnhandledRejection)
@@ -188,12 +196,12 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
                 LoggerErrorText.pluginShutdownCleanupFailed,
                 [error]
               )
-              ProcessPlugin.#reportRuntimeFailure(cleanupError)
+              reportRuntimeFailure(cleanupError)
             }
             try {
               Reflect.apply(originalExit, originalExitReceiver, [code])
             } catch (error) {
-              ProcessPlugin.#reportRuntimeFailure(
+              reportRuntimeFailure(
                 createLoggerError(
                   LoggerErrorCode.pluginShutdownCleanupFailed,
                   LoggerErrorText.pluginShutdownCleanupFailed,
@@ -424,9 +432,8 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
   }
 
   /** Emits process-runtime cleanup failures without creating a second unhandled rejection. */
-  static #reportRuntimeFailure(error: unknown): void {
+  static #reportRuntimeFailure(runtime: ILoggerRuntimeManager, error: unknown): void {
     try {
-      const runtime = getLoggerRuntimeManager()
       const result = runtime.console ? runtime.console.error(error) : runtime.write(String(error))
       observeLoggerReporterResult(result)
     } catch {

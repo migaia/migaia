@@ -10,7 +10,7 @@ import type {
   ILoggerPlugin,
   IPaintFn
 } from '../typing.js'
-import { getLoggerRuntimeManager } from '../runtime-manager.js'
+import type { ILoggerRuntimeManager } from '../runtime-manager.js'
 import { LoggerConsoleTag } from '../plugin-constants.js'
 import { LoggerColorMode } from '../plugin-constants.js'
 
@@ -65,6 +65,8 @@ class ColorPlugin implements ILoggerPlugin<
   // 这几个字段的真正初始化发生在 install() 里（因为要先拿到 core 才能
   // core.config.get()），构造函数阶段还没有值，用 "!" 告诉 TS 这是"稍后一定
   // 会被赋值"，不是遗漏初始化。
+  /** Rendering and environment detection stay with the logger that owns this registration. */
+  #runtime!: ILoggerRuntimeManager
   #resolvedConfig!: IColorPluginConfig
   /**
    * 关键点：ansis 库自己内部也有一套颜色支持等级检测（ansis.level）， 不能只判断"要不要调用染色函数"，还必须把底层这个 Ansis 实例的 level
@@ -82,6 +84,7 @@ class ColorPlugin implements ILoggerPlugin<
 
   featureExpose(core: ILoggerPluginCore): IColorShared {
     // 不读 this.config——统一通过 core.config.get() 读取
+    this.#runtime = core.runtimeManager
     this.#resolvedConfig = core.config.get<IColorPluginConfig>() ?? {}
     this.#instance = new Ansis(this.#isColorEnabled() ? 3 : 0)
     this.#colorMap = {
@@ -118,7 +121,7 @@ class ColorPlugin implements ILoggerPlugin<
     const mode = this.#resolvedConfig.color ?? LoggerColorMode.auto
     if (mode === LoggerColorMode.always) return true
     if (mode === LoggerColorMode.never) return false
-    const runtimeProcess = getLoggerRuntimeManager().process
+    const runtimeProcess = this.#runtime.process
     if (runtimeProcess?.env.NO_COLOR) return false
     if (runtimeProcess?.env.FORCE_COLOR && runtimeProcess.env.FORCE_COLOR !== '0') return true
     if (runtimeProcess?.stdout.isTTY) return true
@@ -131,7 +134,7 @@ class ColorPlugin implements ILoggerPlugin<
   #resolveFormat(): 'pretty' | 'json' {
     const configured = this.#resolvedConfig.format ?? 'auto'
     if (configured !== 'auto') return configured
-    const runtimeProcess = getLoggerRuntimeManager().process
+    const runtimeProcess = this.#runtime.process
     const envFormat = runtimeProcess?.env.LOG_FORMAT
     if (envFormat === 'json' || envFormat === 'pretty') return envFormat
     if (runtimeProcess?.env.CI) return 'pretty' // CI 场景是人在看，优先可读性
@@ -219,7 +222,7 @@ class ColorPlugin implements ILoggerPlugin<
   }
 
   #sink(tag: string): (...args: unknown[]) => void {
-    const runtime = getLoggerRuntimeManager()
+    const runtime = this.#runtime
     if (runtime.console) {
       if (tag === LoggerConsoleTag.error || tag === LoggerConsoleTag.fatal)
         return (...args) => runtime.console!.error(...args)

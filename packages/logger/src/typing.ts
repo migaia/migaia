@@ -15,6 +15,7 @@ import type {
   IPluginHandleTuple,
   IPipelineConfig
 } from '@migaia/plugin-host'
+import type { ILoggerRuntimeManager } from './runtime-manager.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 
 /**
@@ -172,6 +173,8 @@ export type ILoggerCore<
    * share the host's clock domain.
    */
   readonly scheduler: IScheduler
+  /** Host capabilities captured by this logger; plugins share the same instance owner. */
+  readonly runtimeManager: ILoggerRuntimeManager
 
   /**
    * Synchronously constructs and dispatches an entry. Use `dispatchRaw` scheduling options for
@@ -347,6 +350,8 @@ export type ILoggerOptions<
 > = {
   /** Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting. */
   execution: IPluginHostOptions['execution']
+  /** Host capability owner; omitted means capture the current module default at construction. */
+  runtimeManager?: ILoggerRuntimeManager
   context?: string[]
   /** Topic for this logger's internal `extends()` forwarding bookkeeping. */
   topic?: string

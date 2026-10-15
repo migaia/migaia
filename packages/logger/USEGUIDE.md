@@ -404,3 +404,7 @@ pnpm --filter @migaia/logger test
 只有插件真正被装上（无论是构造参数里还是 `await log.use(plugin)`），对应方法才会出现在类型上。异步安装的插件如果是根据运行时条件动态选择的，TypeScript 无法静态推导，需要手动标注类型。
 
 Pipeline replacements must retain a current-realm `Date` in `entry.time`. An invalid replacement (including serialized timestamps or a foreign-realm Date) reports `PIPELINE_ENTRY_INVALID` through `onFailure` with source `pipeline`, then delivers the original entry. Dispatch remains non-throwing.
+
+`new Logger({ execution, runtimeManager })` captures that host capability owner. If omitted, construction captures the current module default. Built-in console, UUID, HTTP and file plugins use their logger's owner. `createAbortController` is an optional host cancellation factory for alternate AbortSignal implementations; HTTP falls back to native controllers when it is absent. This is the same cancellation boundary in production and tests.
+
+`setLoggerRuntimeManager` now selects the default for **future instances**; it no longer retargets existing loggers. Migrate code that changes a live logger globally to construct it with an explicit `runtimeManager`. The manager object itself is retained by reference. ProcessPlugin still owns one shared set of exit/signal hooks: all participants must agree on process identity, configuration and scheduler domain, or receive `PLUGIN_CONFIG_CONFLICT`. Its late diagnostics use the first installer's captured manager.
