@@ -228,8 +228,8 @@ export class PluginHost<
 
   constructor(options: IPluginHostOptions, trustedDefinitionReader?: ITrustedDefinitionReader) {
     this.#trustedDefinitionReader = trustedDefinitionReader
-    // Validate the mandatory execution policy before reading unrelated options or allocating
-    // lifecycle machinery. This preserves fail-fast zero-effect admission for hostile getters.
+    // Validate the mandatory execution policy before reading the remaining options. Field
+    // initializers have already created the basic lifecycle and shared-state owners.
     const execution = options.execution
     if (execution === null || typeof execution !== 'object')
       throw createPluginHostTypeError('execution must provide mutation and pipeline drain budgets')
