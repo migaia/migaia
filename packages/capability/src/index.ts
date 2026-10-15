@@ -147,8 +147,8 @@ type IEntry<Context> = {
   /** Disposer captured at adoption; later mutation of the public handle cannot replace ownership. */
   disposer?: ICapabilityHandle['dispose']
   error?: unknown
-  /** 在途激活。用于幂等：并发 enable 共享它。 */
-  pending?: Promise<boolean>
+  /** 在途激活。用于幂等：并发 enable 共享它。结果在激活闭包内一次性产生，共享者看到同一个分类， 不再各自事后读取可变的 `state`。 */
+  pending?: Promise<ICapabilityEnableResult>
   /**
    * 激活代数，换成 `@migaia/lifecycle` 的 `GenerationController`（`migration.sdd.md` §3.2）。
    *
@@ -436,9 +436,22 @@ export function createCapabilityHost<Context>(
     }
   }
 
-  // Compatibility implementations live outside the public host object so the
-  // structured APIs do not depend on deprecated method names.
-  const enableBoolean = (name: string): Promise<boolean> => {
+  /**
+   * Classifies an activation whose token is no longer current. A superseding `setFlag(false)`
+   * leaves the entry `gated`; any other supersession (disable, dispose, newer activation) is a
+   * cancellation.
+   */
+  const supersededResult = (entry: IEntry<Context>): ICapabilityEnableResult =>
+    entry.state === CapabilityState.gated
+      ? { status: CapabilityEnableStatus.gated }
+      : { status: CapabilityEnableStatus.cancelled }
+
+  /**
+   * Starts or joins one activation and resolves its structured outcome. The outcome is produced
+   * inside the activation closure when it settles, so every caller sharing `entry.pending` sees the
+   * same classification even if a retry begins before their continuation runs.
+   */
+  const enableStructured = (name: string): Promise<ICapabilityEnableResult> => {
     let entry: IEntry<Context>
     try {
       assertUsable()
@@ -450,23 +463,24 @@ export function createCapabilityHost<Context>(
     if (!allowed(name)) {
       entry.state = CapabilityState.gated
       entry.error = undefined
-      return Promise.resolve(false)
+      return Promise.resolve({ status: CapabilityEnableStatus.gated })
     }
-    if (entry.state === CapabilityState.on) return Promise.resolve(true)
+    if (entry.state === CapabilityState.on)
+      return Promise.resolve({ status: CapabilityEnableStatus.enabled })
     if (entry.pending) return entry.pending
 
     const { generation, token } = entry.generationController.begin()
     entry.state = CapabilityState.activating
     entry.error = undefined
-    let resolvePending!: (enabled: boolean) => void
-    const pending = new Promise<boolean>((resolve) => {
+    let resolvePending!: (result: ICapabilityEnableResult) => void
+    const pending = new Promise<ICapabilityEnableResult>((resolve) => {
       resolvePending = resolve
     })
     // Publish activation before invoking user code. Synchronous activate() callbacks may call
     // host.dispose(); that disposal must retain this promise until late handle cleanup finishes.
     entry.pending = pending
     trackPending(entry, pending)
-    void (async () => {
+    void (async (): Promise<ICapabilityEnableResult> => {
       try {
         const handle = await entry.activate(context)
         let disposer: ICapabilityHandle['dispose'] | undefined
@@ -491,24 +505,43 @@ export function createCapabilityHost<Context>(
         const adopted = entry.generationController.adopt(token, handle, (adoptedHandle) =>
           release(entry, adoptedHandle, generation, disposer)
         )
-        if (!adopted) return false
+        if (!adopted) return supersededResult(entry)
         entry.handle = handle
         entry.disposer = disposer
         entry.state = CapabilityState.on
         activationOrder.push(entry)
-        return true
+        return { status: CapabilityEnableStatus.enabled }
       } catch (error) {
-        if (entry.generationController.isCurrent(token)) {
+        /** Whether this failure still owns the entry; a superseded failure is not the entry's state. */
+        const current = entry.generationController.isCurrent(token)
+        if (current) {
           entry.state = CapabilityState.failed
           entry.error = error
         }
         reportError(name, error)
-        return false
+        return current ? { status: CapabilityEnableStatus.failed, error } : supersededResult(entry)
       } finally {
         if (entry.generationController.isCurrent(token)) entry.pending = undefined
       }
-    })().then(resolvePending, () => resolvePending(false))
+    })().then(resolvePending, (error: unknown) =>
+      resolvePending({ status: CapabilityEnableStatus.failed, error })
+    )
     return pending
+  }
+
+  /**
+   * Compatibility boolean view of `enableStructured()`; only `enabled` maps to `true`. It rejects
+   * only for an immediate API failure, which stays marked handled as in `rejectedOperation()`.
+   */
+  const enableBoolean = (name: string): Promise<boolean> => {
+    /** Derived boolean promise handed to the legacy caller. */
+    const enabled = enableStructured(name).then(
+      (result) => result.status === CapabilityEnableStatus.enabled
+    )
+    void enabled.catch(() => {
+      // Callers still observe the rejection; this only suppresses host-level unhandled noise.
+    })
+    return enabled
   }
 
   const disableSync = (name: string): boolean => {
@@ -708,20 +741,9 @@ export function createCapabilityHost<Context>(
       return enableBoolean(name)
     },
 
-    enable(name) {
-      return enableBoolean(name).then((enabled) => {
-        const entry = entries.get(name)
-        if (enabled) return { status: CapabilityEnableStatus.enabled }
-        if (entry?.state === CapabilityState.gated) return { status: CapabilityEnableStatus.gated }
-        if (entry?.state === CapabilityState.failed)
-          return { status: CapabilityEnableStatus.failed, error: entry.error }
-        return { status: CapabilityEnableStatus.cancelled }
-      })
-    },
+    enable: enableStructured,
 
-    enableResult(name) {
-      return this.enable(name)
-    },
+    enableResult: enableStructured,
 
     disableNow(name) {
       return disableSync(name)
