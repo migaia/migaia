@@ -336,18 +336,22 @@ describe('A2 remote generation proxy', () => {
     }
     expect(fixture.registration.departedReasonCount()).toBe(5)
     for (const [index, reason] of reasons.entries()) {
-      const seen = await new Promise<unknown>((resolve) => {
+      /** Late notifications now belong to the injected manual clock. */
+      const waiting = new Promise<unknown>((resolve) => {
         fixture.registration.events.onLeave(index + 1, resolve)
       })
-      expect(seen).toBe(reason)
+      fixture.binding.scheduler.advance(0)
+      expect(await waiting).toBe(reason)
     }
     await holder.release()
     expect(fixture.registration.departedReasonCount()).toBe(0)
-    const afterRelease = await new Promise<unknown>((resolve) => {
+    /** Released registrations still deliver their closed result through the same clock. */
+    const afterRelease = new Promise<unknown>((resolve) => {
       fixture.registration.events.onLeave(1, resolve)
     })
-    expect(afterRelease).toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
-    expect(afterRelease).not.toBe(reasons[0])
+    fixture.binding.scheduler.advance(0)
+    expect(await afterRelease).toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
+    expect(await afterRelease).not.toBe(reasons[0])
   })
 
   it('caps request and stream deadlines while one-way sends without call options', async () => {

@@ -215,6 +215,7 @@ describe('remote PluginHost assembly', () => {
       fixture.emit({ type: 'exit', generation: 1, reason: 'crashed' })
       fixture.nextGeneration()
       fixture.emit({ type: 'state', from: 'backoff', to: 'ready', generation: 2 })
+      fixture.binding.scheduler.advance(0)
       /** The scheduler, not elapsed wall time, drives each enable retry. */
       for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
       expect(enables).toBe(1)
@@ -232,6 +233,7 @@ describe('remote PluginHost assembly', () => {
       fixture.emit({ type: 'exit', generation: 2, reason: 'crashed' })
       fixture.nextGeneration()
       fixture.emit({ type: 'state', from: 'backoff', to: 'ready', generation: 3 })
+      scheduler.advance(0)
       for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
       scheduler.advance(10)
       for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
@@ -278,11 +280,13 @@ describe('remote PluginHost assembly', () => {
       .request
     try {
       fixture.emit({ type: 'exit', generation: 1, reason: 'crashed' })
+      fixture.binding.scheduler.advance(0)
       for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
       expect(disables).toBe(1)
       expect(report).toHaveBeenCalledExactlyOnceWith(mutationError)
       fixture.nextGeneration()
       fixture.emit({ type: 'state', from: 'backoff', to: 'ready', generation: 2 })
+      fixture.binding.scheduler.advance(0)
       for (let turn = 0; turn < 20; turn += 1) await Promise.resolve()
       expect(disables).toBe(2)
       expect(host.plugin.disabled()).not.toContain('p')

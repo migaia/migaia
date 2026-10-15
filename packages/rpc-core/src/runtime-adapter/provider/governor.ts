@@ -6,7 +6,7 @@ import {
   wrapProviderStreamAdmission,
   type IProviderBulkAdmission
 } from '../../core/internal/provider.js'
-import type { IScheduledTask } from '@migaia/utils/scheduler'
+import { deferTask, type IScheduledTask } from '@migaia/utils/scheduler'
 import { portableBytes } from '../../core/idempotency-store.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
 import type { IRpcProviderRejection } from '../../core/index.js'
@@ -124,7 +124,7 @@ export function createRuntimeProviderGovernor(
   /** Both rate/payload and core concurrency refusals share this connection's consecutive count. */
   const violate = (): void => {
     violations += 1
-    if (violations >= options.violationLimit) queueMicrotask(requestClose)
+    if (violations >= options.violationLimit) deferTask(scheduler, requestClose)
   }
 
   /** Reject before invoking a provider; the second consecutive violation closes this session. */
@@ -200,7 +200,7 @@ export function createRuntimeProviderGovernor(
       if (localRpcErrorCode(reason) !== RpcCoreErrorCode.deadlineExceeded) return
       timedOut = true
       consecutiveTimeouts += 1
-      if (consecutiveTimeouts === options.maxConsecutiveTimeouts) queueMicrotask(requestClose)
+      if (consecutiveTimeouts === options.maxConsecutiveTimeouts) deferTask(scheduler, requestClose)
     }
     /** Releasing admission removes listeners even from providers that ignore cancellation. */
     const unsubscribeAbort = (): void => context.signal.removeEventListener('abort', onAbort)

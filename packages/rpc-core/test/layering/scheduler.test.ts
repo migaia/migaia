@@ -346,7 +346,8 @@ describe('endpoint scheduler ownership', () => {
       }
       visit(source)
     }
-    expect([...systemOwners]).toEqual(['endpoint-kernel.ts'])
+    // The standalone memory pair owns delivery even when no endpoint exists.
+    expect([...systemOwners]).toEqual(['adapters/memory.ts', 'endpoint-kernel.ts'])
   })
 
   it('A10 retains very long endpoint deadlines and requests unref for system timers', async () => {

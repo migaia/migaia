@@ -1475,14 +1475,56 @@ try {
       }
     ]
   }),
-  'rpc-core:adapters-memory:createMemoryTransportPair': transportGuide({
-    name: 'createMemoryTransportPair',
-    importPath: '@migaia/rpc-core/adapters/memory',
-    expression: 'createMemoryTransportPair()',
-    boundaryEn: 'an isolated in-process paired channel',
-    boundaryZh: '隔离的 in-process paired channel',
-    cautionEn: 'Production peers live in different processes or browsing contexts.',
-    cautionZh: '生产 peer 位于不同 process 或 browsing context。'
+  'rpc-core:adapters-memory:createMemoryTransportPair': guide({
+    purposeEn:
+      'Creates two opposite in-process transport ends. Default delivery remains a native microtask; an optional scheduler controls pair delivery for deterministic tests without owning endpoint deadlines.',
+    purposeZh:
+      '创建互相连接的两个进程内 transport。默认仍以原生微任务交付；可选 scheduler 控制通道交付，便于确定性测试，不接管 endpoint 截止时间。',
+    quickStart: `import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+import { createManualScheduler } from '@migaia/utils/scheduler'
+
+// This manual clock is for deterministic testing/simulation of the adapter.
+const clock = createManualScheduler()
+const [sender, receiver] = createMemoryTransportPair({ scheduler: clock })
+const messages: unknown[] = []
+const stop = receiver.subscribe(({ data }) => { messages.push(data) })
+sender.send('hello')
+clock.advance(0)
+console.log(messages) // ['hello']
+stop()
+await sender.close()`,
+    useEn: [
+      'Two endpoints need an isolated in-process connection.',
+      'A test must control delivery without a host microtask queue.',
+      'A transport test must verify close-before-delivery independently of endpoint timeouts.'
+    ],
+    useZh: [
+      '两个 endpoint 需要隔离的进程内连接。',
+      '测试需要在没有宿主微任务队列时控制交付。',
+      '通道测试需要独立验证关闭早于交付的行为。'
+    ],
+    avoidEn: [
+      'Use a native adapter for peers in different processes or browsing contexts.',
+      'Pass one returned end to each endpoint; the tuple itself is not a transport.',
+      'Configure endpoint clocks separately when controlling RPC deadlines.'
+    ],
+    avoidZh: [
+      '不同进程或浏览上下文的 peer 应使用原生 adapter。',
+      '每个 endpoint 各接一个返回端，整个 tuple 不是 transport。',
+      '控制 RPC 截止时间时需另行配置 endpoint 时钟。'
+    ],
+    options: [
+      {
+        name: 'options.scheduler',
+        type: 'IScheduler',
+        optional: true,
+        description:
+          'Owns pair delivery jobs; default system microtasks keep their original order.',
+        defaultValue: 'systemScheduler',
+        whenToUse: 'Inject an admitted clock for deterministic delivery.',
+        example: 'createMemoryTransportPair({ scheduler: clock })'
+      }
+    ]
   }),
   'rpc-browser:adapters-broadcast-channel:createBroadcastChannelTransport': transportGuide({
     name: 'createBroadcastChannelTransport',

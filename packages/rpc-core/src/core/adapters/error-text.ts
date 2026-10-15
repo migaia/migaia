@@ -1,5 +1,7 @@
 /** Stable adapters error text stays with its owner outside the root endpoint graph. */
 export const RpcAdapterErrorText = {
+  /** The memory-pair factory accepts only its optional delivery scheduler configuration. */
+  memoryOptions: '[rpc] memory transport options must be an object',
   /**
    * Probe callbacks report through the existing TRANSPORT channel without changing message
    * delivery.

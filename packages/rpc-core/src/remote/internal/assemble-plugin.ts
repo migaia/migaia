@@ -1,3 +1,4 @@
+import { deferTask } from '@migaia/utils/scheduler'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRemoteBinding } from '../types.js'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
@@ -104,7 +105,7 @@ export function observeRemoteGenerations<TUnit, TSpec>(
     pending = true
     if (running) return
     running = true
-    queueMicrotask(() => {
+    deferTask(binding.scheduler, () => {
       void (async () => {
         try {
           while (pending && subscribed) {

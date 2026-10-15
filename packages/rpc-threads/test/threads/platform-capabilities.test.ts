@@ -176,6 +176,8 @@ describe('platform capability admission', () => {
       } finally {
         await fixture.close()
       }
+      // Deferred generation notifications are non-cancellable jobs, like native microtasks.
+      scheduler.advance(0)
       expect(fixture.budget.inUse).toBe(0)
       expect(scheduler.pendingCount).toBe(0)
     }
