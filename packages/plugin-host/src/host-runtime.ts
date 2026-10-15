@@ -373,49 +373,9 @@ export class PluginHost<
         )
       }
     })
-    this.#installRuntime = new PluginHostInstallRuntime({
-      invokeHook: this.#invokeHook,
-      scheduler: this.#scheduler,
-      executionSignal: this.#executionController.signal,
-      state: this.#state,
-      snapshotBatch: () => ({
-        registrations: new Map(),
-        extensionOwners: new Map(),
-        sharedContributions: [],
-        releasedOwners: new Set(),
-        committed: false
-      }),
-      beginOperation: (registration) => {
-        this.#operationRuntime.begin(registration)
-      },
-      createCore: (registration, batch) => this.#coreRuntime.create(registration, batch),
-      awaitOperation: (result, registration) => this.#operationRuntime.await(result, registration),
-      assertOperationCurrent: (registration) => this.#operationRuntime.assertCurrent(registration),
-      setHookRegistration: (registration) => {
-        this.#hookRegistration = registration
-      },
-      setSetupPending: (registration) => {
-        this.#setupPending = registration
-      },
-      publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
-      disposeRegistration: (registration, preserveErrorIdentity) =>
-        this.#removalRuntime.disposeRegistration(registration, preserveErrorIdentity),
-      resetRegistration: (registration) => this.#removalRuntime.resetRegistration(registration),
-      closeRegistrationSync: (registration, rollbackErrors) =>
-        this.#closeRegistrationSync(registration, rollbackErrors),
-      diagnostic: this.#diagnostic,
-      decorateError: (error) => attachPluginHostIdentity(error, this)
-    })
     this.#removalRuntime = new PluginHostRemovalRuntime({
       invokeHook: this.#invokeHook,
-      registrations: this.#state.registrations,
-      removeRegistration: (registration) => this.#state.closeRegistration(registration),
-      clearRegistrationPublication: (registration) =>
-        this.#state.clearRegistrationPublication(registration),
       pipelineLeases: this.#pipelineLeases,
-      retireLeaseOwner: (registration) =>
-        this.#state.lanes.retireLeaseOwner(registration, this.#pipelineLeases),
-      host: this,
       executionSignal: this.#executionController.signal,
       cleanupRuntime: this.#cleanupRuntime,
       scheduler: this.#scheduler,
@@ -430,51 +390,48 @@ export class PluginHost<
       clearBeforeReleaseRegistrationIfOwner: (registration) => {
         if (this.#hookRegistration === registration) this.#hookRegistration = undefined
         if (this.#releasePending === registration) this.#releasePending = undefined
-      }
+      },
+      state: this.#state
+    })
+    this.#installRuntime = new PluginHostInstallRuntime({
+      invokeHook: this.#invokeHook,
+      scheduler: this.#scheduler,
+      executionSignal: this.#executionController.signal,
+      state: this.#state,
+      createCore: (registration, batch) => this.#coreRuntime.create(registration, batch),
+      setHookRegistration: (registration) => {
+        this.#hookRegistration = registration
+      },
+      setSetupPending: (registration) => {
+        this.#setupPending = registration
+      },
+      publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
+      closeRegistrationSync: (registration, rollbackErrors) =>
+        this.#closeRegistrationSync(registration, rollbackErrors),
+      diagnostic: this.#diagnostic,
+      decorateError: (error) => attachPluginHostIdentity(error, this),
+      operations: this.#operationRuntime,
+      removal: this.#removalRuntime
     })
     this.#replaceRuntime = new PluginHostReplaceRuntime({
       invokeHook: this.#invokeHook,
-      registrations: this.#state.registrations,
       state: this.#state,
-      installBatch: (entries, publish, prepareBatch) =>
-        this.#installRuntime.installBatch(entries, publish, prepareBatch),
       publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
       drainLeases: (registration) => this.#drainRegistrationLeases(registration),
-      runBeforeRelease: (registration) => this.#removalRuntime.runBeforeRelease(registration),
-      disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
-      activate: (registration) => this.#installRuntime.activate(registration),
-      disable: (registration) => {
-        this.#enablementRuntime.disable(registration)
-      },
-      markRemoved: (name) => {
-        this.#state.removedNames.add(name)
-      },
-      forget: (name) => this.#enablementRuntime.forget(name),
-      settle: () => {
-        this.#state.commit()
-      },
       diagnostic: this.#diagnostic,
-      decorateError: (error) => attachPluginHostIdentity(error, this)
+      decorateError: (error) => attachPluginHostIdentity(error, this),
+      installation: this.#installRuntime,
+      removal: this.#removalRuntime,
+      enablement: this.#enablementRuntime
     })
     this.#resumeRuntime = new PluginHostResumeRuntime({
       invokeHook: this.#invokeHook,
       state: this.#state,
       drainLeases: (registration) => this.#drainRegistrationLeases(registration),
-      runBeforeRelease: (registration) => this.#removalRuntime.runBeforeRelease(registration),
-      disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
-      installBatch: (entries) => this.#installRuntime.installBatch(entries),
-      activate: (registration) => this.#installRuntime.activate(registration),
-      disable: (registration) => {
-        this.#enablementRuntime.disable(registration)
-      },
-      markRemoved: (name) => {
-        this.#state.removedNames.add(name)
-      },
-      forget: (name) => this.#enablementRuntime.forget(name),
-      settle: () => {
-        this.#state.commit()
-      },
-      diagnostic: this.#diagnostic
+      diagnostic: this.#diagnostic,
+      installation: this.#installRuntime,
+      removal: this.#removalRuntime,
+      enablement: this.#enablementRuntime
     })
     this.#coreRuntime = new PluginHostCoreRuntime({
       createDomainCore: (request) => this.createPluginDomainCore(request),
@@ -621,24 +578,17 @@ export class PluginHost<
     })
     this.#configRuntime = new PluginHostConfigRuntime({
       invokeHook: this.#invokeHook,
-      registrations: this.#state.registrations,
       assertActive: () => this.#assertActive(),
       isSetupPending: () => this.#setupPending !== undefined,
       isReleasePending: () => this.#releasePending !== undefined,
       decorateError: (error) => attachPluginHostIdentity(error, this),
       enqueue: (task) => this.#enqueue(task),
-      beginOperation: (registration) => {
-        this.#operationRuntime.begin(registration)
-      },
-      awaitOperation: (result, registration) => this.#operationRuntime.await(result, registration),
-      assertOperationCurrent: (registration) => this.#operationRuntime.assertCurrent(registration),
       setHookRegistration: (registration) => {
         this.#hookRegistration = registration
       },
-      createCore: (registration) => this.#coreRuntime.create(registration),
-      commitRevision: () => {
-        this.#state.commit()
-      }
+      state: this.#state,
+      operations: this.#operationRuntime,
+      core: this.#coreRuntime
     })
     this.#hostDisposalRuntime = new PluginHostDisposalRuntime({
       terminal: this.#terminal,
@@ -667,52 +617,30 @@ export class PluginHost<
           return [...this.#state.registrations.values()].reverse()
         }
       },
-      runBeforeRelease: (registration) => this.#removalRuntime.runBeforeRelease(registration),
-      disposeRegistration: (registration) => this.#removalRuntime.disposeRegistration(registration),
       clearPipelineState: () => {
         this.#state.lanes.clear()
         for (const slot of this.#state.stageSlots.values()) slot.retired = true
         this.#state.stageSlots.clear()
       },
-      commitRevision: () => {
-        this.#state.commit()
-      },
-      diagnostic: this.#diagnostic
+      diagnostic: this.#diagnostic,
+      state: this.#state,
+      removal: this.#removalRuntime
     })
     this.#compositionRuntime = new PluginHostCompositionRuntime({
       host: this,
       scheduler: this.#scheduler,
       pipelineDrainTimeoutMs,
-      registrations: this.#state.registrations,
       state: this.#state,
-      stageSlots: this.#state.stageSlots,
-      allocateStageSlot: () => this.#state.allocateStageSlot(),
       assertActive: () => this.#assertActive(),
       assertMutationAllowed: () => this.#assertMutationAllowed(),
       snapshotPlugins: (plugins) =>
         snapshotPluginDefinitions<TDomainCore, TValue>(plugins, this.#trustedDefinitionReader),
-      preflight: (definitions) =>
-        preflightPluginDefinitions(definitions, (name) => this.#state.registrations.has(name)),
       enqueue: (task) => this.#enqueue(task),
-      installBatch: (entries, publish) => this.#installRuntime.installBatch(entries, publish),
       publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
-      revision: () => this.#state.revision,
-      commitRevision: () => {
-        this.#state.commit()
-      },
-      disposeRegistration: (registration, preserveErrorIdentity, mode, deadlineAt) =>
-        this.#removalRuntime.disposeRegistration(
-          registration,
-          preserveErrorIdentity,
-          mode,
-          deadlineAt
-        ),
-      revokeRegistration: (registration) => this.#removalRuntime.revokeRegistration(registration),
       createView: () => this.#createView(),
-      markRemoved: (name) => {
-        this.#state.removedNames.add(name)
-      },
-      diagnostic: this.#diagnostic
+      diagnostic: this.#diagnostic,
+      installation: this.#installRuntime,
+      removal: this.#removalRuntime
     })
     this.#pipelineDrainTimeoutMs = pipelineDrainTimeoutMs
     this.#queueAdmissionTimeoutMs = options.queueAdmissionTimeoutMs

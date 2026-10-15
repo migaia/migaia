@@ -1,3 +1,4 @@
+import type { PluginHostState } from './host-state.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   boundedWait,
@@ -18,14 +19,7 @@ import type { IPluginBeforeReleaseContext, IPluginDisposalContext } from './typi
 type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Host-owned synchronous hook boundary, independent of the asynchronous cleanup wait. */
   readonly invokeHook: <T>(invoke: () => T) => T
-  readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
-  /** Removes an exact committed registration and its dependency node atomically. */
-  readonly removeRegistration: (registration: IRegistration<TDomainCore, TValue>) => void
-  /** Withdraws exact attempt publication while retaining the cold registration and topology. */
-  readonly clearRegistrationPublication: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly pipelineLeases: IQuiescenceTracker<object>
-  readonly retireLeaseOwner: (registration: IRegistration<TDomainCore, TValue>) => void
-  readonly host: object
   readonly executionSignal: IAbortSignal
   readonly cleanupRuntime: PluginHostCleanupRuntime
   readonly scheduler: IScheduler
@@ -37,6 +31,8 @@ type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly clearBeforeReleaseRegistrationIfOwner: (
     registration: IRegistration<TDomainCore, TValue>
   ) => void
+  /** One state owner retires exact publication, dependency facts and stage leases. */
+  readonly state: PluginHostState<TDomainCore, TValue>
 }>
 
 /** Owns logical revocation and ordered physical cleanup for plugin registrations. */
@@ -92,7 +88,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     markRegistrationRevoked(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.dispose
     registration.featureExposeValid = false
-    this.#port.retireLeaseOwner(registration)
+    this.#port.state.lanes.retireLeaseOwner(registration, this.#port.pipelineLeases)
     this.#detachStages(registration, errors)
     this.#removeOwnedPublication(registration)
     // The name-keyed slot retains its ordinal across a same-name reinstall. Composition-issued
@@ -143,7 +139,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
       registration.lifecycle = PluginHostRegistrationLifecycle.dispose
       registration.featureExposeValid = false
       this.#detachStages(registration, errors)
-      this.#port.clearRegistrationPublication(registration)
+      this.#port.state.clearRegistrationPublication(registration)
       registration.extensions = []
     } else errors.push(...this.revokeRegistration(registration))
     if (
@@ -247,6 +243,6 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
 
   /** Removes extension capabilities still owned by the exact registration. */
   #removeOwnedPublication(registration: IRegistration<TDomainCore, TValue>): void {
-    this.#port.removeRegistration(registration)
+    this.#port.state.closeRegistration(registration)
   }
 }

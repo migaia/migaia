@@ -1,4 +1,6 @@
-import type { ICleanupResult } from '@migaia/lifecycle'
+import type { PluginHostRemovalRuntime } from './removal-runtime.js'
+import type { PluginHostOperationRuntime } from './operation-runtime.js'
+
 import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
@@ -60,17 +62,10 @@ type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly setSetupPending: (registration: IRegistration<TDomainCore, TValue> | undefined) => void
   /** Shared host state owning dependency facts and committed registration status. */
   readonly state: PluginHostState<TDomainCore, TValue>
-  readonly snapshotBatch: () => IInstallBatchContext<TDomainCore, TValue>
-  readonly beginOperation: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly createCore: (
     registration: IRegistration<TDomainCore, TValue>,
     batch: IInstallBatchContext<TDomainCore, TValue>
   ) => TDomainCore & IPluginHostCore<TValue>
-  readonly awaitOperation: <T>(
-    result: T | PromiseLike<T>,
-    registration: IRegistration<TDomainCore, TValue>
-  ) => Promise<T>
-  readonly assertOperationCurrent: (registration: IRegistration<TDomainCore, TValue>) => void
   readonly setHookRegistration: (
     registration: IRegistration<TDomainCore, TValue> | undefined
   ) => void
@@ -78,14 +73,6 @@ type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonl
     installed: readonly IRegistration<TDomainCore, TValue>[],
     batch: IInstallBatchContext<TDomainCore, TValue>
   ) => void
-  readonly disposeRegistration: (
-    registration: IRegistration<TDomainCore, TValue>,
-    preserveErrorIdentity: boolean
-  ) => Promise<ICleanupResult>
-  /** Cleans a failed lazy attempt while retaining its cold registration for explicit retry. */
-  readonly resetRegistration: (
-    registration: IRegistration<TDomainCore, TValue>
-  ) => Promise<ICleanupResult>
   readonly closeRegistrationSync: (
     registration: IRegistration<TDomainCore, TValue>,
     rollbackErrors: unknown[]
@@ -93,6 +80,10 @@ type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly diagnostic: IPluginHostDiagnostic
   /** Attributes a Host boundary error before its structured detail is frozen. */
   readonly decorateError: <TError extends PluginHostError>(error: TError) => TError
+  /** Shared generation owner; method calls retain the original instance receiver. */
+  readonly operations: Pick<PluginHostOperationRuntime, 'begin' | 'await' | 'assertCurrent'>
+  /** Existing removal owner performs cleanup; the Host adds no forwarding layer. */
+  readonly removal: PluginHostRemovalRuntime<TDomainCore, TValue>
 }>
 
 /** Reports a rejection only when it arrives after timeout or Host disposal won the attempt. */
@@ -222,7 +213,7 @@ async function runPluginSetup(
     })
     let output: unknown
     try {
-      output = await port.awaitOperation(Promise.race([tracked, abandoned]), registration)
+      output = await port.operations.await(Promise.race([tracked, abandoned]), registration)
     } catch (error) {
       if (ownRejection && ownRejection.error === error) throw error
       const code = error instanceof PluginHostError ? error.code : undefined
@@ -240,7 +231,7 @@ async function runPluginSetup(
         )
       throw error
     }
-    port.assertOperationCurrent(registration)
+    port.operations.assertCurrent(registration)
     return output
   } finally {
     port.setSetupPending(undefined)
@@ -258,12 +249,23 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     this.#port = port
   }
 
+  /** Creates empty candidate tables owned solely by this installation transaction. */
+  #createBatch(): IInstallBatchContext<TDomainCore, TValue> {
+    return {
+      registrations: new Map(),
+      extensionOwners: new Map(),
+      sharedContributions: [],
+      releasedOwners: new Set(),
+      committed: false
+    }
+  }
+
   /** Activates one already-published lazy registration without changing its public identity. */
   activate(registration: IRegistration<TDomainCore, TValue>): Promise<void> {
     if (registration.activated) return Promise.resolve()
     if (registration.activationPromise) return registration.activationPromise
     const activation = (async (): Promise<void> => {
-      const batch = this.#port.snapshotBatch()
+      const batch = this.#createBatch()
       batch.registrations.set(registration.name, registration)
       registration.lifecycle = PluginHostRegistrationLifecycle.install
       try {
@@ -273,13 +275,13 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         const installResult = this.#startInstall(registration, batch)
         if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
         const installThen = this.#readThen(installResult)
-        const installedValue = await this.#port.awaitOperation(
+        const installedValue = await this.#port.operations.await(
           typeof installThen === 'function'
             ? assimilateCapturedThen(installThen as (...args: unknown[]) => void, installResult)
             : installResult,
           registration
         )
-        this.#port.assertOperationCurrent(registration)
+        this.#port.operations.assertCurrent(registration)
         this.#prepareInstallResult(registration, batch, installedValue)
         await registration.provisional!.commitTo(registration.scope!)
         registration.provisional = undefined
@@ -290,7 +292,8 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       } catch (error) {
         closeSetupAttempt(registration)
         /** The removal owner handles both provisional leftovers and any committed scope prefix. */
-        const { cleanupErrors: rollbackErrors } = await this.#port.resetRegistration(registration)
+        const { cleanupErrors: rollbackErrors } =
+          await this.#port.removal.resetRegistration(registration)
         this.#reportRollbackFailure(registration.name, rollbackErrors)
         /**
          * Preserve the original primary; immutable failures retain it in the existing wrapper
@@ -325,7 +328,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     const installed: IRegistration<TDomainCore, TValue>[] = []
     // Dependency validation runs before the transaction: its codes are thrown as-is, not wrapped.
     const { order: ordered, installSet } = this.#validateBatch(entries)
-    const batch = this.#port.snapshotBatch()
+    const batch = this.#createBatch()
     prepareBatch?.(batch)
     let failedName = entries[0]?.name ?? 'unknown'
     try {
@@ -345,13 +348,13 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           const installResult = this.#startInstall(registration, batch)
           if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
           const installThen = this.#readThen(installResult)
-          const installedValue = await this.#port.awaitOperation(
+          const installedValue = await this.#port.operations.await(
             typeof installThen === 'function'
               ? assimilateCapturedThen(installThen as (...args: unknown[]) => void, installResult)
               : installResult,
             registration
           )
-          this.#port.assertOperationCurrent(registration)
+          this.#port.operations.assertCurrent(registration)
           this.#prepareInstallResult(registration, batch, installedValue)
           await registration.provisional!.commitTo(registration.scope!)
           registration.provisional = undefined
@@ -369,7 +372,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       const rollbackErrors: unknown[] = []
       for (const registration of [...installed].reverse())
         rollbackErrors.push(
-          ...(await this.#port.disposeRegistration(registration, true)).cleanupErrors
+          ...(await this.#port.removal.disposeRegistration(registration, true)).cleanupErrors
         )
       this.#reportRollbackFailure(failedName, rollbackErrors)
       throw this.#installFailure(failedName, error, {
@@ -391,7 +394,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
             ERROR_TEXT.SETUP_REQUIRES_ASYNC_INSTALL(entry.name)
           )
         )
-    const batch = this.#port.snapshotBatch()
+    const batch = this.#createBatch()
     let failedName = entries[0]?.name ?? 'unknown'
     try {
       for (const entry of ordered) {
@@ -509,7 +512,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       }
     })
     registration.featureExposeValid = true
-    this.#port.beginOperation(registration)
+    this.#port.operations.begin(registration)
     if (provisional)
       registration.provisional = createProvisionalScope({
         parentSignal: registration.operation?.signal
@@ -535,8 +538,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       executionSignal: this.#port.executionSignal,
       scheduler: this.#port.scheduler,
       setSetupPending: this.#port.setSetupPending,
-      awaitOperation: this.#port.awaitOperation,
-      assertOperationCurrent: this.#port.assertOperationCurrent,
+      operations: this.#port.operations,
       diagnostic: this.#port.diagnostic
     }
   }
@@ -792,10 +794,12 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     let rollback: Promise<readonly unknown[]> = Promise.resolve([])
     for (const registration of [...installed].reverse())
       rollback = rollback.then((previousErrors) =>
-        this.#port.disposeRegistration(registration, true).then(({ cleanupErrors: errors }) => {
-          this.#reportRollbackFailure(failedName, errors)
-          return [...previousErrors, ...errors]
-        })
+        this.#port.removal
+          .disposeRegistration(registration, true)
+          .then(({ cleanupErrors: errors }) => {
+            this.#reportRollbackFailure(failedName, errors)
+            return [...previousErrors, ...errors]
+          })
       )
     return rollback
   }

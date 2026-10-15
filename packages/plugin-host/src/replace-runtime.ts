@@ -1,10 +1,12 @@
-import type { ICleanupResult } from '@migaia/lifecycle'
+import type { PluginHostEnablementRuntime } from './enablement-runtime.js'
+import type { PluginHostRemovalRuntime } from './removal-runtime.js'
+
 import { DependencyAction, planReplacement, planRestart } from '@migaia/capability/graph/dependency'
 import { reportDiagnostic } from './diagnostic-report.js'
 import { PluginHostErrorCode } from './error-code.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import type { PluginHostState } from './host-state.js'
-import type { IInstallBatchContext } from './install-runtime.js'
+import type { IInstallBatchContext, PluginHostInstallRuntime } from './install-runtime.js'
 import type { IInstallEntry, IRegistration } from './registry.js'
 import type { IPluginHostDiagnostic } from './typing.js'
 
@@ -12,19 +14,8 @@ import type { IPluginHostDiagnostic } from './typing.js'
 type IPluginHostReplaceRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Marks only the original synchronous rebind call, leaving async waiting to its owner. */
   readonly invokeHook: <T>(invoke: () => T) => T
-  /** Committed registrations by name, read after each publication. */
-  readonly registrations: ReadonlyMap<string, IRegistration<TDomainCore, TValue>>
   /** Host-owned topology and registration status used by capability replacement plans. */
   readonly state: PluginHostState<TDomainCore, TValue>
-  /** Installs a candidate batch; `publish: false` leaves publication to this runtime. */
-  installBatch(
-    entries: readonly IInstallEntry<TDomainCore, TValue>[],
-    publish?: boolean,
-    prepareBatch?: (batch: IInstallBatchContext<TDomainCore, TValue>) => void
-  ): Promise<{
-    readonly installed: readonly IRegistration<TDomainCore, TValue>[]
-    readonly batch: IInstallBatchContext<TDomainCore, TValue>
-  }>
   /** Publishes one prepared candidate at a single synchronous point. */
   publish(
     installed: readonly IRegistration<TDomainCore, TValue>[],
@@ -32,25 +23,15 @@ type IPluginHostReplaceRuntimePort<TDomainCore extends object, TValue> = Readonl
   ): void
   /** Seals and drains pipeline leases held by one registration before its cleanup starts. */
   drainLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void>
-  /** Runs the registration's cleanup and returns every collected cleanup failure. */
-  disposeRegistration(registration: IRegistration<TDomainCore, TValue>): Promise<ICleanupResult>
-  /** Runs a captured pre-release hook before the old generation loses its leases. */
-  runBeforeRelease(
-    registration: IRegistration<TDomainCore, TValue>
-  ): Promise<ICleanupResult> | undefined
-  /** Activates one committed lazy registration that was active before its restart. */
-  activate(registration: IRegistration<TDomainCore, TValue>): Promise<void>
-  /** Disables one current registration so a restarted or replaced plugin keeps its disabled state. */
-  disable(registration: IRegistration<TDomainCore, TValue>): void
-  /** Records a name that left the host through removal rather than replacement. */
-  markRemoved(name: string): void
-  /** Forgets enablement bookkeeping for a name that is no longer installed. */
-  forget(name: string): void
-  /** Rebuilds live lanes and advances the committed revision after the transaction settles. */
-  settle(): void
   readonly diagnostic: IPluginHostDiagnostic
   /** Attributes a Host boundary error to the issuing Host. */
   decorateError<TError extends PluginHostError>(error: TError): TError
+  /** Existing installation owner keeps activation and candidate construction together. */
+  readonly installation: PluginHostInstallRuntime<TDomainCore, TValue>
+  /** Existing removal owner performs cleanup; the Host adds no forwarding layer. */
+  readonly removal: PluginHostRemovalRuntime<TDomainCore, TValue>
+  /** Existing enablement owner retains disabled-generation bookkeeping. */
+  readonly enablement: PluginHostEnablementRuntime<TDomainCore, TValue>
 }>
 
 /**
@@ -77,7 +58,7 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
     definition: IInstallEntry<TDomainCore, TValue>['plugin']
   ): Promise<void> {
     const name = previous.name
-    const { installed, batch } = await this.#port.installBatch(
+    const { installed, batch } = await this.#port.installation.installBatch(
       [{ name, plugin: definition }],
       false,
       (candidate) => {
@@ -86,7 +67,7 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
     )
     const replacement = installed[0]!
     this.#port.publish([replacement], batch)
-    if (!previous.enabled) this.#port.disable(replacement)
+    if (!previous.enabled) this.#port.enablement.disable(replacement)
 
     const hookErrors: unknown[] = []
     const cleanupErrors: unknown[] = []
@@ -97,7 +78,7 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
       {
         target: name,
         canRebind: (pluginName) =>
-          this.#port.registrations.get(pluginName)?.plugin.onDependencyReplaced !== undefined
+          this.#port.state.registrations.get(pluginName)?.plugin.onDependencyReplaced !== undefined
       }
     )
     /** Direct rebind failures that capability must expand into restart closures. */
@@ -105,7 +86,7 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
     for (const step of replacementPlan.steps) {
       if (step.action !== DependencyAction.rebind) continue
       const dependentName = step.id
-      const dependent = this.#port.registrations.get(dependentName)
+      const dependent = this.#port.state.registrations.get(dependentName)
       if (!dependent) continue
       const hook = dependent.plugin.onDependencyReplaced!
       try {
@@ -142,31 +123,33 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
     /** Planned invalidations keep suspended instances without attempting installation. */
     for (const step of [...replacementPlan.steps, ...restartPlan.steps]) {
       if (step.action !== DependencyAction.invalidate) continue
-      const registration = this.#port.registrations.get(step.id)
+      const registration = this.#port.state.registrations.get(step.id)
       if (registration) this.#port.state.setStale(registration, true)
     }
     const restarted: IRegistration<TDomainCore, TValue>[] = []
     for (const restartName of restartPlan.steps
       .filter((step) => step.action === DependencyAction.restart)
       .map((step) => step.id)) {
-      const registration = this.#port.registrations.get(restartName)
+      const registration = this.#port.state.registrations.get(restartName)
       if (!registration) continue
       restarted.push(registration)
-      const beforeRelease = this.#port.runBeforeRelease(registration)
+      const beforeRelease = this.#port.removal.runBeforeRelease(registration)
       if (beforeRelease) cleanupErrors.push(...(await beforeRelease).cleanupErrors)
       await this.#port.drainLeases(registration)
-      cleanupErrors.push(...(await this.#port.disposeRegistration(registration)).cleanupErrors)
+      cleanupErrors.push(
+        ...(await this.#port.removal.disposeRegistration(registration)).cleanupErrors
+      )
     }
 
-    const beforeRelease = this.#port.runBeforeRelease(previous)
+    const beforeRelease = this.#port.removal.runBeforeRelease(previous)
     if (beforeRelease) cleanupErrors.push(...(await beforeRelease).cleanupErrors)
     await this.#port.drainLeases(previous)
-    cleanupErrors.push(...(await this.#port.disposeRegistration(previous)).cleanupErrors)
+    cleanupErrors.push(...(await this.#port.removal.disposeRegistration(previous)).cleanupErrors)
 
     let restartFailure: unknown
     if (restarted.length > 0) {
       try {
-        await this.#port.installBatch(
+        await this.#port.installation.installBatch(
           [...restarted].reverse().map((registration) => ({
             name: registration.name,
             plugin: registration.plugin,
@@ -176,21 +159,22 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
         // Restore each restarted generation's observable state: lazy members that were active
         // activate again (providers first), and disabled members stay disabled.
         for (const registration of [...restarted].reverse()) {
-          const current = this.#port.registrations.get(registration.name)
+          const current = this.#port.state.registrations.get(registration.name)
           if (!current) continue
-          if (registration.activated && !current.activated) await this.#port.activate(current)
-          if (!registration.enabled) this.#port.disable(current)
+          if (registration.activated && !current.activated)
+            await this.#port.installation.activate(current)
+          if (!registration.enabled) this.#port.enablement.disable(current)
         }
       } catch (error) {
         restartFailure = error
         for (const registration of restarted)
-          if (!this.#port.registrations.has(registration.name)) {
-            this.#port.markRemoved(registration.name)
-            this.#port.forget(registration.name)
+          if (!this.#port.state.registrations.has(registration.name)) {
+            this.#port.state.removedNames.add(registration.name)
+            this.#port.enablement.forget(registration.name)
           }
       }
     }
-    this.#port.settle()
+    this.#port.state.commit()
 
     if (restartFailure !== undefined) {
       const names = restarted.map((registration) => registration.name)

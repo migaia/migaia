@@ -1,3 +1,6 @@
+import { PluginHostState } from '../src/host-state.js'
+import { createDataOrderSlotState } from '../src/composition.js'
+import { createQuiescenceTracker } from '@migaia/lifecycle'
 import { describe, expect, it, vi } from 'vitest'
 import { PluginHost } from '../src/host-runtime'
 import { PluginHostError } from '../src/error-text'
@@ -1092,14 +1095,18 @@ describe('PluginHost', () => {
       lifecycle: 'install',
       featureExposeValid: true
     }
+    /** Actual state and a held lease separate synchronous revocation from physical completion. */
+    const state = new PluginHostState<IExt, number>()
+    state.registrations.set(registration.name, registration)
+    state.dependencyIndex().add({ id: registration.name, dependencies: [] })
+    /** One physical user keeps its lease active through logical revocation. */
+    const leases = createQuiescenceTracker<object>()
+    /** Release the fixture lease after proving revocation did not wait for it. */
+    const release = leases.retain(registration.pipelineOwnerKey)
     const runtime = new PluginHostRemovalRuntime({
       invokeHook: (invoke) => invoke(),
-      host: {},
-      registrations: new Map([[registration.name, registration]]),
-      removeRegistration: () => undefined,
-      clearRegistrationPublication: () => undefined,
-      pipelineLeases: { seal: () => undefined } as any,
-      retireLeaseOwner: () => undefined,
+      state,
+      pipelineLeases: leases,
       executionSignal: {} as any,
       cleanupRuntime: {} as any,
       scheduler: createManualScheduler(),
@@ -1110,6 +1117,8 @@ describe('PluginHost', () => {
     })
     runtime.revokeRegistration(registration)
     expect(registration.featureExposeValid).toBe(false)
+    expect(leases.count(registration.pipelineOwnerKey)).toBe(1)
+    release()
   })
 
   it('YS11 cause chain: captured Feature expose revocation keeps declared code and text', async () => {
@@ -1223,22 +1232,18 @@ describe('PluginHost', () => {
       featureOutputs: {},
       featureExposeValid: true
     }
-    const stage = { host, name: registration.name, ordinal: 0n, retired: false }
-    const stageSlots = new Map([[registration.name, stage]])
-    const registrations = new Map([[registration.name, registration]])
-    const extensionOwners = new Map([['owned', registration]])
+    /** Canonical state owns both the retained definition slot and exact extension retirement. */
+    const state = new PluginHostState<IExt, number>()
+    const { state: stage } = createDataOrderSlotState(host, registration.name, 0n)
+    const { stageSlots, registrations, extensionOwners } = state
+    stageSlots.set(registration.name, stage)
+    registrations.set(registration.name, registration)
+    state.dependencyIndex().add({ id: registration.name, dependencies: [] })
+    extensionOwners.set('owned', registration)
     const runtime = new PluginHostRemovalRuntime({
       invokeHook: (invoke) => invoke(),
-      host,
-      registrations,
-      removeRegistration: (current) => {
-        registrations.delete(current.name)
-        // The original Host state port owns extension retirement with registration removal.
-        if (extensionOwners.get('owned') === current) extensionOwners.delete('owned')
-      },
-      clearRegistrationPublication: () => undefined,
-      pipelineLeases: { seal: () => undefined } as any,
-      retireLeaseOwner: () => undefined,
+      state,
+      pipelineLeases: createQuiescenceTracker<object>(),
       executionSignal: {} as any,
       cleanupRuntime: {} as any,
       scheduler: createManualScheduler(),
