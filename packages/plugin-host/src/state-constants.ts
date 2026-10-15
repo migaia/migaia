@@ -12,6 +12,15 @@ export const PluginHostRegistrationLifecycle = {
   dispose: 'dispose'
 } as const
 
+/** Internal physical-cleanup policy: normal steps degrade; managed cleanup awaits each release. */
+export const PluginHostCleanupMode = {
+  bounded: 'bounded',
+  unbounded: 'unbounded'
+} as const
+
+export type PluginHostCleanupMode =
+  (typeof PluginHostCleanupMode)[keyof typeof PluginHostCleanupMode]
+
 export type IPluginHostStatus = (typeof PluginHostStatus)[keyof typeof PluginHostStatus]
 export type IPluginHostRegistrationLifecycle =
   (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle]

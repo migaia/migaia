@@ -3,7 +3,6 @@ import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createAbortController,
-  createPendingTracker,
   createLifecycleScope,
   createProvisionalScope
 } from '@migaia/lifecycle'
@@ -480,7 +479,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       pipelineDisposers: [],
       stageEntries: [],
       pipelineOwnerKey: {},
-      resourceDisposers: [],
       installed: false,
       activated: false,
       enabled: true,
@@ -488,8 +486,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       stale: false,
       lifecycle: PluginHostRegistrationLifecycle.install,
       lifecycleController: createAbortController(),
-      featureExposeValid: true,
-      featurePending: createPendingTracker()
+      featureExposeValid: true
     }
   }
 

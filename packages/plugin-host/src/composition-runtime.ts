@@ -24,6 +24,7 @@ import {
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { reportDiagnostic } from './diagnostic-report.js'
+import { PluginHostCleanupMode } from './state-constants.js'
 import type { PluginHostState } from './host-state.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import type { IInstallEntry, IPluginDefinition, IRegistration } from './registry.js'
@@ -80,12 +81,10 @@ type IPluginHostCompositionRuntimePort<TDomainCore extends object, TValue> = Rea
   readonly commitRevision: () => void
   readonly disposeRegistration: (
     registration: IRegistration<TDomainCore, TValue>,
-    preserveErrorIdentity: boolean
+    preserveErrorIdentity: boolean,
+    mode?: PluginHostCleanupMode
   ) => Promise<unknown[]>
   readonly revokeRegistration: (registration: IRegistration<TDomainCore, TValue>) => unknown[]
-  readonly disposeRegistrationStrict: (
-    registration: IRegistration<TDomainCore, TValue>
-  ) => Promise<unknown[]>
   readonly createView: () => unknown
   /** Records a name removed through the managed protocol; see `PREREQUISITE_REMOVED`. */
   readonly markRemoved: (name: string) => void
@@ -382,7 +381,11 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
       )
     }
     for (const registration of registrations) {
-      const leafErrors = await this.#port.disposeRegistrationStrict(registration)
+      const leafErrors = await this.#port.disposeRegistration(
+        registration,
+        true,
+        PluginHostCleanupMode.unbounded
+      )
       leafErrorsByRegistration.set(registration, Object.freeze([...leafErrors]))
       errors.push(...leafErrors)
     }

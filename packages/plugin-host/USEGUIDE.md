@@ -256,6 +256,8 @@ setup 与后续 install 共用本注册的 `mutationTimeoutMs` 绝对期限；�
 
 宿主直接注册的 stage 与插件槽位共用单调分配序号，按首次分配顺序执行；禁用、启用、挂起、恢复和替换不重排。`createDataOrderSlot(name)` 在调用时即保留位置，所以之后注册的宿主 stage 排在该插件 stage 后。替换在发布点切换可见代，新运行只含新代；旧运行继续持有旧代租约。
 
+managed cleanup 的物理链不设强制截止时间；`execution.pipelineDrainTimeoutMs` 是观察上限，`false` 代表无限等待。普通 `unUse()`/`dispose()` 的逐项 `disposeStepTimeoutMs` 不会截断这条 managed 物理链。
+
 managed cleanup 的 `physicalCompletion` 是全批次共享的严格链：前一 provider/resource 未真实 settle 时，
 后一项不会开始。`pipelineDrainTimeoutMs` 只决定何时向调用方返回逻辑 incomplete，不取消 lease 或 disposer。排空开始时先解除旧代的 stage 可见性，再封存租约 key；此后新运行不含该 stage，也不会因 `QUIESCENCE_SEALED` 失败。
 因此不要把 `cleanupComplete: false` 当成已释放；应 await `physicalCompletion`，或由 realm owner 在更外层执行

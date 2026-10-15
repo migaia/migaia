@@ -96,17 +96,9 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
     if (!disposer) throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_RESOURCE_DISPOSER)
     const owner: IProvisionalScope | ILifecycleScope =
       registration.provisional ?? registration.scope!
-    const ownedResource = () => Promise.resolve(disposer())
     owner.own(
-      ownedResource,
-      this.#port.cleanupRuntime.createStepDescriptor(
-        'resource disposer',
-        disposer,
-        registration.featurePending
-      )
-    )
-    registration.resourceDisposers.push(
-      Object.freeze({ resource: ownedResource, dispose: disposer })
+      disposer,
+      this.#port.cleanupRuntime.createStepDescriptor('resource disposer', disposer, registration)
     )
   }
 }
