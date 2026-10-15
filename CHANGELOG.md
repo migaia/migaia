@@ -31,6 +31,9 @@
 
 ### Behavior
 
+- Capability graph `ctx.own()` rejects a missing or non-callable `force` during
+  registration with `GRAPH_INVALID_OPTION`, retaining the lifecycle TypeError on
+  `cause`. Previously the facade hid it until disposal.
 - Middleware pipeline construction snapshots three distinct generator sentinels;
   duplicate identities now throw `INVALID_OPTION` instead of silently halting.
   Later caller mutation no longer changes dispatch. A non-object options argument

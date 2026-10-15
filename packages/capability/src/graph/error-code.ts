@@ -29,7 +29,10 @@ export const CapabilityGraphErrorCode = {
   unknownNode: 'GRAPH_UNKNOWN_NODE',
   /** A lifecycle callback synchronously re-enters the same graph operation. */
   reentrantOperation: 'GRAPH_REENTRANT_OPERATION',
-  /** Factory options or their accessors fail admission. */
+  /**
+   * Factory options or ctx.own resource descriptors fail admission. Correct the input; ownership
+   * failures retain the lifecycle native error on cause rather than reporting a closed graph.
+   */
   invalidOption: 'GRAPH_INVALID_OPTION',
   /** A reject-policy mutation targets a node that still has required dependents. */
   nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS',
