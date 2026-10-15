@@ -146,3 +146,5 @@ recovery, or output draining. Thread code shares the host process and cannot pro
 guarantees. Platform adapters and their runtime-specific proof belong to their owning packages;
 this profile does not assert that Bun, Deno, browser, or Electron thread termination has been
 verified by its in-memory tests.
+
+Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit. The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor.

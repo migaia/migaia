@@ -195,3 +195,33 @@ describe('A10 bounded idle unit pool', () => {
     await pool.dispose()
   })
 })
+
+describe('SV-B4 prewarm scheduler admission', () => {
+  it('rejects an unreadable scheduler before acquiring or launching a unit', () => {
+    /** Existing launcher and budget expose whether invalid construction caused side effects. */
+    const launcher = memoryProcessLauncher()
+    /** No lease can be consumed before the scheduler snapshot is admitted. */
+    const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
+    /** Original accessor error must remain reachable at the scheduler boundary. */
+    const cause = new Error('prewarm scheduler getter')
+    expect(() =>
+      createPrewarmPool({
+        id: 'invalid-clock',
+        spec: processSpec(),
+        launcher,
+        budget,
+        size: 1,
+        report: () => undefined,
+        scheduler: {
+          get now(): never {
+            throw cause
+          },
+          schedule: () => ({ cancel: () => undefined })
+        }
+      })
+    ).toThrow(expect.objectContaining({ cause }))
+    expect(launcher.handles).toHaveLength(0)
+    expect(budget.inUse).toBe(0)
+    budget.close()
+  })
+})

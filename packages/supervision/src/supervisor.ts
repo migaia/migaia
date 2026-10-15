@@ -772,6 +772,15 @@ export function createSupervisor<
       readonly spec?: TSpec
     } = {}
   ): Promise<IReplaceOutcome> => {
+    /** Invalid strategy cannot enqueue a replacement or retire the serving unit. */
+    const requestedStrategy = replacement.strategy
+    if (
+      requestedStrategy !== undefined &&
+      !Object.values(ReplaceStrategy).includes(requestedStrategy)
+    )
+      invalidOption('replace.strategy')
+    /** Capture the admitted strategy once before entering the asynchronous command queue. */
+    const strategy = requestedStrategy ?? ReplaceStrategy.stopThenStart
     const error = commandError()
     if (error) return Promise.reject(error)
     return commands.enqueue(async (): Promise<IReplaceOutcome> => {
@@ -792,7 +801,6 @@ export function createSupervisor<
         return { kind: 'failed', error: failure }
       }
       const previous = active
-      const strategy = replacement.strategy ?? ReplaceStrategy.stopThenStart
       if (strategy === ReplaceStrategy.stopThenStart) {
         await retire(previous, 'stop')
         active = undefined

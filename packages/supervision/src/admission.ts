@@ -1,3 +1,4 @@
+import { invalidOption } from './options.js'
 import { CapabilityLevel, IsolationMode } from './constants.js'
 import { SupervisionErrorCode } from './error-code.js'
 import { SupervisionErrorText } from './error-text.js'
@@ -10,6 +11,7 @@ export function admitCapabilities(
   isolation: IsolationMode,
   kind: string
 ): { readonly degraded: readonly string[]; readonly diagnostics: readonly Error[] } {
+  if (!Object.values(IsolationMode).includes(isolation)) invalidOption('isolation')
   const degraded: string[] = []
   const diagnostics: Error[] = []
   for (const capability of new Set(requirements)) {

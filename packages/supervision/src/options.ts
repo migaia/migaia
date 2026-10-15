@@ -1,3 +1,4 @@
+import { RestartMode, TerminalPolicyMode } from './constants.js'
 import { SupervisionErrorCode } from './error-code.js'
 import { SupervisionErrorText } from './error-text.js'
 import { createSupervisionError } from './errors.js'
@@ -26,14 +27,30 @@ export function validateSupervisorOptions<
   if (typeof options.id !== 'string' || options.id.length === 0) invalidOption('id')
   if (typeof options.report !== 'function') invalidOption('report')
   if (options.budget.kind !== options.profile.kind) invalidOption('budget')
-  const duration = (value: unknown, field: string): void => {
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
+  /** Only recurrent intervals require positive time; one-shot budgets may deliberately be zero. */
+  const duration = (value: unknown, field: string, allowZero = true): void => {
+    if (
+      typeof value !== 'number' ||
+      !Number.isFinite(value) ||
+      value < 0 ||
+      (!allowZero && value === 0)
+    )
       invalidOption(field, RangeError)
   }
   const count = (value: unknown, field: string): void => {
     if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
       invalidOption(field, RangeError)
   }
+  if (
+    options.restart?.mode !== undefined &&
+    !Object.values(RestartMode).includes(options.restart.mode)
+  )
+    invalidOption('restart.mode')
+  if (
+    options.terminalPolicy !== undefined &&
+    !Object.values(TerminalPolicyMode).includes(options.terminalPolicy.mode)
+  )
+    invalidOption('terminalPolicy.mode')
   if (options.startupTimeoutMs !== undefined) duration(options.startupTimeoutMs, 'startupTimeoutMs')
   if (options.restart?.initialDelayMs !== undefined)
     duration(options.restart.initialDelayMs, 'restart.initialDelayMs')
@@ -48,7 +65,7 @@ export function validateSupervisorOptions<
     count(options.restart.maxRestarts, 'restart.maxRestarts')
   if (options.restart?.windowMs !== undefined)
     duration(options.restart.windowMs, 'restart.windowMs')
-  if (options.terminalPolicy?.mode === 'cooldown')
+  if (options.terminalPolicy?.mode === TerminalPolicyMode.cooldown)
     duration(options.terminalPolicy.afterMs, 'terminalPolicy.afterMs')
   if (options.stop?.drainTimeoutMs !== undefined)
     duration(options.stop.drainTimeoutMs, 'stop.drainTimeoutMs')
@@ -57,7 +74,7 @@ export function validateSupervisorOptions<
   if (options.stop?.reapTimeoutMs !== undefined)
     duration(options.stop.reapTimeoutMs, 'stop.reapTimeoutMs')
   if (options.health?.intervalMs !== undefined)
-    duration(options.health.intervalMs, 'health.intervalMs')
+    duration(options.health.intervalMs, 'health.intervalMs', false)
   if (options.health?.timeoutMs !== undefined)
     duration(options.health.timeoutMs, 'health.timeoutMs')
   if (options.health?.failureThreshold !== undefined)
