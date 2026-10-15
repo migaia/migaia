@@ -36,7 +36,8 @@
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/reactive": "workspace:^",
-    "@migaia/utils": "workspace:^"
+    "@migaia/utils": "workspace:^",
+    "@migaia/resource": "workspace:^"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

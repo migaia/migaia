@@ -8,6 +8,7 @@ export {
   Resource,
   type IResourceCacheSnapshot,
   type IResourceFetcher,
+  type IResourceFetchContext,
   type IResourceOptions,
   type IResourceRetryPolicy,
   type IResourceState

@@ -4,6 +4,7 @@ import type { IResourceVersion } from './store-resource-state.js'
 export class ResourceVersionRegistry<T> {
   #stale: IResourceVersion<T> | undefined
   #retired = new Map<number, IResourceVersion<T>>()
+  /** Loaded values awaiting canonical settlement, including ignored-abort late results. */
   #superseded: T[] = []
   #closing = new Map<number, IResourceVersion<T>>()
 

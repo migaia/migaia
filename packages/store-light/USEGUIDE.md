@@ -233,9 +233,11 @@ store.count = 5 // 抛错：[store] set(count) is not allowed outside an action
 
 `createStoreResource(factory, options?)` 创建一个独立于对象 facade 的异步值容器，`createStoreResourceScope()` 管理一组资源的统一释放。两者都不要求配合 `createStore` 使用。
 
-### 8.1 状态机
+### 8.1 状态投影
 
-```
+请求、数据、取消和共享 Promise 由 `@migaia/resource` 唯一拥有；下图是 StoreLight 结合版本租约派生的视图。
+
+```text
 idle --start()--> loading --resolve--> ready --无持有者+超时--> idle（缓存过期，值被释放）
                      |                   |
                      +---reject--------> failed（若有 stale 值则退回 ready 并保留旧值）
@@ -278,7 +280,7 @@ ready/loading --dispose()（有持有者）--> closing --最后一个持有者�
 | `scheduler`   | `IScheduler`                                      | optional | `systemScheduler` | Captured once for cache TTL and provisional expiry; task cancellation and unref are preserved.                                                  |
 | `keepAliveMs` | `number`                                          | 可选     | `1000`            | 无任何持有者（resource lease + version lease + 挂起的 capture）之后，缓存值继续存活的毫秒数；必须是有限非负数，否则构造时抛 `RangeError`        |
 | `dispose`     | `(value: T) => void \| Promise<void>`             | 可选     | 无                | 自定义清理函数；提供后，值必须是引用类型（对象/函数），否则抛 `TypeError`；不提供时，若值本身带 `$dispose` 方法（例如另一个 Store），会自动调用 |
-| `onError`     | `(error, phase: StoreResourceErrorPhase) => void` | 可选     | 无                | 观察 `'load' \| 'dispose' \| 'listener'` 三个阶段的失败；reporter 自身抛错或拒绝时，原失败与 reporter 失败均由所属 Runtime 报告，资源状态不变                                              |
+| `onError`     | `(error, phase: StoreResourceErrorPhase) => void` | 可选     | 无                | 观察 `'load' \| 'dispose' \| 'listener'` 三个阶段的失败；reporter 自身抛错或拒绝时，原失败与 reporter 失败均由所属 Runtime 报告，资源状态不变   |
 | `onTerminal`  | `() => void`                                      | 可选     | 无                | 资源到达终态时调用一次                                                                                                                          |
 
 `factory` 既可以是函数 `(context) => T \| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。
@@ -317,16 +319,11 @@ export const StoreResourceKind = {
 } as const
 export type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]
 
-export const StoreResourceDataKind = { empty: 'empty', value: 'value', error: 'error' } as const
-export type IStoreResourceDataKind =
-  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]
-
 export const StoreFieldMode = { sync: 'sync', async: 'async' } as const
 export type IStoreFieldMode = (typeof StoreFieldMode)[keyof typeof StoreFieldMode]
 ```
 
-- `StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 [§8.1](#81-状态机)），供比较 `resource.readSnapshot()` 场景外部诊断代码使用；本包内部状态机也是基于同一常量表驱动。
-- `StoreResourceDataKind`：与请求生命周期分离的"可见数据"状态（`empty`/`value`/`error`），描述 `ResourceStateController` 内部持有的数据种类，是 `StoreResourceKind` 派生状态的底层依据，一般诊断代码更常用 `StoreResourceKind`。
+- `StoreResourceKind`：`StoreResource` 请求生命周期的六个状态取值（见 [§8.1](#81-状态机)），用于解释资源读取与关闭流程；这些是从 Resource 请求状态和 StoreLight 值租约生命周期派生的词汇，不是第二套请求状态机。
 - `StoreFieldMode`：`FieldBuilder.mode` 的合法取值（`'sync'` / `'async'`），自定义 Builder 实现时用它标注 `mode` 字段，见 [§6](#6-fieldbuilder自定义字段扩展协议)。
 
 ```ts
@@ -490,3 +487,9 @@ Computed 只有 getter、没有 setter，属性描述符层面就不可写；ESM
 Store Actions keep their original return value or Promise outside the synchronous mutation callback. Only writes before the first await share that batch; use `$batch()` for continuation writes. Mutation-policy callbacks remain synchronous. With `warnAsyncActions`, the first thenable result reports `ACTION_BATCH_BOUNDARY` through the Store Runtime.
 
 StoreResource uses its captured Runtime for idle cleanup and diagnostics, and its admitted scheduler for cache TTL and the 4000ms provisional capture window. `keepAliveMs: 0` still evicts synchronously. Missing `onError` forwards the original failure to Runtime; if a user reporter throws or rejects, both the primary and reporter failure reach that sink by identity. No host console or global reportError fallback is used.
+
+### Resource convergence migration
+
+StoreLight now adapts one `@migaia/resource` instance. It retains actual value identity, render captures, resource/version leases and physical disposal, while deleting its duplicate request/data controller and request coordinator. `StoreResourceDataKind` and its type are removed; use ResourceStatus/ResourceFetchStatus for native Resource state. StoreResourceKind remains the facade vocabulary; readSnapshot still returns value/version/token, not a public kind property.
+
+Repeated pending reads throw the exact canonical Promise, which resolves the original value. `retry()` or forced cancellation immediately rejects the superseded Promise with native AbortError, source `@migaia/resource`, code `REQUEST_ABORTED`; previously an ignored-abort loader could keep that Promise pending until its own completion. Observe old Promise rejection when manually driving retries. Late returned values are released once. Failed refresh restores stale data; old version leases delay its disposer until release. Loaded values awaiting canonical clock settlement remain owned and are released if that settlement fails. A provisional-capture timer admission failure releases partial captures/timers and is reported as disposal housekeeping; a successfully loaded value remains readable and notifies subscribers. No async-context mechanism is introduced.

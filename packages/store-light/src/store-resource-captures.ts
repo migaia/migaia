@@ -1,3 +1,4 @@
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import { createStoreLightError, StoreLightErrorCode } from './errors.js'
 import { StoreLightErrorText } from './error-text.js'
@@ -114,13 +115,28 @@ export class ResourceCaptureRegistry {
     const tokens = this.#pending.get(generation)
     this.#pending.delete(generation)
     if (!tokens) return
-    for (const token of tokens) {
-      token.version = version
-      token.provisional = true
-      this.#finalizer.unregister(token)
-      this.#finalizer.register(token, version, token)
-      this.#track(version, token)
-      this.#scheduleProvisionalExpiry(token, version)
+    try {
+      for (const token of tokens) {
+        token.version = version
+        token.provisional = true
+        this.#finalizer.unregister(token)
+        this.#finalizer.register(token, version, token)
+        this.#track(version, token)
+        this.#scheduleProvisionalExpiry(token, version)
+      }
+    } catch (error) {
+      /** Release this generation's captures and already-started timers after partial admission. */
+      const cleanupErrors: unknown[] = []
+      for (const token of tokens) {
+        this.#captures.delete(token)
+        this.#finalizer.unregister(token)
+        try {
+          this.#cancelProvisionalExpiry(token)
+        } catch (cleanupError) {
+          cleanupErrors.push(cleanupError)
+        }
+      }
+      throw attachSecondaryErrors(error, cleanupErrors)
     }
   }
 

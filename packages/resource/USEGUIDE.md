@@ -21,71 +21,73 @@
 ## `Resource<T>`
 
 ```ts
-import { Resource, type IResourceOptions } from '@migaia/resource';
-import type { IRuntime } from '@migaia/reactive';
+import { Resource, type IResourceOptions } from '@migaia/resource'
+import type { IRuntime } from '@migaia/reactive'
 
 class Resource<T> implements IObserver, IDisposable {
-  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>);
+  constructor(fetcher: IResourceFetcher<T>, runtime: IRuntime, options?: IResourceOptions<T>)
 
-  readonly runtime: IRuntime;
-  debugName?: string;
-  readonly deps: ReadonlySet<IObservable>;
-  readonly depVersions: ReadonlyMap<IObservable, number>;
+  readonly runtime: IRuntime
+  debugName?: string
+  readonly deps: ReadonlySet<IObservable>
+  readonly depVersions: ReadonlyMap<IObservable, number>
 
-  readonly state: IResourceState<T>;
-  readonly promise: Promise<T>;
-  readonly disposed: boolean;
-  readonly refreshing: boolean;
-  readonly fetchStatus: ResourceFetchStatus;
-  readonly isStale: boolean;
-  readonly observed: boolean;
+  readonly state: IResourceState<T>
+  readonly promise: Promise<T>
+  readonly disposed: boolean
+  readonly refreshing: boolean
+  readonly fetchStatus: ResourceFetchStatus
+  readonly isStale: boolean
+  readonly observed: boolean
 
-  read(): T;
-  peek(): T;
-  refetch(): Promise<T>;
-  invalidate(): Promise<T>;
-  cancel(): void;
-  dehydrate(): IResourceCacheSnapshot<T> | undefined;
-  hydrate(snapshot: IResourceCacheSnapshot<T>): void;
-  dispose(): void;
+  read(): T
+  peek(): T
+  peekState(): IResourceState<T>
+  reset(): void
+  refetch(): Promise<T>
+  invalidate(): Promise<T>
+  cancel(): void
+  dehydrate(): IResourceCacheSnapshot<T> | undefined
+  hydrate(snapshot: IResourceCacheSnapshot<T>): void
+  dispose(): void
 
   // IObserver 接口成员：由 @migaia/reactive 的依赖图在内部调用，一般不需要手动调用
-  markDirty(): void;
-  onDependencyDisconnected(): void;
+  markDirty(): void
+  onDependencyDisconnected(): void
 }
 ```
 
 响应式的可取消异步资源：构造时给一个 `fetcher`，它跟踪 `fetcher` 在**首次 `await` 之前**同步读取的响应式值作为依赖；依赖变化时自动发起新请求，只有最新一代请求的结果才会生效。
 
 ```ts
-import { Resource, ResourceStatus } from '@migaia/resource';
-import { createRuntime } from '@migaia/reactive';
-import { fetchUser } from './user-api.js';
+import { Resource, ResourceStatus } from '@migaia/resource'
+import { createRuntime } from '@migaia/reactive'
+import { fetchUser } from './user-api.js'
 
-const runtime = createRuntime();
-const userId = runtime.signal('1');
+const runtime = createRuntime()
+const userId = runtime.signal('1')
 
 const user = new Resource(
   ({ signal }) => {
-    const id = userId.value;
-    return fetchUser(id, { signal });
+    const id = userId.value
+    return fetchUser(id, { signal })
   },
   runtime,
   { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }
-);
+)
 
 const stopRendering = runtime.effect(() => {
-  const state = user.state;
-  if (state.status === ResourceStatus.pending) console.log('loading user');
-  if (state.status === ResourceStatus.success) console.log('render', state.data);
-});
+  const state = user.state
+  if (state.status === ResourceStatus.pending) console.log('loading user')
+  if (state.status === ResourceStatus.success) console.log('render', state.data)
+})
 
-userId.value = '2';
+userId.value = '2'
 
 export function disposeUserPanel(): void {
-  stopRendering.dispose();
-  user.dispose();
-  userId.dispose();
+  stopRendering.dispose()
+  user.dispose()
+  userId.dispose()
 }
 ```
 
@@ -135,7 +137,7 @@ invalidate(): Promise<T>; // 立即使缓存过期（expiresAt = 0）并发起�
 cancel(): void;
 ```
 
-只中止**当前活跃的一代**请求，资源本身仍可复用（下次读取/`refetch()` 会正常发起新请求）。`pending` 状态下取消会把状态落到 `cancelled`（携带 `name === 'AbortError'` 的 `DOMException`，贴 `REQUEST_CANCELLED` 码）；`staleWhileRevalidate` 后台刷新被取消时会回退展示原有的 `success` 数据（清除 `refreshing` 标记，不会遗留"正在刷新但没有实际请求"的不一致状态）。取消期间的清理（timer/listener）若失败，会以贴 `CANCELLATION_CLEANUP_FAILED` 码的错误抛出（不影响状态已经收敛这一事实）。
+只中止**当前活跃的一代**请求，资源本身仍可复用；取消后被动读取保持 cancelled，显式 `refetch()` 可重启。`pending` 状态下取消会把状态落到 `cancelled`（携带 `name === 'AbortError'` 的 `DOMException`，贴 `REQUEST_CANCELLED` 码）；`staleWhileRevalidate` 后台刷新被取消时会回退展示原有的 `success` 数据（清除 `refreshing` 标记，不会遗留"正在刷新但没有实际请求"的不一致状态）。取消期间的清理（timer/listener）若失败，会以贴 `CANCELLATION_CLEANUP_FAILED` 码的错误抛出（不影响状态已经收敛这一事实）。
 
 ### `dehydrate()` / `hydrate()`
 
@@ -164,18 +166,18 @@ dispose(): void;
 
 ```ts
 type IResourceOptions<T = unknown> = {
-  debugName?: string;
-  ttl?: number; // 默认 Infinity（永不过期，除非依赖变化/手动刷新）
-  autoStart?: boolean; // 默认 true
-  staleWhileRevalidate?: boolean; // 默认 false
-  retry?: IResourceRetryPolicy; // 默认 0（不重试）
-  retryDelay?: number | ((failureCount: number, error: unknown) => number); // 默认 0
-  keepAlive?: boolean; // 默认 false
-  initialSnapshot?: IResourceCacheSnapshot<T>;
-  scheduler?: IScheduler; // 默认 @migaia/utils/scheduler 的 systemScheduler
-};
+  debugName?: string
+  ttl?: number // 默认 Infinity（永不过期，除非依赖变化/手动刷新）
+  autoStart?: boolean // 默认 true
+  staleWhileRevalidate?: boolean // 默认 false
+  retry?: IResourceRetryPolicy // 默认 0（不重试）
+  retryDelay?: number | ((failureCount: number, error: unknown) => number) // 默认 0
+  keepAlive?: boolean // 默认 false
+  initialSnapshot?: IResourceCacheSnapshot<T>
+  scheduler?: IScheduler // 默认 @migaia/utils/scheduler 的 systemScheduler
+}
 
-type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean);
+type IResourceRetryPolicy = number | ((failureCount: number, error: unknown) => boolean)
 ```
 
 逐项语义与校验：
@@ -201,18 +203,18 @@ type IResourceState<T> =
   | { status: 'pending' }
   | { status: 'success'; data: T; refreshing?: boolean }
   | { status: 'error'; error: unknown }
-  | { status: 'cancelled'; error: DOMException };
+  | { status: 'cancelled'; error: DOMException }
 
 const ResourceStatus: {
-  idle: 'idle';
-  pending: 'pending';
-  success: 'success';
-  error: 'error';
-  cancelled: 'cancelled';
-  fetching: 'fetching';
-};
+  idle: 'idle'
+  pending: 'pending'
+  success: 'success'
+  error: 'error'
+  cancelled: 'cancelled'
+  fetching: 'fetching'
+}
 
-type ResourceFetchStatus = 'idle' | 'fetching';
+type ResourceFetchStatus = 'idle' | 'fetching'
 ```
 
 `IResourceState<T>` 是 `state`/`peek()` 底层的判别联合，五态：`idle`（尚未发起过请求）、`pending`（请求在途，无历史数据）、`success`（`data` 为最新成功值，`refreshing` 仅在 `staleWhileRevalidate` 后台刷新时为 `true`）、`error`（`error` 为最近一次失败原因）、`cancelled`（`error` 恒为 `name === 'AbortError'` 的 `DOMException`，`code === ResourceErrorCode.requestCancelled`）。`ResourceStatus` 只包含这五种数据状态；独立的 `ResourceFetchStatus` 常量与同名 key union 只包含 `idle/fetching`，供 `fetchStatus` 表示传输活动。
@@ -224,7 +226,7 @@ type ResourceFetchStatus = 'idle' | 'fetching';
 ## `IResourceFetcher` 与依赖追踪
 
 ```ts
-type IResourceFetcher<T> = (ctx: { signal: IAbortSignal }) => T | PromiseLike<T>;
+type IResourceFetcher<T> = (ctx: IResourceFetchContext) => T | PromiseLike<T>
 ```
 
 `fetcher` 在**首次 `await` 之前**同步读取的响应式值（`Signal`/`Computed`，包括异步函数在首个 `await` 之前的同步代码）会被登记为依赖，依赖变化时合并触发一次新请求（同一批变化只重新拉取一次）。`await` 之后再读响应式值**不会**被自动追踪——JavaScript 的同步依赖收集上下文在 `await` 处已经退出；需要的话应把这部分读取挪进一个 `Computed`，或在 `await` 之前先读入局部变量。
@@ -241,11 +243,11 @@ type IResourceFetcher<T> = (ctx: { signal: IAbortSignal }) => T | PromiseLike<T>
 
 ```ts
 type IResourceCacheSnapshot<T> = {
-  readonly version: 1;
-  readonly data: T;
-  readonly updatedAt: number;
-  readonly expiresAt: number | null; // null 表示无限生命周期的 JSON 安全形式
-};
+  readonly version: 1
+  readonly data: T
+  readonly updatedAt: number
+  readonly expiresAt: number | null // null 表示无限生命周期的 JSON 安全形式
+}
 ```
 
 `dehydrate()`/`hydrate()`/`initialSnapshot` 共用的 JSON 安全快照结构。`version` 恒为 `1`（预留未来格式演进）；`expiresAt` 为 `null` 对应内部的 `Infinity`（`ttl: Infinity` 场景）。`hydrate()`/构造期 `initialSnapshot` 校验：`version !== 1`，或 `updatedAt`/非 `null` 的 `expiresAt` 不是有限数字，一律抛 `INVALID_SNAPSHOT`。
@@ -271,7 +273,7 @@ type IResourceCacheSnapshot<T> = {
 ## 错误码
 
 ```ts
-import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource';
+import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@migaia/resource'
 ```
 
 稳定错误码表，**8 个码**，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/resource'`。
@@ -300,8 +302,8 @@ import { RESOURCE_SOURCE, ResourceErrorCode, type IResourceErrorCode } from '@mi
 
 ```tsx
 function UserProfile({ resource }: { resource: Resource<User> }) {
-  const user = resource.read(); // pending 抛 Promise（被 Suspense 捕获），error 抛错误（被 Error Boundary 捕获）
-  return <div>{user.name}</div>;
+  const user = resource.read() // pending 抛 Promise（被 Suspense 捕获），error 抛错误（被 Error Boundary 捕获）
+  return <div>{user.name}</div>
 }
 ```
 
@@ -309,14 +311,14 @@ function UserProfile({ resource }: { resource: Resource<User> }) {
 
 ```ts
 // 服务端：
-const snapshot = userResource.dehydrate(); // undefined 或 { version: 1, data, updatedAt, expiresAt }
+const snapshot = userResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }
 // 序列化 snapshot 注入 HTML
 
 // 客户端：
 const userResource = new Resource(fetchUser, runtime, {
   initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求
   ttl: 30_000
-});
+})
 ```
 
 ### 3. 后台刷新且展示旧数据
@@ -325,7 +327,7 @@ const userResource = new Resource(fetchUser, runtime, {
 const list = new Resource(fetchList, runtime, {
   ttl: 10_000,
   staleWhileRevalidate: true
-});
+})
 
 // list.state.status === 'success' 时，即使正在后台刷新，
 // list.state.data 仍是旧数据，list.refreshing === true 可用来展示"刷新中"角标
@@ -337,14 +339,14 @@ const list = new Resource(fetchList, runtime, {
 const resource = new Resource(fetchWithFlakyBackend, runtime, {
   retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),
   retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s
-});
+})
 ```
 
 ### 5. 手动失效 + 取消
 
 ```ts
-await resource.invalidate(); // 立即视为过期并重新请求
-resource.cancel(); // 只中止当前请求，资源仍可复用；下次读取会重新发起
+await resource.invalidate() // 立即视为过期并重新请求
+resource.cancel() // 只中止当前请求，资源仍可复用；下次读取会重新发起
 ```
 
 ---
@@ -366,8 +368,25 @@ resource.cancel(); // 只中止当前请求，资源仍可复用；下次读取�
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
 
-
 同一请求在所有 Suspense 等待阶段复用同一个 pending Promise。fetcher 抛出的 thenable 完成后，经注入 scheduler 的 0ms 任务继续执行；Suspense 不计入 retry 次数，也不设计数上限。即使 fetcher 连续抛立即完成的 thenable，取消任务仍可执行，cancel/dispose 会停止后续调用。
 
-
 状态类型迁移：`ResourceStatus.fetching` 改为 `ResourceFetchStatus.fetching`；旧 `IResourceStatus` / `IResourceFetchStatus` 类型改用与常量同名的 `ResourceStatus` / `ResourceFetchStatus` key union。运行时的状态字符串与 SWR 数据/传输语义保持不变。
+
+### Ownership adapters: canonical inspection and reset
+
+`peekState()` returns the current `IResourceState<T>` without tracking, loading or TTL revalidation. Unlike `peek()`, it returns the state union rather than materializing/throwing the value. `reset()` cancels any pending generation, clears dependency edges and cached data, and leaves this same instance idle and reusable. The old pending Promise rejects immediately with native `AbortError`, source `@migaia/resource`, code `REQUEST_ABORTED`; reset never reuses a prior generation/token.
+
+`IResourceFetchContext` is the readonly lifecycle request identity (`signal`, monotonic `generation`, opaque `token`). Retries retain that identity; replacement requests receive a new one. Keep request identity separate from observation/suspension generations. Loaded-value ownership and render/version leases belong to adapters, not Resource's dependency graph. StoreLight uses these capabilities with one Resource instance, preserving the original T and shared request Promise.
+
+```ts
+import { createRuntime } from '@migaia/reactive'
+import { Resource } from '@migaia/resource'
+
+const value = new Resource(({ generation }) => generation, createRuntime(), { autoStart: false })
+console.log(value.peekState().status) // idle: no loader was invoked
+console.log(await value.promise)
+value.reset()
+console.log(value.peekState().status) // idle: same owner, no cached data
+console.log(await value.promise) // a later generation
+value.dispose()
+```

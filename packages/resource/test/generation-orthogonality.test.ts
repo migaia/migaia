@@ -124,3 +124,50 @@ describe('M-T7 (§7 批次 2): request generation and suspension generation stay
     resource.dispose()
   })
 })
+
+describe('ARC-T01 canonical adapter capabilities', () => {
+  it('inspects idle without starting or tracking, resets cancellation and reuses monotonic generations', async () => {
+    const runtime = createRuntime()
+    const first = deferred<number>()
+    const contexts: Array<{
+      signal: { readonly aborted: boolean }
+      generation: number
+      token: object
+    }> = []
+    const resource = new Resource(
+      (context) => {
+        contexts.push(context)
+        return contexts.length === 1 ? first.promise : 2
+      },
+      runtime,
+      { autoStart: false }
+    )
+    let reads = 0
+    const observer = runtime.effect(() => {
+      reads++
+      expect(resource.peekState()).toBeDefined()
+    })
+    expect(resource.peekState()).toEqual({ status: 'idle' })
+    expect(contexts).toHaveLength(0)
+    const pending = resource.promise
+    expect(resource.promise).toBe(pending)
+    const cancelled = expect(pending).rejects.toMatchObject({
+      source: '@migaia/resource',
+      code: 'REQUEST_ABORTED',
+      name: 'AbortError'
+    })
+    resource.reset()
+    expect(resource.peekState()).toEqual({ status: 'idle' })
+    expect(contexts[0].signal.aborted).toBe(true)
+    await cancelled
+    expect(await resource.promise).toBe(2)
+    expect(contexts[1].generation).toBeGreaterThan(contexts[0].generation)
+    expect(contexts[1].token).not.toBe(contexts[0].token)
+    expect(reads).toBe(1)
+    first.resolve(1)
+    await flushAsync()
+    expect(resource.peekState()).toEqual({ status: 'success', data: 2 })
+    observer.dispose()
+    resource.dispose()
+  })
+})

@@ -8,13 +8,6 @@ export const StoreResourceKind = {
   disposed: 'disposed'
 } as const
 
-/** Visible resource data states, separate from request lifecycle. */
-export const StoreResourceDataKind = {
-  empty: 'empty',
-  value: 'value',
-  error: 'error'
-} as const
-
 /** Store facade initialization states used while creating field-backed values. */
 export const StoreInitializationStatus = {
   pending: 'pending',
@@ -23,8 +16,6 @@ export const StoreInitializationStatus = {
 } as const
 
 export type IStoreResourceKind = (typeof StoreResourceKind)[keyof typeof StoreResourceKind]
-export type IStoreResourceDataKind =
-  (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]
 export type IStoreInitializationStatus =
   (typeof StoreInitializationStatus)[keyof typeof StoreInitializationStatus]
 

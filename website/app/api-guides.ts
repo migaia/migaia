@@ -25194,7 +25194,7 @@ try {
   'resource:index:Resource': {
     en: {
       purpose:
-        'Owns one cancellable asynchronous value as a reactive state machine. It tracks reactive reads made before the fetcher first awaits, supersedes stale generations, and keeps loading, retry, cache, hydration, and disposal semantics in one place.',
+        'Owns one cancellable asynchronous value as a reactive state machine. It tracks reactive reads made before the fetcher first awaits, supersedes stale generations, and keeps loading, retry, cache, hydration, and disposal semantics in one place. peekState() inspects without tracking or starting; reset() cancels the shared request to reusable idle state. Fetch context exposes readonly generation/token alongside signal for ownership adapters.',
       quickStart:
         "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('42')\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal })\n    if (!response.ok) throw new Error(`HTTP ${response.status}`)\n    return response.json() as Promise<{ id: string; name: string }>\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\nconst data = await user.promise\nconsole.log('loaded user:', data)\nuser.dispose()",
       scenarios: [
@@ -25302,7 +25302,7 @@ try {
     },
     zh: {
       purpose:
-        '把一个可取消的异步值作为响应式状态机统一托管。它追踪 fetcher 首次 await 前的响应式读取、淘汰过期请求代，并统一 loading、重试、缓存、hydrate 与释放语义。',
+        '把一个可取消的异步值作为响应式状态机统一托管。它追踪 fetcher 首次 await 前的响应式读取、淘汰过期请求代，并统一 loading、重试、缓存、hydrate 与释放语义。peekState() 不启动、不追踪；reset() 取消共享请求并回到可复用 idle。fetch context 附带 readonly generation/token，供值租约适配器复用身份。',
       quickStart:
         "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('42')\nconst user = new Resource(\n  async ({ signal }) => {\n    const response = await fetch(`/api/users/${userId.value}`, { signal })\n    if (!response.ok) throw new Error(`HTTP ${response.status}`)\n    return response.json() as Promise<{ id: string; name: string }>\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\nconst data = await user.promise\nconsole.log('加载用户:', data)\nuser.dispose()",
       scenarios: [
