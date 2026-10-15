@@ -1,3 +1,4 @@
+import { ExitReason } from '../index.js'
 import type { IUnitProfile } from '../index.js'
 import { processRequirements } from './capabilities.js'
 import { validateProcessSpec } from './spec.js'
@@ -26,7 +27,7 @@ export function createProcessProfile<THandle extends IProcessHandle>(
     terminate: (handle, mode) => handle.terminate(mode),
     exitStatus: (status) => ({ code: status.code, signal: status.signal }),
     classifyExit: (status) => ({
-      reason: status.code === 0 && status.signal === null ? 'exited' : 'crashed',
+      reason: status.code === 0 && status.signal === null ? ExitReason.exited : ExitReason.crashed,
       detail: { code: status.code, signal: status.signal }
     })
   }

@@ -6,7 +6,7 @@ import {
 } from '@migaia/lifecycle'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
-import { BudgetRejection } from './constants.js'
+import { BudgetRejection, BudgetOverflow } from './constants.js'
 import { SupervisionErrorCode } from './error-code.js'
 import { SupervisionErrorText } from './error-text.js'
 import { createSupervisionError } from './errors.js'
@@ -124,7 +124,7 @@ export function createUnitBudget<TKind extends string>(
       if (signal?.aborted)
         return Promise.resolve({ kind: 'rejected', reason: BudgetRejection.aborted })
       if (
-        options.overflow === 'reject' &&
+        options.overflow === BudgetOverflow.reject &&
         (leases.count(options.kind) >= options.maxUnits || pending > 0)
       )
         return Promise.resolve({ kind: 'rejected', reason: BudgetRejection.full })

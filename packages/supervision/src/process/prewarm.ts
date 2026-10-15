@@ -1,3 +1,4 @@
+import { IsolationMode, TerminationMode, LaunchPhase, ExitReason } from '../index.js'
 import {
   boundedWait,
   createAbortController,
@@ -58,7 +59,7 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
   admitCapabilities(
     [...processRequirements(options.spec), ...(options.requires ?? [])],
     options.launcher.capabilities,
-    options.isolation ?? 'required',
+    options.isolation ?? IsolationMode.required,
     'process'
   )
   const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
@@ -113,14 +114,14 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
           ? {}
           : {
               graceful: () => {
-                handle.terminate('graceful')
+                handle.terminate(TerminationMode.graceful)
                 return handle.exited.then(() => undefined)
               },
               gracefulTimeoutMs: exitTimeoutMs
             }),
         force: async () => {
           try {
-            handle.terminate('force')
+            handle.terminate(TerminationMode.force)
           } catch (error) {
             options.report(error)
           }
@@ -180,13 +181,13 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
                   SupervisionErrorCode.reapTimeout,
                   SupervisionErrorText.reapTimeout,
                   undefined,
-                  { phase: 'launch' }
+                  { phase: LaunchPhase.launch }
                 )
               )
               void entry.launch.then(
                 async (late) => {
                   try {
-                    late.terminate('force')
+                    late.terminate(TerminationMode.force)
                   } catch (error) {
                     options.report(error)
                   }
@@ -207,7 +208,7 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
             handle = await entry.launch
             entry.handle = handle
             try {
-              handle.terminate('force')
+              handle.terminate(TerminationMode.force)
             } catch (error) {
               options.report(error)
             }
@@ -321,13 +322,13 @@ export function createPrewarmPool<THandle extends IProcessHandle>(
           options.usage?.failureThreshold ?? 3,
           (reason, detail, cause) => {
             const code =
-              reason === 'unhealthy'
+              reason === ExitReason.unhealthy
                 ? SupervisionErrorCode.unhealthy
                 : SupervisionErrorCode.resourceLimitExceeded
             options.report(
               failure(
                 code,
-                reason === 'unhealthy'
+                reason === ExitReason.unhealthy
                   ? SupervisionErrorText.unhealthy
                   : SupervisionErrorText.resourceLimitExceeded,
                 cause,

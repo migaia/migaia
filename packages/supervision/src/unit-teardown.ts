@@ -6,6 +6,7 @@ import {
   type IReleaseContext
 } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
+import { TerminationMode, UnitStopMode, TeardownPhase } from './constants.js'
 import { SupervisionErrorCode } from './error-code.js'
 import { SupervisionErrorText } from './error-text.js'
 import { createSupervisionError } from './errors.js'
@@ -35,7 +36,7 @@ export type IUnitSlot<
   /** Settles to a handle or a rejected launch; rejection is observed by the caller. */
   launch: Promise<THandle> | undefined
   handle: THandle | undefined
-  mode: 'stop' | 'force'
+  mode: UnitStopMode
   forceIssued: boolean
   drained: boolean
   abandoned: boolean
@@ -59,11 +60,7 @@ function safeTerminate<
   THandle extends IUnitHandle<TExit>,
   TExit,
   TContext extends ILaunchContext
->(
-  slot: IUnitSlot<TSpec, THandle, TExit, TContext>,
-  handle: THandle,
-  mode: 'graceful' | 'force'
-): void {
+>(slot: IUnitSlot<TSpec, THandle, TExit, TContext>, handle: THandle, mode: TerminationMode): void {
   try {
     slot.profile.terminate(handle, mode)
   } catch (error) {
@@ -75,7 +72,7 @@ function safeTerminate<
 /** Marks an unresponsive unit abandoned exactly once while retaining its lease. */
 function abandon<TSpec, THandle extends IUnitHandle<TExit>, TExit, TContext extends ILaunchContext>(
   slot: IUnitSlot<TSpec, THandle, TExit, TContext>,
-  phase: 'launch' | 'exit'
+  phase: TeardownPhase
 ): void {
   if (slot.abandoned) return
   slot.abandoned = true
@@ -100,13 +97,13 @@ export function forceAndReap<
   slot.forcing = (async () => {
     if (slot.disappeared) return
     slot.forceIssued = true
-    safeTerminate(slot, handle, 'force')
+    safeTerminate(slot, handle, TerminationMode.force)
     if (
       !(await boundedWait(handle.exited, slot.scheduler.now() + slot.reapTimeoutMs, {
         scheduler: slot.scheduler
       }))
     )
-      abandon(slot, 'exit')
+      abandon(slot, TeardownPhase.exit)
   })()
   return slot.forcing
 }
@@ -126,7 +123,7 @@ export async function teardownUnit<
         scheduler: slot.scheduler
       }).catch(() => true)
       if (!settled) {
-        abandon(slot, 'launch')
+        abandon(slot, TeardownPhase.launch)
         return
       }
       try {
@@ -141,7 +138,7 @@ export async function teardownUnit<
       slot.markGone()
       return
     }
-    if (slot.mode === 'stop' && slot.beforeTerminate) {
+    if (slot.mode === UnitStopMode.stop && slot.beforeTerminate) {
       /** The original graceful deadline cannot be renewed by a binding or caller callback. */
       const drainDeadline = Math.min(
         slot.scheduler.now() + slot.drainTimeoutMs,
@@ -195,10 +192,10 @@ export async function teardownUnit<
     }
     if (slot.disappeared) return
     const descriptor =
-      slot.mode === 'stop' && slot.profile.gracefulTermination
+      slot.mode === UnitStopMode.stop && slot.profile.gracefulTermination
         ? {
             graceful: () => {
-              safeTerminate(slot, handle, 'graceful')
+              safeTerminate(slot, handle, TerminationMode.graceful)
               return Promise.race([handle.exited.then(() => undefined), slot.forceRequested])
             },
             gracefulTimeoutMs: slot.exitTimeoutMs,

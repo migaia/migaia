@@ -114,3 +114,11 @@ export const StandardCapability = {
   faultIsolation: 'fault-isolation'
 } as const
 export type StandardCapability = (typeof StandardCapability)[keyof typeof StandardCapability]
+
+/** Internal unit-retirement intent; distinct from a profile's termination strength. */
+export const UnitStopMode = { stop: 'stop', force: 'force' } as const
+export type UnitStopMode = keyof typeof UnitStopMode
+
+/** Teardown diagnostics distinguish waiting for a late launch from waiting for actual exit. */
+export const TeardownPhase = { launch: 'launch', exit: 'exit' } as const
+export type TeardownPhase = keyof typeof TeardownPhase

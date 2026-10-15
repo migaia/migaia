@@ -1,3 +1,4 @@
+import { ExitReason } from '../index.js'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createSupervisor } from '../supervisor.js'
@@ -64,8 +65,8 @@ export function createCoroutineSupervisor<TPort = undefined>(
     },
     classifyExit(status) {
       return status.outcome === CoroutineOutcome.fulfilled
-        ? { reason: 'exited' }
-        : { reason: 'crashed', cause: status.error }
+        ? { reason: ExitReason.exited }
+        : { reason: ExitReason.crashed, cause: status.error }
     }
   }
   const health = heartbeat
