@@ -1,3 +1,4 @@
+import type { TrayShutdownMode } from '../state-constants.js'
 import type {
   IExtractPluginConfig,
   IExtractPluginExt,
@@ -372,7 +373,7 @@ export type ICreateHostOptions<
   /** Selects bounded shutdown or a strict drain that waits for physical completion. */
   readonly shutdown: Readonly<{
     /** Uses a bounded wait or waits strictly until every physical plugin release completes. */
-    readonly mode: 'bounded' | 'strict-drain'
+    readonly mode: TrayShutdownMode
   }>
   /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */
   readonly report?: (error: unknown) => void

@@ -1,3 +1,4 @@
+import { SupervisorState } from '@migaia/supervision'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { defineHost } from '@migaia/plugin-host'
 import { defaultRpcReporter } from '@migaia/rpc-core'
@@ -418,13 +419,16 @@ export function createTrayRuntime<
             : await outlet.replace(record.id)
         current(record)
         const accepted =
-          'state' in outcome ? outcome.state === 'ready' : outcome.kind === 'replaced'
+          'state' in outcome ? outcome.state === SupervisorState.ready : outcome.kind === 'replaced'
         if (!accepted) {
-          if ('state' in outcome && (outcome.state === 'idle' || outcome.state === 'stopped')) {
+          if (
+            'state' in outcome &&
+            (outcome.state === SupervisorState.idle || outcome.state === SupervisorState.stopped)
+          ) {
             transition(record, TrayInstanceState.stopped)
             return registry.snapshot(record)
           }
-          if ('state' in outcome && outcome.state === 'disposed')
+          if ('state' in outcome && outcome.state === SupervisorState.disposed)
             throw createTrayError(TrayErrorCode.disposed)
           /** Native non-ready outcomes never fabricate an error or commit replacement config. */
           const cause = 'error' in outcome ? outcome.error : undefined

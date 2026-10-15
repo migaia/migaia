@@ -1,3 +1,4 @@
+import type { TrayEntryKind } from './state-constants.js'
 import type {
   IGraphNodeState,
   IGraphReleaseContext,
@@ -8,7 +9,7 @@ import type {
 import type { ICapabilityGraphState } from '@migaia/capability/graph'
 
 export type ITrayKey = string & { readonly __trayKey: unique symbol }
-export type ITrayEntryKind = 'value' | 'computed' | 'resource' | 'service'
+export type ITrayEntryKind = TrayEntryKind
 export type ITrayEntryInstance<T> = {
   readonly value: T
   readonly release: (context: IGraphReleaseContext) => void | PromiseLike<void>
@@ -31,7 +32,7 @@ export type ITrayEntryDefinition<T> = {
     context: ITrayEntryContext
   ) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>
 }
-export type ITrayState = 'open' | ICapabilityGraphState
+export type ITrayState = ICapabilityGraphState
 export type ITrayGraph = {
   readonly keys: readonly ITrayKey[]
   readonly state: ITrayState

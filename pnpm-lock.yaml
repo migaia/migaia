@@ -926,13 +926,13 @@ importers:
       '@migaia/rpc-threads':
         specifier: workspace:^
         version: link:../rpc-threads
+      '@migaia/supervision':
+        specifier: workspace:^
+        version: link:../supervision
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/supervision':
-        specifier: workspace:^
-        version: link:../supervision
       typescript:
         specifier: ~6.0.2
         version: 6.0.2

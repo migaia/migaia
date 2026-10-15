@@ -1,3 +1,4 @@
+import { TrayShutdownMode } from '../state-constants.js'
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { createAbortController } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -102,7 +103,7 @@ export function createRuntime<
   if (!host || typeof host !== 'object') throw createTrayError(TrayErrorCode.runtimeContractInvalid)
   const bridge = readRuntimeBridge(host as object)
   if (!bridge) throw createTrayError(TrayErrorCode.runtimeContractInvalid)
-  const shutdown = options.shutdown ?? { mode: 'strict-drain' as const }
+  const shutdown = options.shutdown ?? { mode: TrayShutdownMode['strict-drain'] }
   const active = new Map<number, ReturnType<typeof createAbortController>>()
   const inFlight = new Set<Promise<unknown>>()
   let state: 'active' | 'closing' | 'terminal' = 'active'
@@ -237,7 +238,7 @@ export function createRuntime<
       for (const controller of active.values()) controller.abort()
       disposal = (async () => {
         try {
-          if (shutdown.mode === 'strict-drain') {
+          if (shutdown.mode === TrayShutdownMode['strict-drain']) {
             await Promise.all(
               [...inFlight].map(async (pending) => {
                 try {

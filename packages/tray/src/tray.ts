@@ -1,6 +1,9 @@
+import { TrayEntryKind } from './state-constants.js'
 import { GraphReadinessState } from '@migaia/capability'
 import {
   createCapabilityGraph,
+  CapabilityGraphState,
+  CapabilityGraphNodeState,
   type IGraphNodeDefinition,
   type IGraphNodeId
 } from '@migaia/capability/graph'
@@ -51,7 +54,10 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
     if (
       typeof key !== 'string' ||
       key.trim() === '' ||
-      !['value', 'computed', 'resource', 'service'].includes(kind as string) ||
+      (kind !== TrayEntryKind.value &&
+        kind !== TrayEntryKind.computed &&
+        kind !== TrayEntryKind.resource &&
+        kind !== TrayEntryKind.service) ||
       typeof start !== 'function' ||
       (requires !== undefined && !Array.isArray(requires)) ||
       (readiness !== undefined && (typeof readiness !== 'object' || readiness === null))
@@ -188,9 +194,9 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
   return {
     keys: Object.freeze(admitted.map((entry) => entry.key)),
     get state(): ITrayState {
-      if (gateFailed && !graphProjection) return 'failed'
+      if (gateFailed && !graphProjection) return CapabilityGraphState.failed
       if (graphProjection) return graph.state
-      return 'open'
+      return CapabilityGraphState.open
     },
     get error() {
       return graphProjection ? graph.error : (gateError ?? graph.error)
@@ -199,7 +205,7 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
     get<T>(key: ITrayKey) {
       find(key)
       const diagnostic = graph.nodeState(keyOf(key))
-      if (graph.state !== 'ready' || diagnostic.state !== 'ready')
+      if (graph.state !== CapabilityGraphState.ready || diagnostic.state !== CapabilityGraphNodeState.ready)
         throw createTrayError(TrayErrorCode.unavailable)
       return diagnostic.value as T
     },
