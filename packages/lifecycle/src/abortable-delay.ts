@@ -8,7 +8,7 @@ import {
   observeAbortSubscription,
   type IObservedAbortSubscription
 } from './observed-subscription.js'
-import { safeReport } from './report-boundary.js'
+import { safeReport } from './errors.js'
 import { validateSchedulerDelay } from './scheduler.js'
 
 /** Package-private callback admission shared by duration and deadline waits. */

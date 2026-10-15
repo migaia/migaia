@@ -1,9 +1,7 @@
-import { safeReport } from './report-boundary.js'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import type { ICollectedError, IErrorPolicy } from './types.js'
 import { attachErrorIdentity, attachSecondaryErrors } from '@migaia/utils/error'
 import { LifecycleErrorCode } from './error-code.js'
-
-export { containAsyncRejection } from './report-boundary.js'
 
 /** `source` value stamped onto every error this package throws. */
 export const LIFECYCLE_SOURCE = '@migaia/lifecycle'
@@ -238,5 +236,34 @@ export function createErrorCollector(
       }
       return []
     }
+  }
+}
+
+/**
+ * Delegates callback-result inspection to the canonical utils thenable boundary.
+ *
+ * `() => void` in TypeScript still accepts an `async` function. This guards a diagnostic/release
+ * callback's return value for a thenable and observes its rejection, so a callback that turns out
+ * to be `async` behind our backs doesn't surface as an unhandled rejection one microtask later
+ * (L-T17, L-T26, L-T35).
+ */
+export function containAsyncRejection(value: unknown, onRejected: (error: unknown) => void): void {
+  observeThenableRejection(value, inspectThenable(value), onRejected)
+}
+
+/**
+ * Hands `error` to a caller-supplied reporter, the last error boundary of a lifecycle operation.
+ * The reporter's own synchronous throw and async rejection are contained here because no lower
+ * layer exists to receive them (L-T26, L-T35). An absent reporter makes this a no-op.
+ */
+export function safeReport(report: ((error: unknown) => void) | undefined, error: unknown): void {
+  if (!report) return
+  try {
+    const result: unknown = report(error)
+    containAsyncRejection(result, () => {
+      // The reporter's own async failure has no lower layer to report to; it terminates here.
+    })
+  } catch {
+    // The reporter is the last error boundary for its own failures too (L-T35).
   }
 }
