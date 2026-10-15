@@ -257,7 +257,7 @@
           "signature": "export function alloc_bytes(byte_len: number): number;",
           "declarationLine": 37,
           "source": "packages/wasm/src/wasm_provider.d.ts",
-          "purpose": "Allocate an 8-byte-aligned, zeroed buffer of at least `byte_len` bytes. Returns a stable allocation id, or `0` (`NULL_ID`) if the id space is exhausted. The buffer never moves for the lifetime of the id, so a pointer from [`ptr_of`] stays valid until [`dealloc_bytes`] — suitable for exposing as a contiguous numeric typed array on the JS side.",
+          "purpose": "Allocate an 8-byte-aligned, zeroed buffer of at least `byte_len` bytes. Returns a stable allocation id, or `0` (`NULL_ID`) if the id space or linear memory is exhausted. The buffer never moves for the lifetime of the id, so a pointer from [`ptr_of`] stays valid until [`dealloc_bytes`] — suitable for exposing as a contiguous numeric typed array on the JS side.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for alloc_bytes.",
           "advanced": "No additional advanced behavior is declared for alloc_bytes.",
           "parameters": ["byte_len: number"],
@@ -295,7 +295,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Allocate an 8-byte-aligned, zeroed buffer of at least `byte_len` bytes. Returns a stable allocation id, or `0` (`NULL_ID`) if the id space is exhausted. The buffer never moves for the lifetime of the id, so a pointer from [`ptr_of`] stays valid until [`dealloc_bytes`] — suitable for exposing as a contiguous numeric typed array on the JS side."
+              "content": "Allocate an 8-byte-aligned, zeroed buffer of at least `byte_len` bytes. Returns a stable allocation id, or `0` (`NULL_ID`) if the id space or linear memory is exhausted. The buffer never moves for the lifetime of the id, so a pointer from [`ptr_of`] stays valid until [`dealloc_bytes`] — suitable for exposing as a contiguous numeric typed array on the JS side."
             },
             {
               "id": "getting-started",

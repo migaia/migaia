@@ -2569,6 +2569,70 @@
           "fragment": "rpc-core-index--createRuntimeApiEndpoint"
         },
         {
+          "name": "defaultRpcReporter",
+          "kind": "const",
+          "signature": "export declare const defaultRpcReporter: (error: unknown) => void;",
+          "declarationLine": 9,
+          "source": "packages/rpc-core/dist/core/internal/diagnostic-reporter.d.ts",
+          "purpose": "Default sink for background RPC failures when a caller passes no `report` option. Every rpc-* module falls back to it, and it writes to `console.error`. Its single exported identity lets a caller recognize the default reporter (for example to report an expected notice once) without comparing against `console.error` itself.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defaultRpcReporter.",
+          "advanced": "No additional advanced behavior is declared for defaultRpcReporter.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for defaultRpcReporter."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defaultRpcReporter.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "defaultRpcReporter",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const defaultRpcReporter: (error: unknown) => void;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use defaultRpcReporter when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when defaultRpcReporter does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Default sink for background RPC failures when a caller passes no `report` option. Every rpc-* module falls back to it, and it writes to `console.error`. Its single exported identity lets a caller recognize the default reporter (for example to report an expected notice once) without comparing against `console.error` itself."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import defaultRpcReporter from @migaia/rpc-core, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use defaultRpcReporter when its const contract and declared inputs match the result you need. Choose a different public symbol when defaultRpcReporter does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defaultRpcReporter."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for defaultRpcReporter."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-core/dist/core/internal/diagnostic-reporter.d.ts:defaultRpcReporter:export declare const defaultRpcReporter: (error: unknown) => void;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-core-index--defaultRpcReporter"
+        },
+        {
           "name": "defineFeature",
           "kind": "function",
           "signature": "export declare function defineFeature<TSurface extends object = object, const TDependencies extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>>(install: IFeatureFactory<TExpose, TDependencies, TSurface>, dependencies?: TDependencies): IRpcFeature<TSurface, TDependencies, TExpose>;\nexport declare function defineFeature<TSurface extends object = object, const TDependencies extends IFeatureRecord = Record<never, never>, TExpose extends object = Record<never, never>>(definition: IRpcFeatureDefinition<TSurface, TDependencies, TExpose>): IRpcFeature<TSurface, TDependencies, TExpose>;",
