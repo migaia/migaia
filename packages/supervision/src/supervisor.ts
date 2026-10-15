@@ -1,5 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
+  LifecycleState,
   createAbortController,
   createGenerationController,
   createLifecycleScope,
@@ -16,6 +17,10 @@ import { inspectThenable, observeThenableRejection } from '@migaia/utils/functio
 import { admitCapabilities } from './admission.js'
 import {
   ExitReason,
+  IsolationMode,
+  TerminalPolicyMode,
+  UnitStopMode,
+  LaunchPhase,
   LaunchCause,
   ReplaceStrategy,
   RestartMode,
@@ -61,7 +66,11 @@ type IManagedSlot<
   readonly runtime: IUnitRuntime
   /** Candidate execution ordinal is reused after failure and committed only on promotion. */
   readonly executionGeneration: number
-  failureReason?: 'startup-timeout' | 'launch-failed' | 'unhealthy' | 'resource-violation'
+  failureReason?:
+    | typeof ExitReason.startupTimeout
+    | typeof ExitReason.launchFailed
+    | typeof ExitReason.unhealthy
+    | typeof ExitReason.resourceViolation
   failureError?: unknown
   exitEmitted: boolean
   retired: boolean
@@ -86,7 +95,7 @@ export function createSupervisor<
   const admission = admitCapabilities(
     [...options.profile.requirements(options.spec), ...(options.requires ?? [])],
     options.launcher.capabilities,
-    options.isolation ?? 'required',
+    options.isolation ?? IsolationMode.required,
     options.profile.kind
   )
   const commands = createMutationQueue({ scheduler, admissionDiagnosticMs: false })
@@ -146,7 +155,7 @@ export function createSupervisor<
     if (state === next) return
     const from = state
     state = next
-    emit({ type: 'state', from, to: next, generation: attempts.generation })
+    emit({ type: SupervisorEventType.state, from, to: next, generation: attempts.generation })
     for (const wake of waiters) wake()
   }
   /** Clears only this supervisor's automatic retry timers. */
@@ -161,15 +170,18 @@ export function createSupervisor<
     const now = scheduler.now()
     while (failures.length && now - failures[0]! >= windowMs) failures.shift()
   }
+  /** Both failure sites derive delay from the same already-trimmed failure window. */
+  const restartDelay = (): number =>
+    Math.min(maxDelayMs, initialDelayMs * factor ** (failures.length - 1))
   /** Answers readiness without causing a command or starting a unit. */
   const readyNow = (): IReadyOutcome<THandle> | undefined => {
-    if (terminal.lifecycle !== 'open' || state === SupervisorState.disposed)
-      return { state: 'disposed' }
+    if (terminal.lifecycle !== LifecycleState.open || state === SupervisorState.disposed)
+      return { state: SupervisorState.disposed }
     if (state === SupervisorState.ready && active?.handle)
-      return { state: 'ready', generation: active.generation, unit: active.handle }
-    if (state === SupervisorState.idle) return { state: 'idle' }
-    if (state === SupervisorState.stopped) return { state: 'stopped' }
-    if (state === SupervisorState.terminal) return { state: 'terminal' }
+      return { state: SupervisorState.ready, generation: active.generation, unit: active.handle }
+    if (state === SupervisorState.idle) return { state: SupervisorState.idle }
+    if (state === SupervisorState.stopped) return { state: SupervisorState.stopped }
+    if (state === SupervisorState.terminal) return { state: SupervisorState.terminal }
     return undefined
   }
   /** Preserves an error as the primary while attaching teardown failures. */
@@ -196,7 +208,7 @@ export function createSupervisor<
     if (!lastExit || lastExit.generation <= slot.generation) lastExit = observation
     if (slot.exitObservedAt !== undefined)
       emit({
-        type: 'exit',
+        type: SupervisorEventType.exit,
         generation: slot.generation,
         reason,
         ...(error === undefined ? {} : { error }),
@@ -213,7 +225,9 @@ export function createSupervisor<
   const settleLaunchOutcome = (
     outcome: IReadyOutcome<THandle>
   ): IReadyOutcome<THandle> | Promise<IReadyOutcome<THandle>> =>
-    outcome.state === 'terminal' && state === SupervisorState.backoff ? whenReady() : outcome
+    outcome.state === SupervisorState.terminal && state === SupervisorState.backoff
+      ? whenReady()
+      : outcome
   /**
    * Enqueues one promoting launch and publishes it as `pendingStart` until it settles. Every
    * promote site (start, backoff, cooldown) uses this, so a settled launch never lingers as a stale
@@ -232,7 +246,7 @@ export function createSupervisor<
   }
   /** Terminates after the allowed failure window and optionally arms one cooldown. */
   const enterTerminal = (lastError: unknown, lastRejection?: BudgetRejection): void => {
-    if (terminal.lifecycle !== 'open') return
+    if (terminal.lifecycle !== LifecycleState.open) return
     clearTimers()
     const error = createSupervisionError(
       Error,
@@ -252,12 +266,15 @@ export function createSupervisor<
     terminalError = error
     terminalEntries++
     transition(SupervisorState.terminal)
-    emit({ type: 'terminal', error, entry: terminalEntries })
+    emit({ type: SupervisorEventType.terminal, error, entry: terminalEntries })
     options.report(error)
-    if (terminal.lifecycle === 'open' && options.terminalPolicy?.mode === 'cooldown') {
+    if (
+      terminal.lifecycle === LifecycleState.open &&
+      options.terminalPolicy?.mode === TerminalPolicyMode.cooldown
+    ) {
       cooldownTimer = scheduler.schedule(() => {
         cooldownTimer = undefined
-        if (terminal.lifecycle !== 'open' || state !== SupervisorState.terminal) return
+        if (terminal.lifecycle !== LifecycleState.open || state !== SupervisorState.terminal) return
         failures.length = 0
         void enqueuePromoteLaunch(LaunchCause.cooldown)
       }, options.terminalPolicy.afterMs)
@@ -266,33 +283,33 @@ export function createSupervisor<
   }
   /** Schedules another attempt using a bounded exponential delay. */
   const scheduleBackoff = (delayMs: number): void => {
-    if (terminal.lifecycle !== 'open') return
+    if (terminal.lifecycle !== LifecycleState.open) return
     transition(SupervisorState.backoff)
     backoffTimer = scheduler.schedule(() => {
       backoffTimer = undefined
-      if (terminal.lifecycle !== 'open' || state !== SupervisorState.backoff) return
+      if (terminal.lifecycle !== LifecycleState.open || state !== SupervisorState.backoff) return
       void enqueuePromoteLaunch(LaunchCause.backoff)
     }, delayMs)
   }
   /** Applies the restart policy to a failed active or attempted unit. */
   const onFailure = (error: unknown, lastRejection?: BudgetRejection): void => {
-    if (terminal.lifecycle !== 'open') return
+    if (terminal.lifecycle !== LifecycleState.open) return
     trimFailures()
     failures.push(scheduler.now())
     if (restartMode === RestartMode.never || failures.length > maxRestarts) {
       enterTerminal(error, lastRejection)
       return
     }
-    scheduleBackoff(Math.min(maxDelayMs, initialDelayMs * factor ** (failures.length - 1)))
+    scheduleBackoff(restartDelay())
   }
   /** Stops or force-retires one unit through its lifecycle scope. */
   const retire = (
     slot: IManagedSlot<TSpec, THandle, TExit, TContext>,
-    mode: 'stop' | 'force',
+    mode: UnitStopMode,
     reason?: IManagedSlot<TSpec, THandle, TExit, TContext>['failureReason'],
     error?: unknown
   ): Promise<void> => {
-    if (mode === 'force') {
+    if (mode === UnitStopMode.force) {
       slot.mode = mode
       slot.requestForce()
       if (slot.retired && slot.handle && !slot.disappeared)
@@ -305,6 +322,20 @@ export function createSupervisor<
     slot.failureError = error
     slot.unitController.abort(error)
     return slot.scope.dispose().then(() => undefined)
+  }
+  /** Records an old serving unit's failure while its replacement still owns the restart decision. */
+  const retireReplacingActive = (
+    slot: IManagedSlot<TSpec, THandle, TExit, TContext>,
+    reason: NonNullable<IManagedSlot<TSpec, THandle, TExit, TContext>['failureReason']>,
+    error: Error
+  ): boolean => {
+    if (!replacementInProgress || active !== slot || slot.retired) return false
+    active = undefined
+    trimFailures()
+    failures.push(scheduler.now())
+    replacementOldFailure = error
+    void retire(slot, UnitStopMode.force, reason, error)
+    return true
   }
   /** Converts a fulfilled exit into its profile classification and releases the slot. */
   const onExit = (slot: IManagedSlot<TSpec, THandle, TExit, TContext>, status: TExit): void => {
@@ -355,7 +386,7 @@ export function createSupervisor<
         }
       )
       publishExit(slot, ExitReason.crashed, error)
-      void retire(slot, 'force', 'launch-failed', error)
+      void retire(slot, UnitStopMode.force, ExitReason.launchFailed, error)
       return
     }
     const classification = options.profile.classifyExit(status)
@@ -379,7 +410,7 @@ export function createSupervisor<
     publishExit(slot, reason, error)
     if (active !== slot) return
     active = undefined
-    void retire(slot, 'force')
+    void retire(slot, UnitStopMode.force)
     if (replacementInProgress) {
       if (reason === ExitReason.exited) replacementOldNormalExit = true
       else {
@@ -438,7 +469,7 @@ export function createSupervisor<
       },
       launch: undefined,
       handle: undefined,
-      mode: 'force',
+      mode: UnitStopMode.force,
       forceIssued: false,
       drained: options.stop?.beforeTerminate === undefined,
       abandoned: false,
@@ -498,7 +529,10 @@ export function createSupervisor<
           onFailure(undefined, budget.reason)
         else transition(SupervisorState.stopped)
       }
-      return { outcome: { state: 'stopped', rejection: budget.reason }, rejection: budget.reason }
+      return {
+        outcome: { state: SupervisorState.stopped, rejection: budget.reason },
+        rejection: budget.reason
+      }
     }
     const slot = createSlot(request, budget.lease)
     candidate = slot
@@ -519,12 +553,12 @@ export function createSupervisor<
       { detail: { kind: options.profile.kind } }
     )
     const timer = scheduler.schedule(() => {
-      slot.failureReason = 'startup-timeout'
+      slot.failureReason = ExitReason.startupTimeout
       slot.failureError = timeoutError
       attempts.supersede(timeoutError)
     }, startupTimeoutMs)
     slot.monitors.own(timer, { force: () => timer.cancel() })
-    let phase: 'launch' | 'attach' | 'ready' = 'launch'
+    let phase: LaunchPhase = LaunchPhase.launch
     try {
       const base = { signal: request.signal, executionGeneration: slot.executionGeneration }
       const context = options.profile.launchContext?.(base, slot.runtime) ?? (base as TContext)
@@ -544,13 +578,13 @@ export function createSupervisor<
       )
       const handle = await Promise.race([slot.launch, cancelled])
       if (!attempts.isCurrent(request.token)) throw request.signal.reason
-      phase = 'attach'
+      phase = LaunchPhase.attach
       if (options.hooks?.afterLaunch)
         await Promise.race([
           Promise.resolve(options.hooks.afterLaunch(handle, slot.runtime)),
           cancelled
         ])
-      phase = 'ready'
+      phase = LaunchPhase.ready
       if (options.ready)
         await Promise.race([
           Promise.resolve(options.ready(handle, request.signal)),
@@ -614,17 +648,10 @@ export function createSupervisor<
           options.health,
           scheduler,
           (error) => {
-            if (replacementInProgress && active === slot && !slot.retired) {
-              active = undefined
-              trimFailures()
-              failures.push(scheduler.now())
-              replacementOldFailure = error
-              void retire(slot, 'force', 'unhealthy', error)
-              return
-            }
+            if (retireReplacingActive(slot, ExitReason.unhealthy, error)) return
             void commands.enqueue(async () => {
               if (active !== slot || slot.retired) return
-              await retire(slot, 'force', 'unhealthy', error)
+              await retire(slot, UnitStopMode.force, ExitReason.unhealthy, error)
               active = undefined
               publishExit(slot, ExitReason.unhealthy, error)
               onFailure(error)
@@ -635,33 +662,29 @@ export function createSupervisor<
       options.hooks?.onReady?.(handle, slot.runtime, (reason, detail, cause) => {
         const error = createSupervisionError(
           Error,
-          reason === 'unhealthy'
+          reason === ExitReason.unhealthy
             ? SupervisionErrorCode.unhealthy
             : SupervisionErrorCode.resourceLimitExceeded,
-          reason === 'unhealthy'
+          reason === ExitReason.unhealthy
             ? SupervisionErrorText.unhealthy
             : SupervisionErrorText.resourceLimitExceeded,
           { cause, detail: { kind: options.profile.kind, ...detail } }
         )
-        if (replacementInProgress && active === slot && !slot.retired) {
-          active = undefined
-          trimFailures()
-          failures.push(scheduler.now())
-          replacementOldFailure = error
-          void retire(slot, 'force', reason, error)
-          return
-        }
+        if (retireReplacingActive(slot, reason, error)) return
         void commands.enqueue(async () => {
           if (slot.retired) return
-          await retire(slot, 'force', reason, error)
+          await retire(slot, UnitStopMode.force, reason, error)
           if (active === slot) active = undefined
           publishExit(slot, reason, error)
           onFailure(error)
         })
       })
-      return { outcome: { state: 'ready', generation: slot.generation, unit: handle }, slot }
+      return {
+        outcome: { state: SupervisorState.ready, generation: slot.generation, unit: handle },
+        slot
+      }
     } catch (caught) {
-      const timeout = slot.failureReason === 'startup-timeout'
+      const timeout = slot.failureReason === ExitReason.startupTimeout
       const superseded = request.signal.aborted && !timeout
       const error = timeout
         ? timeoutError
@@ -673,7 +696,12 @@ export function createSupervisor<
               SupervisionErrorText.launchFailed,
               { cause: caught, detail: { kind: options.profile.kind, phase } }
             )
-      await retire(slot, 'force', timeout ? 'startup-timeout' : 'launch-failed', error)
+      await retire(
+        slot,
+        UnitStopMode.force,
+        timeout ? ExitReason.startupTimeout : ExitReason.launchFailed,
+        error
+      )
       request.signal.removeEventListener('abort', aborted)
       if (!slot.exitEmitted && !slot.abandoned)
         publishExit(
@@ -687,7 +715,9 @@ export function createSupervisor<
         else onFailure(error)
       }
       return {
-        outcome: superseded ? { state: 'stopped' } : { state: 'terminal' },
+        outcome: superseded
+          ? { state: SupervisorState.stopped }
+          : { state: SupervisorState.terminal },
         error: withSecondary(error, slot)
       }
     } finally {
@@ -697,8 +727,8 @@ export function createSupervisor<
   }
   /** Rejects unit-producing commands while disposal is in progress or complete. */
   const commandError = (): Error | undefined => {
-    if (terminal.lifecycle === 'open') return undefined
-    const done = terminal.lifecycle === 'terminal'
+    if (terminal.lifecycle === LifecycleState.open) return undefined
+    const done = terminal.lifecycle === LifecycleState.terminal
     return createSupervisionError(
       Error,
       done ? SupervisionErrorCode.scopeTerminal : SupervisionErrorCode.scopeClosed,
@@ -708,7 +738,7 @@ export function createSupervisor<
   /** Stops the current attempt and unit once, keeping the promise identity for joiners. */
   const stop = (
     stopOptions?: ISupervisorStopOptions,
-    mode: 'stop' | 'force' = 'stop'
+    mode: UnitStopMode = UnitStopMode.stop
   ): Promise<void> => {
     /** Configuration is rejected before superseding an attempt or touching a native handle. */
     const graceMs = stopOptions?.graceMs
@@ -717,10 +747,10 @@ export function createSupervisor<
       (typeof graceMs !== 'number' || !Number.isFinite(graceMs) || graceMs < 0)
     )
       invalidOption('stop.graceMs', RangeError)
-    if (mode === 'force') {
+    if (mode === UnitStopMode.force) {
       attempts.supersede()
       for (const slot of [candidate, active])
-        if (slot) void retire(slot, 'force').catch(options.report)
+        if (slot) void retire(slot, UnitStopMode.force).catch(options.report)
     }
     if (pendingDispose) return pendingDispose
     if (pendingStop) return pendingStop
@@ -758,7 +788,7 @@ export function createSupervisor<
     return commands
       .enqueue(async () => {
         if (active) {
-          await retire(active, 'stop')
+          await retire(active, UnitStopMode.stop)
           active = undefined
         }
         return (await launchAttempt(LaunchCause.restart, spec, true)).outcome
@@ -784,8 +814,9 @@ export function createSupervisor<
     const error = commandError()
     if (error) return Promise.reject(error)
     return commands.enqueue(async (): Promise<IReplaceOutcome> => {
-      if (state === SupervisorState.terminal) return { kind: 'rejected', reason: 'terminal' }
-      if (!active) return { kind: 'rejected', reason: 'stopped' }
+      if (state === SupervisorState.terminal)
+        return { kind: 'rejected', reason: SupervisorState.terminal }
+      if (!active) return { kind: 'rejected', reason: SupervisorState.stopped }
       const nextSpec = replacement.spec ?? spec
       let nextDegraded: readonly string[]
       try {
@@ -793,7 +824,7 @@ export function createSupervisor<
         const nextAdmission = admitCapabilities(
           [...options.profile.requirements(nextSpec), ...(options.requires ?? [])],
           options.launcher.capabilities,
-          options.isolation ?? 'required',
+          options.isolation ?? IsolationMode.required,
           options.profile.kind
         )
         nextDegraded = nextAdmission.degraded
@@ -802,7 +833,7 @@ export function createSupervisor<
       }
       const previous = active
       if (strategy === ReplaceStrategy.stopThenStart) {
-        await retire(previous, 'stop')
+        await retire(previous, UnitStopMode.stop)
         active = undefined
       }
       replacementInProgress = true
@@ -823,10 +854,7 @@ export function createSupervisor<
           if (replacementOldFailure !== undefined) {
             if (restartMode === RestartMode.never || failures.length > maxRestarts)
               enterTerminal(replacementOldFailure)
-            else
-              scheduleBackoff(
-                Math.min(maxDelayMs, initialDelayMs * factor ** (failures.length - 1))
-              )
+            else scheduleBackoff(restartDelay())
           } else if (replacementOldNormalExit) {
             if (restartMode === RestartMode.always) scheduleBackoff(initialDelayMs)
             else transition(SupervisorState.stopped)
@@ -854,13 +882,13 @@ export function createSupervisor<
         active = result.slot
         candidate = undefined
         emit({
-          type: 'switched',
+          type: SupervisorEventType.switched,
           from: previous.generation,
           to: result.slot.generation,
           unit: result.slot.handle!
         })
         transition(SupervisorState.ready)
-        await retire(previous, 'stop')
+        await retire(previous, UnitStopMode.stop)
       }
       return { kind: 'replaced', generation: result.slot.generation }
     })
@@ -868,7 +896,7 @@ export function createSupervisor<
   /** Disposes the command axis and resolves after the same bounded stop sequence. */
   const dispose = (): Promise<void> => {
     if (pendingDispose) return pendingDispose
-    if (terminal.lifecycle === 'terminal') return Promise.resolve()
+    if (terminal.lifecycle === LifecycleState.terminal) return Promise.resolve()
     terminal.close()
     attempts.dispose()
     clearTimers()
@@ -876,11 +904,11 @@ export function createSupervisor<
       clearTimers()
       transition(SupervisorState.stopping)
       if (candidate) {
-        await retire(candidate, 'stop')
+        await retire(candidate, UnitStopMode.stop)
         candidate = undefined
       }
       if (active) {
-        await retire(active, 'stop')
+        await retire(active, UnitStopMode.stop)
         active = undefined
       }
       transition(SupervisorState.disposed)
@@ -923,11 +951,12 @@ export function createSupervisor<
       if (error) return Promise.reject(error)
       if (state === SupervisorState.ready && active?.handle)
         return Promise.resolve({
-          state: 'ready',
+          state: SupervisorState.ready,
           generation: active.generation,
           unit: active.handle
         })
-      if (state === SupervisorState.terminal) return Promise.resolve({ state: 'terminal' })
+      if (state === SupervisorState.terminal)
+        return Promise.resolve({ state: SupervisorState.terminal })
       if (pendingStart) return pendingStart
       if (
         state === SupervisorState.backoff ||
@@ -943,7 +972,7 @@ export function createSupervisor<
     },
     whenReady,
     stop,
-    kill: () => stop(undefined, 'force'),
+    kill: () => stop(undefined, UnitStopMode.force),
     restart: restartCommand,
     replace,
     inspect() {

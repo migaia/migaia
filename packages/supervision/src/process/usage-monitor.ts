@@ -1,3 +1,4 @@
+import { ExitReason } from '../index.js'
 import type { IScheduler, IScheduledTask } from '@migaia/utils/scheduler'
 import type { IUnitRuntime } from '../index.js'
 import { CapabilityLevel } from '../index.js'
@@ -14,7 +15,7 @@ export function startUsageMonitor(
   intervalMs: number,
   failureThreshold: number,
   fail: (
-    reason: 'resource-violation' | 'unhealthy',
+    reason: typeof ExitReason.resourceViolation | typeof ExitReason.unhealthy,
     detail: Readonly<Record<string, unknown>>,
     cause?: unknown
   ) => void,
@@ -39,14 +40,14 @@ export function startUsageMonitor(
   const check = (usage: IProcessUsage): void => {
     if (memory && usage.rssBytes !== undefined && usage.rssBytes > limits!.memoryBytes!) {
       active = false
-      fail('resource-violation', {
+      fail(ExitReason.resourceViolation, {
         limit: ProcessLimit.memoryBytes,
         observed: usage.rssBytes,
         maximum: limits!.memoryBytes
       })
     } else if (cpu && usage.cpuTimeMs !== undefined && usage.cpuTimeMs > limits!.cpuTimeMs!) {
       active = false
-      fail('resource-violation', {
+      fail(ExitReason.resourceViolation, {
         limit: ProcessLimit.cpuTimeMs,
         observed: usage.cpuTimeMs,
         maximum: limits!.cpuTimeMs
@@ -76,7 +77,7 @@ export function startUsageMonitor(
           failures++
           if (failures >= failureThreshold) {
             active = false
-            fail('unhealthy', { probe: 'usage' }, error)
+            fail(ExitReason.unhealthy, { probe: 'usage' }, error)
           }
         }
       )

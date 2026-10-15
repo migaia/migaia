@@ -1,3 +1,4 @@
+import { ExitReason } from '../index.js'
 import { SupervisionErrorCode, SupervisionErrorText, type IUnitProfile } from '../index.js'
 import { createSupervisionError } from '../errors.js'
 import { ThreadCapability, ThreadLimit, ThreadUnitKind } from './constants.js'
@@ -52,13 +53,13 @@ export function createThreadProfile<THandle extends IThreadHandle>(): IUnitProfi
     classifyExit: (status) => {
       if (status.limit === ThreadLimit.heapBytes)
         return {
-          reason: 'resource-violation',
+          reason: ExitReason.resourceViolation,
           detail: { limit: status.limit, code: status.code },
           cause: status.error
         }
       if (status.error !== undefined || status.code !== 0)
-        return { reason: 'crashed', detail: { code: status.code }, cause: status.error }
-      return { reason: 'exited' }
+        return { reason: ExitReason.crashed, detail: { code: status.code }, cause: status.error }
+      return { reason: ExitReason.exited }
     }
   }
 }
