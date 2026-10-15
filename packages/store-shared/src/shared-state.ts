@@ -1,3 +1,5 @@
+import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
+import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import {
   ReactiveErrorPhase,
   type IDisposable,
@@ -6,6 +8,7 @@ import {
 } from '@migaia/reactive'
 import {
   claimOwnership,
+  deferRuntimeCleanup,
   createSourceBinding,
   isRuntimeTracking,
   type IRuntimeSourceBinding,
@@ -256,7 +259,8 @@ function watchSlot(
   view: BigInt64Array,
   slot: number,
   onWake: () => void,
-  onError: (error: unknown) => void
+  onError: (error: unknown) => void,
+  schedulerOption?: IScheduler
 ): IDisposer {
   if (!hasWaitAsync()) {
     throw createStoreSharedError(
@@ -273,14 +277,16 @@ function watchSlot(
       ) => IWaitAsyncResult
     }
   ).waitAsync
+  /** Capture one admitted scheduler before any waiter starts. */
+  const scheduler = resolveSchedulerOption({ scheduler: schedulerOption }, systemScheduler)
   let stopped = false
-  let timer: ReturnType<typeof setTimeout> | undefined
+  let timer: IScheduledTask | undefined
 
   /** Schedule another wait without retaining a live timer after disposal. */
   const schedule = (): void => {
     if (stopped) return
     try {
-      timer = setTimeout(() => {
+      timer = scheduler.schedule(() => {
         timer = undefined
         loop()
       }, 0)
@@ -332,7 +338,7 @@ function watchSlot(
     if (stopped) return
     stopped = true
     if (timer !== undefined) {
-      clearTimeout(timer)
+      timer.cancel()
       timer = undefined
     }
     // Wake a pending waitAsync so its promise/callback can release the
@@ -460,7 +466,7 @@ export class SharedInt32Signal implements IObservable, IDisposable {
    *
    * Returns a stop function. `dispose()` also stops the loop.
    */
-  watch(): IDisposer {
+  watch(scheduler?: IScheduler): IDisposer {
     this.#assertActive()
     if (this.#stopWatching) return this.#stopWatching
     let disposer: IDisposer | undefined
@@ -473,7 +479,8 @@ export class SharedInt32Signal implements IObservable, IDisposable {
       (error) => {
         reportSharedWatchFailure(this.runtime, error)
         if (this.#stopWatching === disposer) this.#stopWatching = undefined
-      }
+      },
+      scheduler
     )
     disposer = () => {
       stop()
@@ -839,7 +846,7 @@ export class SharedInt32Array implements IDisposable {
    * It waits on the generation epoch instead of creating a waiter for every cell. After waking,
    * `sync()` scans cells and notifies observers only for cells that changed.
    */
-  watch(): IDisposer {
+  watch(scheduler?: IScheduler): IDisposer {
     this.assertActive()
     if (this.#stopWatching) return this.#stopWatching
     let disposer: IDisposer | undefined
@@ -852,7 +859,8 @@ export class SharedInt32Array implements IDisposable {
       (error) => {
         reportSharedWatchFailure(this.runtime, error)
         if (this.#stopWatching === disposer) this.#stopWatching = undefined
-      }
+      },
+      scheduler
     )
     disposer = () => {
       stop()
@@ -938,7 +946,7 @@ export class SharedInt32Array implements IDisposable {
       cell = created
       this.#cells.set(index, created)
       // Abandoned speculative reads never reach an onUnobserved transition.
-      queueMicrotask(releaseDormant)
+      deferRuntimeCleanup(this.runtime, releaseDormant)
     }
     return cell
   }

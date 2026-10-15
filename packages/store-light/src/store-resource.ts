@@ -1,3 +1,12 @@
+import type { IRuntime } from '@migaia/reactive'
+import {
+  getDefaultRuntime,
+  internalRuntimeOf,
+  deferRuntimeCleanup,
+  ReactiveErrorPhase
+} from '@migaia/reactive/extension'
+import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
+import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { ResourceCachePolicy } from './store-resource-cache-policy.js'
 import { ResourceOwnershipRegistry, type IVersionToken } from './store-resource-ownership.js'
@@ -5,7 +14,7 @@ import type { IStoreResourceLoadContext } from './store-resource-request.js'
 import { createGenerationController, createSyncStartedDisposalLedger } from '@migaia/lifecycle'
 import type { ISyncStartedDisposalLedger } from '@migaia/lifecycle'
 import { ResourceStateController } from './store-resource-state.js'
-import { StoreResourceKind } from './resource-state-constants.js'
+import { StoreResourceKind, StoreResourceErrorPhase } from './resource-state-constants.js'
 import type { IResourceVersion } from './store-resource-state.js'
 import { ResourceVersionRegistry } from './store-resource-versions.js'
 import { ResourceCaptureRegistry, type IResourceCapture } from './store-resource-captures.js'
@@ -47,8 +56,12 @@ export type IStoreResource<T> = {
   }
 }
 
-export type IStoreResourceErrorPhase = 'load' | 'dispose' | 'listener'
+export type IStoreResourceErrorPhase = StoreResourceErrorPhase
 export type IStoreResourceOptions<T> = {
+  /** Owns deferred cleanup and diagnostic reporting; defaults to the lazy shared Runtime. */
+  runtime?: IRuntime
+  /** Owns cache TTL and provisional capture expiry, captured once at creation. */
+  scheduler?: IScheduler
   /** Cache TTL only; React render safety comes from capture/commit leases. */
   keepAliveMs?: number
   dispose?: (value: T) => void | PromiseLike<void>
@@ -69,7 +82,14 @@ export type IStoreResourceScope = {
 }
 
 /** Known option keys copied from hostile inputs without enumerating unrelated user properties. */
-const RESOURCE_OPTION_KEYS = ['keepAliveMs', 'dispose', 'onError', 'onTerminal'] as const
+const RESOURCE_OPTION_KEYS = [
+  'runtime',
+  'scheduler',
+  'keepAliveMs',
+  'dispose',
+  'onError',
+  'onTerminal'
+] as const
 
 /** Reads each own enumerable Resource option at most once, preserving object-spread precedence. */
 function snapshotResourceOptions<T>(source: object): IStoreResourceOptions<T> {
@@ -174,6 +194,11 @@ export function createStoreResource<T>(
       StoreLightErrorText.optionsInvalid
     )
   }
+  /** Validate one real Runtime and capture the timer scheduler before creating resource state. */
+  const runtime = config.runtime ?? getDefaultRuntime()
+  internalRuntimeOf(runtime)
+  const scheduler = resolveSchedulerOption(config, systemScheduler)
+  const cachePolicy = new ResourceCachePolicy(config.keepAliveMs ?? 1000, scheduler)
   const requests = createGenerationController()
   const state = new ResourceStateController<T>()
   /** Physical cleanup completion is tracked separately from logical terminal state. */
@@ -181,12 +206,11 @@ export function createStoreResource<T>(
   const ownership = new ResourceOwnershipRegistry<T>()
   const versions = new ResourceVersionRegistry<T>()
   const captures = new ResourceCaptureRegistry(() => {
-    queueMicrotask(() => {
+    deferRuntimeCleanup(runtime, () => {
       for (const id of versions.retiredIds()) releaseRetired(id)
       onOwnersChanged()
     })
-  })
-  const cachePolicy = new ResourceCachePolicy(config.keepAliveMs ?? 1000)
+  }, scheduler)
   let version = 0
   const versionTokens = new Map<number, IVersionToken>()
   const tokenVersions = new WeakMap<object, number>()
@@ -202,25 +226,37 @@ export function createStoreResource<T>(
   let revision = 0
   /** Owns transient revision notifications while preserving the legacy Set dedupe contract. */
   const listenerChannel = createEventChannel<void>({
-    report: ({ error }) => report(error, 'listener')
+    report: ({ error }) => report(error, StoreResourceErrorPhase.listener)
   })
   /** Maps each legacy listener identity to its event-subscriber registration. */
   const listenerRegistrations = new Map<() => void, () => void>()
   const activeLeaseTokens = new WeakMap<object, number>()
+  /** Preserve the primary when a diagnostic callback fails, without falling back to host globals. */
   const report = (error: unknown, phase: IStoreResourceErrorPhase) => {
+    const context: Parameters<IRuntime['reportError']>[1] = {
+      phase:
+        phase === StoreResourceErrorPhase.dispose
+          ? ReactiveErrorPhase.lifecycleHook
+          : phase === StoreResourceErrorPhase.listener
+            ? ReactiveErrorPhase.subscriptionListener
+            : ReactiveErrorPhase.asyncFlush
+    }
+    const reportFailure = (reporterError: unknown): void => {
+      runtime.reportError(error, context)
+      runtime.reportError(reporterError, { phase: ReactiveErrorPhase.asyncFlush })
+    }
+    if (config.onError === undefined) {
+      runtime.reportError(error, context)
+      return
+    }
     try {
-      config.onError?.(error, phase)
+      const result: unknown = config.onError(error, phase)
+      const probe = probeThenable(result)
+      if (probe.kind === ThenableProbeKind.failed) reportFailure(probe.error)
+      else if (probe.kind === ThenableProbeKind.thenable)
+        void assimilateCapturedThen(probe.thenFn, result).catch(reportFailure)
     } catch (reporterError) {
-      // A reporter is diagnostic-only, but its own failure must remain
-      // observable. Prefer the host's standard reportError sink and fall back
-      // to console.error without allowing either sink to affect resource state.
-      try {
-        const reportError = (globalThis as { reportError?: (error: unknown) => void }).reportError
-        if (reportError) reportError(reporterError)
-        else console.error(reporterError)
-      } catch {
-        // No reporting sink is available; preserve state and avoid recursion.
-      }
+      reportFailure(reporterError)
     }
   }
   const notify = () => {
@@ -229,9 +265,9 @@ export function createStoreResource<T>(
       listenerChannel.publish(undefined)
     } catch (error) {
       if (error instanceof AggregateError) {
-        for (const failure of error.errors) report(failure, 'listener')
+        for (const failure of error.errors) report(failure, StoreResourceErrorPhase.listener)
       } else {
-        report(error, 'listener')
+        report(error, StoreResourceErrorPhase.listener)
       }
     }
   }
@@ -261,7 +297,7 @@ export function createStoreResource<T>(
       const dispose = candidate.$dispose
       return typeof dispose === 'function' ? () => Reflect.apply(dispose, candidate, []) : undefined
     } catch (error) {
-      report(error, 'dispose')
+      report(error, StoreResourceErrorPhase.dispose)
       return undefined
     }
   }
@@ -284,13 +320,14 @@ export function createStoreResource<T>(
       // Non-terminal eviction remains fire-and-forget, but every thenable rejection is observed.
       const result = disposer()
       const probe = probeThenable(result)
-      if (probe.kind === ThenableProbeKind.failed) report(probe.error, 'dispose')
+      if (probe.kind === ThenableProbeKind.failed)
+        report(probe.error, StoreResourceErrorPhase.dispose)
       else if (probe.kind === ThenableProbeKind.thenable)
         void assimilateCapturedThen(probe.thenFn, result).catch((error: unknown) =>
-          report(error, 'dispose')
+          report(error, StoreResourceErrorPhase.dispose)
         )
     } catch (error) {
-      report(error, 'dispose')
+      report(error, StoreResourceErrorPhase.dispose)
     }
   }
   const cleanupUnique = (values: T[], ledger?: ISyncStartedDisposalLedger) => {
@@ -385,15 +422,16 @@ export function createStoreResource<T>(
     const physicalOutcome = physicalLedger.seal()
     physicalTerminal = physicalOutcome.physicalCompletion.then(({ cleanupErrors }) => {
       for (const item of cleanupErrors) {
-        report(item.error, 'dispose')
+        report(item.error, StoreResourceErrorPhase.dispose)
       }
     })
-    for (const item of physicalOutcome.cleanupErrors) report(item.error, 'dispose')
+    for (const item of physicalOutcome.cleanupErrors)
+      report(item.error, StoreResourceErrorPhase.dispose)
     versionTokens.clear()
     try {
       config.onTerminal?.()
     } catch (error) {
-      report(error, 'dispose')
+      report(error, StoreResourceErrorPhase.dispose)
     }
   }
   const finalizeClosingFailure = (error: unknown, superseded: T[], stale?: IResourceVersion<T>) => {
@@ -407,12 +445,12 @@ export function createStoreResource<T>(
       state.dispose()
       notify()
     } catch (transitionError) {
-      report(transitionError, 'load')
+      report(transitionError, StoreResourceErrorPhase.load)
     }
     try {
       cleanupUnique([...superseded, ...(stale ? [stale.value] : [])])
     } finally {
-      report(error, 'load')
+      report(error, StoreResourceErrorPhase.load)
       forceDisposeResource()
     }
   }
@@ -489,7 +527,7 @@ export function createStoreResource<T>(
             notify()
             cleanupUnique(superseded)
           }
-          report(error, 'load')
+          report(error, StoreResourceErrorPhase.load)
         }
         throw error
       })

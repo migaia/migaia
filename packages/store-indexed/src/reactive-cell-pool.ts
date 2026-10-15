@@ -58,7 +58,7 @@ export class ReactiveCellPool<K, V> {
         this.releaseIfDormant(key, cell)
       }
     })
-    scheduleLazyCellRelease(this.#cells, key, cell, () => this.#release(cell))
+    scheduleLazyCellRelease(cell.runtime, this.#cells, key, cell, () => this.#release(cell))
     return cell
   }
 

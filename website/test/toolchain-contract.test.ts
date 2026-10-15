@@ -1303,7 +1303,10 @@ test('SITE-T-STORE-LIGHT-API-COVERAGE separates Store creation, brands, and Reso
     ['raw', ['value']],
     ['isRaw', ['value']],
     ['isFieldBuilder', ['value']],
-    ['createStoreResource', ['factory', 'keepAliveMs', 'dispose', 'onError', 'onTerminal']],
+    [
+      'createStoreResource',
+      ['factory', 'runtime', 'scheduler', 'keepAliveMs', 'dispose', 'onError', 'onTerminal']
+    ],
     ['createStoreResourceScope', []],
     ['createStoreLightError', ['code', 'message', 'options.cause']],
     ['createStoreLightRangeError', ['code', 'message']],

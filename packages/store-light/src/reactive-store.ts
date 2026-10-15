@@ -1,3 +1,4 @@
+import { probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import type {
   IDisposable,
   IDisposer,
@@ -461,28 +462,31 @@ function createStoreCore<S extends Record<string, unknown>>(
         let warnedAsync = false
         store[key] = (...args: unknown[]) => {
           assertNotDisposed()
-          const result = runtime.runTracedAction(actionName, () =>
+          /** The Action owns its return value; synchronous mutation callbacks return void. */
+          let result: unknown
+          runtime.runTracedAction(actionName, () =>
             runMutation(() =>
-              runtime.untracked(() =>
-                (store as Record<PropertyKey, (...values: unknown[]) => unknown>)[contextKey](
-                  ...args
-                )
-              )
+              runtime.untracked(() => {
+                result = (store as Record<PropertyKey, (...values: unknown[]) => unknown>)[
+                  contextKey
+                ](...args)
+              })
             )
           )
-          if (warnAsyncActions && !warnedAsync && result !== null) {
-            // 诊断必须不可观察：then 可能是会抛错的用户 getter，console 也可能被替换。
-            try {
-              const candidate = result as { then?: unknown }
-              if (
-                (typeof result === 'object' || typeof result === 'function') &&
-                typeof candidate.then === 'function'
-              ) {
-                warnedAsync = true
-                console.warn(StoreLightErrorText.asyncAction(key))
-              }
-            } catch {
-              // 忽略所有诊断异常，保持 action 的 DEV/PROD 行为一致。
+          if (warnAsyncActions && !warnedAsync) {
+            /** Inspect once without consuming or replacing the action's returned thenable. */
+            const probe = probeThenable(result)
+            if (probe.kind === ThenableProbeKind.failed)
+              runtime.reportError(probe.error, { phase: ReactiveErrorPhase.asyncFlush })
+            else if (probe.kind === ThenableProbeKind.thenable) {
+              warnedAsync = true
+              runtime.reportError(
+                createStoreLightError(
+                  StoreLightErrorCode.actionBatchBoundary,
+                  StoreLightErrorText.asyncAction(key)
+                ),
+                { phase: ReactiveErrorPhase.asyncFlush }
+              )
             }
           }
           return result

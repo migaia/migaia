@@ -7,6 +7,7 @@ import {
 } from '@migaia/reactive'
 import {
   claimOwnership,
+  deferRuntimeCleanup,
   invalidateObservable,
   currentRuntimeVersion,
   internalRuntimeOf,
@@ -172,7 +173,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     // the preview only through the current commit turn, then drop both the
     // definition and its value so a long-lived Provider cannot retain a
     // speculative object forever.
-    queueMicrotask(() => {
+    deferRuntimeCleanup(runtime, () => {
       const cached = previews.get(key)
       if (!disposed && cached?.version === version && !instances.has(key)) {
         previews.delete(key)
@@ -393,7 +394,7 @@ export function createAtomStore(runtime: IRuntime): IAtomStore {
     // React may call getSnapshot during a render that is later abandoned.
     // Keep the value long enough for the matching subscription commit, then
     // reclaim an instance that was only a speculative peek.
-    queueMicrotask(() => {
+    deferRuntimeCleanup(runtime, () => {
       const stored = instances.get(key as IAtomDefinition<unknown>)
       if (!disposed && stored === instance && !instance.node.observed) {
         releaseByKey(key as IAtomDefinition<unknown>)

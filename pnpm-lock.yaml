@@ -819,6 +819,9 @@ importers:
 
   packages/store-shared:
     dependencies:
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
       '@migaia/reactive':
         specifier: workspace:^
         version: link:../reactive

@@ -85,12 +85,12 @@ const store = createStore(shape, {
 })
 ```
 
-| 选项               | 类型              | 必填性 | 默认值           | 作用                                                                                                                                      |
-| ------------------ | ----------------- | ------ | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `runtime`          | `IRuntime`        | 可选   | `defaultRuntime` | 显式指定节点所属的 Runtime；同一个 Runtime 上的节点共享一张依赖图，跨 Runtime 的节点完全隔离                                              |
-| `debugName`        | `string`          | 可选   | `'Store'`        | 调试名前缀，出现在内部节点的 `debugName`（形如 `${debugName}.${key}`）里，不参与状态语义                                                  |
-| `warnAsyncActions` | `boolean`         | 可选   | `false`          | 开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `console.warn` 提示"只有首个 await 之前的写入被自动 batch" |
-| `mutationPolicy`   | `IMutationPolicy` | 可选   | 无               | 接入 MobX 风格的严格写入守卫，见 [§7](#7-写入守卫imutationguard--imutationpolicy)                                                         |
+| 选项               | 类型              | 必填性 | 默认值           | 作用                                                                                                                                                                       |
+| ------------------ | ----------------- | ------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runtime`          | `IRuntime`        | 可选   | `defaultRuntime` | 显式指定节点所属的 Runtime；同一个 Runtime 上的节点共享一张依赖图，跨 Runtime 的节点完全隔离                                                                               |
+| `debugName`        | `string`          | 可选   | `'Store'`        | 调试名前缀，出现在内部节点的 `debugName`（形如 `${debugName}.${key}`）里，不参与状态语义                                                                                   |
+| `warnAsyncActions` | `boolean`         | 可选   | `false`          | 开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示"只有首个 await 之前的写入被自动 batch" |
+| `mutationPolicy`   | `IMutationPolicy` | 可选   | 无               | 接入 MobX 风格的严格写入守卫，见 [§7](#7-写入守卫imutationguard--imutationpolicy)                                                                                          |
 
 ---
 
@@ -272,14 +272,16 @@ ready/loading --dispose()（有持有者）--> closing --最后一个持有者�
 
 ### 8.3 StoreResourceOptions
 
-| 字段          | 类型                                              | 必填性 | 默认值 | 说明                                                                                                                                            |
-| ------------- | ------------------------------------------------- | ------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `keepAliveMs` | `number`                                          | 可选   | `1000` | 无任何持有者（resource lease + version lease + 挂起的 capture）之后，缓存值继续存活的毫秒数；必须是有限非负数，否则构造时抛 `RangeError`        |
-| `dispose`     | `(value: T) => void \| Promise<void>`             | 可选   | 无     | 自定义清理函数；提供后，值必须是引用类型（对象/函数），否则抛 `TypeError`；不提供时，若值本身带 `$dispose` 方法（例如另一个 Store），会自动调用 |
-| `onError`     | `(error, phase: StoreResourceErrorPhase) => void` | 可选   | 无     | 观察 `'load' \| 'dispose' \| 'listener'` 三个阶段的失败；reporter 自身抛错会被吞掉，不影响资源状态                                              |
-| `onTerminal`  | `() => void`                                      | 可选   | 无     | 资源到达终态时调用一次                                                                                                                          |
+| 字段          | 类型                                              | 必填性   | 默认值            | 说明                                                                                                                                            |
+| ------------- | ------------------------------------------------- | -------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runtime`     | `IRuntime`                                        | optional | shared Runtime    | Owns deferred idle cleanup and diagnostics.                                                                                                     |
+| `scheduler`   | `IScheduler`                                      | optional | `systemScheduler` | Captured once for cache TTL and provisional expiry; task cancellation and unref are preserved.                                                  |
+| `keepAliveMs` | `number`                                          | 可选     | `1000`            | 无任何持有者（resource lease + version lease + 挂起的 capture）之后，缓存值继续存活的毫秒数；必须是有限非负数，否则构造时抛 `RangeError`        |
+| `dispose`     | `(value: T) => void \| Promise<void>`             | 可选     | 无                | 自定义清理函数；提供后，值必须是引用类型（对象/函数），否则抛 `TypeError`；不提供时，若值本身带 `$dispose` 方法（例如另一个 Store），会自动调用 |
+| `onError`     | `(error, phase: StoreResourceErrorPhase) => void` | 可选     | 无                | 观察 `'load' \| 'dispose' \| 'listener'` 三个阶段的失败；reporter 自身抛错或拒绝时，原失败与 reporter 失败均由所属 Runtime 报告，资源状态不变                                              |
+| `onTerminal`  | `() => void`                                      | 可选     | 无                | 资源到达终态时调用一次                                                                                                                          |
 
-`factory` 既可以是函数 `(context) => T \| Promise<T>`，也可以是 `{ load, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。
+`factory` 既可以是函数 `(context) => T \| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。
 
 构造时只读取上述已知字段并形成稳定快照：`load` 与每个已知 accessor 最多读取一次，不枚举或执行未知字段 getter；显式 `options` 的 own-enumerable 字段覆盖 factory 对象上的同名字段。`dispose`、`onError`、`onTerminal` 若存在必须是函数，否则在任何请求或 Resource 状态建立前同步抛出 tagged `INVALID_OPTION`。
 
@@ -484,3 +486,7 @@ Computed 只有 getter、没有 setter，属性描述符层面就不可写；ESM
 仓库根目录：`pnpm --filter @migaia/store-light fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。浏览器集成路径另跑 `typecheck:e2e` 与 `test:e2e`。
 
 单独导入 Store light 不创建默认 Runtime。第一次未显式传入 `options.runtime` 的 store 创建才取得 reactive 的共享默认实例；显式 runtime 的构造路径直接使用给定 owner。该实例与随后导入 reactive root 的 `defaultRuntime` 保持同一 identity。
+
+Store Actions keep their original return value or Promise outside the synchronous mutation callback. Only writes before the first await share that batch; use `$batch()` for continuation writes. Mutation-policy callbacks remain synchronous. With `warnAsyncActions`, the first thenable result reports `ACTION_BATCH_BOUNDARY` through the Store Runtime.
+
+StoreResource uses its captured Runtime for idle cleanup and diagnostics, and its admitted scheduler for cache TTL and the 4000ms provisional capture window. `keepAliveMs: 0` still evicts synchronously. Missing `onError` forwards the original failure to Runtime; if a user reporter throws or rejects, both the primary and reporter failure reach that sink by identity. No host console or global reportError fallback is used.

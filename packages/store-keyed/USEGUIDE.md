@@ -59,8 +59,8 @@ const AtomKind = {
   primitiveFactory: 'primitive-factory',
   derived: 'derived',
   writableDerived: 'writable-derived'
-} as const;
-type IAtomKind = (typeof AtomKind)[keyof typeof AtomKind];
+} as const
+type IAtomKind = (typeof AtomKind)[keyof typeof AtomKind]
 ```
 
 `AtomKind` 是一个冻结的常量对象，无调用参数；`definition.kind` 恒取这四个字符串字面量之一，可用于 `switch`/分支判断。
@@ -72,7 +72,7 @@ type IAtomDefinition<T> =
   | IPrimitiveDefinition<T>
   | IPrimitiveFactoryDefinition<T>
   | IDerivedDefinition<T>
-  | IErasedWritableDerived<T>; // writable-derived 在读侧被擦除掉具体 Args
+  | IErasedWritableDerived<T> // writable-derived 在读侧被擦除掉具体 Args
 ```
 
 只有 `primitive`、`primitive-factory`、`writable-derived` 三种可以传给 `store.set()`（`IWritableAtomDefinition`）；`derived` 是纯只读，`store.set()` 遇到它必抛 `TypeError`（见 [§7](#7-错误工具完整参考)）。
@@ -86,10 +86,10 @@ type IAtomDefinition<T> =
 ## 3. AtomStore API 完整参考
 
 ```ts
-import { createRuntime } from '@migaia/reactive';
-import { createAtomStore, defaultAtomStore } from '@migaia/store-keyed';
+import { createRuntime } from '@migaia/reactive'
+import { createAtomStore, defaultAtomStore } from '@migaia/store-keyed'
 
-const store = createAtomStore(createRuntime());
+const store = createAtomStore(createRuntime())
 ```
 
 | 构造函数           | 签名                                | 参数类型            | 同步/异步 | 说明                                                                                                                                                                                                                                                                     |
@@ -99,18 +99,18 @@ const store = createAtomStore(createRuntime());
 
 ### 3.1 读
 
-| 方法                 | 签名                                       | 参数类型                         | 同步/异步 | 语义                                                                                                                                                                                                                                                                                                                                                                                       |
-| -------------------- | ------------------------------------------ | -------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `store.get(def)`     | `<T>(definition: IAtomDefinition<T>) => T` | `definition: IAtomDefinition<T>` | 同步      | 会在当前 Computed/Effect 的追踪窗口里建立依赖边；在追踪上下文之外调用等价于普通读取，不会报错。若目标定义还没有实例，会先按定义类型建一份（Signal 或 Computed）。                                                                                                                                                                                                                          |
-| `store.peek(def)`    | 同上                                       | 同上                             | 同步      | 非追踪读，绝不建边。用于"读一次但不想被记成依赖"的场景（React 适配层的 `getSnapshot` 就是典型例子）。                                                                                                                                                                                                                                                                                      |
-| `store.preview(def)` | 同上                                       | 同上                             | 同步      | React 并发渲染下的**推测性**读。若该定义在本 store 已经有真实实例，直接返回该实例当前值（`peek()` 语义）；否则计算一个只在当前 runtime 版本内有效的临时值，不创建持久实例，一个 microtask 后若始终未被提交（即没有变成真实实例）就自动丢弃缓存。`primitive-factory` 必须显式标记 `previewSafe` 才能在这里执行，否则抛错；出现自我依赖的循环会抛 `[store] circular atom preview detected`。 |
+| 方法                 | 签名                                       | 参数类型                         | 同步/异步 | 语义                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------- | ------------------------------------------ | -------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `store.get(def)`     | `<T>(definition: IAtomDefinition<T>) => T` | `definition: IAtomDefinition<T>` | 同步      | 会在当前 Computed/Effect 的追踪窗口里建立依赖边；在追踪上下文之外调用等价于普通读取，不会报错。若目标定义还没有实例，会先按定义类型建一份（Signal 或 Computed）。                                                                                                                                                                                                                                                  |
+| `store.peek(def)`    | 同上                                       | 同上                             | 同步      | 非追踪读，绝不建边。用于"读一次但不想被记成依赖"的场景（React 适配层的 `getSnapshot` 就是典型例子）。                                                                                                                                                                                                                                                                                                              |
+| `store.preview(def)` | 同上                                       | 同上                             | 同步      | React 并发渲染下的**推测性**读。若该定义在本 store 已经有真实实例，直接返回该实例当前值（`peek()` 语义）；否则计算一个只在当前 runtime 版本内有效的临时值，不创建持久实例，Runtime idle cleanup 后（默认 microtask）若始终未被提交（即没有变成真实实例）就自动丢弃缓存。`primitive-factory` 必须显式标记 `previewSafe` 才能在这里执行，否则抛错；出现自我依赖的循环会抛 `[store] circular atom preview detected`。 |
 
 ### 3.2 写
 
 ```ts
-store.set(countDef, 1);
-store.set(countDef, (previous) => previous + 1); // 函数式更新
-store.set(writableDerivedDef, ...customArgs); // 走 write(get, set, ...args)
+store.set(countDef, 1)
+store.set(countDef, (previous) => previous + 1) // 函数式更新
+store.set(writableDerivedDef, ...customArgs) // 走 write(get, set, ...args)
 ```
 
 `store.set(definition, ...args)` 内部用 `runtime.batch(() => runtime.untracked(...))` 包裹：批量提交保证一次 `set` 触发的多次下游重算只通知一轮订阅者；`untracked` 保证 `set` 本身不会被外层正在追踪的 Computed/Effect 误记成依赖。
@@ -123,8 +123,8 @@ store.set(writableDerivedDef, ...customArgs); // 走 write(get, set, ...args)
 
 ```ts
 const unsubscribe = store.sub(doubledDef, () => {
-  console.log('changed ->', store.peek(doubledDef));
-});
+  console.log('changed ->', store.peek(doubledDef))
+})
 ```
 
 `store.sub(def, onChange)` 内部用一个 `Effect` 订阅，而不是把底层节点直接交给调用方——实例化策略（何时建 Signal/Computed、是否惰性）因此可以自由演进而不破坏订阅者。首次运行只建立依赖、不触发 `onChange`；此后每次依赖变化都会在 `runtime.untracked()` 里调用 `onChange`，`onChange` 内抛出的异常会被捕获并交给 `runtime.reportError(error, { phase: 'subscription-listener' })`，不会中断其它订阅者或让 Effect 失效。返回的 `unsubscribe` 幂等，可以安全多次调用。
@@ -135,11 +135,11 @@ const unsubscribe = store.sub(doubledDef, () => {
 
 ```ts
 // 只读定义：可以路由到任意同值类型定义
-store.override(derivedDef, replacement);
+store.override(derivedDef, replacement)
 // primitive：只能被 primitive/primitive-factory 替换
-store.override(primitiveDef, replacementPrimitiveDef);
+store.override(primitiveDef, replacementPrimitiveDef)
 // writable-derived：只能被同 Args/Result 的 writable-derived 替换
-store.override(writableDerivedDef, replacementWritableDerivedDef);
+store.override(writableDerivedDef, replacementWritableDerivedDef)
 ```
 
 三个重载对应三种"写契约必须保持不变"的规则（详细原因见 [§10](#10-注意事项详细展开) 第 3 条）；违反规则抛 `TypeError('[store] atom override must preserve the original write contract')`。
@@ -176,7 +176,7 @@ function selectDef<Source, Selected>(
   source: IAtomDefinition<Source>,
   select: (value: Source) => Selected,
   equals: (left: Selected, right: Selected) => boolean = Object.is
-): IDerivedDefinition<Selected>;
+): IDerivedDefinition<Selected>
 ```
 
 等价于 `derivedDef((get) => select(get(source)), undefined, equals)`。`equals` 默认 `Object.is`：源对象其它字段变了但投影值没变（比如新对象但同一个子字段引用），下游不会被通知。
@@ -185,14 +185,14 @@ function selectDef<Source, Selected>(
 
 ```ts
 type IDefOptic<Source, Focus> = {
-  get(source: Source): Focus;
-  set(source: Source, focus: Focus): Source;
-};
+  get(source: Source): Focus
+  set(source: Source, focus: Focus): Source
+}
 
 function opticDef<Source, Focus>(
   source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义
   optic: IDefOptic<Source, Focus>
-): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;
+): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>
 ```
 
 写入时会先用 `optic.get` 取出当前 focus 值，和函数式更新（或直接值）算出的新值做 `Object.is` 比较——相等就直接跳过 `set(source, ...)`，不产生一次空写。`source` 必须是"标准可写定义"（`set(update)` 语义），因为 `opticDef` 内部按这个契约调用 `set(source, optic.set(currentSource, nextFocus))`。
@@ -218,18 +218,18 @@ focusDef(source, key1, key2, key3): IWritableDerivedDefinition<Source[key1][key2
 
 ```ts
 type ISplitDefinition<T, Key> = {
-  readonly source: IStandardWritableDef<readonly T[]>;
-  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>;
-  of(key: Key): ISplitItemDef<T>;
-  insert(store: IAtomStore, item: T, index?: number): void;
-  remove(store: IAtomStore, key: Key): boolean;
-  prune(store: IAtomStore): number;
-};
+  readonly source: IStandardWritableDef<readonly T[]>
+  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>
+  of(key: Key): ISplitItemDef<T>
+  insert(store: IAtomStore, item: T, index?: number): void
+  remove(store: IAtomStore, key: Key): boolean
+  prune(store: IAtomStore): number
+}
 
 function splitDef<T, Key = number>(
   source: IStandardWritableDef<readonly T[]>,
   keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key
-): ISplitDefinition<T, Key>;
+): ISplitDefinition<T, Key>
 ```
 
 | 成员                          | 参数类型                                         | 同步/异步 | 说明                                                                                                                                                                                                                                                                                                                             |
@@ -249,13 +249,13 @@ function splitDef<T, Key = number>(
 源文件：`src/atom/optics-path.ts`。`focusDef`/`splitDef` 内部依赖这些纯函数原语，主入口 `export * from './atom/optics-path.js'` 把它们随同一并导出——面向需要在 `opticDef`/`splitDef` 现成实现之外手写自定义 optics/split 逻辑的调用方，不是纯内部私有实现。
 
 ```ts
-function readOpticPath(value: unknown, path: readonly PropertyKey[], label: string): unknown;
+function readOpticPath(value: unknown, path: readonly PropertyKey[], label: string): unknown
 function writeOpticPath(
   value: unknown,
   path: readonly PropertyKey[],
   next: unknown,
   label: string
-): unknown;
+): unknown
 ```
 
 `readOpticPath` 沿 `path` 逐层 `Reflect.get`；中途遇到 `null`/非对象值抛 `TypeError('[store] ${label} cannot read path segment ${key}')`。`writeOpticPath` 沿路径逐层浅拷贝（数组 `[...value]`、对象 `{...value}`）再写回，不修改原对象；中途遇到 `null`/非对象值（且后面还有路径要走）抛 `TypeError('[store] ${label} cannot write path segment ${key}')`；写入路径命中 `__proto__` 时改走 `Object.defineProperty`，避免原型链污染。两者的 `label` 只用于拼接错误消息，标注是哪个调用点（`focusDef` 内部固定传 `'focusDef'`）。
@@ -265,7 +265,7 @@ function findKeyIndex<T, Key>(
   items: readonly T[],
   keyOf: (item: T, index: number) => Key,
   key: Key
-): number;
+): number
 ```
 
 线性查找第一个 `Object.is(keyOf(item, index), key)` 为真的下标；找不到返回 `-1`，不抛错。
@@ -276,13 +276,13 @@ function requireKeyIndex<T, Key>(
   keyOf: (item: T, index: number) => Key,
   key: Key,
   label: string
-): number;
+): number
 ```
 
 `findKeyIndex` 的严格版本：找不到时抛 `Error('[store] ${label}')`（`label` 直接就是完整消息文案，不再拼接前缀）。`splitDef(...).of(key)` 内部用它，`label` 分别传 `'split def item was removed'`（读）和 `'cannot write a removed split def item'`（写）。
 
 ```ts
-function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): boolean;
+function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): boolean
 ```
 
 长度相同且逐项 `Object.is` 相等才为真；`splitDef(...).items` 的默认 `equals` 就是它。
@@ -292,13 +292,13 @@ function computeUniqueKeys<T, Key>(
   items: readonly T[],
   keyOf: (item: T, index: number) => Key,
   label: string
-): readonly Key[];
+): readonly Key[]
 ```
 
 遍历 `items` 算出每项的 key 并用 `Set` 查重；出现重复 key 抛 `Error('[store] ${label} keys must be unique')`。返回值是 `Object.freeze` 过的只读数组。
 
 ```ts
-function spliceInsert<T>(list: readonly T[], item: T, index: number): readonly T[];
+function spliceInsert<T>(list: readonly T[], item: T, index: number): readonly T[]
 ```
 
 不可变插入：复制 `list`，把 `index` 夹到 `[0, list.length]` 区间后 `splice` 插入 `item`，返回新的冻结数组。`splitDef(...).insert` 内部调用它。
@@ -308,30 +308,30 @@ function filterOutKey<T, Key>(
   list: readonly T[],
   keyOf: (item: T, index: number) => Key,
   key: Key
-): { readonly removed: boolean; readonly next: readonly T[] };
+): { readonly removed: boolean; readonly next: readonly T[] }
 ```
 
 不可变删除：过滤掉第一个（也是唯一一个，因为 key 应当唯一）匹配 `key` 的元素。`removed: false` 时 `next` 直接是入参 `list` 的原始引用（不做无意义拷贝）；`removed: true` 时 `next` 是新的冻结数组。
 
 ```ts
-function replaceAtIndex<T>(list: readonly T[], index: number, value: T): readonly T[];
+function replaceAtIndex<T>(list: readonly T[], index: number, value: T): readonly T[]
 ```
 
 不可变按下标替换：复制 `list` 后把 `list[index]` 换成 `value`，返回新的冻结数组，不做下标越界检查（调用方需自行保证 `index` 合法）。
 
 ```ts
 class KeyedSplitCache<Key, Item> {
-  get(key: Key): Item | undefined;
-  of(key: Key, create: () => Item): Item;
+  get(key: Key): Item | undefined
+  of(key: Key, create: () => Item): Item
   prune(
     isLive: (key: Key) => boolean,
     shouldEvict?: (item: Item) => boolean, // 默认 () => true
     onEvict?: (item: Item) => void
-  ): number;
-  readonly size: number;
-  keys(): IterableIterator<Key>;
-  values(): IterableIterator<Item>;
-  clear(): void;
+  ): number
+  readonly size: number
+  keys(): IterableIterator<Key>
+  values(): IterableIterator<Item>
+  clear(): void
 }
 ```
 
@@ -345,26 +345,26 @@ class KeyedSplitCache<Key, Item> {
 
 ```ts
 type IFamilyDefOptions = {
-  readonly maxSize?: number; // 默认 4096，定义强缓存上限
-  readonly debugLabel?: string; // 默认 'family' / 'derived-family'
-};
+  readonly maxSize?: number // 默认 4096，定义强缓存上限
+  readonly debugLabel?: string // 默认 'family' / 'derived-family'
+}
 
 type IFamilyDef<K, T, D = IAtomDefinition<T>> = {
-  (key: K): D;
-  readonly size: number;
-  forget(key: K): boolean;
-  clear(): void;
-};
+  (key: K): D
+  readonly size: number
+  forget(key: K): boolean
+  clear(): void
+}
 
 function familyDef<K extends IFamilyKey, T>(
   initial: (key: K) => T,
   options?: IFamilyDefOptions
-): IFamilyDef<K, T, IWritableAtomDefinition<T>>;
+): IFamilyDef<K, T, IWritableAtomDefinition<T>>
 
 function derivedFamilyDef<K extends IFamilyKey, T>(
   read: (key: K) => (get: IAtomGet) => T,
   options?: IFamilyDefOptions
-): IFamilyDef<K, T>;
+): IFamilyDef<K, T>
 ```
 
 `IFamilyKey = string | number | symbol`。
@@ -394,31 +394,31 @@ function createStoreKeyedError(
   code: IStoreKeyedErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): Error;
+): Error
 
 function createStoreKeyedRangeError(
   code: IStoreKeyedErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): RangeError;
+): RangeError
 
 function createStoreKeyedTypeError(
   code: IStoreKeyedErrorCode,
   message: string,
   options?: { readonly cause?: unknown }
-): TypeError;
+): TypeError
 
 function createStoreKeyedAggregateError(
   code: IStoreKeyedErrorCode,
   errors: unknown[],
   message: string
-): AggregateError;
+): AggregateError
 ```
 
 前三者只在返回的运行时类型上不同（`Error`/`RangeError`/`TypeError`），参数形状完全一致：`code`（必填）、`message`（必填）、`options?.cause`（可选，透传进原生 `Error` 构造器的 `{ cause }`）。返回值都经 `attachErrorIdentity`（来自 `@migaia/utils/error`）打上 `source: '@migaia/store-keyed'` 与 `code`，不改动 `stack`/`name`。`createStoreKeyedAggregateError` 额外要求 `errors: unknown[]`（必填，成为 `AggregateError.errors`），不接受 `cause` 选项。
 
 ```ts
-const STORE_KEYED_SOURCE = '@migaia/store-keyed';
+const STORE_KEYED_SOURCE = '@migaia/store-keyed'
 ```
 
 字符串常量，无参数；等价于任意本包抛出错误上的 `error.source`。
@@ -438,8 +438,8 @@ const StoreKeyedErrorCode = {
   crossRuntime: 'CROSS_RUNTIME',
   envUnsupported: 'ENV_UNSUPPORTED',
   invalidOption: 'INVALID_OPTION'
-} as const;
-type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];
+} as const
+type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]
 ```
 
 | 抛出者                                                    | 错误类型         | code                  | message                                                                                                                    | 触发条件                                                                                                                              |
@@ -474,8 +474,8 @@ type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyed
 ## 8. 子路径：reactive/atom
 
 ```ts
-import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom';
-import { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';
+import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom'
+import { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'
 ```
 
 这个文件只定义"实例式" atom 的**协议形状**和跨 Runtime 校验，本包不提供任何具体实现——留在这里是因为 async / family / react 等上层包只需要认识这套类型，不需要认识 `atom/store.ts` 里的实例化策略。
@@ -503,7 +503,7 @@ import { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';
 ### 9.2 dispose() 的精确顺序
 
 ```ts
-store.dispose();
+store.dispose()
 ```
 
 1. 立即置 `disposed = true`（此后所有方法入口都会先抛 `[store] cannot use a disposed atom store`），清空 override 表。
@@ -522,7 +522,7 @@ store.dispose();
 
 ### 9.4 override 与 preview 的相互影响
 
-`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有"还没有真实实例"的定义才会走推测计算路径，且该路径产出的值只在当前版本时钟值内复用（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取），一个 microtask 后如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。
+`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有"还没有真实实例"的定义才会走推测计算路径，且该路径产出的值只在当前版本时钟值内复用（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取），Runtime idle cleanup 后（默认 microtask）如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。
 
 ---
 
@@ -551,7 +551,7 @@ store.dispose();
 一个"每个会话（session）一份状态、字段可独立订阅、列表按 key 拆分、测试期可替身"的组合示例：
 
 ```ts
-import { createRuntime, type IRuntime } from '@migaia/reactive';
+import { createRuntime, type IRuntime } from '@migaia/reactive'
 import {
   atomDef,
   derivedDef,
@@ -560,64 +560,64 @@ import {
   splitDef,
   familyDef,
   type IAtomStore
-} from '@migaia/store-keyed';
+} from '@migaia/store-keyed'
 
-type ITodo = { id: string; text: string; done: boolean };
-type ISessionState = { user: { name: string }; todos: readonly ITodo[] };
+type ITodo = { id: string; text: string; done: boolean }
+type ISessionState = { user: { name: string }; todos: readonly ITodo[] }
 
 // —— 模块顶层：只建一次，纯描述，不含状态 ——
 const sessionDef = atomDef<ISessionState>({
   user: { name: 'guest' },
   todos: []
-});
-const userNameDef = focusDef(sessionDef, 'user', 'name');
-const todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);
+})
+const userNameDef = focusDef(sessionDef, 'user', 'name')
+const todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)
 const doneCountDef = derivedDef(
   (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length
-);
+)
 
 // 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,
 // 但真正落地成值仍要经某个 AtomStore
 const sessionBySessionId = familyDef((sessionId: string) => ({
   user: { name: 'guest' },
   todos: [] as ITodo[]
-}));
+}))
 
 function openSession(runtime: IRuntime, sessionId: string): IAtomStore {
-  const store = createAtomStore(runtime);
-  const state = sessionBySessionId(sessionId);
-  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));
-  return store;
+  const store = createAtomStore(runtime)
+  const state = sessionBySessionId(sessionId)
+  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))
+  return store
 }
 
 // —— 用法 ——
-const runtime = createRuntime();
-const store = createAtomStore(runtime);
+const runtime = createRuntime()
+const store = createAtomStore(runtime)
 
-store.set(userNameDef, 'ada');
-todosSplit.insert(store, { id: 't1', text: '写文档', done: false });
-todosSplit.insert(store, { id: 't2', text: '发版', done: false });
+store.set(userNameDef, 'ada')
+todosSplit.insert(store, { id: 't1', text: '写文档', done: false })
+todosSplit.insert(store, { id: 't2', text: '发版', done: false })
 
-const item = todosSplit.of('t1');
-store.set(item, (previous) => ({ ...previous, done: true }));
-console.log(store.get(doneCountDef)); // 1
+const item = todosSplit.of('t1')
+store.set(item, (previous) => ({ ...previous, done: true }))
+console.log(store.get(doneCountDef)) // 1
 
 const unsubscribe = store.sub(doneCountDef, () => {
-  console.log('doneCount ->', store.peek(doneCountDef));
-});
+  console.log('doneCount ->', store.peek(doneCountDef))
+})
 
 // —— 测试里替换某个定义的实现 ——
 const undo = store.override(
   doneCountDef,
   derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义
-);
-console.log(store.get(doneCountDef)); // 999
-undo(); // 撤销后状态原样保留
+)
+console.log(store.get(doneCountDef)) // 999
+undo() // 撤销后状态原样保留
 
-unsubscribe();
-todosSplit.remove(store, 't2');
-todosSplit.prune(store); // 只清 splitDef 自己的 key 缓存
-store.dispose(); // 释放这个作用域建出的全部实例
+unsubscribe()
+todosSplit.remove(store, 't2')
+todosSplit.prune(store) // 只清 splitDef 自己的 key 缓存
+store.dispose() // 释放这个作用域建出的全部实例
 ```
 
 ---
@@ -669,3 +669,5 @@ pnpm --filter @migaia/store-keyed build
 pnpm --filter @migaia/store-keyed typecheck:e2e
 pnpm --filter @migaia/store-keyed test:e2e
 ```
+
+Speculative cleanup uses the owning Runtime idle channel (`scheduleIdle`, default microtasks); no adapter-owned microtask queue is created.

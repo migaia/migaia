@@ -1012,3 +1012,88 @@ describe('ST-B3 hydration option capture', () => {
     }
   })
 })
+
+describe('ST-C5 async action diagnostics', () => {
+  it('batches the synchronous prefix and returns the Promise until explicit continuation batching', async () => {
+    const runtime = createRuntime({ schedulerStrategy: (run) => run() })
+    let resume!: () => void
+    const gate = new Promise<void>((resolve) => {
+      resume = resolve
+    })
+    const store = createStore(
+      {
+        count: 0,
+        async save() {
+          this.count = 1
+          this.count = 2
+          await gate
+          store.$batch((draft) => {
+            draft.count = 3
+            draft.count = 4
+          })
+        }
+      },
+      { runtime }
+    )
+    const values: number[] = []
+    const stop = store.$subscribe(() => {
+      values.push(store.count)
+    })
+    const pending = store.save()
+    expect(pending).toBeInstanceOf(Promise)
+    expect(values).toEqual([2])
+    resume()
+    await pending
+    expect(values).toEqual([2, 4])
+    expect(() => runtime.batch(() => Promise.resolve())).toThrow(
+      expect.objectContaining({ source: '@migaia/reactive', code: 'INVALID_OPTION' })
+    )
+    stop()
+    await store.$dispose()
+  })
+
+  it('reports one coded warning through the Store Runtime without replacing the result', async () => {
+    const onError = vi.fn()
+    const runtime = createRuntime({ onError })
+    const result = Promise.resolve(7)
+    const store = createStore(
+      {
+        save() {
+          return result
+        }
+      },
+      { runtime, warnAsyncActions: true }
+    )
+    expect(store.save()).toBe(result)
+    await store.save()
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError.mock.calls[0][0]).toMatchObject({
+      source: '@migaia/store-light',
+      code: StoreLightErrorCode.actionBatchBoundary
+    })
+    await store.$dispose()
+  })
+
+  it('reports a diagnostic then getter failure while returning the original action value', async () => {
+    const onError = vi.fn()
+    const failure = new Error('action then getter failed')
+    // oxlint-disable-next-line unicorn/no-thenable -- hostile getter is the diagnostic admission input.
+    const result = Object.defineProperty({}, 'then', {
+      get() {
+        throw failure
+      }
+    })
+    const runtime = createRuntime({ onError })
+    const store = createStore(
+      {
+        save() {
+          return result
+        }
+      },
+      { runtime, warnAsyncActions: true }
+    )
+    expect(store.save()).toBe(result)
+    expect(onError.mock.calls[0][0]).toBe(failure)
+    await store.$dispose()
+  })
+})

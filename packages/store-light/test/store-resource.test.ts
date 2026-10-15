@@ -1,5 +1,7 @@
 /* oxlint-disable unicorn/no-thenable -- adversarial fixtures verify lifecycle thenable admission. */
 import { describe, expect, it, vi } from 'vitest'
+import { createRuntime } from '@migaia/reactive'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import { ResourceOwnershipRegistry } from '../src/store-resource-ownership.js'
 import { ResourceCachePolicy } from '../src/store-resource-cache-policy.js'
 import { createStoreResource, createStoreResourceScope } from '../src/store-resource.js'
@@ -390,33 +392,114 @@ describe('createStoreResource getSnapshot stability (M-T43)', () => {
 })
 
 describe('createStoreResource reporter failure policy', () => {
-  it('routes a reporter failure to the host sink without changing resource state', async () => {
-    const reported: unknown[] = []
-    const previous = (globalThis as { reportError?: (error: unknown) => void }).reportError
-    ;(globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
-      reported.push(error)
-    }
-    const resource = createStoreResource(
-      async () => {
-        throw new Error('load failed')
-      },
-      {
-        onError: () => {
-          throw new Error('reporter failed')
+  it.each(['sync', 'async'] as const)(
+    'routes %s reporter failure and its primary to the Runtime sink',
+    async (mode) => {
+      const reported: unknown[] = []
+      const primary = new Error('load failed')
+      const secondary = new Error('reporter failed')
+      const runtime = createRuntime({
+        onError: (error) => {
+          reported.push(error)
         }
-      }
-    )
-    try {
+      })
+      const resource = createStoreResource(
+        async () => {
+          throw primary
+        },
+        {
+          runtime,
+          onError: () => {
+            if (mode === 'sync') throw secondary
+            return Promise.reject(secondary)
+          }
+        }
+      )
       resource.preload()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      expect(reported).toHaveLength(1)
-      expect(reported[0]).toMatchObject({ message: 'reporter failed' })
-      expect(() => resource.read()).toThrow('load failed')
-    } finally {
+      await vi.waitFor(() => expect(reported).toHaveLength(2))
+      expect(reported).toEqual([primary, secondary])
+      expect(() => resource.read()).toThrow(primary)
       resource.dispose()
-      if (previous)
-        (globalThis as { reportError?: (error: unknown) => void }).reportError = previous
-      else delete (globalThis as { reportError?: (error: unknown) => void }).reportError
     }
+  )
+})
+
+describe('ST-C5 resource scheduler and Runtime ownership', () => {
+  it('captures scheduler accessors once and cancels cache expiry through the injected owner', async () => {
+    const manual = createManualScheduler()
+    let nowReads = 0
+    let scheduleReads = 0
+    const scheduler = {
+      get now() {
+        if (++nowReads > 1) throw new Error('now reread')
+        return () => manual.now()
+      },
+      get schedule() {
+        if (++scheduleReads > 1) throw new Error('schedule reread')
+        return (task: () => void, delay: number) => manual.schedule(task, delay)
+      }
+    }
+    const value = { disposed: false }
+    const resource = createStoreResource(() => value, {
+      scheduler,
+      keepAliveMs: 50,
+      dispose: () => {
+        value.disposed = true
+      }
+    })
+    const release = resource.retainResource()
+    let operation: unknown
+    try {
+      resource.read()
+    } catch (error) {
+      operation = error
+    }
+    expect(operation).toBeInstanceOf(Promise)
+    await operation
+    release()
+    expect(manual.pendingCount).toBe(1)
+    manual.advance(49)
+    expect(value.disposed).toBe(false)
+    manual.advance(1)
+    expect(value.disposed).toBe(true)
+    expect([nowReads, scheduleReads]).toEqual([1, 1])
+    resource.forceDispose()
+    expect(manual.pendingCount).toBe(0)
+  })
+
+  it('expires provisional captures on the injected timer and releases through Runtime idle', async () => {
+    const scheduler = createManualScheduler()
+    const idle: Array<() => void> = []
+    const runtime = createRuntime({
+      scheduleIdle: (task) => {
+        idle.push(task)
+      }
+    })
+    let disposed = false
+    const resource = createStoreResource(() => ({}), {
+      runtime,
+      scheduler,
+      keepAliveMs: 10,
+      dispose: () => {
+        disposed = true
+      }
+    })
+    let operation: unknown
+    try {
+      resource.captureSnapshot()
+    } catch (error) {
+      operation = error
+    }
+    expect(operation).toBeInstanceOf(Promise)
+    await operation
+    expect(scheduler.pendingCount).toBe(1)
+    scheduler.advance(4000)
+    expect(disposed).toBe(false)
+    expect(idle).toHaveLength(1)
+    idle.shift()!()
+    scheduler.advance(10)
+    expect(disposed).toBe(true)
+    resource.forceDispose()
+    expect(scheduler.pendingCount).toBe(0)
   })
 })

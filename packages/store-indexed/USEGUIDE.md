@@ -39,7 +39,7 @@ users.get('u1') // 现在为 'u1' 创建了 cell
 cell 的生命周期完全自动：
 
 - **无人订阅就回收**：一个新建的 cell 挂上 `onUnobserved` 钩子——它的最后一个订阅者取消订阅时，立即尝试回收。
-- **从未被订阅也会回收**：如果一次 cell 创建之后，直到当前微任务结束都没有任何 effect/computed 订阅这个 cell（比如只是一次性读了一下），会在微任务尾部被当作"从未使用"回收，不会因为一次孤立的读而永久占用内存。
+- **从未被订阅也会回收**：如果一次 cell 创建之后，直到所属 Runtime 的 idle 清理执行（默认微任务）都没有任何 effect/computed 订阅这个 cell（比如只是一次性读了一下），会在 Runtime idle 清理阶段（默认微任务）被当作"从未使用"回收，不会因为一次孤立的读而永久占用内存。
 - **值消失后不会立刻消失**：某个 key 被 `delete()` 后，如果它的 cell 仍被订阅（还有依赖它的 effect 存在），cell 不会被摘除——它会把值置为"缺失"标记，继续存在，直到订阅者自己解除订阅。这保证了"正在观察这个 key 的代码，会正确看到它变成 undefined"，而不是让 cell 无声消失导致订阅者拿到陈旧状态。
 
 ### 结构信号 / 修订信号 / 迭代信号
@@ -415,7 +415,7 @@ function createStoreIndexedTypeError(
 
 ### 为什么需要 `prune()`
 
-cell 的自动回收是"事件驱动"的：一个 cell 的最后一个订阅者取消订阅时立即触发回收；一个从未被订阅过的 cell 在创建后的当前微任务尾部被回收。但存在一种中间状态：一个 key 被 `delete()` 时，如果它的 cell **当时仍有订阅者**，这个 cell 不会被摘除（要保证订阅者能看到它变成"缺失"），而是留在原地，直到订阅者自己解除订阅才会经由 `onUnobserved` 钩子回收。
+cell 的自动回收是"事件驱动"的：一个 cell 的最后一个订阅者取消订阅时立即触发回收；一个从未被订阅过的 cell 在创建后的 Runtime idle 清理阶段回收（默认微任务）。但存在一种中间状态：一个 key 被 `delete()` 时，如果它的 cell **当时仍有订阅者**，这个 cell 不会被摘除（要保证订阅者能看到它变成"缺失"），而是留在原地，直到订阅者自己解除订阅才会经由 `onUnobserved` 钩子回收。
 
 Object/Map/Set 的 `prune()` 是按已删除 key/member 进行显式整理与计数的 owner API，保留该领域谓词；它不会释放仍有订阅者的 cell。数组仅使用自动路径。
 
@@ -531,3 +531,5 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 ```bash
 pnpm run typecheck:e2e && pnpm run test:e2e
 ```
+
+Abandoned speculative cells use their owning Runtime idle channel (`scheduleIdle`, default microtasks). Observed cells still follow the canonical observer lifecycle.
