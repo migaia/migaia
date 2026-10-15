@@ -691,12 +691,9 @@ export function serializeTrustedSSRState(state: ITrustedSSRState): string {
 }
 
 /**
- * \u5185\u8054\u8fdb HTML \u524d\u7684 JSON \u8f6c\u4e49\u3002
+ * 内联进 HTML 前的 JSON 转义。
  *
- * \u4e00\u6b21\u6b63\u5219\u626b\u63cf\uff0c\u800c\u4e0d\u662f\u4e94\u6b21
- * `replaceAll`\uff1a\u540e\u8005\u8981\u628a\u6574\u4efd\u8f7d\u8377\u5b8c\u6574\u904d\u5386\u4e94\u904d\uff0c\u800c
- * SSR
- * \u8f7d\u8377\u6b63\u662f\u6700\u5927\u7684\u90a3\u4e2a\u5b57\u7b26\u4e32\u3002\u8f6c\u4e49\u7ed3\u679c\u9010\u5b57\u7b26\u7b49\u4ef7\u3002
+ * 一次正则扫描，而不是五次 `replaceAll`：后者要把整份载荷完整遍历五遍，而 SSR 载荷正是最大的那个字符串。转义结果逐字符等价。
  */
 const HTML_UNSAFE_IN_JSON = /[&<>\u2028\u2029]/g
 const HTML_JSON_ESCAPES: Readonly<Record<string, string>> = {
