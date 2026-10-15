@@ -3045,12 +3045,6 @@
       "library": "reactive"
     },
     {
-      "path": "/en/docs/reactive/api/ReactiveErrorPhase",
-      "locale": "en",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
       "path": "/en/docs/reactive/api/ReactiveTracePhase",
       "locale": "en",
       "domain": "docs",
@@ -3153,6 +3147,12 @@
       "library": "reactive"
     },
     {
+      "path": "/en/docs/reactive/api/extension/ReactiveErrorPhase",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/en/docs/reactive/api/extension/assertOwnedBy",
       "locale": "en",
       "domain": "docs",
@@ -3196,6 +3196,12 @@
     },
     {
       "path": "/en/docs/reactive/api/extension/currentRuntimeVersion",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/en/docs/reactive/api/extension/getDefaultRuntime",
       "locale": "en",
       "domain": "docs",
       "library": "reactive"
@@ -18549,12 +18555,6 @@
       "library": "reactive"
     },
     {
-      "path": "/zh/docs/reactive/api/ReactiveErrorPhase",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "reactive"
-    },
-    {
       "path": "/zh/docs/reactive/api/ReactiveTracePhase",
       "locale": "zh",
       "domain": "docs",
@@ -18657,6 +18657,12 @@
       "library": "reactive"
     },
     {
+      "path": "/zh/docs/reactive/api/extension/ReactiveErrorPhase",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/zh/docs/reactive/api/extension/assertOwnedBy",
       "locale": "zh",
       "domain": "docs",
@@ -18700,6 +18706,12 @@
     },
     {
       "path": "/zh/docs/reactive/api/extension/currentRuntimeVersion",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
+      "path": "/zh/docs/reactive/api/extension/getDefaultRuntime",
       "locale": "zh",
       "domain": "docs",
       "library": "reactive"

@@ -28323,36 +28323,6 @@
     },
     {
       "from": "/en/docs/reactive/api",
-      "to": "/en/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "to": "/en/docs/reactive/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "to": "/en/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/reactive/getting-started",
-      "to": "/en/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "to": "/en/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/reactive",
-      "to": "/en/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/reactive/api",
       "to": "/en/docs/reactive/api#reactive-index--ReactiveTracePhase",
       "type": "api-symbol"
     },
@@ -28440,6 +28410,16 @@
       "from": "/en/docs/reactive",
       "to": "/en/docs/reactive/api#reactive-index--ReactiveTraceType",
       "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api#ReactiveErrorPhase",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "to": "/en/docs/reactive/api#ReactiveErrorPhase",
+      "type": "alias-symbol"
     },
     {
       "from": "/zh/docs/reactive/api",
@@ -29093,36 +29073,6 @@
     },
     {
       "from": "/zh/docs/reactive/api",
-      "to": "/zh/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "to": "/zh/docs/reactive/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "to": "/zh/docs/reactive/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/reactive/getting-started",
-      "to": "/zh/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "to": "/zh/docs/reactive",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/reactive",
-      "to": "/zh/docs/reactive/api#reactive-index--ReactiveErrorPhase",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/reactive/api",
       "to": "/zh/docs/reactive/api#reactive-index--ReactiveTracePhase",
       "type": "api-symbol"
     },
@@ -29210,6 +29160,16 @@
       "from": "/zh/docs/reactive",
       "to": "/zh/docs/reactive/api#reactive-index--ReactiveTraceType",
       "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api#ReactiveErrorPhase",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "to": "/zh/docs/reactive/api#ReactiveErrorPhase",
+      "type": "alias-symbol"
     },
     {
       "from": "/en/docs/reactive/api/extension",
@@ -29473,6 +29433,36 @@
     },
     {
       "from": "/en/docs/reactive/api/extension",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "to": "/en/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "to": "/en/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/reactive/getting-started",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "to": "/en/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/reactive",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension",
       "to": "/en/docs/reactive/api/extension#reactive-extension--ICapture",
       "type": "api-symbol"
     },
@@ -29919,6 +29909,36 @@
     {
       "from": "/en/docs/reactive",
       "to": "/en/docs/reactive/api/extension#reactive-extension--ownerOf",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "to": "/en/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "to": "/en/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/reactive/getting-started",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "to": "/en/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/reactive",
+      "to": "/en/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
       "type": "architecture-symbol"
     },
     {
@@ -30183,6 +30203,36 @@
     },
     {
       "from": "/zh/docs/reactive/api/extension",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "to": "/zh/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "to": "/zh/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/reactive/getting-started",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "to": "/zh/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/reactive",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--getDefaultRuntime",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension",
       "to": "/zh/docs/reactive/api/extension#reactive-extension--ICapture",
       "type": "api-symbol"
     },
@@ -30629,6 +30679,36 @@
     {
       "from": "/zh/docs/reactive",
       "to": "/zh/docs/reactive/api/extension#reactive-extension--ownerOf",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "to": "/zh/docs/reactive/api/extension",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "to": "/zh/docs/reactive/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/reactive/getting-started",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
+      "to": "/zh/docs/reactive",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/reactive",
+      "to": "/zh/docs/reactive/api/extension#reactive-extension--ReactiveErrorPhase",
       "type": "architecture-symbol"
     },
     {

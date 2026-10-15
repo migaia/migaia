@@ -183,6 +183,7 @@
       "createSourceBinding": "@migaia/reactive/extension",
       "createTrackedObserver": "@migaia/reactive/extension",
       "currentRuntimeVersion": "@migaia/reactive/extension",
+      "getDefaultRuntime": "@migaia/reactive/extension",
       "ICapture": "@migaia/reactive/extension",
       "IInternalRuntime": "@migaia/reactive/extension",
       "internalRuntimeOf": "@migaia/reactive/extension",
@@ -197,7 +198,8 @@
       "isAnyRuntimeTracking": "@migaia/reactive/extension",
       "isRuntimeTracking": "@migaia/reactive/extension",
       "ITrackedObserverBinding": "@migaia/reactive/extension",
-      "ownerOf": "@migaia/reactive/extension"
+      "ownerOf": "@migaia/reactive/extension",
+      "ReactiveErrorPhase": "@migaia/reactive/extension"
     },
     "@migaia/resource": {},
     "@migaia/rpc-bridge-jsonrpc": {},
