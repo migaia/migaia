@@ -83,6 +83,8 @@ function readApi(tray: ITrayGraph, apiKey: ITrayKey): unknown {
 }
 ```
 
+外部门返回 `blocked` 后，可再次显式调用 `ready()` 重新门控；使用 entry 的 readiness getter 取得 provider 当前快照。`failed` 或 getter/快照错误保留原 rejected Promise。启动成功和 dispose 后都不再采样外部门，没有自动重试。
+
 完整 entry 契约、readiness gate、状态、错误码与生命周期语义见 [USEGUIDE.md](./USEGUIDE.md)。
 
 ## Hosts：实例发现与生命周期

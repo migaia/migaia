@@ -22,6 +22,10 @@ export type ITrayEntryDefinition<T> = {
   readonly key: ITrayKey
   readonly kind: ITrayEntryKind
   readonly requires?: readonly ITrayKey[]
+  /**
+   * Initial fact is captured at admission. Only a blocked ready() may reacquire this property;
+   * supply a getter for fresh provider snapshots. Failed results remain cached permanently.
+   */
   readonly readiness?: IGraphReadinessSnapshot
   readonly start: (
     context: ITrayEntryContext

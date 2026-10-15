@@ -1,3 +1,4 @@
+import { GraphReadinessState } from '@migaia/capability'
 import {
   createCapabilityGraph,
   type IGraphNodeDefinition,
@@ -17,6 +18,8 @@ import type { IGraphNodeState, IReleaseDescriptor } from './types.js'
 const keyOf = (key: ITrayKey): IGraphNodeId => key as unknown as IGraphNodeId
 
 type IAdmittedEntry = {
+  /** Original definitions are needed only while blocked can retry; final gates/dispose release them. */
+  source: ITrayEntryDefinition<unknown> | undefined
   readonly key: ITrayKey
   readonly kind: ITrayEntryDefinition<unknown>['kind']
   readonly requires: readonly ITrayKey[]
@@ -56,13 +59,14 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
       throw createTrayError(TrayErrorCode.invalidEntry)
     let admittedEntry: IAdmittedEntry
     try {
-      admittedEntry = Object.freeze({
+      admittedEntry = {
+        source: entry,
         key: key as ITrayKey,
         kind: kind as IAdmittedEntry['kind'],
         requires: Object.freeze([...((requires as readonly ITrayKey[] | undefined) ?? [])]),
         readiness: readiness as IAdmittedEntry['readiness'],
         start: start as IAdmittedEntry['start']
-      })
+      }
     } catch (error) {
       throw createTrayError(TrayErrorCode.invalidEntry, error)
     }
@@ -104,16 +108,33 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
     }
   })
   for (const node of nodes) graph.register(node)
-  const readiness = admitted.map((entry) => entry.readiness)
   const runGate = (): Promise<void> => {
     if (disposed) {
       graphProjection = true
       return graph.ready()
     }
     if (gatePromise) return gatePromise
+    /** Only a previous blocked gate lacks a cached Promise; other failures never reach this read. */
+    const retry = gateFailed
+    gateFailed = false
+    gateError = undefined
     try {
-      for (const snapshot of readiness) {
-        if (!snapshot) continue
+      for (const entry of admitted) {
+        /** Initial admission already captured a fact; retries obtain the provider's current fact. */
+        let snapshot: IAdmittedEntry['readiness']
+        try {
+          snapshot = retry ? entry.source?.readiness : entry.readiness
+        } catch (caught) {
+          gateFailed = true
+          gateError = attachTrayError(caught, TrayErrorCode.gateReadFailed)
+          break
+        }
+        if (snapshot === undefined) continue
+        if (typeof snapshot !== 'object' || snapshot === null) {
+          gateFailed = true
+          gateError = createTrayError(TrayErrorCode.invalidEntry)
+          break
+        }
         let state: unknown
         try {
           state = snapshot.state
@@ -122,7 +143,11 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
           gateError = attachTrayError(caught, TrayErrorCode.gateReadFailed)
           break
         }
-        if (state !== 'ready' && state !== 'blocked' && state !== 'failed') {
+        if (
+          state !== GraphReadinessState.ready &&
+          state !== GraphReadinessState.blocked &&
+          state !== GraphReadinessState.failed
+        ) {
           gateFailed = true
           gateError = createTrayError(TrayErrorCode.invalidEntry)
           break
@@ -135,9 +160,11 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
           gateError = attachTrayError(caught, TrayErrorCode.gateReadFailed)
           break
         }
-        if (state !== 'ready') {
+        if (state !== GraphReadinessState.ready) {
           gateFailed = true
           gateError = error ?? createTrayError(TrayErrorCode.unavailable)
+          // Retry only on another explicit ready() call; no background work or extra Promise turn.
+          if (state === GraphReadinessState.blocked) return Promise.reject(gateError)
           break
         }
       }
@@ -151,6 +178,8 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
       gateError = error
       gatePromise = Promise.reject(error)
     }
+    // Cached final results cannot retry and no longer need the caller's full definition object.
+    for (const entry of admitted) entry.source = undefined
     return gatePromise
   }
   const find = (key: ITrayKey): void => {
@@ -180,6 +209,7 @@ export function createTrayGraph(entries: readonly ITrayEntryDefinition<unknown>[
     },
     dispose() {
       disposed = true
+      for (const entry of admitted) entry.source = undefined
       graphProjection = true
       return graph.dispose()
     }

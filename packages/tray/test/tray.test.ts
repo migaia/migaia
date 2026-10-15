@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { GraphReadinessState, type IGraphReadinessSnapshot } from '@migaia/capability'
 import { CapabilityGraphErrorCode } from '@migaia/capability/graph'
 import * as trayRoot from '@migaia/tray'
 import {
@@ -284,8 +285,8 @@ describe('tray', () => {
         start: () => ({ value: 1, release: () => undefined })
       }
     ])
-    await expect(tray.ready()).rejects.toThrow()
     const firstGate = tray.ready()
+    await expect(firstGate).rejects.toThrow()
     const dispose = tray.dispose()
     expect(['quiescing', 'terminal']).toContain(tray.state)
     expect(tray.error).toBeUndefined()
@@ -606,3 +607,123 @@ describe('tray', () => {
     expect(visibleDuringRelease).toEqual([false])
   })
 })
+
+it('TC-T01 reacquires a blocked provider snapshot without rereading other admitted metadata', async () => {
+  /** Providers publish immutable facts; the entry getter obtains the current one. */
+  let snapshot: IGraphReadinessSnapshot = Object.freeze({
+    state: GraphReadinessState.blocked,
+    error: new Error('provider unavailable')
+  })
+  /** Initial admission and the blocked retry each read this property once. */
+  let reads = 0
+  /** Key admission is fixed even when readiness is retried. */
+  let keyReads = 0
+  /** Startup remains exactly once after all external gates accept. */
+  const start = vi.fn(() => ({ value: 9, release: () => undefined }))
+  /** The public factory owns the unchanged static graph throughout recovery. */
+  const tray = createTrayGraph([
+    {
+      get key() {
+        keyReads++
+        return key('retry')
+      },
+      kind: 'value',
+      get readiness() {
+        reads++
+        return snapshot
+      },
+      start
+    }
+  ])
+  await expect(tray.ready()).rejects.toBe(snapshot.error)
+  expect(start).not.toHaveBeenCalled()
+  snapshot = Object.freeze({ state: GraphReadinessState.ready, error: undefined })
+  /** Successful startup retains the same Promise for every later caller. */
+  const accepted = tray.ready()
+  await accepted
+  expect(tray.ready()).toBe(accepted)
+  expect(tray.get(key('retry'))).toBe(9)
+  expect(reads).toBe(2)
+  expect(keyReads).toBe(1)
+  expect(start).toHaveBeenCalledTimes(1)
+  expect(tray.error).toBeUndefined()
+  await tray.dispose()
+})
+
+it.each([false, true])('TC-T01 caches failed readiness after blocked=%s', async (blocked) => {
+  /** A failed fact stays terminal even if its producer subsequently publishes ready. */
+  const error = new Error('provider failed')
+  /** Only blocked admits a later fact; failed keeps its first rejection identity. */
+  let snapshot: IGraphReadinessSnapshot = {
+    state: blocked ? GraphReadinessState.blocked : GraphReadinessState.failed,
+    error
+  }
+  /** Rejected cached facts must not reacquire external state. */
+  let reads = 0
+  /** The entry must never start through a failed gate. */
+  const start = vi.fn(() => ({ value: 1, release: () => undefined }))
+  /** Readiness is the only dynamic definition field. */
+  const tray = createTrayGraph([
+    {
+      key: key('failed'),
+      kind: 'value',
+      get readiness() {
+        reads++
+        return snapshot
+      },
+      start
+    }
+  ])
+  if (blocked) {
+    await expect(tray.ready()).rejects.toBe(error)
+    snapshot = { state: GraphReadinessState.failed, error }
+  }
+  /** This rejected Promise remains the permanent cached result. */
+  const failed = tray.ready()
+  await expect(failed).rejects.toBe(error)
+  snapshot = { state: GraphReadinessState.ready, error: undefined }
+  expect(tray.ready()).toBe(failed)
+  expect(reads).toBe(blocked ? 2 : 1)
+  expect(start).not.toHaveBeenCalled()
+  await tray.dispose()
+})
+
+it.each(['getter', 'shape'] as const)(
+  'TC-T01 retains refreshed %s failures without another retry',
+  async (mode) => {
+    /** Original native getter failure stays reachable as the same object. */
+    const error = new TypeError('provider getter failed')
+    /** The initial admitted fact is valid; the explicit retry tests the new boundary. */
+    let refresh = false
+    /** Invalid retries must be cached rather than repeatedly executing provider code. */
+    let reads = 0
+    /** Startup cannot acquire a resource after a failed refreshed boundary. */
+    const start = vi.fn(() => ({ value: 1, release: () => undefined }))
+    /** The test drives only the public readiness entry. */
+    const tray = createTrayGraph([
+      {
+        key: key('refresh-error'),
+        kind: 'value',
+        start,
+        get readiness(): IGraphReadinessSnapshot {
+          reads++
+          if (!refresh) return { state: GraphReadinessState.blocked, error }
+          if (mode === 'getter') throw error
+          return 17 as never
+        }
+      }
+    ])
+    await expect(tray.ready()).rejects.toBe(error)
+    refresh = true
+    /** Source getter failures and invalid refreshed shapes both become stable failed results. */
+    const failed = tray.ready()
+    if (mode === 'getter') {
+      await expect(failed).rejects.toBe(error)
+      expect(error).toMatchObject({ code: TrayErrorCode.gateReadFailed })
+    } else await expect(failed).rejects.toMatchObject({ code: TrayErrorCode.invalidEntry })
+    expect(tray.ready()).toBe(failed)
+    expect(reads).toBe(2)
+    expect(start).not.toHaveBeenCalled()
+    await tray.dispose()
+  }
+)
