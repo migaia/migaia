@@ -482,4 +482,4 @@ suspended 状态的节点调用 `resume()` 抛 `GRAPH_NODE_NOT_SUSPENDED`；排�
 incomplete observation，但不能在 fence 之前启动物理 disposer。`metrics.queueTimeMs` 只计算 mutation 在 Graph
 FIFO 中等待的时间；`wallTimeMs` 计算实际 affected reconciliation，二者不可相互替代。
 
-Graph ownership admission: ctx.own(resource, descriptor) requires a callable force immediately. Invalid descriptors throw GRAPH_INVALID_OPTION with the original lifecycle TypeError reachable through cause; they do not wait until disposal or report a closed graph.
+Graph ownership admission: ctx.own(resource, descriptor) requires a callable force immediately. Invalid descriptors throw GRAPH_INVALID_OPTION with the original lifecycle TypeError reachable through cause; they do not wait until disposal or report a closed graph. Dynamic graph report callbacks are final observers: synchronous throws and returned Promise rejections are contained without changing the mutation result.

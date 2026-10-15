@@ -581,4 +581,4 @@ mutation metrics 同时报告 affected-frontier 的 `visitedNodes`、`visitedEdg
 `queueTimeMs`、`wallTimeMs` 与 `fullScan`。Dynamic Graph 复用增量拓扑索引和依赖规划器，所有 frontier
 按 `(level, ordinal)` 的规范顺序执行；无依赖关系但层级不同的节点不再沿用旧的最小 ordinal 堆顺序。
 
-Graph ownership admission: ctx.own(resource, descriptor) requires a callable force immediately. Invalid descriptors throw GRAPH_INVALID_OPTION with the original lifecycle TypeError reachable through cause; they do not wait until disposal or report a closed graph.
+Graph ownership admission: ctx.own(resource, descriptor) requires a callable force immediately. Invalid descriptors throw GRAPH_INVALID_OPTION with the original lifecycle TypeError reachable through cause; they do not wait until disposal or report a closed graph. Dynamic graph report callbacks are final observers: synchronous throws and returned Promise rejections are contained without changing the mutation result.
