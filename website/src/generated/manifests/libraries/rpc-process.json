@@ -54,7 +54,7 @@
                 "items": [
                   "同一进程内的 Worker 线程：用 `@migaia/rpc-threads`，可以零拷贝转移 `ArrayBuffer`。",
                   "浏览器内的窗口、iframe、Service Worker：用 `@migaia/rpc-browser`。",
-                  "Python、Go、Rust 等非 TypeScript 对端：用 `@migaia/rpc-bridge-jsonrpc`，它基于本包的字节通道。",
+                  "Python、Go、Rust 等非 TypeScript 对端：本包的 `createProcessPeer` 支持 `spawn.wire: 'jsonrpc'`；自有字节通道使用 `createProcessJsonRpcChannel`。",
                   "跨机器网络通信：socket 适配器只接受本机地址（`127.0.0.1`、`[::1]`、Unix socket 路径或 Windows 命名管道）。",
                   "需要严格保证\"整棵进程树都被终止\"：Node launcher 目前只能尽力终止（见下文）。"
                 ]
@@ -148,7 +148,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\nconst service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n} finally {\n  await service.close()\n}"
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\nconst service = await createProcessPeer<IServiceApi>({\n  spawn: new URL('./service.ts', import.meta.url)\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n} finally {\n  await service.close()\n}"
               }
             ]
           },
@@ -163,7 +163,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const child = await createProcessPeer<IMathApi>({ spawn: true })\n  try { console.log(await child.request('math.double', 21)) } finally { await child.close() }\n}"
+                "code": "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const child = await createProcessPeer<IMathApi>({ spawn: true })\n  try {\n    console.log(await child.request('math.double', 21))\n  } finally {\n    await child.close()\n  }\n}"
               },
               {
                 "type": "paragraph",
@@ -186,7 +186,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({ listen: 'math-service', provide: { math: { double: (value: number) => value * 2 } } })\nconst math = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry { console.log(await math.request('math.double', 21)) } finally { await math.close(); await server.close() }"
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({\n  listen: 'math-service',\n  provide: { math: { double: (value: number) => value * 2 } }\n})\nconst math = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry {\n  console.log(await math.request('math.double', 21))\n} finally {\n  await math.close()\n  await server.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -205,12 +205,12 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer, createProcessTransport, type IProcessByteChannel } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'native', token,\n    supervision: {\n      id: 'math-service', isolation: 'best-effort', report, launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator', offer: prepared.offer!, peerId: prepared.session.processId!,\n      scheduler: prepared.scheduler, signal: prepared.signal,\n      ipc: { ...prepared.session, log: () => undefined }, report\n    })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally { await service.close() }"
+                "code": "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport {\n  createNodeProcessLauncher,\n  type INodeProcessHandle\n} from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn',\n    channelKind: 'byte',\n    wire: 'native',\n    token,\n    supervision: {\n      id: 'math-service',\n      isolation: 'best-effort',\n      report,\n      launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) =>\n      createProcessTransport(raw as IProcessByteChannel, {\n        role: 'initiator',\n        offer: prepared.offer!,\n        peerId: prepared.session.processId!,\n        scheduler: prepared.scheduler,\n        signal: prepared.signal,\n        ipc: { ...prepared.session, log: () => undefined },\n        report\n      })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally {\n  await service.close()\n}"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: { math: { double: (value: number) => value * 2, sum: (values: number[]) => values.reduce((total, value) => total + value, 0) } }\n})"
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: {\n      double: (value: number) => value * 2,\n      sum: (values: number[]) => values.reduce((total, value) => total + value, 0)\n    }\n  }\n})"
               },
               {
                 "type": "paragraph",
@@ -305,13 +305,35 @@
                   ["`@migaia/rpc-core`", "调用语义、Endpoint、Remote、测试工具；本包的 peer 依赖"],
                   ["`@migaia/rpc-contract`", "协议常量（`RpcCapability` 等）与 framing；peer 依赖"],
                   ["`@migaia/rpc-threads`", "同一套 API 的 Worker 版本"],
-                  ["`@migaia/rpc-bridge-jsonrpc`", "在本包字节通道上与非 TS 语言互通"],
                   ["`@migaia/supervision`", "launcher、预算、重启策略"]
                 ]
               },
               {
                 "type": "paragraph",
                 "text": "完整用法、选项说明、错误码表与高级用法见 USEGUIDE。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-外部语言",
+            "heading": "JSON-RPC 外部语言",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "TypeScript 端启动一个 Python 子进程并调用它（对端实现见 USEGUIDE 第 4 节，约 100 行，只用标准库）："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { fileURLToPath } from 'node:url'\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport type { IRemoteContract } from '@migaia/rpc-core/remote'\n\ntype IPythonApi = { echo(values: string[]): string[]; math: { add(values: number[]): number } }\n/** This is the peer-specific local declaration; the accepted remote directory still owns routing. */\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: false } } } }\n}\nconst peer = await createProcessPeer<IPythonApi>({\n  spawn: {\n    command: 'python3',\n    args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n    wire: 'jsonrpc',\n    contract\n  }\n})\ntry {\n  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await peer.request('math.add', [20, 22])) // 42\n  await peer.notify('echo', ['notification'])\n  console.log(\n    await Promise.all([peer.request('math.add', [1, 2]), peer.request('math.add', [3, 4])])\n  ) // [3, 7]\n  try {\n    await peer.request('math.add', [])\n  } catch (error) {\n    const detail = error as { source?: string; code?: string }\n    if (detail.source !== 'python-service' || detail.code !== 'BUSINESS') throw error\n    console.log(detail.code) // BUSINESS\n  }\n} finally {\n  await peer.close()\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`spawn` 保留子进程的监督、退出与 budget 所有权；`peer.close()` 关闭连接和子进程。只需声明对端特有的 command、args、wire 与本地 contract；launcher、预算、随机 stdin token 和桥接握手由既有操作组合。需要自有字节通道时，仍可使用 `createProcessJsonRpcChannel`，见 USEGUIDE。文档检查器将本段与 USEGUIDE 的 `service.py` 联合执行；缺少 `python3` 时报告 SKIP-WARN。"
+              },
+              {
+                "type": "paragraph",
+                "text": "旧桥接包的两个工厂名统一迁移为本包 `createProcessJsonRpcChannel`，选项类型为 `IProcessJsonRpcChannelOptions`；三个错误常量/类型从 `@migaia/rpc-contract/framing/jsonrpc` 导入。Core 独占协议协商、correlation 与 cleanup；本包仅保留原字节资源的 closed error、stderr 和诊断。完整协议及 Python 对端见 JSON-RPC 手册。"
               }
             ]
           }
@@ -428,7 +450,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number }; feed: { count(limit: number): AsyncIterableIterator<number> } }\nconst service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n} finally { await service.close() }"
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nconst service = await createProcessPeer<IServiceApi>({\n  spawn: new URL('./service.ts', import.meta.url)\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n} finally {\n  await service.close()\n}"
               },
               {
                 "type": "list",
@@ -452,7 +474,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IEchoApi = { echo(value: string): string }\nif (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })\nelse {\n  const child = await createProcessPeer<IEchoApi>({ spawn: true })\n  try { console.log(await child.request('echo', 'hello')) } finally { await child.close() }\n}"
+                "code": "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IEchoApi = { echo(value: string): string }\nif (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })\nelse {\n  const child = await createProcessPeer<IEchoApi>({ spawn: true })\n  try {\n    console.log(await child.request('echo', 'hello'))\n  } finally {\n    await child.close()\n  }\n}"
               },
               {
                 "type": "paragraph",
@@ -487,7 +509,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The application owns this profile and its permitted filesystem operations. */\nconst profile = '/absolute/path/to/application.sb'\n/** The peer owns the sandboxed child and closes it with the original launcher. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Keep runtime detection and wrap only the resulting command. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/sandbox-exec',\n      args: ['-f', profile, command.command, ...command.args]\n    })\n  }\n})\ntry { console.log(await child.request('echo', 'hello')) } finally { await child.close() }"
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The application owns this profile and its permitted filesystem operations. */\nconst profile = '/absolute/path/to/application.sb'\n/** The peer owns the sandboxed child and closes it with the original launcher. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Keep runtime detection and wrap only the resulting command. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/sandbox-exec',\n      args: ['-f', profile, command.command, ...command.args]\n    })\n  }\n})\ntry {\n  console.log(await child.request('echo', 'hello'))\n} finally {\n  await child.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -496,7 +518,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The peer owns the child launched through the application's bubblewrap policy. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Preserve the original runtime arguments, cwd and environment. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/bwrap',\n      args: [\n        '--ro-bind', '/', '/', '--proc', '/proc', '--dev', '/dev',\n        '--unshare-net', '--die-with-parent', '--', command.command, ...command.args\n      ]\n    })\n  }\n})\ntry { console.log(await child.request('echo', 'hello')) } finally { await child.close() }"
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The peer owns the child launched through the application's bubblewrap policy. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Preserve the original runtime arguments, cwd and environment. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/bwrap',\n      args: [\n        '--ro-bind',\n        '/',\n        '/',\n        '--proc',\n        '/proc',\n        '--dev',\n        '/dev',\n        '--unshare-net',\n        '--die-with-parent',\n        '--',\n        command.command,\n        ...command.args\n      ]\n    })\n  }\n})\ntry {\n  console.log(await child.request('echo', 'hello'))\n} finally {\n  await child.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -536,7 +558,7 @@
                   ],
                   [
                     "`wire`",
-                    "`'native'`（默认，本库协议）或 `'jsonrpc'`（对端是 JSON-RPC 实现，见 rpc-bridge-jsonrpc）。"
+                    "`'native'`（默认，本库协议）或 `'jsonrpc'`（对端是 JSON-RPC 实现，见本手册 JSON-RPC 章节）。"
                   ],
                   [
                     "`token`",
@@ -640,7 +662,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import type { IRuntimeTypedPeer } from '@migaia/rpc-process'\n\ntype IActionApi = {\n  math: { double(value: number): number }; log: { note(value: string): void }\n  feed: { count(limit: number): AsyncIterableIterator<number> }; fail: { boom(): void }\n}\n/** The application already owns this peer; the idempotency examples need a matching server declaration. */\ndeclare const service: IRuntimeTypedPeer<IActionApi>\n\nawait service.notify('log.note', 'hello')\n\nfor await (const item of service.stream('feed.count', 3)) console.log(item) // 1 2 3\n\nconst steps = await service.group([\n  { method: 'math.double', payload: 1 },\n  { method: 'fail.boom' },\n  { method: 'math.double', payload: 3 }\n])\n// [{ state: 'success', result: 2 }, { state: 'failure', error: {…} }, { state: 'not-executed' }]\n\nawait service.request('math.double', 5, { idempotencyKey: 'order-42' })\nawait service.outcome('order-42') // { state: 'done', outcome: { completion: { ok: true, result: 10 } }, … }"
+                "code": "import type { IRuntimeTypedPeer } from '@migaia/rpc-process'\n\ntype IActionApi = {\n  math: { double(value: number): number }\n  log: { note(value: string): void }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n  fail: { boom(): void }\n}\n/** The application already owns this peer; the idempotency examples need a matching server declaration. */\ndeclare const service: IRuntimeTypedPeer<IActionApi>\n\nawait service.notify('log.note', 'hello')\n\nfor await (const item of service.stream('feed.count', 3)) console.log(item) // 1 2 3\n\nconst steps = await service.group([\n  { method: 'math.double', payload: 1 },\n  { method: 'fail.boom' },\n  { method: 'math.double', payload: 3 }\n])\n// [{ state: 'success', result: 2 }, { state: 'failure', error: {…} }, { state: 'not-executed' }]\n\nawait service.request('math.double', 5, { idempotencyKey: 'order-42' })\nawait service.outcome('order-42') // { state: 'done', outcome: { completion: { ok: true, result: 10 } }, … }"
               }
             ]
           },
@@ -689,7 +711,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nif (isProcessChild()) {\n  await createProcessPeer({ provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: { count: async function* (limit: number) { for (let value = 1; value <= limit; value++) yield value } }\n  } })\n} else {\n  const service = await createProcessPeer<IServiceApi>({ spawn: true })\n  try {\n    const result: number = await service.request('math.double', 21)\n    console.log(result) // 42\n    for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n  } finally { await service.close() }\n}"
+                "code": "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nif (isProcessChild()) {\n  await createProcessPeer({\n    provide: {\n      math: { double: (value: number) => value * 2 },\n      feed: {\n        count: async function* (limit: number) {\n          for (let value = 1; value <= limit; value++) yield value\n        }\n      }\n    }\n  })\n} else {\n  const service = await createProcessPeer<IServiceApi>({ spawn: true })\n  try {\n    const result: number = await service.request('math.double', 21)\n    console.log(result) // 42\n    for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n  } finally {\n    await service.close()\n  }\n}"
               },
               {
                 "type": "paragraph",
@@ -708,7 +730,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({ listen: 'math-service', provide: { math: { double: (value: number) => value * 2 } } })\nconst client = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry { console.log(await client.request('math.double', 21)) } finally { await client.close(); await server.close() }"
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({\n  listen: 'math-service',\n  provide: { math: { double: (value: number) => value * 2 } }\n})\nconst client = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry {\n  console.log(await client.request('math.double', 21))\n} finally {\n  await client.close()\n  await server.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -717,7 +739,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst token = 'local-example-secret'\nconst server = await createProcessPeer({ listen: 'tcp://127.0.0.1:4000', token, provide: { echo: (value: string) => value } })\nconst client = await createProcessPeer<{ echo(value: string): string }>({ connect: 'tcp://127.0.0.1:4000', token })\ntry { console.log(await client.request('echo', 'hello')) } finally { await client.close(); await server.close() }"
+                "code": "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst token = 'local-example-secret'\nconst server = await createProcessPeer({\n  listen: 'tcp://127.0.0.1:4000',\n  token,\n  provide: { echo: (value: string) => value }\n})\nconst client = await createProcessPeer<{ echo(value: string): string }>({\n  connect: 'tcp://127.0.0.1:4000',\n  token\n})\ntry {\n  console.log(await client.request('echo', 'hello'))\n} finally {\n  await client.close()\n  await server.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -744,7 +766,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }"
+                "code": "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -779,7 +801,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPeer, createProcessPlugin, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({ name: 'service', spawn: true })\n  const host = defineHost<Record<string, never>, never, readonly [typeof service]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(service)\n    console.log(await host.process!.request('service', 'math.double', 21)) // 42\n    console.log((await host.process!.list()).connections.map((connection) => connection.kind)) // ['spawn']\n  } finally { await host.dispose() }\n}"
+                "code": "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPeer, createProcessPlugin, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({\n    name: 'service',\n    spawn: true\n  })\n  const host = defineHost<Record<string, never>, never, readonly [typeof service]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(service)\n    console.log(await host.process!.request('service', 'math.double', 21)) // 42\n    console.log((await host.process!.list()).connections.map((connection) => connection.kind)) // ['spawn']\n  } finally {\n    await host.dispose()\n  }\n}"
               },
               {
                 "type": "paragraph",
@@ -1027,7 +1049,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import type { Socket } from 'node:net'\nimport { createProcessTransport } from '@migaia/rpc-process'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The application supplies an already connected Duplex socket; this fragment does not dial another one. */\ndeclare const socket: Socket\nconst raw = createAdapterSocketByteIO(socket)\nconst channel = await createProcessTransport(raw, {\n  peerId: 'service', role: 'initiator',\n  offer: {\n    peer: { id: 'client', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json], capabilities: []\n  },\n  scheduler: systemScheduler,\n  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log: () => undefined },\n  report: console.error\n})\ntry { console.log(channel.peerId) } finally { await channel.close() }"
+                "code": "import type { Socket } from 'node:net'\nimport { createProcessTransport } from '@migaia/rpc-process'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The application supplies an already connected Duplex socket; this fragment does not dial another one. */\ndeclare const socket: Socket\nconst raw = createAdapterSocketByteIO(socket)\nconst channel = await createProcessTransport(raw, {\n  peerId: 'service',\n  role: 'initiator',\n  offer: {\n    peer: { id: 'client', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: []\n  },\n  scheduler: systemScheduler,\n  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log: () => undefined },\n  report: console.error\n})\ntry {\n  console.log(channel.peerId)\n} finally {\n  await channel.close()\n}"
               },
               {
                 "type": "paragraph",
@@ -1089,6 +1111,399 @@
               {
                 "type": "paragraph",
                 "text": "怎样传大文件？ 单条消息受帧上限约束。用 `stream` 分块传输，或者把文件路径传过去，由对端自己读取。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-字节通道与对端协议",
+            "heading": "JSON-RPC 字节通道与对端协议",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "普通子进程优先使用 `createProcessPeer` 的 JSON-RPC spawn。下列高级入口保留实际字节通道及其 stderr/诊断归属，不负责替调用方终止借用的进程。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-1-typescript-端-createprocessjsonrpcchannel",
+            "heading": "JSON-RPC 1. TypeScript 端：createProcessJsonRpcChannel",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createProcessJsonRpcChannel } from '@migaia/rpc-process'"
+              },
+              {
+                "type": "paragraph",
+                "text": "`createProcessJsonRpcChannel(options)` 在一条有序字节连接上完成 `migaia.hello` 握手，返回协议通道。它用于自有字节通道的高级组合。普通 Python 子进程直接使用 README 的 `createProcessPeer({ spawn: { command, args, wire: 'jsonrpc', contract } })`，不必手写 launcher 或握手。"
+              },
+              {
+                "type": "table",
+                "headers": ["选项", "说明"],
+                "rows": [
+                  [
+                    "`byte`",
+                    "有序字节连接（`IProcessByteChannel`），来自 `@migaia/rpc-process` 的 launcher handle 或 socket 适配器。"
+                  ],
+                  ["`peerId`", "对端标识。"],
+                  [
+                    "`target`",
+                    "`{ kind: 'plugin', contract }`（单个服务）或 `{ kind: 'host', catalog }`（对端是一个插件宿主）。见下文。"
+                  ],
+                  [
+                    "`offer`",
+                    "本端提议：`versions`、`peer: { id, runtime }`、`capabilities`。`codecs` 与 `auth` 由本包填写。"
+                  ],
+                  [
+                    "`offer.capabilities`",
+                    "只能从 `deadline@1`、`trace@1`、`idempotency@1`（以及桥接必需能力）中选择；其它能力以 `JSONRPC_PROFILE_INVALID` 拒绝。"
+                  ],
+                  ["`token`", "会话凭据，随 `migaia.hello` 发给对端认证。"],
+                  [
+                    "`scheduler`、`wallClock`",
+                    "计时依赖，通常用 `@migaia/utils/scheduler` 的 `systemScheduler` 与 `systemWallClock`。"
+                  ],
+                  ["`ipc`", "`{ connectionId, sessionId, log }`：诊断标签与日志回调。"],
+                  [
+                    "`handshakeTimeoutMs`",
+                    "可选，握手超时；超时以 `JSONRPC_HANDSHAKE_TIMEOUT` 失败。"
+                  ],
+                  ["`signal`", "可选，取消握手。"],
+                  ["`report`", "接收后台错误。"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "关于 `target.contract`：它是本地声明，桥接只用它在建立连接前校验\"没有 stream 方法\"。真正可以调用的方法以对端 `migaia.describe` 返回的目录为准；调用目录之外的方法会以 `PROVIDER_NOT_FOUND` 拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "必需能力 `jsonrpc-bridge@1`、`runtime-api@1`、`batch@1`、`abort@1`、`wire-error@1` 由本包自动加入提议，不需要在 `offer.capabilities` 中列出。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-2-获得字节通道-子进程与本机-socket",
+            "heading": "JSON-RPC 2. 获得字节通道：子进程与本机 socket",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "子进程：用 `@migaia/rpc-process` 的 launcher 启动对端，取 `handle.channel`。`spec.stdio` 设为 `{ stdin: 'channel', stdout: 'channel', stderr: 'drain' }`，对端从 stdin 读、向 stdout 写；stderr 由库持续读取，对端可以放心向 stderr 写日志。用 `bootstrap: { via: 'stdin', payload }` 把 token 交给对端，对端会先读到一个\"4 字节大端长度 + 内容\"的 bootstrap 帧（见第 5.1 节）。"
+              },
+              {
+                "type": "paragraph",
+                "text": "本机 socket：对端已经在监听时，用 `@migaia/rpc-process/adapters/node-socket` 的 `dialProcessByteChannel({ address })` 拨号，把返回的通道作为 `byte`。token 需要通过你自己的方式（例如配置或密钥服务）让双方事先共享。"
+              },
+              {
+                "type": "paragraph",
+                "text": "所有权：`connect` 来源只拥有这条连接。`peer.close()` 关闭连接，但不会结束对端进程；如果进程是你启动的，用 `handle.terminate()` 结束它。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-3-调用与限制",
+            "heading": "JSON-RPC 3. 调用与限制",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["调用", "映射到", "说明"],
+                "rows": [
+                  ["`request(method, payload)`", "带 `id` 的 `migaia.invoke`", "等待对端回复"],
+                  ["`notify(method, payload)`", "不带 `id` 的 `migaia.invoke`", "对端执行但不回复"],
+                  [
+                    "并发的多个调用",
+                    "JSON-RPC 批量数组",
+                    "对端按数组顺序处理，并以数组回复（notify 不出现在回复中）"
+                  ],
+                  [
+                    "`signal` / 超时取消",
+                    "`migaia.cancel`",
+                    "通知对端放弃该调用；不等待确认，不回滚已发生的副作用"
+                  ],
+                  ["`stream`", "—", "不支持"],
+                  ["`transfer`", "—", "不支持"]
+                ]
+              },
+              {
+                "type": "list",
+                "items": [
+                  "payload 必须是数组，作为对端方法的位置参数列表；传入非数组以 `JSONRPC_PROFILE_INVALID` 拒绝。",
+                  "数据经 JSON 编码。跨语言传整数时，超过 ±(2^53 − 1) 的值请用字符串表示。",
+                  "帧、UTF-8 或 JSON 格式非法时连接会被终止（`JSONRPC_FRAME_INVALID`）。",
+                  "收到未知 `id` 或迟到的回复会被报告并丢弃，不影响其它调用。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-4-对端最小实现-python",
+            "heading": "JSON-RPC 4. 对端最小实现（Python）",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面的实现只依赖 Python 标准库，与 README 的 TypeScript parent 构成同一个可执行文档组，覆盖 `request`、`notify`、并发批量调用和业务错误。把它保存为 `service.py`，即可作为其它语言实现的参照。"
+              },
+              {
+                "type": "code",
+                "language": "python",
+                "code": "\"\"\"A minimal migaia JSON-RPC bridge responder using only the Python standard library.\"\"\"\nimport json\nimport struct\nimport sys\n\n# 本端提供的业务方法：只支持 request / notify，不支持 stream。\nMETHODS = {\n    \"echo\": lambda args: args,\n    \"math.add\": lambda args: args[0] + args[1],\n}\n# 本端握手时声明的能力；前五项是桥接协议的必需能力。\nCAPABILITIES = [\"jsonrpc-bridge@1\", \"runtime-api@1\", \"batch@1\", \"abort@1\", \"wire-error@1\",\n                \"deadline@1\", \"trace@1\", \"idempotency@1\"]\nPEER = {\"id\": \"python-service\", \"runtime\": \"python\"}\n\nstdin, stdout = sys.stdin.buffer, sys.stdout.buffer\n\n\ndef read_exact(size):\n    data = stdin.read(size)\n    if len(data) != size:\n        raise SystemExit(0)\n    return data\n\n\ndef read_message():\n    \"\"\"Read one Content-Length frame; return None at EOF.\"\"\"\n    header = b\"\"\n    while not header.endswith(b\"\\r\\n\\r\\n\"):\n        byte = stdin.read(1)\n        if not byte:\n            return None\n        header += byte\n    length = next(int(line.split(b\":\", 1)[1]) for line in header.split(b\"\\r\\n\")\n                  if line.lower().startswith(b\"content-length:\"))\n    return json.loads(read_exact(length).decode(\"utf-8\"))\n\n\ndef write_message(message):\n    body = json.dumps(message, ensure_ascii=False, separators=(\",\", \":\")).encode(\"utf-8\")\n    stdout.write(b\"Content-Length: %d\\r\\n\\r\\n\" % len(body) + body)\n    stdout.flush()\n\n\ndef wire_error(code, message):\n    \"\"\"JSON-RPC error carrying the migaia wire error tree in data.migaiaWireError.\"\"\"\n    return {\"code\": -32000, \"message\": message, \"data\": {\"migaiaWireError\": {\n        \"source\": \"python-service\", \"code\": code, \"name\": \"Error\",\n        \"message\": message, \"stack\": \"Error: \" + message}}}\n\n\ndef handle(message, state):\n    method, params, ident = message.get(\"method\"), message.get(\"params\", {}), message.get(\"id\")\n    if method == \"migaia.hello\":\n        hello = json.loads(params[\"hello\"])\n        ok = hello.get(\"auth\") == state[\"token\"] and {\"major\": 1, \"minor\": 1} in hello[\"versions\"]\n        state[\"authenticated\"] = ok\n        if ok:\n            reply = {\"kind\": \"handshake\", \"step\": \"accept\", \"protocol\": \"migaia.rpc\",\n                     \"major\": 1, \"minor\": 1, \"codec\": \"json\", \"peer\": PEER,\n                     \"capabilities\": [c for c in hello[\"capabilities\"] if c in CAPABILITIES]}\n        else:\n            reply = {\"kind\": \"handshake\", \"step\": \"reject\", \"protocol\": \"migaia.rpc\",\n                     \"error\": wire_error(\"AUTH_REJECTED\", \"authentication rejected\")[\"data\"][\"migaiaWireError\"]}\n        result = {\"reply\": json.dumps(reply), \"methods\": [\"migaia.hello\", \"migaia.describe\",\n                                                          \"migaia.invoke\", \"migaia.cancel\"]}\n        return {\"jsonrpc\": \"2.0\", \"id\": ident, \"result\": result}\n    if not state[\"authenticated\"]:\n        raise SystemExit(1)\n    if method == \"migaia.describe\":\n        return {\"jsonrpc\": \"2.0\", \"id\": ident, \"result\": {\n            \"schemaVersion\": 2, \"self\": {\"name\": \"python-service\", \"instanceId\": PEER[\"id\"]},\n            \"methods\": [{\"name\": name, \"supportedModes\": [\"request\", \"notify\"], \"modeSource\": \"declared\"}\n                        for name in METHODS]}}\n    if method == \"migaia.cancel\":\n        return None  # 本示例的方法都是同步完成，没有可取消的在途调用\n    if method == \"migaia.invoke\":\n        provider = METHODS.get(params[\"method\"])\n        if ident is None:  # 无 id 即 notify：执行但不回复\n            if provider:\n                provider(params[\"args\"])\n            return None\n        if provider is None:\n            return {\"jsonrpc\": \"2.0\", \"id\": ident,\n                    \"error\": wire_error(\"PROVIDER_NOT_FOUND\", \"method not found\")}\n        try:\n            return {\"jsonrpc\": \"2.0\", \"id\": ident, \"result\": provider(params[\"args\"])}\n        except Exception as error:  # 业务异常转换为 wire error\n            return {\"jsonrpc\": \"2.0\", \"id\": ident, \"error\": wire_error(\"BUSINESS\", str(error))}\n    return {\"jsonrpc\": \"2.0\", \"id\": ident, \"error\": {\"code\": -32601, \"message\": \"method not found\"}}\n\n\ndef main():\n    # 父进程先写入一个 4 字节大端长度前缀的 bootstrap 帧，内容是会话 token。\n    (length,) = struct.unpack(\">I\", read_exact(4))\n    state = {\"token\": read_exact(length).decode(\"utf-8\"), \"authenticated\": False}\n    while (message := read_message()) is not None:\n        if isinstance(message, list):  # 已协商 batch：逐个处理，按顺序回复数组\n            replies = [r for r in (handle(m, state) for m in message) if r is not None]\n            if replies:\n                write_message(replies)\n        else:\n            reply = handle(message, state)\n            if reply is not None:\n                write_message(reply)\n\n\nmain()"
+              },
+              {
+                "type": "paragraph",
+                "text": "实现要点："
+              },
+              {
+                "type": "list",
+                "items": [
+                  "先读 bootstrap 帧拿到 token，再进入 Content-Length 消息循环。",
+                  "握手通过前，除 `migaia.hello` 外的任何消息都应拒绝（示例直接退出）。",
+                  "握手回复中的 `capabilities` 必须包含五个必需能力，`methods` 必须列出全部四个扩展方法，否则 TypeScript 端以 `JSONRPC_EXTENSION_MISSING` 拒绝。",
+                  "回复写到 stdout，日志写到 stderr，不要把日志混进 stdout。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-5-高阶用法-对端协议规范-5-1-分帧",
+            "heading": "JSON-RPC 5. 高阶用法：对端协议规范 · 5.1 分帧",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "bootstrap 帧（仅子进程场景、启用 `bootstrap` 时）：连接建立后，对端最先从 stdin 收到一个 4 字节大端无符号长度，紧接着是该长度的 UTF-8 内容（通常是 token）。之后才是 JSON-RPC 消息。",
+                  "消息帧：`Content-Length: <字节数>\\r\\n\\r\\n<UTF-8 JSON>`。长度按 UTF-8 字节计算，不是字符数。头部不超过 1024 字节，单帧不超过 16 MiB。",
+                  "消息体是一个 JSON-RPC 2.0 对象，或者（握手成功后）一个由这些对象组成的数组（批量）。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-5-高阶用法-对端协议规范-5-2-migaia-hello-握手",
+            "heading": "JSON-RPC 5. 高阶用法：对端协议规范 · 5.2 migaia.hello：握手",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "请求："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{ \"jsonrpc\": \"2.0\", \"id\": \"…\", \"method\": \"migaia.hello\", \"params\": { \"hello\": \"<JSON 字符串>\" } }"
+              },
+              {
+                "type": "paragraph",
+                "text": "`params.hello` 是一个 JSON 字符串，解析后为："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"kind\": \"handshake\",\n  \"step\": \"hello\",\n  \"protocol\": \"migaia.rpc\",\n  \"versions\": [{ \"major\": 1, \"minor\": 1 }],\n  \"codecs\": [\"json\"],\n  \"capabilities\": [\n    \"jsonrpc-bridge@1\",\n    \"runtime-api@1\",\n    \"batch@1\",\n    \"abort@1\",\n    \"wire-error@1\",\n    \"deadline@1\"\n  ],\n  \"peer\": { \"id\": \"node-client-1\", \"runtime\": \"node\" },\n  \"auth\": \"<token>\"\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "对端校验 `auth`，选出双方共同的版本（目前为 1.1）、codec（`json`）与能力，然后回复："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"…\",\n  \"result\": {\n    \"reply\": \"<JSON 字符串>\",\n    \"methods\": [\"migaia.hello\", \"migaia.describe\", \"migaia.invoke\", \"migaia.cancel\"]\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "`result.reply` 是一个 JSON 字符串。接受时为："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"kind\": \"handshake\",\n  \"step\": \"accept\",\n  \"protocol\": \"migaia.rpc\",\n  \"major\": 1,\n  \"minor\": 1,\n  \"codec\": \"json\",\n  \"capabilities\": [\"…双方都支持的能力，按请求中的顺序…\"],\n  \"peer\": { \"id\": \"python-service\", \"runtime\": \"python\" }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "拒绝时为 `{ \"kind\": \"handshake\", \"step\": \"reject\", \"protocol\": \"migaia.rpc\", \"error\": <wire error> }`，wire error 的结构见 5.6 节；凭据错误用 code `AUTH_REJECTED`。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-5-高阶用法-对端协议规范-5-3-migaia-describe-方法目录",
+            "heading": "JSON-RPC 5. 高阶用法：对端协议规范 · 5.3 migaia.describe：方法目录",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "请求 `params` 为 `{ \"args\": [] }`，回复："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"schemaVersion\": 2,\n  \"self\": { \"name\": \"python-service\", \"instanceId\": \"python-service\" },\n  \"methods\": [\n    { \"name\": \"echo\", \"supportedModes\": [\"request\", \"notify\"], \"modeSource\": \"declared\" },\n    { \"name\": \"math.add\", \"supportedModes\": [\"request\", \"notify\"], \"modeSource\": \"declared\" }\n  ]\n}"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`self.instanceId` 必须与握手回复中的 `peer.id` 一致。",
+                  "`supportedModes` 只能包含 `request` 与 `notify`；出现 `stream` 时 TypeScript 端以 `JSONRPC_UNSUPPORTED_MODE` 拒绝。",
+                  "可选字段 `idempotent: boolean` 声明该方法是否幂等。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-5-高阶用法-对端协议规范-5-4-migaia-invoke-调用",
+            "heading": "JSON-RPC 5. 高阶用法：对端协议规范 · 5.4 migaia.invoke：调用",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"7\",\n  \"method\": \"migaia.invoke\",\n  \"params\": { \"method\": \"math.add\", \"args\": [20, 22], \"meta\": { \"timeoutMs\": 30000 } }\n}"
+              },
+              {
+                "type": "list",
+                "items": [
+                  "`params.args` 就是 TypeScript 端传入的 payload，必须是数组（按位置的参数列表）：`request('math.add', [20, 22])` 发出 `\"args\": [20, 22]`；不传 payload 时为 `[]`。",
+                  "`params.meta` 可选，只会包含 `timeoutMs`、`idempotencyKey`、`trace` 中实际设置了的字段。对端可以忽略它。",
+                  "成功：`{ \"jsonrpc\": \"2.0\", \"id\": \"7\", \"result\": 42 }`。",
+                  "没有 `id` 的 invoke 是 notify：执行，但不回复。",
+                  "方法不存在：回复 wire error，code 为 `PROVIDER_NOT_FOUND`。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-5-高阶用法-对端协议规范-5-5-migaia-cancel-取消",
+            "heading": "JSON-RPC 5. 高阶用法：对端协议规范 · 5.5 migaia.cancel：取消",
+            "blocks": [
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"migaia.cancel\",\n  \"params\": { \"id\": \"7\", \"reason\": \"…可选，取消原因…\" }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "通知对端放弃 `id` 为 `\"7\"` 的在途调用。这是一条通知，对端不回复确认。之后再到达的该调用结果会被 TypeScript 端丢弃。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-5-高阶用法-对端协议规范-5-6-错误格式",
+            "heading": "JSON-RPC 5. 高阶用法：对端协议规范 · 5.6 错误格式",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "业务失败时，按 JSON-RPC 规范回复 `error`，并把完整错误信息放在 `data.migaiaWireError`："
+              },
+              {
+                "type": "code",
+                "language": "json",
+                "code": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"7\",\n  \"error\": {\n    \"code\": -32000,\n    \"message\": \"list index out of range\",\n    \"data\": {\n      \"migaiaWireError\": {\n        \"source\": \"python-service\",\n        \"code\": \"BUSINESS\",\n        \"name\": \"Error\",\n        \"message\": \"list index out of range\",\n        \"stack\": \"Error: list index out of range\"\n      }\n    }\n  }\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "wire error 至少包含 `source`、`code`、`name`、`message`、`stack`；可选的 `cause` 与 `errors` 用于嵌套原因。JSON-RPC 整数 `code` 建议使用标准值：`-32700`（解析错误）、`-32600`（无效请求）、`-32601`（方法不存在）、`-32602`（参数无效）、`-32603`（内部错误）、`-32000`（业务错误）。"
+              },
+              {
+                "type": "paragraph",
+                "text": "TypeScript 实现的对端可以直接用 `@migaia/rpc-contract/errors` 的 `toJsonRpcError(serialized, code)` 与 `fromJsonRpcError(value)` 生成和解析这种格式，并用 `@migaia/rpc-contract/framing/jsonrpc` 的 `encodeJsonRpcFrame`、`createJsonRpcFrameDecoder` 处理 Content-Length 分帧。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-5-高阶用法-对端协议规范-5-7-批量",
+            "heading": "JSON-RPC 5. 高阶用法：对端协议规范 · 5.7 批量",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "握手成功后，TypeScript 端可能把多个调用放进一个数组发送。对端应按数组顺序逐个处理，并把所有带 `id` 的回复按顺序放进一个数组写回；某个成员失败不影响其它成员。全是 notify 的批量不需要回复。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-语义错误码",
+            "heading": "JSON-RPC 语义错误码",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "source 均为 `@migaia/rpc/bridge/jsonrpc`。"
+              },
+              {
+                "type": "table",
+                "headers": ["code", "何时发生", "处理"],
+                "rows": [
+                  [
+                    "`JSONRPC_FRAME_INVALID`",
+                    "头部、UTF-8、JSON 非法，或连接在一帧中途关闭；连接随之终止",
+                    "修正对端的分帧与编码；已发出的调用先对账"
+                  ],
+                  [
+                    "`JSONRPC_EXTENSION_MISSING`",
+                    "握手回复缺少必需能力或四个扩展方法",
+                    "对端补齐扩展实现"
+                  ],
+                  [
+                    "`JSONRPC_PROFILE_INVALID`",
+                    "本端选项不合法，或提议了桥接不支持的能力",
+                    "修正选项；原样重试无效"
+                  ],
+                  [
+                    "`JSONRPC_UNSUPPORTED_MODE`",
+                    "本地声明或对端目录中包含 stream 方法",
+                    "流式场景改用原生协议"
+                  ],
+                  [
+                    "`JSONRPC_HANDSHAKE_TIMEOUT`",
+                    "握手超时",
+                    "检查对端是否在读 stdin / socket，然后重新建立连接"
+                  ]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "这些 JSON-RPC 常量从 Contract 的 framing 入口导入："
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import {\n  JSONRPC_BRIDGE_ERROR_SOURCE,\n  JsonRpcBridgeErrorCode\n} from '@migaia/rpc-contract/framing/jsonrpc'"
+              }
+            ]
+          },
+          {
+            "id": "对端返回的业务错误",
+            "heading": "对端返回的业务错误",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "通过 `createProcessPeer` 或 `createRuntimePeer` 调用时，对端回复的 wire error 按原始 `name`、`source`、`code`、`message`、`stack` 和原因链恢复。Python 示例中的业务错误因此携带 `source: 'python-service'`、`code: 'BUSINESS'`。这些字段只用于诊断，不会获得本地库的控制身份；不要用对端声明的 source / code 判断本地取消、重试或认证策略。"
+              }
+            ]
+          },
+          {
+            "id": "重试原则",
+            "heading": "重试原则",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "超时、取消或连接中断都不能证明对端没有执行。对非幂等方法，重试前请先确认结果，或者让对端在 `meta.idempotencyKey` 上实现去重。"
+              }
+            ]
+          },
+          {
+            "id": "json-rpc-7-常见问题",
+            "heading": "JSON-RPC 7. 常见问题",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "握手一直超时？ 确认对端在读 stdin（或 socket），并且回复写到了 stdout 而不是 stderr；确认先消费了 bootstrap 帧。"
+              },
+              {
+                "type": "paragraph",
+                "text": "对端日志打乱了协议？ stdout 只能输出协议帧，日志写 stderr。"
+              },
+              {
+                "type": "paragraph",
+                "text": "需要流式返回？ 桥接不支持。可以拆成分页的 `request`，或者把对端改为原生协议实现。"
+              },
+              {
+                "type": "paragraph",
+                "text": "对端能主动调用 TypeScript 端吗？ 桥接协议在同一连接上允许对端发送 `migaia.invoke`，调用 TypeScript 端 `provide` 的方法。本手册的示例只演示 TypeScript 端发起调用；需要反向调用时，请先在你的场景中验证。"
               }
             ]
           }
@@ -1563,7 +1978,7 @@
           "errors": ["No documented errors are declared for createNativeProcessOffer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNativeProcessOffer.",
           "examples": [
-            "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}"
           ],
           "members": [],
           "aliasOf": "createNativeProcessOffer",
@@ -1701,6 +2116,84 @@
           "fragment": "rpc-process-index--createProcessChannelClosedError"
         },
         {
+          "name": "createProcessJsonRpcChannel",
+          "kind": "function",
+          "signature": "export declare function createProcessJsonRpcChannel(options: IProcessJsonRpcChannelOptions): Promise<IRemoteChannel>;",
+          "declarationLine": 10,
+          "source": "packages/rpc-process/dist/process/jsonrpc-channel.d.ts",
+          "purpose": "Negotiate held bytes through Core while retaining Process closed errors and stderr ownership.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessJsonRpcChannel.",
+          "advanced": "No additional advanced behavior is declared for createProcessJsonRpcChannel.",
+          "parameters": ["options: IProcessJsonRpcChannelOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IProcessJsonRpcChannelOptions",
+              "optional": false
+            }
+          ],
+          "returns": "Promise<IRemoteChannel>",
+          "errors": ["No documented errors are declared for createProcessJsonRpcChannel."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessJsonRpcChannel.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "createProcessJsonRpcChannel",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createProcessJsonRpcChannel(options: IProcessJsonRpcChannelOptions): Promise<IRemoteChannel>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IProcessJsonRpcChannelOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<IRemoteChannel>"],
+          "whenToUse": "Use createProcessJsonRpcChannel when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when createProcessJsonRpcChannel does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Negotiate held bytes through Core while retaining Process closed errors and stderr ownership."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createProcessJsonRpcChannel from @migaia/rpc-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createProcessJsonRpcChannel when its function contract and declared inputs match the result you need. Choose a different public symbol when createProcessJsonRpcChannel does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createProcessJsonRpcChannel."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for createProcessJsonRpcChannel."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/jsonrpc-channel.d.ts:createProcessJsonRpcChannel:export declare function createProcessJsonRpcChannel(options: IProcessJsonRpcChannelOptions): Promise<IRemoteChannel>;",
+          "guidance": [],
+          "usageScore": 32,
+          "configuration": [],
+          "fragment": "rpc-process-index--createProcessJsonRpcChannel"
+        },
+        {
           "name": "createProcessPeer",
           "kind": "function",
           "signature": "export declare function createProcessPeer<TRemote = Record<never, never>>(options: IRuntimeProcessPeerOptions): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>;",
@@ -1722,21 +2215,22 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessPeer.",
           "examples": [
             "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: {\n      // async generator 方法可以被对端用 stream() 逐项读取\n      count: async function* (limit: number) {\n        for (let index = 1; index <= limit; index++) yield index\n      }\n    }\n  },\n  report: (error) => console.error(error)\n})",
-            "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number }; feed: { count(limit: number): AsyncIterableIterator<number> } }\nconst service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n} finally { await service.close() }",
-            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IEchoApi = { echo(value: string): string }\nif (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })\nelse {\n  const child = await createProcessPeer<IEchoApi>({ spawn: true })\n  try { console.log(await child.request('echo', 'hello')) } finally { await child.close() }\n}",
-            "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The application owns this profile and its permitted filesystem operations. */\nconst profile = '/absolute/path/to/application.sb'\n/** The peer owns the sandboxed child and closes it with the original launcher. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Keep runtime detection and wrap only the resulting command. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/sandbox-exec',\n      args: ['-f', profile, command.command, ...command.args]\n    })\n  }\n})\ntry { console.log(await child.request('echo', 'hello')) } finally { await child.close() }",
-            "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The peer owns the child launched through the application's bubblewrap policy. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Preserve the original runtime arguments, cwd and environment. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/bwrap',\n      args: [\n        '--ro-bind', '/', '/', '--proc', '/proc', '--dev', '/dev',\n        '--unshare-net', '--die-with-parent', '--', command.command, ...command.args\n      ]\n    })\n  }\n})\ntry { console.log(await child.request('echo', 'hello')) } finally { await child.close() }",
-            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nif (isProcessChild()) {\n  await createProcessPeer({ provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: { count: async function* (limit: number) { for (let value = 1; value <= limit; value++) yield value } }\n  } })\n} else {\n  const service = await createProcessPeer<IServiceApi>({ spawn: true })\n  try {\n    const result: number = await service.request('math.double', 21)\n    console.log(result) // 42\n    for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n  } finally { await service.close() }\n}",
-            "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({ listen: 'math-service', provide: { math: { double: (value: number) => value * 2 } } })\nconst client = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry { console.log(await client.request('math.double', 21)) } finally { await client.close(); await server.close() }",
-            "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst token = 'local-example-secret'\nconst server = await createProcessPeer({ listen: 'tcp://127.0.0.1:4000', token, provide: { echo: (value: string) => value } })\nconst client = await createProcessPeer<{ echo(value: string): string }>({ connect: 'tcp://127.0.0.1:4000', token })\ntry { console.log(await client.request('echo', 'hello')) } finally { await client.close(); await server.close() }",
-            "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }",
-            "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPeer, createProcessPlugin, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({ name: 'service', spawn: true })\n  const host = defineHost<Record<string, never>, never, readonly [typeof service]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(service)\n    console.log(await host.process!.request('service', 'math.double', 21)) // 42\n    console.log((await host.process!.list()).connections.map((connection) => connection.kind)) // ['spawn']\n  } finally { await host.dispose() }\n}",
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nconst service = await createProcessPeer<IServiceApi>({\n  spawn: new URL('./service.ts', import.meta.url)\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n} finally {\n  await service.close()\n}",
+            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IEchoApi = { echo(value: string): string }\nif (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })\nelse {\n  const child = await createProcessPeer<IEchoApi>({ spawn: true })\n  try {\n    console.log(await child.request('echo', 'hello'))\n  } finally {\n    await child.close()\n  }\n}",
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The application owns this profile and its permitted filesystem operations. */\nconst profile = '/absolute/path/to/application.sb'\n/** The peer owns the sandboxed child and closes it with the original launcher. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Keep runtime detection and wrap only the resulting command. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/sandbox-exec',\n      args: ['-f', profile, command.command, ...command.args]\n    })\n  }\n})\ntry {\n  console.log(await child.request('echo', 'hello'))\n} finally {\n  await child.close()\n}",
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\n/** The peer owns the child launched through the application's bubblewrap policy. */\nconst child = await createProcessPeer<{ echo(value: string): string }>({\n  spawn: {\n    entry: new URL('./service.ts', import.meta.url),\n    /** Preserve the original runtime arguments, cwd and environment. */\n    wrap: (command) => ({\n      ...command,\n      command: '/usr/bin/bwrap',\n      args: [\n        '--ro-bind',\n        '/',\n        '/',\n        '--proc',\n        '/proc',\n        '--dev',\n        '/dev',\n        '--unshare-net',\n        '--die-with-parent',\n        '--',\n        command.command,\n        ...command.args\n      ]\n    })\n  }\n})\ntry {\n  console.log(await child.request('echo', 'hello'))\n} finally {\n  await child.close()\n}",
+            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nif (isProcessChild()) {\n  await createProcessPeer({\n    provide: {\n      math: { double: (value: number) => value * 2 },\n      feed: {\n        count: async function* (limit: number) {\n          for (let value = 1; value <= limit; value++) yield value\n        }\n      }\n    }\n  })\n} else {\n  const service = await createProcessPeer<IServiceApi>({ spawn: true })\n  try {\n    const result: number = await service.request('math.double', 21)\n    console.log(result) // 42\n    for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n  } finally {\n    await service.close()\n  }\n}",
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({\n  listen: 'math-service',\n  provide: { math: { double: (value: number) => value * 2 } }\n})\nconst client = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry {\n  console.log(await client.request('math.double', 21))\n} finally {\n  await client.close()\n  await server.close()\n}",
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\nconst token = 'local-example-secret'\nconst server = await createProcessPeer({\n  listen: 'tcp://127.0.0.1:4000',\n  token,\n  provide: { echo: (value: string) => value }\n})\nconst client = await createProcessPeer<{ echo(value: string): string }>({\n  connect: 'tcp://127.0.0.1:4000',\n  token\n})\ntry {\n  console.log(await client.request('echo', 'hello'))\n} finally {\n  await client.close()\n  await server.close()\n}",
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}",
+            "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPeer, createProcessPlugin, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({\n    name: 'service',\n    spawn: true\n  })\n  const host = defineHost<Record<string, never>, never, readonly [typeof service]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(service)\n    console.log(await host.process!.request('service', 'math.double', 21)) // 42\n    console.log((await host.process!.list()).connections.map((connection) => connection.kind)) // ['spawn']\n  } finally {\n    await host.dispose()\n  }\n}",
             "// service.ts（子进程入口）\nimport { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: {\n      double: (value: number) => value * 2,\n      sum: (values: number[]) => values.reduce((total, value) => total + value, 0)\n    }\n  }\n})",
-            "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\nconst service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n} finally {\n  await service.close()\n}",
-            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const child = await createProcessPeer<IMathApi>({ spawn: true })\n  try { console.log(await child.request('math.double', 21)) } finally { await child.close() }\n}",
-            "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({ listen: 'math-service', provide: { math: { double: (value: number) => value * 2 } } })\nconst math = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry { console.log(await math.request('math.double', 21)) } finally { await math.close(); await server.close() }",
-            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer, createProcessTransport, type IProcessByteChannel } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'native', token,\n    supervision: {\n      id: 'math-service', isolation: 'best-effort', report, launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator', offer: prepared.offer!, peerId: prepared.session.processId!,\n      scheduler: prepared.scheduler, signal: prepared.signal,\n      ipc: { ...prepared.session, log: () => undefined }, report\n    })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally { await service.close() }",
-            "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: { math: { double: (value: number) => value * 2, sum: (values: number[]) => values.reduce((total, value) => total + value, 0) } }\n})"
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\nconst service = await createProcessPeer<IServiceApi>({\n  spawn: new URL('./service.ts', import.meta.url)\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n} finally {\n  await service.close()\n}",
+            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const child = await createProcessPeer<IMathApi>({ spawn: true })\n  try {\n    console.log(await child.request('math.double', 21))\n  } finally {\n    await child.close()\n  }\n}",
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nconst server = await createProcessPeer({\n  listen: 'math-service',\n  provide: { math: { double: (value: number) => value * 2 } }\n})\nconst math = await createProcessPeer<IMathApi>({ connect: 'math-service' })\ntry {\n  console.log(await math.request('math.double', 21))\n} finally {\n  await math.close()\n  await server.close()\n}",
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport {\n  createNodeProcessLauncher,\n  type INodeProcessHandle\n} from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn',\n    channelKind: 'byte',\n    wire: 'native',\n    token,\n    supervision: {\n      id: 'math-service',\n      isolation: 'best-effort',\n      report,\n      launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) =>\n      createProcessTransport(raw as IProcessByteChannel, {\n        role: 'initiator',\n        offer: prepared.offer!,\n        peerId: prepared.session.processId!,\n        scheduler: prepared.scheduler,\n        signal: prepared.signal,\n        ipc: { ...prepared.session, log: () => undefined },\n        report\n      })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally {\n  await service.close()\n}",
+            "import { createProcessPeer } from '@migaia/rpc-process'\n\nawait createProcessPeer({\n  provide: {\n    math: {\n      double: (value: number) => value * 2,\n      sum: (values: number[]) => values.reduce((total, value) => total + value, 0)\n    }\n  }\n})",
+            "import { fileURLToPath } from 'node:url'\nimport { createProcessPeer } from '@migaia/rpc-process'\nimport type { IRemoteContract } from '@migaia/rpc-core/remote'\n\ntype IPythonApi = { echo(values: string[]): string[]; math: { add(values: number[]): number } }\n/** This is the peer-specific local declaration; the accepted remote directory still owns routing. */\nconst contract: IRemoteContract = {\n  schemaVersion: 1,\n  plugin: 'python-service',\n  features: { math: { methods: { add: { mode: 'request', idempotent: false } } } }\n}\nconst peer = await createProcessPeer<IPythonApi>({\n  spawn: {\n    command: 'python3',\n    args: [fileURLToPath(new URL('./service.py', import.meta.url))],\n    wire: 'jsonrpc',\n    contract\n  }\n})\ntry {\n  console.log(await peer.request('echo', ['hello', 'python'])) // ['hello', 'python']\n  console.log(await peer.request('math.add', [20, 22])) // 42\n  await peer.notify('echo', ['notification'])\n  console.log(\n    await Promise.all([peer.request('math.add', [1, 2]), peer.request('math.add', [3, 4])])\n  ) // [3, 7]\n  try {\n    await peer.request('math.add', [])\n  } catch (error) {\n    const detail = error as { source?: string; code?: string }\n    if (detail.source !== 'python-service' || detail.code !== 'BUSINESS') throw error\n    console.log(detail.code) // BUSINESS\n  }\n} finally {\n  await peer.close()\n}"
           ],
           "members": [],
           "aliasOf": "createProcessPeer",
@@ -1792,8 +2286,19 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/peer.d.ts:createProcessPeer:export declare function createProcessPeer<TRemote = Record<never, never>>(options: IRuntimeProcessPeerOptions): Promise<IRuntimeTypedPeer<TRemote, IRuntimeFlatten<TRemote>, typeof RuntimePluginKey.process>>;",
-          "guidance": [],
-          "usageScore": 220,
+          "guidance": [
+            {
+              "id": "对端返回的业务错误",
+              "heading": "对端返回的业务错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "通过 `createProcessPeer` 或 `createRuntimePeer` 调用时，对端回复的 wire error 按原始 `name`、`source`、`code`、`message`、`stack` 和原因链恢复。Python 示例中的业务错误因此携带 `source: 'python-service'`、`code: 'BUSINESS'`。这些字段只用于诊断，不会获得本地库的控制身份；不要用对端声明的 source / code 判断本地取消、重试或认证策略。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 244,
           "configuration": [],
           "fragment": "rpc-process-index--createProcessPeer"
         },
@@ -2013,9 +2518,9 @@
           "errors": ["No documented errors are declared for createProcessTransport."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createProcessTransport.",
           "examples": [
-            "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }",
-            "import type { Socket } from 'node:net'\nimport { createProcessTransport } from '@migaia/rpc-process'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The application supplies an already connected Duplex socket; this fragment does not dial another one. */\ndeclare const socket: Socket\nconst raw = createAdapterSocketByteIO(socket)\nconst channel = await createProcessTransport(raw, {\n  peerId: 'service', role: 'initiator',\n  offer: {\n    peer: { id: 'client', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json], capabilities: []\n  },\n  scheduler: systemScheduler,\n  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log: () => undefined },\n  report: console.error\n})\ntry { console.log(channel.peerId) } finally { await channel.close() }",
-            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer, createProcessTransport, type IProcessByteChannel } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'native', token,\n    supervision: {\n      id: 'math-service', isolation: 'best-effort', report, launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator', offer: prepared.offer!, peerId: prepared.session.processId!,\n      scheduler: prepared.scheduler, signal: prepared.signal,\n      ipc: { ...prepared.session, log: () => undefined }, report\n    })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally { await service.close() }"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}",
+            "import type { Socket } from 'node:net'\nimport { createProcessTransport } from '@migaia/rpc-process'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The application supplies an already connected Duplex socket; this fragment does not dial another one. */\ndeclare const socket: Socket\nconst raw = createAdapterSocketByteIO(socket)\nconst channel = await createProcessTransport(raw, {\n  peerId: 'service',\n  role: 'initiator',\n  offer: {\n    peer: { id: 'client', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: []\n  },\n  scheduler: systemScheduler,\n  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log: () => undefined },\n  report: console.error\n})\ntry {\n  console.log(channel.peerId)\n} finally {\n  await channel.close()\n}",
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport {\n  createNodeProcessLauncher,\n  type INodeProcessHandle\n} from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn',\n    channelKind: 'byte',\n    wire: 'native',\n    token,\n    supervision: {\n      id: 'math-service',\n      isolation: 'best-effort',\n      report,\n      launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) =>\n      createProcessTransport(raw as IProcessByteChannel, {\n        role: 'initiator',\n        offer: prepared.offer!,\n        peerId: prepared.session.processId!,\n        scheduler: prepared.scheduler,\n        signal: prepared.signal,\n        ipc: { ...prepared.session, log: () => undefined },\n        report\n      })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally {\n  await service.close()\n}"
           ],
           "members": [],
           "aliasOf": "createProcessTransport",
@@ -2649,8 +3154,8 @@
           "errors": ["No documented errors are declared for IProcessByteChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessByteChannel.",
           "examples": [
-            "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }",
-            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer, createProcessTransport, type IProcessByteChannel } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'native', token,\n    supervision: {\n      id: 'math-service', isolation: 'best-effort', report, launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator', offer: prepared.offer!, peerId: prepared.session.processId!,\n      scheduler: prepared.scheduler, signal: prepared.signal,\n      ipc: { ...prepared.session, log: () => undefined }, report\n    })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally { await service.close() }"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}",
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport {\n  createNodeProcessLauncher,\n  type INodeProcessHandle\n} from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn',\n    channelKind: 'byte',\n    wire: 'native',\n    token,\n    supervision: {\n      id: 'math-service',\n      isolation: 'best-effort',\n      report,\n      launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) =>\n      createProcessTransport(raw as IProcessByteChannel, {\n        role: 'initiator',\n        offer: prepared.offer!,\n        peerId: prepared.session.processId!,\n        scheduler: prepared.scheduler,\n        signal: prepared.signal,\n        ipc: { ...prepared.session, log: () => undefined },\n        report\n      })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally {\n  await service.close()\n}"
           ],
           "members": [],
           "aliasOf": "IProcessByteChannel",
@@ -2697,7 +3202,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/types.d.ts:IProcessByteChannel:export type IProcessByteChannel = Readonly<{ kind: 'byte'; write(chunk: Uint8Array): Promise<void>; onData(listener: (chunk: Uint8Array) => void): () => void; onClose(listener: (reason?: unknown) => void): () => void; close(): void | Promise<void>; }>;",
           "guidance": [],
-          "usageScore": 20,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "rpc-process-index--IProcessByteChannel"
         },
@@ -3146,6 +3651,70 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-process-index--IProcessHostRegistrations"
+        },
+        {
+          "name": "IProcessJsonRpcChannelOptions",
+          "kind": "type",
+          "signature": "export type IProcessJsonRpcChannelOptions = Omit<IAdapterJsonRpcChannelOptions, 'byte' | 'ipc'> & Readonly<{ byte: IProcessByteChannel; ipc: IProcessCommonOptions['ipc']; }>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-process/dist/process/jsonrpc-channel.d.ts",
+          "purpose": "The original Process byte and stderr/diagnostic inputs surround Core's one JSON-RPC protocol.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessJsonRpcChannelOptions.",
+          "advanced": "No additional advanced behavior is declared for IProcessJsonRpcChannelOptions.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IProcessJsonRpcChannelOptions."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessJsonRpcChannelOptions.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IProcessJsonRpcChannelOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IProcessJsonRpcChannelOptions = Omit<IAdapterJsonRpcChannelOptions, 'byte' | 'ipc'> & Readonly<{ byte: IProcessByteChannel; ipc: IProcessCommonOptions['ipc']; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IProcessJsonRpcChannelOptions when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IProcessJsonRpcChannelOptions does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The original Process byte and stderr/diagnostic inputs surround Core's one JSON-RPC protocol."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IProcessJsonRpcChannelOptions from @migaia/rpc-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IProcessJsonRpcChannelOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IProcessJsonRpcChannelOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessJsonRpcChannelOptions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IProcessJsonRpcChannelOptions."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-process/dist/process/jsonrpc-channel.d.ts:IProcessJsonRpcChannelOptions:export type IProcessJsonRpcChannelOptions = Omit<IAdapterJsonRpcChannelOptions, 'byte' | 'ipc'> & Readonly<{ byte: IProcessByteChannel; ipc: IProcessCommonOptions['ipc']; }>;",
+          "guidance": [],
+          "usageScore": 2,
+          "configuration": [],
+          "fragment": "rpc-process-index--IProcessJsonRpcChannelOptions"
         },
         {
           "name": "IProcessLaunchCommand",
@@ -4566,7 +5135,7 @@
           "errors": ["No documented errors are declared for IProcessServeListenerIngress."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessServeListenerIngress.",
           "examples": [
-            "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}"
           ],
           "members": [],
           "aliasOf": "IProcessServeListenerIngress",
@@ -5784,7 +6353,7 @@
           "errors": ["No documented errors are declared for IRuntimeTypedPeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeTypedPeer.",
           "examples": [
-            "import type { IRuntimeTypedPeer } from '@migaia/rpc-process'\n\ntype IActionApi = {\n  math: { double(value: number): number }; log: { note(value: string): void }\n  feed: { count(limit: number): AsyncIterableIterator<number> }; fail: { boom(): void }\n}\n/** The application already owns this peer; the idempotency examples need a matching server declaration. */\ndeclare const service: IRuntimeTypedPeer<IActionApi>\n\nawait service.notify('log.note', 'hello')\n\nfor await (const item of service.stream('feed.count', 3)) console.log(item) // 1 2 3\n\nconst steps = await service.group([\n  { method: 'math.double', payload: 1 },\n  { method: 'fail.boom' },\n  { method: 'math.double', payload: 3 }\n])\n// [{ state: 'success', result: 2 }, { state: 'failure', error: {…} }, { state: 'not-executed' }]\n\nawait service.request('math.double', 5, { idempotencyKey: 'order-42' })\nawait service.outcome('order-42') // { state: 'done', outcome: { completion: { ok: true, result: 10 } }, … }",
+            "import type { IRuntimeTypedPeer } from '@migaia/rpc-process'\n\ntype IActionApi = {\n  math: { double(value: number): number }\n  log: { note(value: string): void }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n  fail: { boom(): void }\n}\n/** The application already owns this peer; the idempotency examples need a matching server declaration. */\ndeclare const service: IRuntimeTypedPeer<IActionApi>\n\nawait service.notify('log.note', 'hello')\n\nfor await (const item of service.stream('feed.count', 3)) console.log(item) // 1 2 3\n\nconst steps = await service.group([\n  { method: 'math.double', payload: 1 },\n  { method: 'fail.boom' },\n  { method: 'math.double', payload: 3 }\n])\n// [{ state: 'success', result: 2 }, { state: 'failure', error: {…} }, { state: 'not-executed' }]\n\nawait service.request('math.double', 5, { idempotencyKey: 'order-42' })\nawait service.outcome('order-42') // { state: 'done', outcome: { completion: { ok: true, result: 10 } }, … }",
             "import type { IRuntimeTypedPeer } from '@migaia/rpc-process'\n\n/** Error handling continues an established application-owned connection. */\ndeclare const service: IRuntimeTypedPeer<{ math: { double(value: number): number } }>\n\nimport { RPC_PROCESS_ERROR_SOURCE, RpcProcessErrorCode } from '@migaia/rpc-process'\n\ntry {\n  await service.request('math.double', 21, { timeoutMs: 1000 })\n} catch (error) {\n  const { source, code } = error as { source?: string; code?: string }\n  if (source === '@migaia/rpc/core' && code === 'DEADLINE_EXCEEDED') {\n    // 超时：对端可能仍在执行，先对账再决定是否重试\n  } else if (source === RPC_PROCESS_ERROR_SOURCE && code === RpcProcessErrorCode.channelClosed) {\n    // 通道已关闭：需要新建连接\n  } else throw error\n}"
           ],
           "members": [],
@@ -5998,10 +6567,10 @@
           "errors": ["No documented errors are declared for isProcessChild."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isProcessChild.",
           "examples": [
-            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IEchoApi = { echo(value: string): string }\nif (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })\nelse {\n  const child = await createProcessPeer<IEchoApi>({ spawn: true })\n  try { console.log(await child.request('echo', 'hello')) } finally { await child.close() }\n}",
-            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nif (isProcessChild()) {\n  await createProcessPeer({ provide: {\n    math: { double: (value: number) => value * 2 },\n    feed: { count: async function* (limit: number) { for (let value = 1; value <= limit; value++) yield value } }\n  } })\n} else {\n  const service = await createProcessPeer<IServiceApi>({ spawn: true })\n  try {\n    const result: number = await service.request('math.double', 21)\n    console.log(result) // 42\n    for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n  } finally { await service.close() }\n}",
-            "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPeer, createProcessPlugin, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({ name: 'service', spawn: true })\n  const host = defineHost<Record<string, never>, never, readonly [typeof service]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(service)\n    console.log(await host.process!.request('service', 'math.double', 21)) // 42\n    console.log((await host.process!.list()).connections.map((connection) => connection.kind)) // ['spawn']\n  } finally { await host.dispose() }\n}",
-            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const child = await createProcessPeer<IMathApi>({ spawn: true })\n  try { console.log(await child.request('math.double', 21)) } finally { await child.close() }\n}"
+            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IEchoApi = { echo(value: string): string }\nif (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })\nelse {\n  const child = await createProcessPeer<IEchoApi>({ spawn: true })\n  try {\n    console.log(await child.request('echo', 'hello'))\n  } finally {\n    await child.close()\n  }\n}",
+            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = {\n  math: { double(value: number): number }\n  feed: { count(limit: number): AsyncIterableIterator<number> }\n}\nif (isProcessChild()) {\n  await createProcessPeer({\n    provide: {\n      math: { double: (value: number) => value * 2 },\n      feed: {\n        count: async function* (limit: number) {\n          for (let value = 1; value <= limit; value++) yield value\n        }\n      }\n    }\n  })\n} else {\n  const service = await createProcessPeer<IServiceApi>({ spawn: true })\n  try {\n    const result: number = await service.request('math.double', 21)\n    console.log(result) // 42\n    for await (const value of service.stream('feed.count', 3)) console.log(value) // 1 2 3\n  } finally {\n    await service.close()\n  }\n}",
+            "import { defineHost } from '@migaia/plugin-host'\nimport { createProcessPeer, createProcessPlugin, isProcessChild } from '@migaia/rpc-process'\n\ntype IServiceApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({\n    name: 'service',\n    spawn: true\n  })\n  const host = defineHost<Record<string, never>, never, readonly [typeof service]>({\n    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n  })\n  try {\n    await host.use(service)\n    console.log(await host.process!.request('service', 'math.double', 21)) // 42\n    console.log((await host.process!.list()).connections.map((connection) => connection.kind)) // ['spawn']\n  } finally {\n    await host.dispose()\n  }\n}",
+            "import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'\n\ntype IMathApi = { math: { double(value: number): number } }\nif (isProcessChild()) {\n  await createProcessPeer({ provide: { math: { double: (value: number) => value * 2 } } })\n} else {\n  const child = await createProcessPeer<IMathApi>({ spawn: true })\n  try {\n    console.log(await child.request('math.double', 21))\n  } finally {\n    await child.close()\n  }\n}"
           ],
           "members": [],
           "aliasOf": "isProcessChild",
@@ -7597,7 +8166,7 @@
           "errors": ["No documented errors are declared for dialProcessByteChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for dialProcessByteChannel.",
           "examples": [
-            "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}"
           ],
           "members": [],
           "exportPath": "./adapters/deno-socket",
@@ -7651,7 +8220,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/adapters/deno-socket.d.ts:dialProcessByteChannel:export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;",
           "guidance": [],
-          "usageScore": 38,
+          "usageScore": 42,
           "configuration": [],
           "fragment": "rpc-process-adapters/deno-socket--dialProcessByteChannel"
         },
@@ -7671,7 +8240,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for listenProcessByteChannel.",
           "examples": [
             "import {\n  createProcessPeer,\n  createProcessPlugin,\n  createProcessTransport,\n  createNativeProcessOffer,\n  RpcProcessErrorCode,\n  RPC_PROCESS_ERROR_SOURCE\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'",
-            "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}"
           ],
           "members": [],
           "exportPath": "./adapters/deno-socket",
@@ -8170,7 +8739,7 @@
           "errors": ["No documented errors are declared for createNodeProcessLauncher."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createNodeProcessLauncher.",
           "examples": [
-            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer, createProcessTransport, type IProcessByteChannel } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'native', token,\n    supervision: {\n      id: 'math-service', isolation: 'best-effort', report, launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator', offer: prepared.offer!, peerId: prepared.session.processId!,\n      scheduler: prepared.scheduler, signal: prepared.signal,\n      ipc: { ...prepared.session, log: () => undefined }, report\n    })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally { await service.close() }"
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport {\n  createNodeProcessLauncher,\n  type INodeProcessHandle\n} from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn',\n    channelKind: 'byte',\n    wire: 'native',\n    token,\n    supervision: {\n      id: 'math-service',\n      isolation: 'best-effort',\n      report,\n      launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) =>\n      createProcessTransport(raw as IProcessByteChannel, {\n        role: 'initiator',\n        offer: prepared.offer!,\n        peerId: prepared.session.processId!,\n        scheduler: prepared.scheduler,\n        signal: prepared.signal,\n        ipc: { ...prepared.session, log: () => undefined },\n        report\n      })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally {\n  await service.close()\n}"
           ],
           "members": [],
           "exportPath": "./adapters/node-child-process",
@@ -8371,7 +8940,7 @@
           "errors": ["No documented errors are declared for INodeProcessHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for INodeProcessHandle.",
           "examples": [
-            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport { createProcessPeer, createProcessTransport, type IProcessByteChannel } from '@migaia/rpc-process'\nimport { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn', channelKind: 'byte', wire: 'native', token,\n    supervision: {\n      id: 'math-service', isolation: 'best-effort', report, launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {\n      role: 'initiator', offer: prepared.offer!, peerId: prepared.session.processId!,\n      scheduler: prepared.scheduler, signal: prepared.signal,\n      ipc: { ...prepared.session, log: () => undefined }, report\n    })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally { await service.close() }"
+            "import { randomBytes } from 'node:crypto'\nimport { fileURLToPath } from 'node:url'\nimport {\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessByteChannel\n} from '@migaia/rpc-process'\nimport {\n  createNodeProcessLauncher,\n  type INodeProcessHandle\n} from '@migaia/rpc-process/adapters/node-child-process'\nimport { createUnitBudget } from '@migaia/supervision'\n\ntype IServiceApi = { math: { double(value: number): number; sum(values: number[]): number } }\n/** The original native launcher retains all child lifetime operations. */\nconst launcher = createNodeProcessLauncher()\n/** This fresh credential travels only through the existing stdin bootstrap and handshake. */\nconst token = randomBytes(32).toString('base64url')\n/** Full sources explicitly retain their reporter instead of using the short-source default. */\nconst report = (error: unknown) => console.error(error)\nconst service = await createProcessPeer<IServiceApi>({\n  report,\n  spawn: {\n    kind: 'spawn',\n    channelKind: 'byte',\n    wire: 'native',\n    token,\n    supervision: {\n      id: 'math-service',\n      isolation: 'best-effort',\n      report,\n      launcher,\n      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),\n      spec: {\n        command: process.execPath,\n        args: [fileURLToPath(new URL('./service.ts', import.meta.url))],\n        env: { inherit: ['PATH'], set: {} },\n        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },\n        bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }\n      }\n    },\n    rawChannel: async (handle) => (handle as INodeProcessHandle).channel!,\n    establish: (raw, prepared) =>\n      createProcessTransport(raw as IProcessByteChannel, {\n        role: 'initiator',\n        offer: prepared.offer!,\n        peerId: prepared.session.processId!,\n        scheduler: prepared.scheduler,\n        signal: prepared.signal,\n        ipc: { ...prepared.session, log: () => undefined },\n        report\n      })\n  }\n})\ntry {\n  console.log(await service.request('math.double', 21)) // 42\n  console.log(await service.request('math.sum', [1, 2, 3])) // 6\n} finally {\n  await service.close()\n}"
           ],
           "members": [],
           "exportPath": "./adapters/node-child-process",
@@ -8542,7 +9111,7 @@
           "errors": ["No documented errors are declared for createAdapterSocketByteIO."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAdapterSocketByteIO.",
           "examples": [
-            "import type { Socket } from 'node:net'\nimport { createProcessTransport } from '@migaia/rpc-process'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The application supplies an already connected Duplex socket; this fragment does not dial another one. */\ndeclare const socket: Socket\nconst raw = createAdapterSocketByteIO(socket)\nconst channel = await createProcessTransport(raw, {\n  peerId: 'service', role: 'initiator',\n  offer: {\n    peer: { id: 'client', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json], capabilities: []\n  },\n  scheduler: systemScheduler,\n  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log: () => undefined },\n  report: console.error\n})\ntry { console.log(channel.peerId) } finally { await channel.close() }"
+            "import type { Socket } from 'node:net'\nimport { createProcessTransport } from '@migaia/rpc-process'\nimport { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** The application supplies an already connected Duplex socket; this fragment does not dial another one. */\ndeclare const socket: Socket\nconst raw = createAdapterSocketByteIO(socket)\nconst channel = await createProcessTransport(raw, {\n  peerId: 'service',\n  role: 'initiator',\n  offer: {\n    peer: { id: 'client', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: []\n  },\n  scheduler: systemScheduler,\n  ipc: { connectionId: 'custom-ipc', sessionId: 'session', log: () => undefined },\n  report: console.error\n})\ntry {\n  console.log(channel.peerId)\n} finally {\n  await channel.close()\n}"
           ],
           "members": [],
           "aliasOf": "createAdapterSocketByteIO",
@@ -8624,7 +9193,7 @@
           "errors": ["No documented errors are declared for dialProcessByteChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for dialProcessByteChannel.",
           "examples": [
-            "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}"
           ],
           "members": [],
           "exportPath": "./adapters/node-socket",
@@ -8678,7 +9247,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-process/dist/process/adapters/node-socket.d.ts:dialProcessByteChannel:export declare function dialProcessByteChannel(options: Readonly<{ address: string; signal?: AbortSignal; }>): Promise<IProcessByteChannel>;",
           "guidance": [],
-          "usageScore": 38,
+          "usageScore": 42,
           "configuration": [],
           "fragment": "rpc-process-adapters/node-socket--dialProcessByteChannel"
         },
@@ -8698,7 +9267,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for listenProcessByteChannel.",
           "examples": [
             "import {\n  createProcessPeer,\n  createProcessPlugin,\n  createProcessTransport,\n  createNativeProcessOffer,\n  RpcProcessErrorCode,\n  RPC_PROCESS_ERROR_SOURCE\n} from '@migaia/rpc-process'\nimport { createNodeProcessLauncher } from '@migaia/rpc-process/adapters/node-child-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'",
-            "import { createNativeProcessOffer, createProcessPeer, createProcessTransport, type IProcessServeListenerIngress } from '@migaia/rpc-process'\nimport { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener', address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return { peerId: `client-${sequence}`, ipc: { connectionId: `conn-${sequence}`, sessionId: `session-${sequence}`, log: () => undefined } }\n  }\n}\nconst server = await createProcessPeer({ listen: ingress, provide: { math: { double: (value: number) => value * 2 } }, report })\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect', address, token,\n      dial: (value, signal) => dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) => createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n        role: 'initiator', offer: prepared.offer!, peerId: 'math-server', scheduler: prepared.scheduler,\n        signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report\n      })\n    }\n  })\n  try { console.log(await client.request('math.double', 21)) } finally { await client.close() }\n} finally { await server.close() }"
+            "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}"
           ],
           "members": [],
           "exportPath": "./adapters/node-socket",

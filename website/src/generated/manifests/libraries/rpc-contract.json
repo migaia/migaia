@@ -139,7 +139,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\nconst frame = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } })\n\nconst decoder = createJsonRpcFrameDecoder()\nconst messages: unknown[] = []\nfor (let offset = 0; offset < frame.length; offset += 7)\n  messages.push(...decoder.push(frame.subarray(offset, offset + 7)))\ndecoder.finish() // 连接结束时调用：残留半帧会以 JSONRPC_FRAME_INVALID 报错\nconsole.log(messages) // [{ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } }]"
+                "code": "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\nconst frame = encodeJsonRpcFrame({\n  jsonrpc: '2.0',\n  id: 1,\n  method: 'ping',\n  params: { text: '你好' }\n})\n\nconst decoder = createJsonRpcFrameDecoder()\nconst messages: unknown[] = []\nfor (let offset = 0; offset < frame.length; offset += 7)\n  messages.push(...decoder.push(frame.subarray(offset, offset + 7)))\ndecoder.finish() // 连接结束时调用：残留半帧会以 JSONRPC_FRAME_INVALID 报错\nconsole.log(messages) // [{ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } }]"
               },
               {
                 "type": "paragraph",
@@ -179,7 +179,7 @@
                 "headers": ["包", "关系"],
                 "rows": [
                   ["`@migaia/rpc-core`", "使用本包实现 Endpoint、调用与连接"],
-                  ["`@migaia/rpc-bridge-jsonrpc`", "基于本包的 Content-Length 分帧与错误转换"],
+                  ["`@migaia/rpc-process`", "基于本包的 Content-Length 分帧与错误转换"],
                   ["`@migaia/serialize`", "可移植数据遍历的底层实现"]
                 ]
               },
@@ -259,7 +259,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
+                "code": "import {\n  acceptRpcHandshake,\n  completeRpcHandshake,\n  createRpcHello\n} from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
               },
               {
                 "type": "list",
@@ -342,7 +342,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRpcStreamFrameDecoder, encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'\n\nconst frame = encodeRpcStreamFrame(new TextEncoder().encode('hello')) // 4 字节长度 + 5 字节内容\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => console.log(new TextDecoder().decode(payload)),\n  onError: (error) => console.error(error) // 只会收到第一个分帧错误\n})\ndecoder.push(frame.subarray(0, 3))\ndecoder.push(frame.subarray(3)) // 输出 hello\ndecoder.finish() // 连接结束；残留半帧报告 INVALID_FRAME"
+                "code": "import {\n  createRpcStreamFrameDecoder,\n  encodeRpcStreamFrame\n} from '@migaia/rpc-contract/framing/stream'\n\nconst frame = encodeRpcStreamFrame(new TextEncoder().encode('hello')) // 4 字节长度 + 5 字节内容\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => console.log(new TextDecoder().decode(payload)),\n  onError: (error) => console.error(error) // 只会收到第一个分帧错误\n})\ndecoder.push(frame.subarray(0, 3))\ndecoder.push(frame.subarray(3)) // 输出 hello\ndecoder.finish() // 连接结束；残留半帧报告 INVALID_FRAME"
               },
               {
                 "type": "list",
@@ -555,7 +555,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 rpc-bridge-jsonrpc USEGUIDE。"
+                "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 Process JSON-RPC 错误。"
               },
               {
                 "type": "paragraph",
@@ -591,7 +591,7 @@
                     "`RpcThreadErrorCode`"
                   ],
                   [
-                    "`@migaia/rpc-bridge-jsonrpc`",
+                    "`@migaia/rpc-contract/framing/jsonrpc`",
                     "`JSONRPC_BRIDGE_ERROR_SOURCE`（`@migaia/rpc/bridge/jsonrpc`）",
                     "`JsonRpcBridgeErrorCode`"
                   ]
@@ -689,7 +689,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "我在其它语言里实现对端，最少需要实现什么？ 原生协议需要长度前缀分帧、握手（第 2 节）与 runtime 信封；JSON-RPC 桥只需要 Content-Length 分帧与四个扩展方法，见 rpc-bridge-jsonrpc USEGUIDE。"
+                "text": "我在其它语言里实现对端，最少需要实现什么？ 原生协议需要长度前缀分帧、握手（第 2 节）与 runtime 信封；JSON-RPC 桥只需要 Content-Length 分帧与四个扩展方法，见 Process JSON-RPC 协议。"
               },
               {
                 "type": "paragraph",
@@ -5792,7 +5792,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 rpc-bridge-jsonrpc USEGUIDE。"
+                  "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 Process JSON-RPC 错误。"
                 },
                 {
                   "type": "paragraph",
@@ -5828,7 +5828,7 @@
                       "`RpcThreadErrorCode`"
                     ],
                     [
-                      "`@migaia/rpc-bridge-jsonrpc`",
+                      "`@migaia/rpc-contract/framing/jsonrpc`",
                       "`JSONRPC_BRIDGE_ERROR_SOURCE`（`@migaia/rpc/bridge/jsonrpc`）",
                       "`JsonRpcBridgeErrorCode`"
                     ]
@@ -5977,7 +5977,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 rpc-bridge-jsonrpc USEGUIDE。"
+                  "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 Process JSON-RPC 错误。"
                 },
                 {
                   "type": "paragraph",
@@ -6013,7 +6013,7 @@
                       "`RpcThreadErrorCode`"
                     ],
                     [
-                      "`@migaia/rpc-bridge-jsonrpc`",
+                      "`@migaia/rpc-contract/framing/jsonrpc`",
                       "`JSONRPC_BRIDGE_ERROR_SOURCE`（`@migaia/rpc/bridge/jsonrpc`）",
                       "`JsonRpcBridgeErrorCode`"
                     ]
@@ -8177,7 +8177,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createJsonRpcFrameDecoder.",
           "examples": [
             "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\nconst bytes = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 1, method: 'ping' })\nconst decoder = createJsonRpcFrameDecoder()\nconst messages = decoder.push(bytes) // 返回本次完整解出的消息数组\ndecoder.finish()",
-            "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\nconst frame = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } })\n\nconst decoder = createJsonRpcFrameDecoder()\nconst messages: unknown[] = []\nfor (let offset = 0; offset < frame.length; offset += 7)\n  messages.push(...decoder.push(frame.subarray(offset, offset + 7)))\ndecoder.finish() // 连接结束时调用：残留半帧会以 JSONRPC_FRAME_INVALID 报错\nconsole.log(messages) // [{ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } }]"
+            "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\nconst frame = encodeJsonRpcFrame({\n  jsonrpc: '2.0',\n  id: 1,\n  method: 'ping',\n  params: { text: '你好' }\n})\n\nconst decoder = createJsonRpcFrameDecoder()\nconst messages: unknown[] = []\nfor (let offset = 0; offset < frame.length; offset += 7)\n  messages.push(...decoder.push(frame.subarray(offset, offset + 7)))\ndecoder.finish() // 连接结束时调用：残留半帧会以 JSONRPC_FRAME_INVALID 报错\nconsole.log(messages) // [{ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } }]"
           ],
           "members": [],
           "exportPath": "./framing/jsonrpc",
@@ -8249,7 +8249,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeJsonRpcFrame.",
           "examples": [
             "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\nconst bytes = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 1, method: 'ping' })\nconst decoder = createJsonRpcFrameDecoder()\nconst messages = decoder.push(bytes) // 返回本次完整解出的消息数组\ndecoder.finish()",
-            "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\nconst frame = encodeJsonRpcFrame({ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } })\n\nconst decoder = createJsonRpcFrameDecoder()\nconst messages: unknown[] = []\nfor (let offset = 0; offset < frame.length; offset += 7)\n  messages.push(...decoder.push(frame.subarray(offset, offset + 7)))\ndecoder.finish() // 连接结束时调用：残留半帧会以 JSONRPC_FRAME_INVALID 报错\nconsole.log(messages) // [{ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } }]"
+            "import { createJsonRpcFrameDecoder, encodeJsonRpcFrame } from '@migaia/rpc-contract/framing/jsonrpc'\n\nconst frame = encodeJsonRpcFrame({\n  jsonrpc: '2.0',\n  id: 1,\n  method: 'ping',\n  params: { text: '你好' }\n})\n\nconst decoder = createJsonRpcFrameDecoder()\nconst messages: unknown[] = []\nfor (let offset = 0; offset < frame.length; offset += 7)\n  messages.push(...decoder.push(frame.subarray(offset, offset + 7)))\ndecoder.finish() // 连接结束时调用：残留半帧会以 JSONRPC_FRAME_INVALID 报错\nconsole.log(messages) // [{ jsonrpc: '2.0', id: 1, method: 'ping', params: { text: '你好' } }]"
           ],
           "members": [],
           "exportPath": "./framing/jsonrpc",
@@ -8548,7 +8548,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 rpc-bridge-jsonrpc USEGUIDE。"
+                  "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 Process JSON-RPC 错误。"
                 },
                 {
                   "type": "paragraph",
@@ -8584,7 +8584,7 @@
                       "`RpcThreadErrorCode`"
                     ],
                     [
-                      "`@migaia/rpc-bridge-jsonrpc`",
+                      "`@migaia/rpc-contract/framing/jsonrpc`",
                       "`JSONRPC_BRIDGE_ERROR_SOURCE`（`@migaia/rpc/bridge/jsonrpc`）",
                       "`JsonRpcBridgeErrorCode`"
                     ]
@@ -8715,7 +8715,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 rpc-bridge-jsonrpc USEGUIDE。"
+                  "text": "`./framing/jsonrpc` 另导出 JSON-RPC 桥的错误常量（source `@migaia/rpc/bridge/jsonrpc`）：`JSONRPC_FRAME_INVALID`、`JSONRPC_EXTENSION_MISSING`、`JSONRPC_PROFILE_INVALID`、`JSONRPC_UNSUPPORTED_MODE`、`JSONRPC_HANDSHAKE_TIMEOUT`，说明见 Process JSON-RPC 错误。"
                 },
                 {
                   "type": "paragraph",
@@ -8751,7 +8751,7 @@
                       "`RpcThreadErrorCode`"
                     ],
                     [
-                      "`@migaia/rpc-bridge-jsonrpc`",
+                      "`@migaia/rpc-contract/framing/jsonrpc`",
                       "`JSONRPC_BRIDGE_ERROR_SOURCE`（`@migaia/rpc/bridge/jsonrpc`）",
                       "`JsonRpcBridgeErrorCode`"
                     ]
@@ -9032,7 +9032,7 @@
           "errors": ["No documented errors are declared for createRpcStreamFrameDecoder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcStreamFrameDecoder.",
           "examples": [
-            "import { createRpcStreamFrameDecoder, encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'\n\nconst frame = encodeRpcStreamFrame(new TextEncoder().encode('hello')) // 4 字节长度 + 5 字节内容\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => console.log(new TextDecoder().decode(payload)),\n  onError: (error) => console.error(error) // 只会收到第一个分帧错误\n})\ndecoder.push(frame.subarray(0, 3))\ndecoder.push(frame.subarray(3)) // 输出 hello\ndecoder.finish() // 连接结束；残留半帧报告 INVALID_FRAME"
+            "import {\n  createRpcStreamFrameDecoder,\n  encodeRpcStreamFrame\n} from '@migaia/rpc-contract/framing/stream'\n\nconst frame = encodeRpcStreamFrame(new TextEncoder().encode('hello')) // 4 字节长度 + 5 字节内容\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => console.log(new TextDecoder().decode(payload)),\n  onError: (error) => console.error(error) // 只会收到第一个分帧错误\n})\ndecoder.push(frame.subarray(0, 3))\ndecoder.push(frame.subarray(3)) // 输出 hello\ndecoder.finish() // 连接结束；残留半帧报告 INVALID_FRAME"
           ],
           "members": [],
           "aliasOf": "createRpcStreamFrameDecoder",
@@ -9200,7 +9200,7 @@
           "errors": ["No documented errors are declared for encodeRpcStreamFrame."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeRpcStreamFrame.",
           "examples": [
-            "import { createRpcStreamFrameDecoder, encodeRpcStreamFrame } from '@migaia/rpc-contract/framing/stream'\n\nconst frame = encodeRpcStreamFrame(new TextEncoder().encode('hello')) // 4 字节长度 + 5 字节内容\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => console.log(new TextDecoder().decode(payload)),\n  onError: (error) => console.error(error) // 只会收到第一个分帧错误\n})\ndecoder.push(frame.subarray(0, 3))\ndecoder.push(frame.subarray(3)) // 输出 hello\ndecoder.finish() // 连接结束；残留半帧报告 INVALID_FRAME"
+            "import {\n  createRpcStreamFrameDecoder,\n  encodeRpcStreamFrame\n} from '@migaia/rpc-contract/framing/stream'\n\nconst frame = encodeRpcStreamFrame(new TextEncoder().encode('hello')) // 4 字节长度 + 5 字节内容\n\nconst decoder = createRpcStreamFrameDecoder({\n  onFrame: (payload) => console.log(new TextDecoder().decode(payload)),\n  onError: (error) => console.error(error) // 只会收到第一个分帧错误\n})\ndecoder.push(frame.subarray(0, 3))\ndecoder.push(frame.subarray(3)) // 输出 hello\ndecoder.finish() // 连接结束；残留半帧报告 INVALID_FRAME"
           ],
           "members": [],
           "aliasOf": "encodeRpcStreamFrame",
@@ -10106,7 +10106,7 @@
           "errors": ["No documented errors are declared for acceptRpcHandshake."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for acceptRpcHandshake.",
           "examples": [
-            "import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
+            "import {\n  acceptRpcHandshake,\n  completeRpcHandshake,\n  createRpcHello\n} from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
           ],
           "members": [],
           "aliasOf": "acceptRpcHandshake",
@@ -10212,7 +10212,7 @@
           "errors": ["No documented errors are declared for completeRpcHandshake."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for completeRpcHandshake.",
           "examples": [
-            "import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
+            "import {\n  acceptRpcHandshake,\n  completeRpcHandshake,\n  createRpcHello\n} from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
           ],
           "members": [],
           "aliasOf": "completeRpcHandshake",
@@ -10302,7 +10302,7 @@
           "errors": ["No documented errors are declared for createRpcHello."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRpcHello.",
           "examples": [
-            "import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
+            "import {\n  acceptRpcHandshake,\n  completeRpcHandshake,\n  createRpcHello\n} from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
           ],
           "members": [],
           "aliasOf": "createRpcHello",
@@ -10846,7 +10846,7 @@
           "errors": ["No documented errors are declared for RpcCapability."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcCapability.",
           "examples": [
-            "import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
+            "import {\n  acceptRpcHandshake,\n  completeRpcHandshake,\n  createRpcHello\n} from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
           ],
           "members": [],
           "aliasOf": "RpcCapability",
@@ -11107,7 +11107,7 @@
           "errors": ["No documented errors are declared for RpcProtocol."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcProtocol.",
           "examples": [
-            "import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
+            "import {\n  acceptRpcHandshake,\n  completeRpcHandshake,\n  createRpcHello\n} from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
           ],
           "members": [],
           "aliasOf": "RpcProtocol",
@@ -17820,7 +17820,7 @@
           "errors": ["No documented errors are declared for RpcCodecId."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcCodecId.",
           "examples": [
-            "import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
+            "import {\n  acceptRpcHandshake,\n  completeRpcHandshake,\n  createRpcHello\n} from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
           ],
           "members": [],
           "exportPath": "./wire",
@@ -18075,7 +18075,7 @@
           "errors": ["No documented errors are declared for RpcPeerRuntime."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcPeerRuntime.",
           "examples": [
-            "import { acceptRpcHandshake, completeRpcHandshake, createRpcHello } from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
+            "import {\n  acceptRpcHandshake,\n  completeRpcHandshake,\n  createRpcHello\n} from '@migaia/rpc-contract/handshake'\nimport { RpcCapability, RpcCodecId, RpcPeerRuntime, RpcProtocol } from '@migaia/rpc-contract'\n\nconst clientOffer = {\n  peer: { id: 'client', runtime: RpcPeerRuntime.node },\n  versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n  codecs: [RpcCodecId.json],\n  capabilities: [RpcCapability.ping, RpcCapability.batch]\n}\nconst hello = createRpcHello(clientOffer) // JSON 文本，作为第一帧发送\n\n// 响应方：\nconst accepted = acceptRpcHandshake(\n  {\n    peer: { id: 'server', runtime: RpcPeerRuntime.node },\n    versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],\n    codecs: [RpcCodecId.json],\n    capabilities: [RpcCapability.batch]\n  },\n  hello\n)\n// accepted.ok === true；accepted.reply 是要发回的 JSON 文本\n// accepted.agreement: { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'client', … } }\n\n// 发起方：\nconst agreement = completeRpcHandshake(clientOffer, accepted.reply)\n// { major: 1, minor: 1, codec: 'json', capabilities: ['batch@1'], peer: { id: 'server', … } }"
           ],
           "members": [],
           "exportPath": "./wire",

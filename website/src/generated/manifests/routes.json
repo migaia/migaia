@@ -3387,66 +3387,6 @@
       "library": "resource"
     },
     {
-      "path": "/en/docs/rpc-bridge-jsonrpc",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/en/docs/rpc-bridge-jsonrpc/api",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/en/docs/rpc-bridge-jsonrpc/api/IJsonRpcBridgeErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/en/docs/rpc-bridge-jsonrpc/api/IJsonRpcBridgeOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/en/docs/rpc-bridge-jsonrpc/api/IProcessByteChannel",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/en/docs/rpc-bridge-jsonrpc/api/JSONRPC_BRIDGE_ERROR_SOURCE",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/en/docs/rpc-bridge-jsonrpc/api/JsonRpcBridgeErrorCode",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/en/docs/rpc-bridge-jsonrpc/api/createJsonRpcAdapterChannel",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/en/docs/rpc-bridge-jsonrpc/api/createJsonRpcRemoteChannel",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "locale": "en",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
       "path": "/en/docs/rpc-browser",
       "locale": "en",
       "domain": "docs",
@@ -7599,6 +7539,12 @@
       "library": "rpc-process"
     },
     {
+      "path": "/en/docs/rpc-process/api/IProcessJsonRpcChannelOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
       "path": "/en/docs/rpc-process/api/IProcessLaunchCommand",
       "locale": "en",
       "domain": "docs",
@@ -8134,6 +8080,12 @@
     },
     {
       "path": "/en/docs/rpc-process/api/createProcessChannelClosedError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/api/createProcessJsonRpcChannel",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-process"
@@ -18897,66 +18849,6 @@
       "library": "resource"
     },
     {
-      "path": "/zh/docs/rpc-bridge-jsonrpc",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/zh/docs/rpc-bridge-jsonrpc/api/IJsonRpcBridgeErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/zh/docs/rpc-bridge-jsonrpc/api/IJsonRpcBridgeOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/zh/docs/rpc-bridge-jsonrpc/api/IProcessByteChannel",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/zh/docs/rpc-bridge-jsonrpc/api/JSONRPC_BRIDGE_ERROR_SOURCE",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/zh/docs/rpc-bridge-jsonrpc/api/JsonRpcBridgeErrorCode",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/zh/docs/rpc-bridge-jsonrpc/api/createJsonRpcAdapterChannel",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/zh/docs/rpc-bridge-jsonrpc/api/createJsonRpcRemoteChannel",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
-      "path": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "rpc-bridge-jsonrpc"
-    },
-    {
       "path": "/zh/docs/rpc-browser",
       "locale": "zh",
       "domain": "docs",
@@ -23109,6 +23001,12 @@
       "library": "rpc-process"
     },
     {
+      "path": "/zh/docs/rpc-process/api/IProcessJsonRpcChannelOptions",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
       "path": "/zh/docs/rpc-process/api/IProcessLaunchCommand",
       "locale": "zh",
       "domain": "docs",
@@ -23644,6 +23542,12 @@
     },
     {
       "path": "/zh/docs/rpc-process/api/createProcessChannelClosedError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/api/createProcessJsonRpcChannel",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-process"

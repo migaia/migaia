@@ -255,14 +255,6 @@
         "ResourceStatus"
       ]
     },
-    "@migaia/rpc-bridge-jsonrpc": {
-      ".": [
-        "JSONRPC_BRIDGE_ERROR_SOURCE",
-        "JsonRpcBridgeErrorCode",
-        "createJsonRpcAdapterChannel",
-        "createJsonRpcRemoteChannel"
-      ]
-    },
     "@migaia/rpc-browser": {
       ".": [
         "RPC_BROWSER_ERROR_SOURCE",
@@ -823,6 +815,7 @@
         "createAdapterWebByteIO",
         "createNativeProcessOffer",
         "createProcessChannelClosedError",
+        "createProcessJsonRpcChannel",
         "createProcessPeer",
         "createProcessPlugin",
         "createProcessResilience",
