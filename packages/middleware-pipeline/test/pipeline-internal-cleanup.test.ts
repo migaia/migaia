@@ -258,7 +258,7 @@ describe('pipeline internal cleanup', () => {
     )
     expect(
       source.flatMap(([name, text]) => [...text.matchAll(/new TypeError\(/g)].map(() => name))
-    ).toEqual(['signal-errors.ts'])
+    ).toEqual(['errors.ts'])
     const create = source.find(([name]) => name === 'create-pipeline.ts')?.[1] ?? ''
     const runtime = source.find(([name]) => name === 'runtime.ts')?.[1] ?? ''
     expect(create).not.toContain('const invalidOption')

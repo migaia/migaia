@@ -1,7 +1,7 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { tryReadProperty } from '@migaia/utils/error'
 import { MiddlewarePipelineErrorText } from './error-text.js'
-import { createMiddlewarePipelineInvalidOptionError } from './signal-errors.js'
+import { createMiddlewarePipelineInvalidOptionError } from './errors.js'
 import {
   adaptGeneratorStageToAsyncGenerator,
   adaptSyncStageToAsync,
@@ -15,10 +15,10 @@ import {
   type IAsyncMiddlewareStage,
   type IGeneratorMiddlewareStage,
   type IMiddlewarePipelineContext,
+  type IMiddlewarePipelineOptions,
   type IMiddlewarePipelineControlOptions,
   type ISyncMiddlewareStage
 } from './runtime.js'
-import { MiddlewarePipelineSignalText } from './signal-text.js'
 import {
   MiddlewarePipelineGeneratorSignals,
   MiddlewarePipelineMode,
@@ -98,14 +98,12 @@ export type IMiddlewarePipeline<TMode extends IMiddlewarePipelineMode, TValue> =
 }>
 
 /** Frozen internal options consumed by mode dispatch. */
-type INormalizedPipelineOptions = Readonly<{
-  readonly mode: IMiddlewarePipelineMode
-  readonly onViolation: IMiddlewarePipelineViolationHandler
-  readonly assertActive?: () => void
-  readonly signal?: IAbortSignal
-  readonly signals: IGeneratorMiddlewareSignals
-  readonly combineStageAndDownstreamError?: (stage: unknown, downstream: unknown) => unknown
-}>
+type INormalizedPipelineOptions = Readonly<
+  IMiddlewarePipelineOptions & {
+    readonly mode: IMiddlewarePipelineMode
+    readonly signals: IGeneratorMiddlewareSignals
+  }
+>
 
 /** Stable no-op violation sink used when a host omits reporting. */
 const ignoreViolation: IMiddlewarePipelineViolationHandler = () => undefined
@@ -125,7 +123,7 @@ const isPipelineMode = (value: unknown): value is IMiddlewarePipelineMode =>
 const readCallback = <TCallback extends Function>(value: unknown): TCallback | undefined => {
   if (value === undefined) return undefined
   if (typeof value !== 'function')
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
   return value as TCallback
 }
 
@@ -133,14 +131,14 @@ const readCallback = <TCallback extends Function>(value: unknown): TCallback | u
 const readSignals = (value: unknown): IGeneratorMiddlewareSignals => {
   if (value === undefined) return MiddlewarePipelineGeneratorSignals
   if (value === null || typeof value !== 'object')
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
   /** Only the three named properties are admitted from the caller's structural record. */
   const candidate = value as Record<string, unknown>
   /** Read each caller-owned getter exactly once before committing the immutable sentinel set. */
   const reads = ['undefined', 'halt', 'continue'].map((key) => tryReadProperty(candidate, key))
   for (const read of reads) {
     if (read.threw)
-      throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, {
+      throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption, {
         cause: read.error
       })
   }
@@ -156,7 +154,7 @@ const readSignals = (value: unknown): IGeneratorMiddlewareSignals => {
     undefinedSignal === continueSignal ||
     halt === continueSignal
   )
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
   return Object.freeze({ undefined: undefinedSignal, halt, continue: continueSignal })
 }
 
@@ -188,7 +186,7 @@ const selectSignal = (
 ): IAbortSignal | undefined => {
   if (control === undefined) return options.signal
   if (!isOptionRecord(control))
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption)
   /** Call-time signal wins when supplied; creation signal remains the fallback. */
   return (control as IMiddlewarePipelineControlOptions).signal ?? options.signal
 }

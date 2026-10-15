@@ -1,4 +1,5 @@
 import { createMiddlewarePipelineExecutionError } from './errors.js'
+import { MiddlewarePipelineErrorText } from './error-text.js'
 import { MAX_NATIVE_RECURSION_DEPTH } from '@migaia/utils/function'
 import { admitAbortSignal } from '@migaia/utils/promise'
 import type { IAbortSignal } from '@migaia/utils/promise'
@@ -7,8 +8,7 @@ import {
   createMiddlewarePipelineAbortCleanupError,
   createMiddlewarePipelineAbortError,
   createMiddlewarePipelineInvalidOptionError
-} from './signal-errors.js'
-import { MiddlewarePipelineSignalText } from './signal-text.js'
+} from './errors.js'
 
 import {
   GENERATOR_CONTINUE,
@@ -19,24 +19,6 @@ import {
   type IGeneratorMiddlewareSignals,
   type IMiddlewarePipelineViolationHandler
 } from './state-constants.js'
-
-export {
-  GENERATOR_CONTINUE,
-  GENERATOR_HALT,
-  GENERATOR_UNDEFINED,
-  MiddlewarePipelineGeneratorSignals,
-  MiddlewarePipelineMode,
-  MiddlewarePipelineViolation
-} from './state-constants.js'
-export type {
-  IGeneratorMiddlewareSignals,
-  IMiddlewarePipelineMode,
-  IMiddlewarePipelineViolation,
-  IMiddlewarePipelineViolationHandler
-} from './state-constants.js'
-
-export { MIDDLEWARE_PIPELINE_SOURCE, MiddlewarePipelineErrorCode } from './error-code.js'
-export type { IMiddlewarePipelineErrorCode } from './error-code.js'
 
 /** Explicit generator result used when the payload itself may be undefined. */
 type IGeneratorUndefinedSignal<TValue> = undefined extends TValue
@@ -154,7 +136,7 @@ const admit = (signal: IAbortSignal | undefined): IMiddlewarePipelineContext | u
   if (signal === undefined) return undefined
   const admission = admitAbortSignal(signal)
   if (admission.kind === 'invalid')
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, {
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption, {
       cause: admission.cause
     })
   if (admission.aborted) throw makeAbortError(signal)
@@ -165,7 +147,7 @@ const readAborted = (signal: IAbortSignal): boolean => {
   /** Structural signals may fail on a later read; preserve that failure on the coded boundary. */
   const aborted = tryReadProperty(signal, 'aborted')
   if (aborted.threw)
-    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, {
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineErrorText.invalidOption, {
       cause: aborted.error
     })
   return Boolean(aborted.value)
@@ -238,7 +220,7 @@ const reduceGeneratorTerminal = <TValue>(
 export const adaptSyncStageToAsync =
   <TValue>(
     stage: ISyncMiddlewareStage<TValue>,
-    onViolation: IMiddlewarePipelineViolationHandler = () => {}
+    onViolation: IMiddlewarePipelineViolationHandler
   ): IAsyncMiddlewareStage<TValue> =>
   async (value, next, context) => {
     let nextValue = value
