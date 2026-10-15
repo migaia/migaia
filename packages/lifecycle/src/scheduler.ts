@@ -7,7 +7,7 @@
  * lifecycle identity (`INVALID_OPTION`) so every lifecycle factory keeps its public error
  * contract.
  */
-import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
+import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
   createLifecycleError,
@@ -221,11 +221,3 @@ export function resolveScheduler(value: unknown): IScheduler {
   }
   return snapshot
 }
-
-/**
- * The package default scheduler: `systemScheduler` admitted once at module load (LC-P2) instead of
- * re-snapshotting it on every `boundedWait`, graceful race, generation controller and mutation
- * queue. Admission and per-call validation stay identical to an injected scheduler, so delay and
- * time errors keep their lifecycle `INVALID_OPTION` identity. Internal to the package.
- */
-export const defaultLifecycleScheduler: IScheduler = resolveScheduler(systemScheduler)

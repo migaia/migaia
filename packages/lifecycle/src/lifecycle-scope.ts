@@ -1,3 +1,4 @@
+import { assertErrorPolicyReporter } from './error-boundary.js'
 import type {
   ICollectedError,
   IErrorPolicy,
@@ -8,7 +9,7 @@ import type {
 } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
 import { createDisposerContext } from './disposer-context.js'
-import { assertErrorPolicyReporter, containAsyncRejection, createLifecycleError } from './errors.js'
+import { containAsyncRejection, createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createOwnedEntryList } from './owned-entries.js'

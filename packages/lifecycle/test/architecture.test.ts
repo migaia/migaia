@@ -184,6 +184,9 @@ describe('L-T20 cross-module: a downstream adapter uses only public primitives',
         name === 'index.ts' ||
         name === 'abort-factory.ts' ||
         name === 'owned-entries.ts' ||
+        name === 'report-boundary.ts' ||
+        name === 'error-boundary.ts' ||
+        name === 'default-scheduler.ts' ||
         name === 'disposal.ts' ||
         name === 'scope.ts' ||
         name === 'generation.ts' ||

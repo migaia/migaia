@@ -1,6 +1,7 @@
+import { attachLifecycleSecondaryErrors } from './error-boundary.js'
 import type { ILifecycleOwner, IReleaseDescriptor } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
-import { attachLifecycleSecondaryErrors, createLifecycleError } from './errors.js'
+import { createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
