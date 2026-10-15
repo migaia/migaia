@@ -1,5 +1,6 @@
 import { Ansis } from 'ansis'
-import { defineFeature, definePlugin, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
+import { type IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+import { defineFeature, definePlugin } from '@migaia/plugin-host'
 
 import type {
   IEmptyPluginExt,

@@ -9,8 +9,7 @@ import {
   type IFeature,
   type IFeatureReference,
   type IFeatureRecord,
-  type IFeatureRecordRequiredExpose,
-  invokeCaptured
+  type IFeatureRecordRequiredExpose
 } from '@migaia/plugin-host'
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type {
@@ -95,7 +94,7 @@ const createNativeDataProjection = (
         ) {
           return {
             ...descriptor,
-            value: (...args: unknown[]) => invokeCaptured(descriptor.value, value, args),
+            value: (...args: unknown[]) => Reflect.apply(descriptor.value, value, args),
             configurable: true
           }
         }

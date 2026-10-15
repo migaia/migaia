@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  defineFeature,
-  definePlugin,
-  MiddlewarePipelineMode,
-  PluginHost,
-  type IPluginHostCore
-} from '../src/index.js'
+import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+import { defineFeature, definePlugin, PluginHost, type IPluginHostCore } from '../src/index.js'
 import { openComposition } from '../src/composition-entry.js'
 
 /** Sync host exposes the current pipeline result for allocation-order assertions. */

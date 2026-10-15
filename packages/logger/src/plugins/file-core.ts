@@ -1,4 +1,5 @@
-import { defineFeature, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
+import { type IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
+import { defineFeature } from '@migaia/plugin-host'
 import { createLoggerError, LoggerErrorCode } from '../errors.js'
 import { LoggerErrorText } from '../error-text.js'
 import { getLoggerRuntimeManager, type ILoggerRuntimeManager } from '../runtime-manager.js'

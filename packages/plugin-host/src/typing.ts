@@ -1,5 +1,5 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { asyncDisposeKey, disposeKey } from './symbols.js'
+import { asyncDisposeKey } from './symbols.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { ICleanupResult } from '@migaia/lifecycle'
 import type {
@@ -17,7 +17,7 @@ export type IPluginDisposer = () => IPluginAwaitable<void>
 export type IPluginResource =
   | IPluginDisposer
   | { [asyncDisposeKey](): IPluginAwaitable<void> }
-  | { [disposeKey](): void }
+  | { [Symbol.dispose](): void }
 
 /** Generic structured detail carried by a PluginHost boundary error. */
 export type IPluginHostErrorDetail = Readonly<Record<string, unknown>>
@@ -173,7 +173,7 @@ export type IPluginCommon<
   /** Runs while an installed registration still owns its leases and lifecycle signal. */
   beforeRelease?: (context: IPluginBeforeReleaseContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
-  [disposeKey]?: () => void
+  [Symbol.dispose]?: () => void
 }
 
 /** Feature-ready core passed to install and update. */
@@ -289,7 +289,7 @@ export type IPluginConstraint<
   /** Captured before the registration enters its bounded release step. */
   beforeRelease?: (context: IPluginBeforeReleaseContext) => IPluginAwaitable<void>
   [asyncDisposeKey]?: () => IPluginAwaitable<void>
-  [disposeKey]?: () => void
+  [Symbol.dispose]?: () => void
 } & (
   | IPluginPlainHooks<TCore, Record<string, unknown>, any, TFeatures, TExpose>
   | {

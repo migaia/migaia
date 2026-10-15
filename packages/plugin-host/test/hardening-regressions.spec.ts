@@ -4,7 +4,6 @@ import {
   asyncDisposeKey,
   defineFeature,
   definePlugin,
-  disposeKey,
   PluginHost,
   PluginHostError
 } from '../src/index.js'
@@ -282,6 +281,21 @@ describe('native Feature synchronous installation', () => {
 /** Set subclass overrides every reader family to prove custom calls receive only the proxy. */
 
 describe('PH-AF-63：resource disposer admission snapshot', () => {
+  it('rejects native cleanup methods published as extension capabilities', async () => {
+    /** Cleanup symbols belong to resource admission, so a view cannot publish them as methods. */
+    const host = new Host()
+    await expect(
+      host.use({
+        name: 'reserved-native-cleanup',
+        install: () => ({ [Symbol.dispose]: () => undefined })
+      })
+    ).rejects.toMatchObject({
+      code: 'PLUGIN_INSTALL_FAILED',
+      cause: { code: 'EXTENSION_RESERVED' }
+    })
+    await host.dispose()
+  })
+
   it('只读取一次 disposer，保留 receiver，并忽略 admission 后的替换', async () => {
     const host = new Host()
     const resource: Record<PropertyKey, unknown> = {}
@@ -297,7 +311,7 @@ describe('PH-AF-63：resource disposer admission snapshot', () => {
       secondCalls += 1
     }
 
-    Object.defineProperty(resource, disposeKey, {
+    Object.defineProperty(resource, Symbol.dispose, {
       configurable: true,
       get: () => {
         getterReads += 1
@@ -313,7 +327,7 @@ describe('PH-AF-63：resource disposer admission snapshot', () => {
       }
     } as any)
 
-    Object.defineProperty(resource, disposeKey, {
+    Object.defineProperty(resource, Symbol.dispose, {
       configurable: true,
       value: second,
       writable: true
@@ -394,10 +408,10 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
           return replacement
         }
       },
-      [disposeKey]: {
+      [Symbol.dispose]: {
         configurable: true,
         get: () => {
-          count(disposeKey)
+          count(Symbol.dispose)
           return replacement
         }
       }
@@ -410,7 +424,7 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
       update: { configurable: true, value: replacement },
       dispose: { configurable: true, value: replacement },
       [asyncDisposeKey]: { configurable: true, value: replacement },
-      [disposeKey]: { configurable: true, value: replacement }
+      [Symbol.dispose]: { configurable: true, value: replacement }
     })
 
     await host.config.update('snapshot', () => ({ enabled: false }))
@@ -422,7 +436,7 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
     expect(reads.get('update')).toBe(1)
     expect(reads.get('dispose')).toBe(1)
     expect(reads.get(asyncDisposeKey)).toBe(1)
-    expect(reads.get(disposeKey)).toBe(1)
+    expect(reads.get(Symbol.dispose)).toBe(1)
     expect(calls).toEqual({ install: 1, update: 1, dispose: 1 })
     expect(receivers).toEqual({ install: true, update: true, dispose: true })
   })
@@ -455,7 +469,7 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
           return firstAsync
         }
       },
-      [disposeKey]: {
+      [Symbol.dispose]: {
         configurable: true,
         get: () => {
           disposeReads += 1
@@ -467,7 +481,7 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
     await host.use(plugin as any)
     Object.defineProperties(plugin, {
       [asyncDisposeKey]: { configurable: true, value: replacementAsync },
-      [disposeKey]: { configurable: true, value: replacementAsync }
+      [Symbol.dispose]: { configurable: true, value: replacementAsync }
     })
     await host.unUse('symbol-snapshot')
 
@@ -506,7 +520,7 @@ describe('PH-T16：plugin admission snapshot and disposer boundary', () => {
     const host = new Host()
     const cause = new Error('resource disposer getter boom')
     const resource = {} as Record<PropertyKey, unknown>
-    Object.defineProperty(resource, disposeKey, {
+    Object.defineProperty(resource, Symbol.dispose, {
       configurable: true,
       get: () => {
         throw cause

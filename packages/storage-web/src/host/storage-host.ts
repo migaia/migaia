@@ -2,7 +2,6 @@ import {
   defineFeature as defineHostFeature,
   defineHost,
   definePlugin as defineHostPlugin,
-  invokeCaptured,
   type IHostHandle,
   type IPluginHostOptions,
   type IPlugin,
@@ -405,7 +404,7 @@ export class StorageHostFacade<
               )
             }
             try {
-              core.onDispose(() => invokeCaptured(snapshot.dispose, snapshot.receiver, []))
+              core.onDispose(() => Reflect.apply(snapshot.dispose, snapshot.receiver, []))
             } catch (error) {
               void this.#disposeLateStore(snapshot.store)
               throw error
@@ -800,7 +799,7 @@ export class StorageHostFacade<
       return
     }
     try {
-      await invokeCaptured(snapshot.dispose, snapshot.receiver, [])
+      await Reflect.apply(snapshot.dispose, snapshot.receiver, [])
     } catch (error) {
       this.#report(error)
     }

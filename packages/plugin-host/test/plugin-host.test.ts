@@ -578,11 +578,20 @@ describe('PluginHost', () => {
     ).rejects.toMatchObject({ code: 'ABORTED' })
   })
 
-  it('re-exports generator signals with middleware-pipeline identity', () => {
+  it('uses canonical signals internally without exposing pipeline or invocation aliases', () => {
     expect(hostContinue).toBe(middlewareContinue)
     expect(hostHalt).toBe(middlewareHalt)
     expect(hostUndefined).toBe(middlewareUndefined)
-    expect(pluginHostPublic.MiddlewarePipelineMode).toBe(MiddlewarePipelineMode)
+    for (const name of [
+      'MiddlewarePipelineMode',
+      'MiddlewarePipelineViolation',
+      'GENERATOR_CONTINUE',
+      'GENERATOR_HALT',
+      'GENERATOR_UNDEFINED',
+      'disposeKey',
+      'invokeCaptured'
+    ])
+      expect(pluginHostPublic).not.toHaveProperty(name)
     expect(pluginHostPublic).not.toHaveProperty('PluginHostPipelineMode')
     expect(pluginHostPublic).not.toHaveProperty('adaptSyncStageToAsync')
   })

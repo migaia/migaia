@@ -89,6 +89,9 @@ importers:
       '@migaia/lifecycle':
         specifier: workspace:^
         version: link:../lifecycle
+      '@migaia/middleware-pipeline':
+        specifier: workspace:^
+        version: link:../middleware-pipeline
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host
@@ -711,6 +714,9 @@ importers:
 
   packages/store-middleware:
     dependencies:
+      '@migaia/middleware-pipeline':
+        specifier: workspace:^
+        version: link:../middleware-pipeline
       '@migaia/plugin-host':
         specifier: workspace:^
         version: link:../plugin-host

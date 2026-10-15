@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { openComposition } from '../src/composition-entry.js'
+import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import {
   defineFeature,
   definePlugin,
   PluginHost,
   PluginHostErrorCode,
-  MiddlewarePipelineMode,
   type IPluginConstraint
 } from '../src/index.js'
 

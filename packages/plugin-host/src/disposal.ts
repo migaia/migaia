@@ -1,8 +1,6 @@
 import type { IPluginDisposer, IPluginResource } from './typing.js'
-import { asyncDisposeKey, asyncDisposeKeys, disposeKey, disposeKeys } from './symbols.js'
+import { asyncDisposeKeys, disposeKeys } from './symbols.js'
 import { invokeCaptured } from './invocation.js'
-
-export { asyncDisposeKey, disposeKey }
 
 /** One disposer property value captured during admission, before user mutation can replace it. */
 type IDisposerCandidate = {

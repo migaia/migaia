@@ -1,6 +1,6 @@
 import { reportDiagnostic } from './diagnostic-report.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
-import { asyncDisposeKey, disposeKey } from './disposal.js'
+import { asyncDisposeKey, disposeKeys } from './symbols.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginHostErrorCode } from './typing.js'
 import type { IExtensionOwner, ISharedExtensionSlot } from './registry.js'
@@ -68,7 +68,7 @@ const assertExtensionResult = (extension: unknown, pluginName: string): object =
   for (const key of Reflect.ownKeys(extension)) {
     if (
       (asyncDisposeKey !== undefined && key === asyncDisposeKey) ||
-      (disposeKey !== undefined && key === disposeKey)
+      (typeof key === 'symbol' && disposeKeys.includes(key))
     )
       throw new PluginHostError(
         PluginHostErrorCode.extensionReserved,

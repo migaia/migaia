@@ -35,6 +35,7 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
+    "@migaia/middleware-pipeline": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
     "@migaia/reactive": "workspace:^",
     "@migaia/store-light": "workspace:^",

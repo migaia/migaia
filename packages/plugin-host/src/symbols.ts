@@ -1,11 +1,10 @@
 /**
  * Disposal symbols for resource contracts (R-7).
  *
- * The declared `unique symbol` supplies the type-level disposal key. Runtime capability detection
- * reads host `Symbol.dispose` and `Symbol.asyncDispose` and recognizes them alongside the declared
- * keys. Plugins can use either package-exported symbols or host-global symbols.
+ * Synchronous resources use the native Symbol.dispose or a callback. Async callers may use the
+ * exported asyncDisposeKey when the host lacks a native symbol. Admission and extension validation
+ * share these captured key lists instead of introducing another synchronous symbol.
  */
-export const disposeKey: unique symbol = Symbol('plugin-host.dispose')
 export const asyncDisposeKey: typeof Symbol.asyncDispose =
   (Symbol as { asyncDispose?: typeof Symbol.asyncDispose }).asyncDispose ??
   (Symbol('plugin-host.asyncDispose') as typeof Symbol.asyncDispose)
@@ -14,13 +13,8 @@ export const asyncDisposeKey: typeof Symbol.asyncDispose =
 const hostDispose = (Symbol as { dispose?: symbol }).dispose
 const hostAsyncDispose = (Symbol as { asyncDispose?: symbol }).asyncDispose
 
-/**
- * Equivalent synchronous disposal keys, including the package declaration and available host
- * symbol, for runtime detection.
- */
-export const disposeKeys: readonly symbol[] = [disposeKey, hostDispose].filter(
-  (key): key is symbol => key !== undefined
-)
+/** Supported synchronous disposal key, empty when the host requires a cleanup callback instead. */
+export const disposeKeys: readonly symbol[] = hostDispose === undefined ? [] : [hostDispose]
 /**
  * Equivalent asynchronous disposal keys, including the package declaration and available host
  * symbol, for runtime detection.

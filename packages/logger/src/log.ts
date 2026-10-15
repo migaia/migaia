@@ -7,13 +7,15 @@ import {
   type ICanonicalEventChannel
 } from '@migaia/event-subscriber'
 import type {
-  IPluginHostDisposalResult,
-  IPluginHostOptions,
   IMiddlewarePipelineMode,
   ISyncMiddlewareStage,
   IAsyncMiddlewareStage,
   IGeneratorMiddlewareStage,
-  IAsyncGeneratorMiddlewareStage,
+  IAsyncGeneratorMiddlewareStage
+} from '@migaia/middleware-pipeline'
+import type {
+  IPluginHostDisposalResult,
+  IPluginHostOptions,
   IHostHandle
 } from '@migaia/plugin-host'
 import { createLoggerError, createLoggerTypeError, LoggerErrorCode } from './errors.js'

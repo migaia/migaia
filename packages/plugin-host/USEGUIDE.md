@@ -153,7 +153,7 @@ const prefix = definePlugin(prefixDefinition)
 | `features`                                      | 命名 Feature 定义或 provider 的 Feature 引用                                | 可选   | Feature record          | 同步      | 声明本插件提供和消费的实例能力；依赖拓扑由 Host 统一解析。                                                          |
 | `update?(next, core)`                           | `next: IReadonlyConfig<TConfig>`，候选完整配置                              | 可选   | `void \| Promise<void>` | 视情况    | 响应 `config.update`；成功返回才提交 `next`，且 `next` 只能读取。                                                   |
 | `dispose?()`                                    | 无                                                                          | 可选   | `void \| Promise<void>` | 视情况    | 插件级清理。                                                                                                        |
-| `[disposeKey]?` / `[Symbol.dispose]?`           | 无                                                                          | 可选   | `void`                  | 同步      | 未声明 `dispose` 时的同步清理兜底；也接受宿主原生 `Symbol.dispose`（若存在）。                                      |
+| `[Symbol.dispose]?` / `[Symbol.dispose]?`           | 无                                                                          | 可选   | `void`                  | 同步      | 未声明 `dispose` 时的同步清理兜底；也接受宿主原生 `Symbol.dispose`（若存在）。                                      |
 | `[asyncDisposeKey]?` / `[Symbol.asyncDispose]?` | 无                                                                          | 可选   | `void \| Promise<void>` | 视情况    | 未声明 `dispose` 时的清理兜底。同步安装也可提供异步清理钩子。                                                       |
 
 `install()` 返回的可枚举 data property 通过 `handle.extensions` 发布。非枚举 key 被忽略，并经 `diagnostic` 上报 `EXTENSION_NON_ENUMERABLE_IGNORED`。extension 对象必须是普通对象。getter、setter 和不可配置的属性会被拒绝为 `INVALID_OPTION`。`then`、dispose symbols 等保留键会被拒绝为 `EXTENSION_RESERVED`。已占用的 extension key 会被拒绝为 `EXTENSION_DUPLICATE`。`Object.prototype` 成员会被拒绝为 `EXTENSION_OBJECT_PROTOTYPE`。`catch` 和 `finally` 可以正常使用。
@@ -467,7 +467,7 @@ setup 运行期间 Host mutation 与 `config.update` 由同步守卫拒绝，不
 | `PLUGIN_DISPOSE_FAILED`            | 插件 `beforeRelease` 或卸载步骤失败；原始错误位于 `cause`，后续清理继续。                                                                                                                                                                                 |
 | `EXTENSION_DUPLICATE`              | extension key 与已有成员冲突。                                                                                                                                                                                                                            |
 | `EXTENSION_OBJECT_PROTOTYPE`       | extension key 与 `Object.prototype` 上的成员冲突（如 `toString`）。                                                                                                                                                                                       |
-| `EXTENSION_RESERVED`               | extension key 是 Host 保留成员（如 `then`、`disposeKey`、`asyncDisposeKey`）。                                                                                                                                                                            |
+| `EXTENSION_RESERVED`               | extension key 是 Host 保留成员（如 `then`、`Symbol.dispose`、`asyncDisposeKey`）。                                                                                                                                                                            |
 | `EXTENSION_NON_ENUMERABLE_IGNORED` | 诊断（非抛出）：`install()` 返回值上的非枚举 key 被有意忽略，未挂载到 Host；通过 `diagnostic` 回调上报。                                                                                                                                                  |
 | `PREREQUISITE_DISABLED`            | feature provider 被禁用；可启用该插件后重试。                                                                                                                                                                                                             |
 | `PREREQUISITE_REMOVED`             | feature provider 已卸载；需重新安装 provider。                                                                                                                                                                                                            |
@@ -502,20 +502,23 @@ PluginHostErrorCode.mutationQueueTimeout // 'MUTATION_QUEUE_TIMEOUT'
 ## 10. 资源清理协议
 
 ```ts doc-test=check
-import { definePlugin, disposeKey, asyncDisposeKey } from '@migaia/plugin-host'
+import {
+  definePlugin,
+  asyncDisposeKey
+} from '@migaia/plugin-host'
 
 const resources = definePlugin('resources', (core) => ({
   install: () => {
     const cleanup = () => console.log('resource released')
     core.onDispose(() => cleanup()) // 普通函数
-    core.onDispose({ [disposeKey]: () => cleanup() }) // 同步 disposable
+    if (Symbol.dispose) core.onDispose({ [Symbol.dispose]: () => cleanup() }) // 同步 disposable
     core.onDispose({ [asyncDisposeKey]: async () => cleanup() }) // 异步 disposable
     return {}
   }
 }))
 ```
 
-`onDispose(resource)` 接受三种形状（`IPluginResource`）：普通函数、带 `[disposeKey]`/`Symbol.dispose` 的同步 disposable、带 `[asyncDisposeKey]`/`Symbol.asyncDispose` 的异步 disposable。同一个资源如果同时提供多种清理方式，优先级是：显式的函数形态 > `Symbol.asyncDispose`/`asyncDisposeKey` > `Symbol.dispose`/`disposeKey`（源码 `src/disposal.ts` 的 `snapshotDisposer`：先扫描全部 async 候选键，再扫描 sync 候选键，取第一个值为函数的）。异步（`use()` 或 `useSync`）插件的资源清理支持完整的 async disposer；`useSync` 安装失败时通过 `detail.completion` 取得最终 rollback detail，见 [§4](#4-插件-core-api-参考)。
+`onDispose(resource)` 接受普通清理函数、带 `Symbol.dispose` 的同步资源或带 `asyncDisposeKey`/`Symbol.asyncDispose` 的异步资源。普通函数直接执行；对象优先使用异步 disposer，其次同步 disposer。没有原生同步 symbol 的环境可传清理函数。资源逆序释放，异步回滚的完整错误从 `detail.completion` 取得。
 
 `unUse()`/`dispose()` 先运行该代可选的 `beforeRelease`。随后撤销注册与 stage 可见性，再运行插件 disposer，最后释放资源 disposer。资源按登记的逆序释放。每个 disposer 受 `disposeStepTimeoutMs` 限制。失败不会中断后续清理。`unUse()` 把失败收集到结果的 `errors`，`dispose()` 把失败收集到 `cleanupErrors`。`cleanupComplete: false` 表示仍有物理清理未完成；调用方应继续等待 `physicalCompletion`。
 
@@ -534,20 +537,21 @@ import {
   type IAsyncGeneratorMiddlewareStage,
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
-  GENERATOR_UNDEFINED,
+  GENERATOR_UNDEFINED
+} from '@migaia/middleware-pipeline'
+import {
   PluginHostDisposalNodeKind,
-  invokeCaptured,
   readPluginHostDisposalProvenance,
-  disposeKey,
   asyncDisposeKey
 } from '@migaia/plugin-host'
 ```
 
-mode、violation 与四种 stage 类型都从 `@migaia/middleware-pipeline` **原名转发**。plugin-host 不再维护重复的 mode/stage 声明或公开适配器；宿主在注册 stage 时通过其唯一的 `createPipeline` runner 执行提升。需要手工提升或直接执行 pipeline 时使用 `@migaia/middleware-pipeline` 的 `createPipeline`。
+管线 mode、violation、stage 类型与 generator 信号直接从 `@migaia/middleware-pipeline` 导入。Host 使用其唯一的 `createPipeline` runner 执行和提升 stage。
 
-- **`GENERATOR_CONTINUE` / `GENERATOR_HALT` / `GENERATOR_UNDEFINED`**——generator/async-generator pipeline 共用的哨兵值（`unique symbol`，从 `@migaia/middleware-pipeline` 转发，保持跨包同一身份）：stage 的 `return` 可以返回它们中的一个来表达"继续/终止/显式 undefined"，语义见 [§7](#7-pipeline-处理管线) 表格。
-- **`disposeKey: unique symbol` / `asyncDisposeKey: unique symbol`**——本包自声明的 symbol（不依赖 `ESNext.Disposable` lib，因此不强制要求该 lib 的类型声明）。插件/资源可以用这两个 key 之一声明清理方法，运行时会把自声明 symbol 与宿主原生 `Symbol.dispose`/`Symbol.asyncDispose`（若当前运行时提供）都识别为等价键；宿主不提供原生 symbol 时，只有自声明 symbol 生效。
-- **`invokeCaptured(callable, receiver, args)`**——框架适配器用于保留 JavaScript receiver、参数顺序和抛出值身份的低层调用边界。业务插件应直接调用自己的函数；只有已经独立完成 callable/receiver/args 准入的适配器才应使用它。
+使用这些管线 API 时，将 `@migaia/middleware-pipeline` 声明为应用的直接依赖。
+
+- **`GENERATOR_CONTINUE` / `GENERATOR_HALT` / `GENERATOR_UNDEFINED`**——generator/async-generator pipeline 共用的哨兵值（`unique symbol`，从 `@migaia/middleware-pipeline` 导入）：stage 的 `return` 可以返回它们中的一个来表达"继续/终止/显式 undefined"，语义见 [§7](#7-pipeline-处理管线) 表格。
+- **`asyncDisposeKey`** —— 宿主提供 `Symbol.asyncDispose` 时使用该原生键，否则使用包内 fallback。同步资源使用原生 `Symbol.dispose` 或普通清理函数。
 - **`PluginHostDisposalNodeKind` / `readPluginHostDisposalProvenance(error)`**——清理诊断协议。前者区分 host error、aggregate 和 disposer wrapper；后者只读取本物理包实例登记的 provenance，未知错误或另一份重复安装的包实例会返回 `undefined`，不会按对象外形猜测。它用于日志与审计，不应代替 `source`/`code`/`cause` 错误处理。
 
 ---
@@ -705,7 +709,10 @@ try {
 ### 12.5 generator pipeline：用 `GENERATOR_HALT` 提前截断处理链
 
 ```ts doc-test=check
-import { PluginHost, GENERATOR_HALT } from '@migaia/plugin-host'
+import {
+  GENERATOR_HALT
+} from '@migaia/middleware-pipeline'
+import { PluginHost } from '@migaia/plugin-host'
 
 type IEvent = { level: 'info' | 'debug'; message: string }
 
