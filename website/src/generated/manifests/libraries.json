@@ -24527,7 +24527,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createStore,\n  createStoreSync,\n  createAsyncStore,\n  createLegacyStore,\n  storeReady\n} from '@migaia/store-light';"
+                  "code": "import {\n  createStore,\n  createAsyncStore,\n  storeReady\n} from '@migaia/store-light';"
                 },
                 {
                   "type": "paragraph",
@@ -24557,15 +24557,6 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createStoreSync`｜3 秒上手 —— `createStore` 的显式命名别名，行为完全一致："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const store = createStoreSync({ count: 0 });"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createAsyncStore`｜10 秒上手 —— 定义里含异步 `FieldBuilder` 时使用，返回的 Promise resolve 时全部字段已就绪："
                 },
                 {
@@ -24576,19 +24567,6 @@
                 {
                   "type": "paragraph",
                   "text": "参数与 `createStore` 相同（`shape`、`options?: ICreateStoreOptions`），区别只在于接受异步 `FieldBuilder` 且返回 `Promise<IReactiveStore<S>>`。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createLegacyStore`｜5 秒上手 —— 历史兼容入口：不做同步字段限制，异步字段未就绪时需自行等待："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const store = createLegacyStore(shapeWithAsyncField);\nawait storeReady(store); // 或检查 store.$async"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数与 `createStore` 相同；新代码优先用 `createStore`/`createAsyncStore`。"
                 },
                 {
                   "type": "paragraph",
@@ -24953,7 +24931,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createStore,\n  createStoreSync,\n  createAsyncStore,\n  createLegacyStore,\n  storeReady,\n  raw,\n  isRaw,\n  isFieldBuilder,\n  FIELD_BUILDER,\n  createStoreResource,\n  createStoreResourceScope\n} from '@migaia/store-light';"
+                  "code": "import {\n  createStore,\n  createAsyncStore,\n  storeReady,\n  raw,\n  isRaw,\n  isFieldBuilder,\n  FIELD_BUILDER,\n  createStoreResource,\n  createStoreResourceScope\n} from '@migaia/store-light';"
                 },
                 {
                   "type": "paragraph",
@@ -25026,25 +25004,11 @@
                       "同步创建；shape 中任意字段是非 `mode: 'sync'` 的 `FieldBuilder`（`mode: 'async'` 或历史无 mode 的 Builder）会在读取属性描述符阶段直接抛错，不会执行任何 I/O，提示改用 `createAsyncStore`"
                     ],
                     [
-                      "`createStoreSync(shape, options?)`",
-                      "同上",
-                      "同上",
-                      "同步",
-                      "`createStore` 的显式命名别名，行为完全一致，不是独立的生命周期语义"
-                    ],
-                    [
                       "`createAsyncStore(shape, options?)`",
                       "`(S) => Promise<IReactiveStore<S>>`",
                       "`shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions`",
                       "异步",
                       "允许异步 `FieldBuilder`；返回的 Promise 在全部异步字段初始化完成（或抛错）后才 resolve/reject，resolve 后每个字段都已就绪"
-                    ],
-                    [
-                      "`createLegacyStore(shape, options?)`",
-                      "`(S) => IReactiveStore<S>`",
-                      "`shape: IStoreDefinition<S>`；`options?: ICreateStoreOptions`",
-                      "同步",
-                      "历史兼容门面：不做同步字段限制，即使 shape 里有异步字段也立即同步返回 Store——此时异步字段还没就绪，调用方需要自行用 `storeReady(store)` 等待，或检查 `store.$async`"
                     ],
                     [
                       "`storeReady(store)`",
@@ -25057,7 +25021,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "新代码建议只用 `createStore`（纯同步定义）和 `createAsyncStore`（含异步字段的定义）这两个入口；`createLegacyStore` 是为迁移期保留的兼容层。"
+                  "text": "创建入口只有 `createStore`（纯同步定义）和 `createAsyncStore`（含异步字段的定义）。"
                 },
                 {
                   "type": "paragraph",
@@ -25245,7 +25209,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "同步 vs 异步字段：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `LegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve，或用 `createLegacyStore()` + `storeReady()`。"
+                  "text": "同步 vs 异步字段：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `LegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve。"
                 },
                 {
                   "type": "paragraph",
@@ -25651,7 +25615,7 @@
                     ],
                     [
                       "`[store] store has no asynchronous initialization`",
-                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore`/`createLegacyStore` 创建的对象）调用 `storeReady()`"
+                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
                     ],
                     [
                       "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
@@ -25736,7 +25700,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`createStore()` 报 \"only accepts synchronous fields\"，但我看代码是同步的。 检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `LegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()`/`createLegacyStore()` 接受。"
+                  "text": "Q：`createStore()` 报 \"only accepts synchronous fields\"，但我看代码是同步的。 检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `LegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()` 接受。"
                 },
                 {
                   "type": "paragraph",

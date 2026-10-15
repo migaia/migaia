@@ -108663,36 +108663,6 @@
     },
     {
       "from": "/en/docs/store-light/api",
-      "to": "/en/docs/store-light/api#store-light-index--createLegacyStore",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/store-light/api#store-light-index--createLegacyStore",
-      "to": "/en/docs/store-light/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/store-light/api#store-light-index--createLegacyStore",
-      "to": "/en/docs/store-light/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/store-light/getting-started",
-      "to": "/en/docs/store-light/api#store-light-index--createLegacyStore",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/store-light/api#store-light-index--createLegacyStore",
-      "to": "/en/docs/store-light",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/store-light",
-      "to": "/en/docs/store-light/api#store-light-index--createLegacyStore",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/store-light/api",
       "to": "/en/docs/store-light/api#store-light-index--createStore",
       "type": "api-symbol"
     },
@@ -108899,36 +108869,6 @@
     {
       "from": "/en/docs/store-light",
       "to": "/en/docs/store-light/api#store-light-index--createStoreResourceScope",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/store-light/api",
-      "to": "/en/docs/store-light/api#store-light-index--createStoreSync",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/store-light/api#store-light-index--createStoreSync",
-      "to": "/en/docs/store-light/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/store-light/api#store-light-index--createStoreSync",
-      "to": "/en/docs/store-light/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/store-light/getting-started",
-      "to": "/en/docs/store-light/api#store-light-index--createStoreSync",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/store-light/api#store-light-index--createStoreSync",
-      "to": "/en/docs/store-light",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/store-light",
-      "to": "/en/docs/store-light/api#store-light-index--createStoreSync",
       "type": "architecture-symbol"
     },
     {
@@ -110093,36 +110033,6 @@
     },
     {
       "from": "/zh/docs/store-light/api",
-      "to": "/zh/docs/store-light/api#store-light-index--createLegacyStore",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/store-light/api#store-light-index--createLegacyStore",
-      "to": "/zh/docs/store-light/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/store-light/api#store-light-index--createLegacyStore",
-      "to": "/zh/docs/store-light/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/store-light/getting-started",
-      "to": "/zh/docs/store-light/api#store-light-index--createLegacyStore",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/store-light/api#store-light-index--createLegacyStore",
-      "to": "/zh/docs/store-light",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/store-light",
-      "to": "/zh/docs/store-light/api#store-light-index--createLegacyStore",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/store-light/api",
       "to": "/zh/docs/store-light/api#store-light-index--createStore",
       "type": "api-symbol"
     },
@@ -110329,36 +110239,6 @@
     {
       "from": "/zh/docs/store-light",
       "to": "/zh/docs/store-light/api#store-light-index--createStoreResourceScope",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/store-light/api",
-      "to": "/zh/docs/store-light/api#store-light-index--createStoreSync",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/store-light/api#store-light-index--createStoreSync",
-      "to": "/zh/docs/store-light/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/store-light/api#store-light-index--createStoreSync",
-      "to": "/zh/docs/store-light/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/store-light/getting-started",
-      "to": "/zh/docs/store-light/api#store-light-index--createStoreSync",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/store-light/api#store-light-index--createStoreSync",
-      "to": "/zh/docs/store-light",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/store-light",
-      "to": "/zh/docs/store-light/api#store-light-index--createStoreSync",
       "type": "architecture-symbol"
     },
     {
