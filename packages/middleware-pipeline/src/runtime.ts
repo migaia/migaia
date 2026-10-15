@@ -217,45 +217,34 @@ const reduceGeneratorTerminal = <TValue>(
   return { halted: false, value: terminal as TValue }
 }
 
-/** Adapts a sync stage to async middleware while preserving next() violations. */
+/**
+ * Adapts a sync stage to async middleware while preserving next() violations.
+ *
+ * Keeps the sync runner's linear-reduce order: `next()` inside the stage only records the value,
+ * and downstream starts after the stage returns, so code after `next()` always runs before
+ * downstream. A throwing stage never starts downstream and rejects with its own error; a downstream
+ * rejection propagates unchanged, and the runner still owns stage+downstream composition.
+ */
 export const adaptSyncStageToAsync =
   <TValue>(
     stage: ISyncMiddlewareStage<TValue>,
     onViolation: IMiddlewarePipelineViolationHandler = () => {}
   ): IAsyncMiddlewareStage<TValue> =>
   async (value, next, context) => {
-    let downstream: Promise<void> | undefined
+    let nextValue = value
     const guard = createNextGuard<TValue, void>(
       onViolation,
       () => undefined,
-      (nextValue) => {
-        downstream = next(nextValue)
+      (candidate) => {
+        nextValue = candidate
       }
     )
-    let stageError: unknown
-    let hasStageError = false
     try {
       invokeWithContext(stage, [value, guard.next], context)
-    } catch (error) {
-      stageError = error
-      hasStageError = true
+    } finally {
+      guard.returned()
     }
-    guard.returned()
-    let downstreamError: unknown
-    let hasDownstreamError = false
-    if (downstream) {
-      try {
-        await downstream
-      } catch (error) {
-        downstreamError = error
-        hasDownstreamError = true
-      }
-    }
-    // The runner owns stage+downstream composition. Standalone adapter calls preserve the
-    // stage's identity while still observing downstream, preventing a second AggregateError from
-    // entering the host combiner when this adapter is nested inside runAsyncMiddleware.
-    if (hasStageError) throw stageError
-    if (hasDownstreamError) throw downstreamError
+    if (guard.called()) await next(nextValue)
   }
 
 /** Adapts a sync stage to generator middleware while preserving next() violations. */

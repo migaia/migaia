@@ -38,8 +38,9 @@ export const StoreSharedErrorCode = {
   indexOutOfRange: 'INDEX_OUT_OF_RANGE',
 
   /**
-   * A seqlock does not settle within the spin limit because a cell is unstable, a lock cannot be
-   * acquired, or updates keep failing.
+   * A seqlock does not settle because a cell stays unstable or its lock stays held for the
+   * sustained contention window (about 1 s, after spin rounds with backoff), or `update()` keeps
+   * losing the write race for its whole spin limit.
    *
    * A writer may have crashed while holding the lock, leaving a deadlock that cannot recover.
    * Rebuild the buffer.

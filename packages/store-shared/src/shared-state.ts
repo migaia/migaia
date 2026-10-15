@@ -32,28 +32,69 @@ import {
  * - 写者不在持锁期间调用用户代码——`update()` 先一致读、锁外算、再带期望值获锁， 值被别人改了就重来。用户回调抛错不会留下一把奇数的死锁。
  */
 
+/** Busy-spin attempts in one contention round, before each pause or backoff. */
 const SPIN_LIMIT = 1 << 16
 
-/** Keeps waitAsync callback diagnostics from escaping the cross-thread promise boundary. */
-function reportSharedWatchFailure(runtime: IRuntime, error: unknown): void {
-  try {
-    runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
-    return
-  } catch (reporterError) {
-    const hostReportError = (globalThis as { reportError?: (error: unknown) => void }).reportError
+/**
+ * Sustained contention window, in milliseconds, before a seqlock read or lock acquisition throws
+ * `CONTENTION_LIMIT`. A preempted writer resumes well within it; a seq that stays odd for this long
+ * means the writer abandoned the lock.
+ */
+const CONTENTION_TIMEOUT_MS = 1000
+
+/** Timeout, in milliseconds, of one `Atomics.wait` pause between contention rounds. */
+const CONTENTION_WAIT_MS = 1
+
+/**
+ * Whether this agent may block in `Atomics.wait`. Browser main threads refuse it with a
+ * `TypeError`; the first refusal flips this to false so later rounds back off by spinning again.
+ */
+let blockingWaitAllowed = true
+
+/**
+ * Pauses after one exhausted spin round. Returns false once contention has lasted
+ * `CONTENTION_TIMEOUT_MS` since `startedAt`, so the caller throws `CONTENTION_LIMIT`.
+ *
+ * Worker threads block in `Atomics.wait` until the seq changes or `CONTENTION_WAIT_MS` elapses.
+ * Where blocking is refused, the pause returns at once and the caller runs another spin round.
+ */
+function backOffContention(
+  versionView: BigInt64Array,
+  versionSlot: number,
+  startedAt: number
+): boolean {
+  if (performance.now() - startedAt >= CONTENTION_TIMEOUT_MS) return false
+  if (blockingWaitAllowed) {
     try {
-      if (hostReportError) hostReportError(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // Diagnostics are best effort; a failing sink must not create another unhandled failure.
+      Atomics.wait(
+        versionView,
+        versionSlot,
+        Atomics.load(versionView, versionSlot),
+        CONTENTION_WAIT_MS
+      )
+    } catch (error) {
+      // A TypeError is the host refusing to block this agent, a capability answer rather than a
+      // failure. Any other error is a real fault and propagates.
+      if (!(error instanceof TypeError)) throw error
+      blockingWaitAllowed = false
     }
   }
+  return true
+}
+
+/**
+ * Keeps waitAsync callback diagnostics from escaping the cross-thread promise boundary.
+ * `runtime.reportError` already contains reporter failures, so no fallback sink is needed here.
+ */
+function reportSharedWatchFailure(runtime: IRuntime, error: unknown): void {
+  runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
 }
 
 /**
  * 一致读：value 与 version 同源。
  *
- * 自旋有上限：写者若在持锁期间崩溃（线程被终止、页面被杀），seq 会永远停在奇数， 此时无限自旋会把这条线程也吊死。到限即抛，把「有人写坏了」暴露出来，而不是静默卡住。
+ * 自旋有上限：写者若在持锁期间崩溃（线程被终止、页面被杀），seq 会永远停在奇数， 此时无限自旋会把这条线程也吊死。 每轮自旋到限后先退避（worker 用 `Atomics.wait`
+ * 短暂阻塞，主线程再自旋一轮），写者只是被抢占时会很快恢复； 持续 `CONTENTION_TIMEOUT_MS` 仍未稳定才抛，把「有人写坏了」暴露出来，而不是静默卡住。
  */
 function readConsistent(
   valueView: Int32Array,
@@ -61,28 +102,38 @@ function readConsistent(
   valueSlot: number,
   versionSlot: number
 ): { readonly value: number; readonly version: bigint } {
-  for (let spins = 0; spins < SPIN_LIMIT; spins++) {
-    const before = Atomics.load(versionView, versionSlot)
-    if ((before & 1n) !== 0n) continue
-    const value = Atomics.load(valueView, valueSlot)
-    const after = Atomics.load(versionView, versionSlot)
-    if (before === after) return { value, version: before }
-  }
+  /** Start of the sustained-contention window; set after the first exhausted spin round. */
+  let startedAt: number | undefined
+  do {
+    for (let spins = 0; spins < SPIN_LIMIT; spins++) {
+      const before = Atomics.load(versionView, versionSlot)
+      if ((before & 1n) !== 0n) continue
+      const value = Atomics.load(valueView, valueSlot)
+      const after = Atomics.load(versionView, versionSlot)
+      if (before === after) return { value, version: before }
+    }
+    startedAt ??= performance.now()
+  } while (backOffContention(versionView, versionSlot, startedAt))
   throw createStoreSharedError(
     StoreSharedErrorCode.contentionLimit,
     StoreSharedErrorText.cellUnsettled
   )
 }
 
-/** 获锁：把偶数 seq 推成奇数。返回获锁前的偶数 seq。 */
+/** 获锁：把偶数 seq 推成奇数。返回获锁前的偶数 seq。退避与超时规则同 `readConsistent`。 */
 function acquire(versionView: BigInt64Array, versionSlot: number): bigint {
-  for (let spins = 0; spins < SPIN_LIMIT; spins++) {
-    const seq = Atomics.load(versionView, versionSlot)
-    if ((seq & 1n) !== 0n) continue
-    if (Atomics.compareExchange(versionView, versionSlot, seq, seq + 1n) === seq) {
-      return seq
+  /** Start of the sustained-contention window; set after the first exhausted spin round. */
+  let startedAt: number | undefined
+  do {
+    for (let spins = 0; spins < SPIN_LIMIT; spins++) {
+      const seq = Atomics.load(versionView, versionSlot)
+      if ((seq & 1n) !== 0n) continue
+      if (Atomics.compareExchange(versionView, versionSlot, seq, seq + 1n) === seq) {
+        return seq
+      }
     }
-  }
+    startedAt ??= performance.now()
+  } while (backOffContention(versionView, versionSlot, startedAt))
   throw createStoreSharedError(
     StoreSharedErrorCode.contentionLimit,
     StoreSharedErrorText.lockUnacquired

@@ -210,6 +210,8 @@ export function createEventHub<C extends IEventMap, V = undefined>(
       )
     }
     const { channel, validated } = getChannel(key)
+    /** Alias the channel context carries; the hub copies only this data key, never `abort`. */
+    const alias = projectionPlan?.alias
     let deactivateRegistration: (() => void) | undefined
     const channelRelease = channel.subscribe((event) => {
       const context = {
@@ -233,16 +235,15 @@ export function createEventHub<C extends IEventMap, V = undefined>(
           event.setTaskId(taskId)
         }
       }
-      for (const key of Reflect.ownKeys(event as object)) {
-        const descriptor = Object.getOwnPropertyDescriptor(event as object, key)
-        if (descriptor && 'value' in descriptor)
-          Object.defineProperty(context, key, {
-            configurable: false,
-            enumerable: descriptor.enumerable,
-            writable: false,
-            value: descriptor.value
-          })
-      }
+      // Copy only the projection alias. A reflective copy would also copy the channel's own
+      // `abort`/`setTaskId` data properties over the wrappers above, so `deactivate` never ran.
+      if (alias !== undefined)
+        Object.defineProperty(context, alias, {
+          configurable: false,
+          enumerable: true,
+          writable: false,
+          value: (event as unknown as Record<string, unknown>)[alias]
+        })
       return listener(context as never)
     })
     totalSize += 1
