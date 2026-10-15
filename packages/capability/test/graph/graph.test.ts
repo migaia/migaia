@@ -34,6 +34,26 @@ const deferred = <T>() => {
 }
 
 describe('capability graph core', () => {
+  it('CAP-P3 preserves strict-equality treatment of a NaN auxiliary value', async () => {
+    /** Owning a primitive is supported; NaN was never equal to itself in the old collision scan. */
+    const released = vi.fn()
+    /** The public graph must adopt the primary NaN while still releasing its auxiliary entry. */
+    const graph = createCapabilityGraph()
+    graph.register({
+      id: id('nan-resource'),
+      kind: 'test',
+      dependencies: [],
+      start: (context) => {
+        context.own(Number.NaN, { force: released })
+        return instance(Number.NaN)
+      }
+    })
+    await graph.ready()
+    expect(graph.state).toBe(CapabilityGraphState.ready)
+    await graph.dispose()
+    expect(released).toHaveBeenCalledTimes(1)
+  })
+
   it('CAP-B6 rejects missing force at own admission and preserves the coded cause', async () => {
     /** A valid sibling proves malformed ownership does not poison later cleanup. */
     const released = vi.fn()
