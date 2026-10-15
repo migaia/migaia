@@ -373,6 +373,30 @@ export function persistUnit<TState>(
     }, debounceMs)
   }
 
+  /**
+   * Starts the write of a debounce window that dispose cut short. The snapshot is taken now, while
+   * the unit is still intact; the write runs after the write chain and is not awaited. Its failure
+   * is published on `writeError`, because the handle no longer reports write status.
+   */
+  function startFinalWrite(): void {
+    /** Envelope built from the snapshot at dispose time. */
+    let envelope: IEnvelope<Partial<TState>>
+    try {
+      envelope = {
+        version,
+        state: assertSynchronousCallbackResult(key, 'partialize', partialize(unit.snapshot()))
+      }
+    } catch (caught) {
+      writeError.value = caught
+      return
+    }
+    writeChain = writeChain
+      .then(() => writeEnvelope(storage, key, codec, envelope, {}))
+      .catch((caught: unknown) => {
+        writeError.value = caught
+      })
+  }
+
   stopSubscription = unit.subscribe(scheduleWrite)
 
   const hydrateAttempt = async (): Promise<void> => {
@@ -511,7 +535,12 @@ export function persistUnit<TState>(
       activeOperations.clear()
       writeStatus.value = PersistState.disposed
       lifecycleStatus.value = PersistState.disposed
-      if (timer) clearTimeout(timer)
+      if (timer) {
+        clearTimeout(timer)
+        timer = undefined
+        // A pending debounced write still owes storage the latest state.
+        startFinalWrite()
+      }
       stopSubscription?.()
     }
   }
