@@ -335,15 +335,14 @@ describe('createStore: IFieldBuilder protocol', () => {
 })
 
 describe('createAsyncStore / createLegacyStore / storeReady', () => {
-  it('contains cleanup reporter failure after synchronous construction failure', async () => {
+  it('reports cleanup failure after synchronous construction failure', async () => {
     const cleanup = new Error('sync cleanup failed')
-    let reporterCalled = false
-    const reporter = () => {
-      reporterCalled = true
-      throw new Error('runtime reporter failed')
-    }
+    /** Failures handed to the runtime reporter. */
+    const reported: unknown[] = []
     const runtime = createRuntime()
-    vi.spyOn(runtime, 'reportError').mockImplementation(reporter)
+    vi.spyOn(runtime, 'reportError').mockImplementation((error) => {
+      reported.push(error)
+    })
     const dirty: IFieldBuilder<IDisposable & { value: number }> = {
       [FIELD_BUILDER]: true,
       mode: 'sync',
@@ -372,7 +371,7 @@ describe('createAsyncStore / createLegacyStore / storeReady', () => {
     ).toThrow('sync init failed')
 
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
-    expect(reporterCalled).toBe(true)
+    expect(reported).toContain(cleanup)
   })
 
   it('disposes an async field that resolves after a synchronous sibling failure', async () => {

@@ -130,6 +130,7 @@ describe('store-light foreign field adoption rollback', () => {
       source: '@migaia/reactive',
       code: 'OWNERSHIP_CONFLICT'
     })
-    expect((thrown as Error).cause).toBe(cleanup)
+    // Cleanup failures are appended to the primary's non-enumerable `errors`, never its `cause`.
+    expect((thrown as { errors?: readonly unknown[] }).errors).toContain(cleanup)
   })
 })
