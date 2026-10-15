@@ -467,6 +467,13 @@ const graph = createDynamicCapabilityGraph<{ readonly version: number }>({
 })
 ```
 
+`startBatch` 与 `releaseBatch` 都是必填项：Graph 只负责排序、协调与 binding custody，不再自带节点级的
+start/release 默认路径。缺少任一回调时，`createDynamicCapabilityGraph()` 在创建时抛 `GRAPH_INVALID_OPTION`。
+`startBatch` 失败时，单节点批次把该节点标为 `failed`；多节点批次中 Graph 无法判断是哪一个节点出错，因此本批
+所有节点都标为 `blocked`（`reason: 'failed'`）。两种情况下 `nodeState().error` 都保留原始错误；抛出的 `GRAPH_START_FAILED` 在 `detail.nodes` 中列出本批节点。对没有处于
+suspended 状态的节点调用 `resume()` 抛 `GRAPH_NODE_NOT_SUSPENDED`；排在卡住的 mutation 之后、等待超过
+`mutationAdmissionMs` 的 mutation 以 `GRAPH_MUTATION_ADMISSION_TIMEOUT` 拒绝。
+
 `getBinding()` 是非 owning 诊断读取；需要把 binding 保留到异步工作结束时必须使用
 `acquireBinding()`，并在 `finally` 调用 lease 的 `release()`。Graph 对 remove/replace/dispose 的旧 generation
 先 seal 后 drain，新 generation 使用不同 lease key，因而晚到的旧 release 不会替新 binding 解锁。

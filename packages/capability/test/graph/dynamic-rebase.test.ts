@@ -4,6 +4,7 @@ import {
   type IDynamicGraphNodeDefinition
 } from '../../src/graph/dynamic.js'
 import type { IGraphNodeId } from '../../src/graph/index.js'
+import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.js'
 
 /** Builds one traced node for the canonical-order dynamic rebase oracle. */
 function node(
@@ -37,7 +38,7 @@ describe('dynamic topology-index rebase', () => {
     /** Observable startup and release sequence across the rebase boundary. */
     const events: string[] = []
     let startEnabled = false
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await expect(graph.register(node('A', [], events, () => startEnabled))).rejects.toMatchObject({
       code: 'GRAPH_START_FAILED'
     })
@@ -56,7 +57,7 @@ describe('dynamic topology-index rebase', () => {
 
     /** Fresh graph isolates removal policy from the terminal startup oracle. */
     const removalEvents: string[] = []
-    const removalGraph = createDynamicCapabilityGraph()
+    const removalGraph = createDynamicCapabilityGraph(createTestBatchOwner())
     await removalGraph.register(node('A', [], removalEvents))
     await removalGraph.register(node('B', ['A'], removalEvents))
     await removalGraph.register(node('C', [], removalEvents))

@@ -10,6 +10,7 @@ import type {
   IGraphNodeDiagnostic,
   IGraphNodeId
 } from '../../src/graph/index.js'
+import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.js'
 
 type INodeBinding = Readonly<{ readonly name: string }>
 
@@ -60,6 +61,7 @@ describe('dynamic capability graph', () => {
   it('releases only the exact removed binding custody after instance cleanup', async () => {
     const custody: string[] = []
     const graph = createDynamicCapabilityGraph<INodeBinding>({
+      ...createTestBatchOwner<INodeBinding>(),
       startBatch: (entries) =>
         entries.map((entry) => ({ value: entry.binding, release: async () => undefined })),
       releaseBinding: ({ id, reason }) => {
@@ -76,7 +78,7 @@ describe('dynamic capability graph', () => {
 
   it('retains missing-provider definitions as blocked and reconciles their frontier', async () => {
     const events: string[] = []
-    const graph = createDynamicCapabilityGraph<INodeBinding>()
+    const graph = createDynamicCapabilityGraph<INodeBinding>(createTestBatchOwner())
     await graph.register(node('consumer', ['provider'], events), { name: 'consumer' })
     expect(graph.nodeState('consumer' as IGraphNodeId).state).toBe('blocked')
     await graph.register(node('provider', [], events), { name: 'provider' })
@@ -88,7 +90,7 @@ describe('dynamic capability graph', () => {
   })
 
   it('starts a newly registered consumer against an existing ready provider', async () => {
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('provider'))
     await graph.register(node('consumer', ['provider']))
     expect(graph.nodeState('consumer' as IGraphNodeId).state).toBe('ready')
@@ -97,7 +99,7 @@ describe('dynamic capability graph', () => {
 
   it('cascades removal and restarts only the blocked frontier', async () => {
     const events: string[] = []
-    const graph: IDynamicCapabilityGraph = createDynamicCapabilityGraph()
+    const graph: IDynamicCapabilityGraph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('provider', [], events))
     await graph.register(node('consumer', ['provider'], events))
     await graph.register(node('unrelated', [], events))
@@ -113,7 +115,7 @@ describe('dynamic capability graph', () => {
   })
 
   it('rejects cyclic replacement before changing the existing generation', async () => {
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('a'))
     await graph.register(node('b', ['a']))
     const generation = graph.generation
@@ -125,9 +127,9 @@ describe('dynamic capability graph', () => {
     await graph.dispose()
   })
 
-  it('keeps a ready provider committed when a dependent restart fails', async () => {
+  it('blocks the whole start batch with the original error when one start fails', async () => {
     let failDependent = false
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('provider'))
     await graph.register({
       ...node('dependent', ['provider']),
@@ -138,16 +140,27 @@ describe('dynamic capability graph', () => {
     })
     failDependent = true
     await graph.remove('provider' as IGraphNodeId)
-    await expect(graph.register(node('provider'))).rejects.toMatchObject({
-      code: 'GRAPH_START_FAILED'
+    // Provider and dependent restart in one batch. The batch owner reports one failure, so the
+    // graph cannot attribute it to a node and blocks the whole batch with the original error.
+    const failure = await graph.register(node('provider')).then(
+      () => undefined,
+      (error: unknown) => error
+    )
+    expect(failure).toMatchObject({
+      code: 'GRAPH_START_FAILED',
+      detail: { nodes: ['provider', 'dependent'] }
     })
-    expect(graph.nodeState('provider' as IGraphNodeId).state).toBe('ready')
-    expect(graph.nodeState('dependent' as IGraphNodeId).state).toBe('failed')
+    for (const nodeId of ['provider', 'dependent'])
+      expect(graph.nodeState(nodeId as IGraphNodeId)).toMatchObject({
+        state: 'blocked',
+        reason: 'failed',
+        error: failure
+      })
     await graph.dispose()
   })
 
   it('retains a failed replacement definition for explicit recovery', async () => {
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('replaceable'))
     await expect(
       graph.replace({
@@ -158,6 +171,7 @@ describe('dynamic capability graph', () => {
       })
     ).rejects.toMatchObject({ code: 'GRAPH_START_FAILED' })
     expect(graph.nodes).toContain('replaceable')
+    // A single-node batch attributes the failure to that node.
     expect(graph.nodeState('replaceable' as IGraphNodeId).state).toBe('failed')
     await graph.replace(node('replaceable'))
     expect(graph.nodeState('replaceable' as IGraphNodeId).state).toBe('ready')
@@ -169,7 +183,7 @@ describe('dynamic capability graph', () => {
     const states: IGraphNodeDiagnostic[] = []
     const sizes: number[] = []
     for (const unrelatedCount of [0, 1_000, 4_000, 8_000]) {
-      const graph = createDynamicCapabilityGraph()
+      const graph = createDynamicCapabilityGraph(createTestBatchOwner())
       await graph.register(node('provider'))
       await graph.register(node('consumer', ['provider']))
       for (let index = 0; index < unrelatedCount; index += 1)
@@ -222,7 +236,7 @@ describe('dynamic capability graph', () => {
     }> = []
     for (const backgroundNodes of [1, 1_000, 2_000, 4_000, 8_000]) {
       for (const dense of [false, true]) {
-        const graph = createDynamicCapabilityGraph()
+        const graph = createDynamicCapabilityGraph(createTestBatchOwner())
         await graph.register(node('target'))
         const frontier = Array.from({ length: 32 }, (_, index) => `frontier-${index}`)
         for (const [index, id] of frontier.entries()) {

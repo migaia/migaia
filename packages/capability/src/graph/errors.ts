@@ -99,7 +99,8 @@ export function graphMessageFor(code: ICapabilityGraphErrorCode): string {
     [CapabilityGraphErrorCode.invalidOption]: CapabilityGraphErrorText.invalidOption,
     [CapabilityGraphErrorCode.nodeHasDependents]: CapabilityGraphErrorText.nodeHasDependents,
     [CapabilityGraphErrorCode.mutationAdmissionTimeout]:
-      CapabilityGraphErrorText.mutationAdmissionTimeout
+      CapabilityGraphErrorText.mutationAdmissionTimeout,
+    [CapabilityGraphErrorCode.nodeNotSuspended]: CapabilityGraphErrorText.nodeNotSuspended
   }
   return messages[code]
 }

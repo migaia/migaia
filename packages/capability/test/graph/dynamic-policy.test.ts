@@ -4,6 +4,7 @@ import {
   type IDynamicGraphNodeDefinition
 } from '../../src/graph/dynamic.js'
 import type { IGraphNodeId } from '../../src/graph/index.js'
+import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.js'
 
 /** Creates a traced node with explicitly strong or optional provider edges. */
 const node = (
@@ -31,7 +32,7 @@ const node = (
 describe('dynamic dependency policy', () => {
   it('suspends without release and resumes the blocked frontier', async () => {
     const events: string[] = []
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('provider', [], events))
     await graph.register(node('consumer', [{ provider: 'provider', required: true }], events))
     events.length = 0
@@ -49,7 +50,7 @@ describe('dynamic dependency policy', () => {
   })
 
   it('rejects required dependents atomically and preserves default cascade', async () => {
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('provider'))
     await graph.register(node('consumer', [{ provider: 'provider', required: true }]))
     await expect(
@@ -65,7 +66,7 @@ describe('dynamic dependency policy', () => {
   })
 
   it('admits missing optional edges and reports direct dependents', async () => {
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('consumer', [{ provider: 'optional', required: false }]))
     expect(graph.nodeState('consumer' as IGraphNodeId).state).toBe('ready')
     await graph.register(node('optional'))
@@ -78,7 +79,7 @@ describe('dynamic dependency policy', () => {
   it('replaces without restarting dependents', async () => {
     const events: string[] = []
     const notified: string[] = []
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('provider', [], events))
     await graph.register(node('consumer', [{ provider: 'provider', required: true }], events))
     events.length = 0
@@ -96,7 +97,10 @@ describe('dynamic dependency policy', () => {
     const events: string[] = []
     const reported: unknown[] = []
     const hookFailure = new Error('rebind failed')
-    const graph = createDynamicCapabilityGraph({ report: (error) => reported.push(error) })
+    const graph = createDynamicCapabilityGraph({
+      ...createTestBatchOwner((error) => reported.push(error)),
+      report: (error) => reported.push(error)
+    })
     await graph.register(node('provider', [], events))
     await graph.register(node('consumer', [{ provider: 'provider', required: true }], events))
     await graph.register(node('leaf', [{ provider: 'consumer', required: true }], events))
@@ -120,7 +124,7 @@ describe('dynamic dependency policy', () => {
 
   it('restarts dependents when no rebind callback exists', async () => {
     const events: string[] = []
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('provider', [], events))
     await graph.register(node('consumer', [{ provider: 'provider', required: true }], events))
     events.length = 0
@@ -134,7 +138,7 @@ describe('dynamic dependency policy', () => {
   })
 
   it('keeps a diamond dependent blocked while another provider stays suspended', async () => {
-    const graph = createDynamicCapabilityGraph()
+    const graph = createDynamicCapabilityGraph(createTestBatchOwner())
     await graph.register(node('left'))
     await graph.register(node('right'))
     await graph.register(

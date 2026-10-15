@@ -38,7 +38,12 @@ export const CapabilityGraphErrorCode = {
    * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck
    * predecessor (start that never settles, leaked binding lease) or raise the budget.
    */
-  mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT'
+  mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT',
+  /**
+   * `resume()` targets a dynamic-graph node that is not suspended. A state conflict, not a bad
+   * option: suspend the node first, or skip the call when the node is already running.
+   */
+  nodeNotSuspended: 'GRAPH_NODE_NOT_SUSPENDED'
 } as const
 
 export type ICapabilityGraphErrorCode =
