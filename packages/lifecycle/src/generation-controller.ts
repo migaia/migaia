@@ -13,7 +13,7 @@ import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { type IAbortController } from './abort.js'
-import { captureAbortControllerFactory } from './abort-factory.js'
+import { captureAbortControllerFactory, createLazyAbortController } from './abort-factory.js'
 import {
   observeAbortSubscription,
   type IObservedAbortSubscription
@@ -290,7 +290,8 @@ export function createGenerationController(
       )
       generation++
       const token: IGenerationToken = {}
-      const controller = createController()
+      /** Per-generation signal source, created on the first `request.signal` read (LC-P3). */
+      const controller = createLazyAbortController(createController)
       currentToken = token
       currentController = controller
       // parent abort 与 timeout 都原子作废当前 token（AF-14）：作废 = 取消 timer + 移除 parent listener。
@@ -373,7 +374,15 @@ export function createGenerationController(
       } catch (error) {
         throw rollbackAdmission(error, admissionRegistration)
       }
-      return { generation, token, signal: controller.signal }
+      /** Generation number captured for this request; `generation` keeps advancing afterwards. */
+      const requestGeneration = generation
+      return {
+        generation: requestGeneration,
+        token,
+        get signal() {
+          return controller.signal
+        }
+      }
     },
     isCurrent(token) {
       return !disposed && currentToken === token
