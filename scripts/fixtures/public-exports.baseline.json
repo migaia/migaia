@@ -233,25 +233,14 @@
         "claimOwnership",
         "createFieldSource",
         "createObserverBinding",
+        "createSourceBinding",
+        "createTrackedObserver",
         "currentRuntimeVersion",
         "internalRuntimeOf",
+        "invalidateObservable",
         "isAnyRuntimeTracking",
         "isRuntimeTracking",
         "ownerOf"
-      ],
-      "./internals": [
-        "internalsOf",
-        "isRuntime",
-        "mutableDepVersions",
-        "mutableDeps",
-        "mutableSubs",
-        "readVersion",
-        "registerDepVersions",
-        "registerDeps",
-        "registerInternals",
-        "registerSubs",
-        "registerVersion",
-        "setVersion"
       ]
     },
     "@migaia/resource": {
