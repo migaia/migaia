@@ -79,7 +79,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  atomDef,\n  atomDefFactory,\n  previewSafeAtomDefFactory,\n  derivedDef,\n  writableDef,\n  isAtomDefinition,\n  assertNotThenable,\n  AtomKind\n} from '@migaia/store-keyed';"
+                "code": "import {\n  atomDef,\n  atomDefFactory,\n  previewSafeAtomDefFactory,\n  derivedDef,\n  writableDef,\n  isAtomDefinition,\n  assertNotThenable,\n  AtomKind\n} from '@migaia/store-keyed'"
               },
               {
                 "type": "paragraph",
@@ -92,7 +92,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const count = atomDef(0, 'count');"
+                "code": "const count = atomDef(0, 'count')"
               },
               {
                 "type": "paragraph",
@@ -105,7 +105,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const list = atomDefFactory(() => [], 'list');"
+                "code": "const list = atomDefFactory(() => [], 'list')"
               },
               {
                 "type": "paragraph",
@@ -118,7 +118,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const list = previewSafeAtomDefFactory(() => [], 'list');"
+                "code": "const list = previewSafeAtomDefFactory(() => [], 'list')"
               },
               {
                 "type": "paragraph",
@@ -131,7 +131,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const doubled = derivedDef((get) => get(count) * 2, 'doubled');"
+                "code": "const doubled = derivedDef((get) => get(count) * 2, 'doubled')"
               },
               {
                 "type": "paragraph",
@@ -144,7 +144,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const filterText = writableDef(\n  (get) => get(state).filter,\n  (get, set, next) => set(state, (s) => ({ ...s, filter: next }))\n);"
+                "code": "const filterText = writableDef(\n  (get) => get(state).filter,\n  (get, set, next) => set(state, (s) => ({ ...s, filter: next }))\n)"
               },
               {
                 "type": "paragraph",
@@ -157,7 +157,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "isAtomDefinition(count); // true\nisAtomDefinition({}); // false"
+                "code": "isAtomDefinition(count) // true\nisAtomDefinition({}) // false"
               },
               {
                 "type": "paragraph",
@@ -170,7 +170,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "assertNotThenable(value, 'myFactory create()');"
+                "code": "assertNotThenable(value, 'myFactory create()')"
               },
               {
                 "type": "paragraph",
@@ -183,7 +183,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "AtomKind.primitive; // 'primitive'\nAtomKind.primitiveFactory; // 'primitive-factory'\nAtomKind.derived; // 'derived'\nAtomKind.writableDerived; // 'writable-derived'"
+                "code": "AtomKind.primitive // 'primitive'\nAtomKind.primitiveFactory // 'primitive-factory'\nAtomKind.derived // 'derived'\nAtomKind.writableDerived // 'writable-derived'"
               },
               {
                 "type": "paragraph",
@@ -198,7 +198,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRuntime } from '@migaia/reactive';\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed';"
+                "code": "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed'"
               },
               {
                 "type": "paragraph",
@@ -207,7 +207,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const store = createAtomStore(createRuntime());"
+                "code": "const store = createAtomStore(createRuntime())"
               },
               {
                 "type": "paragraph",
@@ -220,7 +220,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const store = defaultAtomStore(defaultRuntime);"
+                "code": "const store = defaultAtomStore(defaultRuntime)"
               },
               {
                 "type": "paragraph",
@@ -237,7 +237,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.get(doubled); // 2"
+                "code": "store.get(doubled) // 2"
               },
               {
                 "type": "paragraph",
@@ -250,7 +250,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.peek(doubled);"
+                "code": "store.peek(doubled)"
               },
               {
                 "type": "paragraph",
@@ -263,11 +263,11 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.preview(doubled);"
+                "code": "store.preview(doubled)"
               },
               {
                 "type": "paragraph",
-                "text": "单参数同上。已有真实实例时直接走 `peek()` 语义；否则计算一个只在当前版本时钟值内有效（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取）的临时值，一个 microtask 后若始终未提交就自动丢弃。`primitive-factory` 必须标记 `previewSafe: true` 才能在这里执行，否则抛 `Error('[store] atom factory is not marked preview-safe')`；出现循环自我依赖抛 `Error('[store] circular atom preview detected')`。"
+                "text": "单参数同上。已有真实实例时直接走 `peek()` 语义；否则计算一个只在当前版本时钟值内有效（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取）的临时值，Runtime idle cleanup 后（默认 microtask）若始终未提交就自动丢弃。`primitive-factory` 必须标记 `previewSafe: true` 才能在这里执行，否则抛 `Error('[store] atom factory is not marked preview-safe')`；出现循环自我依赖抛 `Error('[store] circular atom preview detected')`。"
               },
               {
                 "type": "paragraph",
@@ -276,7 +276,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.set(count, 1);\nstore.set(count, (previous) => previous + 1); // 函数式更新"
+                "code": "store.set(count, 1)\nstore.set(count, (previous) => previous + 1) // 函数式更新"
               },
               {
                 "type": "paragraph",
@@ -289,7 +289,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const unsubscribe = store.sub(doubled, () => console.log('changed ->', store.peek(doubled)));"
+                "code": "const unsubscribe = store.sub(doubled, () => console.log('changed ->', store.peek(doubled)))"
               },
               {
                 "type": "paragraph",
@@ -302,7 +302,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const undo = store.override(\n  doubled,\n  derivedDef(() => 999)\n); // 只读定义可路由到任意同值定义\nundo(); // 撤销，状态原样保留"
+                "code": "const undo = store.override(\n  doubled,\n  derivedDef(() => 999)\n) // 只读定义可路由到任意同值定义\nundo() // 撤销，状态原样保留"
               },
               {
                 "type": "paragraph",
@@ -315,7 +315,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.isObserved(doubled); // 是否已建实例且有活跃订阅者"
+                "code": "store.isObserved(doubled) // 是否已建实例且有活跃订阅者"
               },
               {
                 "type": "paragraph",
@@ -328,7 +328,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.release(count); // 返回是否确实释放了什么"
+                "code": "store.release(count) // 返回是否确实释放了什么"
               },
               {
                 "type": "paragraph",
@@ -341,7 +341,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.size;"
+                "code": "store.size"
               },
               {
                 "type": "paragraph",
@@ -350,7 +350,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.dispose();"
+                "code": "store.dispose()"
               },
               {
                 "type": "paragraph",
@@ -363,7 +363,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.runtime; // 创建时传入的 IRuntime\nstore.disposed; // boolean"
+                "code": "store.runtime // 创建时传入的 IRuntime\nstore.disposed // boolean"
               }
             ]
           },
@@ -374,7 +374,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { selectDef, opticDef, focusDef, splitDef } from '@migaia/store-keyed';"
+                "code": "import { selectDef, opticDef, focusDef, splitDef } from '@migaia/store-keyed'"
               },
               {
                 "type": "paragraph",
@@ -387,7 +387,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const userName = selectDef(userDef, (user) => user.name);"
+                "code": "const userName = selectDef(userDef, (user) => user.name)"
               },
               {
                 "type": "paragraph",
@@ -400,7 +400,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const nameField = opticDef(userDef, {\n  get: (user) => user.name,\n  set: (user, name) => ({ ...user, name })\n});"
+                "code": "const nameField = opticDef(userDef, {\n  get: (user) => user.name,\n  set: (user, name) => ({ ...user, name })\n})"
               },
               {
                 "type": "paragraph",
@@ -413,7 +413,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const userName = focusDef(sessionDef, 'user', 'name');"
+                "code": "const userName = focusDef(sessionDef, 'user', 'name')"
               },
               {
                 "type": "paragraph",
@@ -426,7 +426,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const todosSplit = splitDef(todosDef, (todo) => todo.id);\nconst item = todosSplit.of('t1');"
+                "code": "const todosSplit = splitDef(todosDef, (todo) => todo.id)\nconst item = todosSplit.of('t1')"
               },
               {
                 "type": "paragraph",
@@ -456,7 +456,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  readOpticPath,\n  writeOpticPath,\n  findKeyIndex,\n  requireKeyIndex,\n  shallowArrayEquals,\n  computeUniqueKeys,\n  spliceInsert,\n  filterOutKey,\n  replaceAtIndex,\n  KeyedSplitCache\n} from '@migaia/store-keyed';"
+                "code": "import {\n  readOpticPath,\n  writeOpticPath,\n  findKeyIndex,\n  requireKeyIndex,\n  shallowArrayEquals,\n  computeUniqueKeys,\n  spliceInsert,\n  filterOutKey,\n  replaceAtIndex,\n  KeyedSplitCache\n} from '@migaia/store-keyed'"
               },
               {
                 "type": "paragraph",
@@ -469,7 +469,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens'); // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens'); // { a: { b: 2 } }，原对象不变"
+                "code": "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens') // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens') // { a: { b: 2 } }，原对象不变"
               },
               {
                 "type": "paragraph",
@@ -482,7 +482,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "findKeyIndex(todos, (t) => t.id, 't1');"
+                "code": "findKeyIndex(todos, (t) => t.id, 't1')"
               },
               {
                 "type": "paragraph",
@@ -495,7 +495,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "requireKeyIndex(todos, (t) => t.id, 't1', 'item was removed');"
+                "code": "requireKeyIndex(todos, (t) => t.id, 't1', 'item was removed')"
               },
               {
                 "type": "paragraph",
@@ -508,7 +508,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "shallowArrayEquals([1, 2], [1, 2]); // true"
+                "code": "shallowArrayEquals([1, 2], [1, 2]) // true"
               },
               {
                 "type": "paragraph",
@@ -521,7 +521,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "computeUniqueKeys(todos, (t) => t.id, 'myList'); // 冻结的 Key[]"
+                "code": "computeUniqueKeys(todos, (t) => t.id, 'myList') // 冻结的 Key[]"
               },
               {
                 "type": "paragraph",
@@ -534,7 +534,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "spliceInsert([1, 2], 3, 1); // [1, 3, 2]"
+                "code": "spliceInsert([1, 2], 3, 1) // [1, 3, 2]"
               },
               {
                 "type": "paragraph",
@@ -547,7 +547,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "filterOutKey(todos, (t) => t.id, 't1'); // { removed: boolean, next: readonly T[] }"
+                "code": "filterOutKey(todos, (t) => t.id, 't1') // { removed: boolean, next: readonly T[] }"
               },
               {
                 "type": "paragraph",
@@ -560,7 +560,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "replaceAtIndex([1, 2, 3], 1, 9); // [1, 9, 3]"
+                "code": "replaceAtIndex([1, 2, 3], 1, 9) // [1, 9, 3]"
               },
               {
                 "type": "paragraph",
@@ -573,7 +573,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const cache = new KeyedSplitCache<string, MyToken>();\nconst token = cache.of('k1', () => makeToken('k1'));"
+                "code": "const cache = new KeyedSplitCache<string, MyToken>()\nconst token = cache.of('k1', () => makeToken('k1'))"
               },
               {
                 "type": "paragraph",
@@ -588,7 +588,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { familyDef, derivedFamilyDef } from '@migaia/store-keyed';"
+                "code": "import { familyDef, derivedFamilyDef } from '@migaia/store-keyed'"
               },
               {
                 "type": "paragraph",
@@ -601,7 +601,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const sessionByChat = familyDef((chatId: string) => ({ messages: [] }));\nconst def = sessionByChat('chat-1'); // 同一个 key 永远拿到同一个 token"
+                "code": "const sessionByChat = familyDef((chatId: string) => ({ messages: [] }))\nconst def = sessionByChat('chat-1') // 同一个 key 永远拿到同一个 token"
               },
               {
                 "type": "paragraph",
@@ -625,7 +625,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const doneCountByChat = derivedFamilyDef(\n  (chatId: string) => (get) => get(sessionByChat(chatId)).messages.length\n);"
+                "code": "const doneCountByChat = derivedFamilyDef(\n  (chatId: string) => (get) => get(sessionByChat(chatId)).messages.length\n)"
               },
               {
                 "type": "paragraph",
@@ -656,7 +656,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed';"
+                "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'"
               },
               {
                 "type": "paragraph",
@@ -669,7 +669,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input');"
+                "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
               },
               {
                 "type": "paragraph",
@@ -682,7 +682,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive');\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition');"
+                "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
               },
               {
                 "type": "paragraph",
@@ -691,7 +691,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n);"
+                "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
               },
               {
                 "type": "paragraph",
@@ -717,7 +717,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "error.source === STORE_KEYED_SOURCE;"
+                "code": "error.source === STORE_KEYED_SOURCE"
               }
             ]
           },
@@ -728,7 +728,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';"
+                "code": "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
               },
               {
                 "type": "paragraph",
@@ -741,7 +741,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const get = atomGetter(runtime);\nget(someInstanceAtom); // 读取前校验 atom.runtime === runtime"
+                "code": "const get = atomGetter(runtime)\nget(someInstanceAtom) // 读取前校验 atom.runtime === runtime"
               },
               {
                 "type": "paragraph",
@@ -754,7 +754,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const set = atomSetter(runtime);\nset(someWritableInstanceAtom, nextValue);"
+                "code": "const set = atomSetter(runtime)\nset(someWritableInstanceAtom, nextValue)"
               },
               {
                 "type": "paragraph",
@@ -773,7 +773,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createAtomStore, defaultAtomStore } from '@migaia/store-keyed/atom/store';\nimport { atomDef, derivedDef, writableDef } from '@migaia/store-keyed/atom/definition';"
+                "code": "import { createAtomStore, defaultAtomStore } from '@migaia/store-keyed/atom/store'\nimport { atomDef, derivedDef, writableDef } from '@migaia/store-keyed/atom/definition'"
               },
               {
                 "type": "paragraph",
@@ -788,7 +788,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] });\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nstore.dispose(); // 释放这个作用域建出的全部实例"
+                "code": "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
               }
             ]
           },
@@ -799,7 +799,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport type { IRuntime } from '@migaia/reactive';\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }));\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime);\n  const state = sessionByChatId(chatId); // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }));\n  return store;\n}"
+                "code": "import { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport type { IRuntime } from '@migaia/reactive'\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }))\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime)\n  const state = sessionByChatId(chatId) // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }))\n  return store\n}"
               }
             ]
           },
@@ -810,7 +810,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createAtomStore, derivedDef } from '@migaia/store-keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst store = createAtomStore(createRuntime());\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留"
+                "code": "import { createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
               }
             ]
           },
@@ -821,7 +821,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed';\n\nconst todos = [{ id: 't1', done: false }];\nconst index = findKeyIndex(todos, (t) => t.id, 't1');\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true });\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity);"
+                "code": "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 't1', done: false }]\nconst index = findKeyIndex(todos, (t) => t.id, 't1')\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true })\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity)"
               }
             ]
           },
@@ -832,7 +832,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { StoreKeyedErrorCode } from '@migaia/store-keyed';\n\ntry {\n  store.set(readOnlyDerivedDef as never, 1);\n} catch (error) {\n  if ((error as { code?: string }).code === StoreKeyedErrorCode.overrideContract) {\n    // 处理\"写契约不匹配\"\n  }\n}"
+                "code": "import { StoreKeyedErrorCode } from '@migaia/store-keyed'\n\ntry {\n  store.set(readOnlyDerivedDef as never, 1)\n} catch (error) {\n  if ((error as { code?: string }).code === StoreKeyedErrorCode.overrideContract) {\n    // 处理\"写契约不匹配\"\n  }\n}"
               }
             ]
           },
@@ -857,6 +857,10 @@
               {
                 "type": "paragraph",
                 "text": "未发布的实例式 family 源码已移除。按 key 管理状态使用公开的 `familyDef`/`derivedFamilyDef` 和 `createAtomStore` 组合；`StoreKeyedErrorCode.familyDisposed`、`.evictionFailed` 及对应 union 值随无触发路径删除，调用方应移除这两种无效检查。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Speculative cleanup uses the owning Runtime idle channel (`scheduleIdle`, default microtasks); no adapter-owned microtask queue is created."
               }
             ]
           }
@@ -980,7 +984,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const AtomKind = {\n  primitive: 'primitive',\n  primitiveFactory: 'primitive-factory',\n  derived: 'derived',\n  writableDerived: 'writable-derived'\n} as const;\ntype IAtomKind = (typeof AtomKind)[keyof typeof AtomKind];"
+                "code": "const AtomKind = {\n  primitive: 'primitive',\n  primitiveFactory: 'primitive-factory',\n  derived: 'derived',\n  writableDerived: 'writable-derived'\n} as const\ntype IAtomKind = (typeof AtomKind)[keyof typeof AtomKind]"
               },
               {
                 "type": "paragraph",
@@ -993,7 +997,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T>; // writable-derived 在读侧被擦除掉具体 Args"
+                "code": "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T> // writable-derived 在读侧被擦除掉具体 Args"
               },
               {
                 "type": "paragraph",
@@ -1016,7 +1020,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRuntime } from '@migaia/reactive';\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed';\n\nconst store = createAtomStore(createRuntime());"
+                "code": "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed'\n\nconst store = createAtomStore(createRuntime())"
               },
               {
                 "type": "table",
@@ -1067,7 +1071,7 @@
                     "同上",
                     "同上",
                     "同步",
-                    "React 并发渲染下的推测性读。若该定义在本 store 已经有真实实例，直接返回该实例当前值（`peek()` 语义）；否则计算一个只在当前 runtime 版本内有效的临时值，不创建持久实例，一个 microtask 后若始终未被提交（即没有变成真实实例）就自动丢弃缓存。`primitive-factory` 必须显式标记 `previewSafe` 才能在这里执行，否则抛错；出现自我依赖的循环会抛 `[store] circular atom preview detected`。"
+                    "React 并发渲染下的推测性读。若该定义在本 store 已经有真实实例，直接返回该实例当前值（`peek()` 语义）；否则计算一个只在当前 runtime 版本内有效的临时值，不创建持久实例，Runtime idle cleanup 后（默认 microtask）若始终未被提交（即没有变成真实实例）就自动丢弃缓存。`primitive-factory` 必须显式标记 `previewSafe` 才能在这里执行，否则抛错；出现自我依赖的循环会抛 `[store] circular atom preview detected`。"
                   ]
                 ]
               }
@@ -1080,7 +1084,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.set(countDef, 1);\nstore.set(countDef, (previous) => previous + 1); // 函数式更新\nstore.set(writableDerivedDef, ...customArgs); // 走 write(get, set, ...args)"
+                "code": "store.set(countDef, 1)\nstore.set(countDef, (previous) => previous + 1) // 函数式更新\nstore.set(writableDerivedDef, ...customArgs) // 走 write(get, set, ...args)"
               },
               {
                 "type": "paragraph",
@@ -1103,7 +1107,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const unsubscribe = store.sub(doubledDef, () => {\n  console.log('changed ->', store.peek(doubledDef));\n});"
+                "code": "const unsubscribe = store.sub(doubledDef, () => {\n  console.log('changed ->', store.peek(doubledDef))\n})"
               },
               {
                 "type": "paragraph",
@@ -1118,7 +1122,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// 只读定义：可以路由到任意同值类型定义\nstore.override(derivedDef, replacement);\n// primitive：只能被 primitive/primitive-factory 替换\nstore.override(primitiveDef, replacementPrimitiveDef);\n// writable-derived：只能被同 Args/Result 的 writable-derived 替换\nstore.override(writableDerivedDef, replacementWritableDerivedDef);"
+                "code": "// 只读定义：可以路由到任意同值类型定义\nstore.override(derivedDef, replacement)\n// primitive：只能被 primitive/primitive-factory 替换\nstore.override(primitiveDef, replacementPrimitiveDef)\n// writable-derived：只能被同 Args/Result 的 writable-derived 替换\nstore.override(writableDerivedDef, replacementWritableDerivedDef)"
               },
               {
                 "type": "paragraph",
@@ -1211,7 +1215,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>;"
+                "code": "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>"
               },
               {
                 "type": "paragraph",
@@ -1226,7 +1230,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus;\n  set(source: Source, focus: Focus): Source;\n};\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;"
+                "code": "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>"
               },
               {
                 "type": "paragraph",
@@ -1269,7 +1273,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>;\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>;\n  of(key: Key): ISplitItemDef<T>;\n  insert(store: IAtomStore, item: T, index?: number): void;\n  remove(store: IAtomStore, key: Key): boolean;\n  prune(store: IAtomStore): number;\n};\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>;"
+                "code": "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
               },
               {
                 "type": "table",
@@ -1324,7 +1328,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function readOpticPath(value: unknown, path: readonly PropertyKey[], label: string): unknown;\nfunction writeOpticPath(\n  value: unknown,\n  path: readonly PropertyKey[],\n  next: unknown,\n  label: string\n): unknown;"
+                "code": "function readOpticPath(value: unknown, path: readonly PropertyKey[], label: string): unknown\nfunction writeOpticPath(\n  value: unknown,\n  path: readonly PropertyKey[],\n  next: unknown,\n  label: string\n): unknown"
               },
               {
                 "type": "paragraph",
@@ -1333,7 +1337,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function findKeyIndex<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key\n): number;"
+                "code": "function findKeyIndex<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key\n): number"
               },
               {
                 "type": "paragraph",
@@ -1342,7 +1346,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function requireKeyIndex<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key,\n  label: string\n): number;"
+                "code": "function requireKeyIndex<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key,\n  label: string\n): number"
               },
               {
                 "type": "paragraph",
@@ -1351,7 +1355,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): boolean;"
+                "code": "function shallowArrayEquals<T>(left: readonly T[], right: readonly T[]): boolean"
               },
               {
                 "type": "paragraph",
@@ -1360,7 +1364,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function computeUniqueKeys<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  label: string\n): readonly Key[];"
+                "code": "function computeUniqueKeys<T, Key>(\n  items: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  label: string\n): readonly Key[]"
               },
               {
                 "type": "paragraph",
@@ -1369,7 +1373,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function spliceInsert<T>(list: readonly T[], item: T, index: number): readonly T[];"
+                "code": "function spliceInsert<T>(list: readonly T[], item: T, index: number): readonly T[]"
               },
               {
                 "type": "paragraph",
@@ -1378,7 +1382,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function filterOutKey<T, Key>(\n  list: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key\n): { readonly removed: boolean; readonly next: readonly T[] };"
+                "code": "function filterOutKey<T, Key>(\n  list: readonly T[],\n  keyOf: (item: T, index: number) => Key,\n  key: Key\n): { readonly removed: boolean; readonly next: readonly T[] }"
               },
               {
                 "type": "paragraph",
@@ -1387,7 +1391,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function replaceAtIndex<T>(list: readonly T[], index: number, value: T): readonly T[];"
+                "code": "function replaceAtIndex<T>(list: readonly T[], index: number, value: T): readonly T[]"
               },
               {
                 "type": "paragraph",
@@ -1396,7 +1400,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "class KeyedSplitCache<Key, Item> {\n  get(key: Key): Item | undefined;\n  of(key: Key, create: () => Item): Item;\n  prune(\n    isLive: (key: Key) => boolean,\n    shouldEvict?: (item: Item) => boolean, // 默认 () => true\n    onEvict?: (item: Item) => void\n  ): number;\n  readonly size: number;\n  keys(): IterableIterator<Key>;\n  values(): IterableIterator<Item>;\n  clear(): void;\n}"
+                "code": "class KeyedSplitCache<Key, Item> {\n  get(key: Key): Item | undefined\n  of(key: Key, create: () => Item): Item\n  prune(\n    isLive: (key: Key) => boolean,\n    shouldEvict?: (item: Item) => boolean, // 默认 () => true\n    onEvict?: (item: Item) => void\n  ): number\n  readonly size: number\n  keys(): IterableIterator<Key>\n  values(): IterableIterator<Item>\n  clear(): void\n}"
               },
               {
                 "type": "paragraph",
@@ -1419,7 +1423,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IFamilyDefOptions = {\n  readonly maxSize?: number; // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string; // 默认 'family' / 'derived-family'\n};\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D;\n  readonly size: number;\n  forget(key: K): boolean;\n  clear(): void;\n};\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>;\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>;"
+                "code": "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
               },
               {
                 "type": "paragraph",
@@ -1474,7 +1478,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createStoreKeyedError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error;\n\nfunction createStoreKeyedRangeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError;\n\nfunction createStoreKeyedTypeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError;\n\nfunction createStoreKeyedAggregateError(\n  code: IStoreKeyedErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError;"
+                "code": "function createStoreKeyedError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\n\nfunction createStoreKeyedRangeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): RangeError\n\nfunction createStoreKeyedTypeError(\n  code: IStoreKeyedErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\n\nfunction createStoreKeyedAggregateError(\n  code: IStoreKeyedErrorCode,\n  errors: unknown[],\n  message: string\n): AggregateError"
               },
               {
                 "type": "paragraph",
@@ -1483,7 +1487,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const STORE_KEYED_SOURCE = '@migaia/store-keyed';"
+                "code": "const STORE_KEYED_SOURCE = '@migaia/store-keyed'"
               },
               {
                 "type": "paragraph",
@@ -1498,7 +1502,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
               },
               {
                 "type": "table",
@@ -1669,7 +1673,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';"
+                "code": "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
               },
               {
                 "type": "paragraph",
@@ -1730,7 +1734,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "store.dispose();"
+                "code": "store.dispose()"
               },
               {
                 "type": "paragraph",
@@ -1765,7 +1769,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有\"还没有真实实例\"的定义才会走推测计算路径，且该路径产出的值只在当前版本时钟值内复用（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取），一个 microtask 后如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。"
+                "text": "`override()`/其撤销函数都会 `previews.clear()`——这保证 `store.preview()` 不会在 override 状态切换的瞬间读到一份对应旧路由的推测值。`preview()` 本身对已有真实实例的定义直接短路成 `peek()`，只有\"还没有真实实例\"的定义才会走推测计算路径，且该路径产出的值只在当前版本时钟值内复用（由 `@migaia/reactive/extension` 的 `currentRuntimeVersion(runtime)` 读取），Runtime idle cleanup 后（默认 microtask）如果始终没有变成真实实例就会被丢弃——一个长期挂载的 Provider 不会因为一次被放弃的推测渲染而永久持有一份推测对象。"
               }
             ]
           },
@@ -1818,7 +1822,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n});\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}));\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime);\n  const state = sessionBySessionId(sessionId);\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));\n  return store;\n}\n\n// —— 用法 ——\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false });\n\nconst item = todosSplit.of('t1');\nstore.set(item, (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef));\n});\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留\n\nunsubscribe();\ntodosSplit.remove(store, 't2');\ntodosSplit.prune(store); // 只清 splitDef 自己的 key 缓存\nstore.dispose(); // 释放这个作用域建出的全部实例"
+                "code": "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例"
               }
             ]
           },
@@ -1881,6 +1885,10 @@
                 "type": "code",
                 "language": "bash",
                 "code": "pnpm --filter @migaia/store-keyed typecheck:e2e\npnpm --filter @migaia/store-keyed test:e2e"
+              },
+              {
+                "type": "paragraph",
+                "text": "Speculative cleanup uses the owning Runtime idle channel (`scheduleIdle`, default microtasks); no adapter-owned microtask queue is created."
               }
             ]
           }
@@ -1921,9 +1929,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for AtomKind.",
           "examples": [
             "atom/definition.ts   —— 纯定义：判别联合 + 冻结对象构造器，不 import 任何运行时\natom/kind-constants.ts —— AtomKind 常量表\natom/store.ts         —— AtomStore：把定义落到 IRuntime 上，管理实例表/override/preview\natom/def-optics.ts    —— definition 级 optics：selectDef/opticDef/focusDef/splitDef\natom/optics-path.ts   —— optics 与 split 共用的纯函数（路径读写、按 key 拆分的原语）\nfamily/definition.ts  —— definition 级 family：familyDef/derivedFamilyDef（按 key 缓存 token）\nerrors.ts / error-code.ts / error-text.ts —— 包边界错误的构造器、稳定错误码、诊断文案\nreactive/atom.ts       —— \"实例式\" atom 协议类型，只有类型和跨 Runtime 校验，无实现",
-            "const AtomKind = {\n  primitive: 'primitive',\n  primitiveFactory: 'primitive-factory',\n  derived: 'derived',\n  writableDerived: 'writable-derived'\n} as const;\ntype IAtomKind = (typeof AtomKind)[keyof typeof AtomKind];",
-            "import {\n  atomDef,\n  atomDefFactory,\n  previewSafeAtomDefFactory,\n  derivedDef,\n  writableDef,\n  isAtomDefinition,\n  assertNotThenable,\n  AtomKind\n} from '@migaia/store-keyed';",
-            "AtomKind.primitive; // 'primitive'\nAtomKind.primitiveFactory; // 'primitive-factory'\nAtomKind.derived; // 'derived'\nAtomKind.writableDerived; // 'writable-derived'"
+            "const AtomKind = {\n  primitive: 'primitive',\n  primitiveFactory: 'primitive-factory',\n  derived: 'derived',\n  writableDerived: 'writable-derived'\n} as const\ntype IAtomKind = (typeof AtomKind)[keyof typeof AtomKind]",
+            "import {\n  atomDef,\n  atomDefFactory,\n  previewSafeAtomDefFactory,\n  derivedDef,\n  writableDef,\n  isAtomDefinition,\n  assertNotThenable,\n  AtomKind\n} from '@migaia/store-keyed'",
+            "AtomKind.primitive // 'primitive'\nAtomKind.primitiveFactory // 'primitive-factory'\nAtomKind.derived // 'derived'\nAtomKind.writableDerived // 'writable-derived'"
           ],
           "members": [],
           "aliasOf": "AtomKind",
@@ -2008,7 +2016,7 @@
           "returns": "readonly Key[]",
           "errors": ["No documented errors are declared for computeUniqueKeys."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for computeUniqueKeys.",
-          "examples": ["computeUniqueKeys(todos, (t) => t.id, 'myList'); // 冻结的 Key[]"],
+          "examples": ["computeUniqueKeys(todos, (t) => t.id, 'myList') // 冻结的 Key[]"],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -2078,7 +2086,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -2278,7 +2286,7 @@
           "errors": ["No documented errors are declared for createStoreKeyedAggregateError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreKeyedAggregateError.",
           "examples": [
-            "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n);"
+            "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
           ],
           "members": [],
           "exportPath": ".",
@@ -2349,7 +2357,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed';"
+                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -2362,7 +2370,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input');"
+                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
                 },
                 {
                   "type": "paragraph",
@@ -2375,7 +2383,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive');\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition');"
+                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
                 },
                 {
                   "type": "paragraph",
@@ -2384,7 +2392,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n);"
+                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -2410,7 +2418,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "error.source === STORE_KEYED_SOURCE;"
+                  "code": "error.source === STORE_KEYED_SOURCE"
                 }
               ]
             }
@@ -2454,7 +2462,7 @@
           "errors": ["No documented errors are declared for createStoreKeyedError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreKeyedError.",
           "examples": [
-            "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input');"
+            "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
           ],
           "members": [],
           "exportPath": ".",
@@ -2525,7 +2533,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed';"
+                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -2538,7 +2546,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input');"
+                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
                 },
                 {
                   "type": "paragraph",
@@ -2551,7 +2559,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive');\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition');"
+                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
                 },
                 {
                   "type": "paragraph",
@@ -2560,7 +2568,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n);"
+                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -2586,7 +2594,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "error.source === STORE_KEYED_SOURCE;"
+                  "code": "error.source === STORE_KEYED_SOURCE"
                 }
               ]
             }
@@ -2630,7 +2638,7 @@
           "errors": ["No documented errors are declared for createStoreKeyedRangeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreKeyedRangeError.",
           "examples": [
-            "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive');\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition');"
+            "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
           ],
           "members": [],
           "exportPath": ".",
@@ -2701,7 +2709,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed';"
+                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -2714,7 +2722,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input');"
+                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
                 },
                 {
                   "type": "paragraph",
@@ -2727,7 +2735,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive');\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition');"
+                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
                 },
                 {
                   "type": "paragraph",
@@ -2736,7 +2744,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n);"
+                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -2762,7 +2770,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "error.source === STORE_KEYED_SOURCE;"
+                  "code": "error.source === STORE_KEYED_SOURCE"
                 }
               ]
             }
@@ -2806,7 +2814,7 @@
           "errors": ["No documented errors are declared for createStoreKeyedTypeError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreKeyedTypeError.",
           "examples": [
-            "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive');\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition');"
+            "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
           ],
           "members": [],
           "exportPath": ".",
@@ -2877,7 +2885,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed';"
+                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -2890,7 +2898,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input');"
+                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
                 },
                 {
                   "type": "paragraph",
@@ -2903,7 +2911,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive');\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition');"
+                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
                 },
                 {
                   "type": "paragraph",
@@ -2912,7 +2920,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n);"
+                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -2938,7 +2946,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "error.source === STORE_KEYED_SOURCE;"
+                  "code": "error.source === STORE_KEYED_SOURCE"
                 }
               ]
             }
@@ -2976,7 +2984,7 @@
           "errors": ["No documented errors are declared for derivedFamilyDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for derivedFamilyDef.",
           "examples": [
-            "const doneCountByChat = derivedFamilyDef(\n  (chatId: string) => (get) => get(sessionByChat(chatId)).messages.length\n);"
+            "const doneCountByChat = derivedFamilyDef(\n  (chatId: string) => (get) => get(sessionByChat(chatId)).messages.length\n)"
           ],
           "members": [],
           "exportPath": ".",
@@ -3055,7 +3063,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -3267,9 +3275,9 @@
           "errors": ["No documented errors are declared for familyDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for familyDef.",
           "examples": [
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n});\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}));\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime);\n  const state = sessionBySessionId(sessionId);\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));\n  return store;\n}\n\n// —— 用法 ——\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false });\n\nconst item = todosSplit.of('t1');\nstore.set(item, (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef));\n});\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留\n\nunsubscribe();\ntodosSplit.remove(store, 't2');\ntodosSplit.prune(store); // 只清 splitDef 自己的 key 缓存\nstore.dispose(); // 释放这个作用域建出的全部实例",
-            "const sessionByChat = familyDef((chatId: string) => ({ messages: [] }));\nconst def = sessionByChat('chat-1'); // 同一个 key 永远拿到同一个 token",
-            "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport type { IRuntime } from '@migaia/reactive';\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }));\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime);\n  const state = sessionByChatId(chatId); // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }));\n  return store;\n}"
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "const sessionByChat = familyDef((chatId: string) => ({ messages: [] }))\nconst def = sessionByChat('chat-1') // 同一个 key 永远拿到同一个 token",
+            "import { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport type { IRuntime } from '@migaia/reactive'\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }))\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime)\n  const state = sessionByChatId(chatId) // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }))\n  return store\n}"
           ],
           "members": [],
           "exportPath": ".",
@@ -3348,7 +3356,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -3569,7 +3577,7 @@
           "errors": ["No documented errors are declared for filterOutKey."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for filterOutKey.",
           "examples": [
-            "filterOutKey(todos, (t) => t.id, 't1'); // { removed: boolean, next: readonly T[] }"
+            "filterOutKey(todos, (t) => t.id, 't1') // { removed: boolean, next: readonly T[] }"
           ],
           "members": [],
           "exportPath": ".",
@@ -3672,8 +3680,8 @@
           "errors": ["No documented errors are declared for findKeyIndex."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for findKeyIndex.",
           "examples": [
-            "findKeyIndex(todos, (t) => t.id, 't1');",
-            "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed';\n\nconst todos = [{ id: 't1', done: false }];\nconst index = findKeyIndex(todos, (t) => t.id, 't1');\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true });\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity);"
+            "findKeyIndex(todos, (t) => t.id, 't1')",
+            "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 't1', done: false }]\nconst index = findKeyIndex(todos, (t) => t.id, 't1')\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true })\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity)"
           ],
           "members": [],
           "exportPath": ".",
@@ -3783,9 +3791,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for focusDef.",
           "examples": [
             "focusDef(source, key1): IWritableDerivedDefinition<Source[key1], ...>;\nfocusDef(source, key1, key2): IWritableDerivedDefinition<Source[key1][key2], ...>;\nfocusDef(source, key1, key2, key3): IWritableDerivedDefinition<Source[key1][key2][key3], ...>;",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n});\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}));\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime);\n  const state = sessionBySessionId(sessionId);\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));\n  return store;\n}\n\n// —— 用法 ——\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false });\n\nconst item = todosSplit.of('t1');\nstore.set(item, (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef));\n});\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留\n\nunsubscribe();\ntodosSplit.remove(store, 't2');\ntodosSplit.prune(store); // 只清 splitDef 自己的 key 缓存\nstore.dispose(); // 释放这个作用域建出的全部实例",
-            "const userName = focusDef(sessionDef, 'user', 'name');",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] });\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nstore.dispose(); // 释放这个作用域建出的全部实例"
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "const userName = focusDef(sessionDef, 'user', 'name')",
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
           ],
           "members": [],
           "exportPath": ".",
@@ -3896,7 +3904,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -4080,7 +4088,7 @@
           "errors": ["No documented errors are declared for IAtomKind."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomKind.",
           "examples": [
-            "const AtomKind = {\n  primitive: 'primitive',\n  primitiveFactory: 'primitive-factory',\n  derived: 'derived',\n  writableDerived: 'writable-derived'\n} as const;\ntype IAtomKind = (typeof AtomKind)[keyof typeof AtomKind];"
+            "const AtomKind = {\n  primitive: 'primitive',\n  primitiveFactory: 'primitive-factory',\n  derived: 'derived',\n  writableDerived: 'writable-derived'\n} as const\ntype IAtomKind = (typeof AtomKind)[keyof typeof AtomKind]"
           ],
           "members": [],
           "aliasOf": "IAtomKind",
@@ -4146,7 +4154,7 @@
           "errors": ["No documented errors are declared for IDefOptic."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDefOptic.",
           "examples": [
-            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus;\n  set(source: Source, focus: Focus): Source;\n};\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;"
+            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>"
           ],
           "members": [],
           "exportPath": ".",
@@ -4211,7 +4219,7 @@
           "errors": ["No documented errors are declared for IFamilyDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFamilyDef.",
           "examples": [
-            "type IFamilyDefOptions = {\n  readonly maxSize?: number; // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string; // 默认 'family' / 'derived-family'\n};\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D;\n  readonly size: number;\n  forget(key: K): boolean;\n  clear(): void;\n};\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>;\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>;"
+            "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
           "members": [],
           "exportPath": ".",
@@ -4276,7 +4284,7 @@
           "errors": ["No documented errors are declared for IFamilyDefOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFamilyDefOptions.",
           "examples": [
-            "type IFamilyDefOptions = {\n  readonly maxSize?: number; // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string; // 默认 'family' / 'derived-family'\n};\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D;\n  readonly size: number;\n  forget(key: K): boolean;\n  clear(): void;\n};\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>;\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>;"
+            "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
           "members": [],
           "exportPath": ".",
@@ -4341,7 +4349,7 @@
           "errors": ["No documented errors are declared for IFamilyKey."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFamilyKey.",
           "examples": [
-            "type IFamilyDefOptions = {\n  readonly maxSize?: number; // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string; // 默认 'family' / 'derived-family'\n};\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D;\n  readonly size: number;\n  forget(key: K): boolean;\n  clear(): void;\n};\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>;\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>;"
+            "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
           "members": [],
           "exportPath": ".",
@@ -4404,7 +4412,7 @@
           "errors": ["No documented errors are declared for ISplitDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISplitDefinition.",
           "examples": [
-            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>;\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>;\n  of(key: Key): ISplitItemDef<T>;\n  insert(store: IAtomStore, item: T, index?: number): void;\n  remove(store: IAtomStore, key: Key): boolean;\n  prune(store: IAtomStore): number;\n};\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>;"
+            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
           ],
           "members": [],
           "exportPath": ".",
@@ -4469,7 +4477,7 @@
           "errors": ["No documented errors are declared for ISplitItemDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISplitItemDef.",
           "examples": [
-            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>;\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>;\n  of(key: Key): ISplitItemDef<T>;\n  insert(store: IAtomStore, item: T, index?: number): void;\n  remove(store: IAtomStore, key: Key): boolean;\n  prune(store: IAtomStore): number;\n};\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>;"
+            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
           ],
           "members": [],
           "exportPath": ".",
@@ -4534,8 +4542,8 @@
           "errors": ["No documented errors are declared for IStandardWritableDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStandardWritableDef.",
           "examples": [
-            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus;\n  set(source: Source, focus: Focus): Source;\n};\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;",
-            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>;\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>;\n  of(key: Key): ISplitItemDef<T>;\n  insert(store: IAtomStore, item: T, index?: number): void;\n  remove(store: IAtomStore, key: Key): boolean;\n  prune(store: IAtomStore): number;\n};\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>;"
+            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>",
+            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
           ],
           "members": [],
           "exportPath": ".",
@@ -4600,7 +4608,7 @@
           "errors": ["No documented errors are declared for KeyedSplitCache."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for KeyedSplitCache.",
           "examples": [
-            "const cache = new KeyedSplitCache<string, MyToken>();\nconst token = cache.of('k1', () => makeToken('k1'));"
+            "const cache = new KeyedSplitCache<string, MyToken>()\nconst token = cache.of('k1', () => makeToken('k1'))"
           ],
           "members": [
             {
@@ -4766,7 +4774,7 @@
           "errors": ["No documented errors are declared for opticDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for opticDef.",
           "examples": [
-            "const nameField = opticDef(userDef, {\n  get: (user) => user.name,\n  set: (user, name) => ({ ...user, name })\n});"
+            "const nameField = opticDef(userDef, {\n  get: (user) => user.name,\n  set: (user, name) => ({ ...user, name })\n})"
           ],
           "members": [],
           "exportPath": ".",
@@ -4862,7 +4870,7 @@
           "errors": ["No documented errors are declared for readOpticPath."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readOpticPath.",
           "examples": [
-            "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens'); // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens'); // { a: { b: 2 } }，原对象不变"
+            "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens') // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens') // { a: { b: 2 } }，原对象不变"
           ],
           "members": [],
           "exportPath": ".",
@@ -4933,7 +4941,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -5133,8 +5141,8 @@
           "errors": ["No documented errors are declared for replaceAtIndex."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for replaceAtIndex.",
           "examples": [
-            "replaceAtIndex([1, 2, 3], 1, 9); // [1, 9, 3]",
-            "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed';\n\nconst todos = [{ id: 't1', done: false }];\nconst index = findKeyIndex(todos, (t) => t.id, 't1');\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true });\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity);"
+            "replaceAtIndex([1, 2, 3], 1, 9) // [1, 9, 3]",
+            "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 't1', done: false }]\nconst index = findKeyIndex(todos, (t) => t.id, 't1')\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true })\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity)"
           ],
           "members": [],
           "exportPath": ".",
@@ -5242,7 +5250,7 @@
           "returns": "number",
           "errors": ["No documented errors are declared for requireKeyIndex."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for requireKeyIndex.",
-          "examples": ["requireKeyIndex(todos, (t) => t.id, 't1', 'item was removed');"],
+          "examples": ["requireKeyIndex(todos, (t) => t.id, 't1', 'item was removed')"],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -5348,7 +5356,7 @@
           "returns": "IDerivedDefinition<Selected>",
           "errors": ["No documented errors are declared for selectDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for selectDef.",
-          "examples": ["const userName = selectDef(userDef, (user) => user.name);"],
+          "examples": ["const userName = selectDef(userDef, (user) => user.name)"],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -5440,7 +5448,7 @@
           "returns": "boolean",
           "errors": ["No documented errors are declared for shallowArrayEquals."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for shallowArrayEquals.",
-          "examples": ["shallowArrayEquals([1, 2], [1, 2]); // true"],
+          "examples": ["shallowArrayEquals([1, 2], [1, 2]) // true"],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -5533,8 +5541,8 @@
           "errors": ["No documented errors are declared for spliceInsert."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for spliceInsert.",
           "examples": [
-            "spliceInsert([1, 2], 3, 1); // [1, 3, 2]",
-            "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed';\n\nconst todos = [{ id: 't1', done: false }];\nconst index = findKeyIndex(todos, (t) => t.id, 't1');\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true });\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity);"
+            "spliceInsert([1, 2], 3, 1) // [1, 3, 2]",
+            "import { findKeyIndex, replaceAtIndex, spliceInsert } from '@migaia/store-keyed'\n\nconst todos = [{ id: 't1', done: false }]\nconst index = findKeyIndex(todos, (t) => t.id, 't1')\nconst next = replaceAtIndex(todos, index, { id: 't1', done: true })\nconst withNew = spliceInsert(next, { id: 't2', done: false }, Infinity)"
           ],
           "members": [],
           "exportPath": ".",
@@ -5631,9 +5639,9 @@
           "errors": ["No documented errors are declared for splitDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for splitDef.",
           "examples": [
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n});\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}));\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime);\n  const state = sessionBySessionId(sessionId);\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));\n  return store;\n}\n\n// —— 用法 ——\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false });\n\nconst item = todosSplit.of('t1');\nstore.set(item, (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef));\n});\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留\n\nunsubscribe();\ntodosSplit.remove(store, 't2');\ntodosSplit.prune(store); // 只清 splitDef 自己的 key 缓存\nstore.dispose(); // 释放这个作用域建出的全部实例",
-            "const todosSplit = splitDef(todosDef, (todo) => todo.id);\nconst item = todosSplit.of('t1');",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] });\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nstore.dispose(); // 释放这个作用域建出的全部实例"
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "const todosSplit = splitDef(todosDef, (todo) => todo.id)\nconst item = todosSplit.of('t1')",
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
           ],
           "members": [],
           "exportPath": ".",
@@ -5699,7 +5707,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -5883,9 +5891,9 @@
           "errors": ["No documented errors are declared for STORE_KEYED_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_KEYED_SOURCE.",
           "examples": [
-            "const STORE_KEYED_SOURCE = '@migaia/store-keyed';",
-            "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed';",
-            "error.source === STORE_KEYED_SOURCE;"
+            "const STORE_KEYED_SOURCE = '@migaia/store-keyed'",
+            "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'",
+            "error.source === STORE_KEYED_SOURCE"
           ],
           "members": [],
           "exportPath": ".",
@@ -5938,7 +5946,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed';"
+                  "code": "import {\n  createStoreKeyedError,\n  createStoreKeyedRangeError,\n  createStoreKeyedTypeError,\n  createStoreKeyedAggregateError,\n  StoreKeyedErrorCode,\n  STORE_KEYED_SOURCE\n} from '@migaia/store-keyed'"
                 },
                 {
                   "type": "paragraph",
@@ -5951,7 +5959,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input');"
+                  "code": "throw createStoreKeyedError(StoreKeyedErrorCode.invalidOption, 'bad input')"
                 },
                 {
                   "type": "paragraph",
@@ -5964,7 +5972,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive');\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition');"
+                  "code": "throw createStoreKeyedRangeError(StoreKeyedErrorCode.invalidOption, 'maxSize must be positive')\nthrow createStoreKeyedTypeError(StoreKeyedErrorCode.invalidOption, 'not a definition')"
                 },
                 {
                   "type": "paragraph",
@@ -5973,7 +5981,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n);"
+                  "code": "throw createStoreKeyedAggregateError(\n  StoreKeyedErrorCode.disposalFailed,\n  [err1, err2],\n  'disposal failed'\n)"
                 },
                 {
                   "type": "paragraph",
@@ -5999,7 +6007,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "error.source === STORE_KEYED_SOURCE;"
+                  "code": "error.source === STORE_KEYED_SOURCE"
                 }
               ]
             }
@@ -6049,7 +6057,7 @@
           "errors": ["No documented errors are declared for writeOpticPath."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for writeOpticPath.",
           "examples": [
-            "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens'); // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens'); // { a: { b: 2 } }，原对象不变"
+            "readOpticPath({ a: { b: 1 } }, ['a', 'b'], 'myLens') // 1\nwriteOpticPath({ a: { b: 1 } }, ['a', 'b'], 2, 'myLens') // { a: { b: 2 } }，原对象不变"
           ],
           "members": [],
           "exportPath": ".",
@@ -6125,7 +6133,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -6549,7 +6557,7 @@
           "returns": "void",
           "errors": ["No documented errors are declared for assertNotThenable."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertNotThenable.",
-          "examples": ["assertNotThenable(value, 'myFactory create()');"],
+          "examples": ["assertNotThenable(value, 'myFactory create()')"],
           "members": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
@@ -6614,7 +6622,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -6809,9 +6817,9 @@
           "errors": ["No documented errors are declared for atomDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for atomDef.",
           "examples": [
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n});\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}));\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime);\n  const state = sessionBySessionId(sessionId);\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));\n  return store;\n}\n\n// —— 用法 ——\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false });\n\nconst item = todosSplit.of('t1');\nstore.set(item, (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef));\n});\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留\n\nunsubscribe();\ntodosSplit.remove(store, 't2');\ntodosSplit.prune(store); // 只清 splitDef 自己的 key 缓存\nstore.dispose(); // 释放这个作用域建出的全部实例",
-            "const count = atomDef(0, 'count');",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] });\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nstore.dispose(); // 释放这个作用域建出的全部实例"
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "const count = atomDef(0, 'count')",
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -6877,7 +6885,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -7071,7 +7079,7 @@
           "returns": "IPrimitiveFactoryDefinition<T>",
           "errors": ["No documented errors are declared for atomDefFactory."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for atomDefFactory.",
-          "examples": ["const list = atomDefFactory(() => [], 'list');"],
+          "examples": ["const list = atomDefFactory(() => [], 'list')"],
           "members": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
@@ -7136,7 +7144,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -7340,11 +7348,11 @@
           "errors": ["No documented errors are declared for derivedDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for derivedDef.",
           "examples": [
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n});\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}));\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime);\n  const state = sessionBySessionId(sessionId);\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));\n  return store;\n}\n\n// —— 用法 ——\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false });\n\nconst item = todosSplit.of('t1');\nstore.set(item, (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef));\n});\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留\n\nunsubscribe();\ntodosSplit.remove(store, 't2');\ntodosSplit.prune(store); // 只清 splitDef 自己的 key 缓存\nstore.dispose(); // 释放这个作用域建出的全部实例",
-            "const doubled = derivedDef((get) => get(count) * 2, 'doubled');",
-            "const undo = store.override(\n  doubled,\n  derivedDef(() => 999)\n); // 只读定义可路由到任意同值定义\nundo(); // 撤销，状态原样保留",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] });\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nstore.dispose(); // 释放这个作用域建出的全部实例",
-            "import { createAtomStore, derivedDef } from '@migaia/store-keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst store = createAtomStore(createRuntime());\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留"
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "const doubled = derivedDef((get) => get(count) * 2, 'doubled')",
+            "const undo = store.override(\n  doubled,\n  derivedDef(() => 999)\n) // 只读定义可路由到任意同值定义\nundo() // 撤销，状态原样保留",
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "import { createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -7415,7 +7423,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -7599,9 +7607,9 @@
           "errors": ["No documented errors are declared for IAtomDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomDefinition.",
           "examples": [
-            "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T>; // writable-derived 在读侧被擦除掉具体 Args",
-            "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>;",
-            "type IFamilyDefOptions = {\n  readonly maxSize?: number; // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string; // 默认 'family' / 'derived-family'\n};\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D;\n  readonly size: number;\n  forget(key: K): boolean;\n  clear(): void;\n};\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>;\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>;"
+            "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T> // writable-derived 在读侧被擦除掉具体 Args",
+            "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>",
+            "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -7666,7 +7674,7 @@
           "errors": ["No documented errors are declared for IAtomGet."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomGet.",
           "examples": [
-            "type IFamilyDefOptions = {\n  readonly maxSize?: number; // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string; // 默认 'family' / 'derived-family'\n};\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D;\n  readonly size: number;\n  forget(key: K): boolean;\n  clear(): void;\n};\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>;\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>;"
+            "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -7855,7 +7863,7 @@
           "errors": ["No documented errors are declared for IAtomUpdate."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomUpdate.",
           "examples": [
-            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus;\n  set(source: Source, focus: Focus): Source;\n};\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;"
+            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -7981,9 +7989,9 @@
           "errors": ["No documented errors are declared for IDerivedDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDerivedDefinition.",
           "examples": [
-            "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T>; // writable-derived 在读侧被擦除掉具体 Args",
-            "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>;",
-            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>;\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>;\n  of(key: Key): ISplitItemDef<T>;\n  insert(store: IAtomStore, item: T, index?: number): void;\n  remove(store: IAtomStore, key: Key): boolean;\n  prune(store: IAtomStore): number;\n};\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>;"
+            "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T> // writable-derived 在读侧被擦除掉具体 Args",
+            "function selectDef<Source, Selected>(\n  source: IAtomDefinition<Source>,\n  select: (value: Source) => Selected,\n  equals: (left: Selected, right: Selected) => boolean = Object.is\n): IDerivedDefinition<Selected>",
+            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -8048,7 +8056,7 @@
           "errors": ["No documented errors are declared for IPrimitiveDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPrimitiveDefinition.",
           "examples": [
-            "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T>; // writable-derived 在读侧被擦除掉具体 Args"
+            "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T> // writable-derived 在读侧被擦除掉具体 Args"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -8113,7 +8121,7 @@
           "errors": ["No documented errors are declared for IPrimitiveFactoryDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPrimitiveFactoryDefinition.",
           "examples": [
-            "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T>; // writable-derived 在读侧被擦除掉具体 Args"
+            "type IAtomDefinition<T> =\n  | IPrimitiveDefinition<T>\n  | IPrimitiveFactoryDefinition<T>\n  | IDerivedDefinition<T>\n  | IErasedWritableDerived<T> // writable-derived 在读侧被擦除掉具体 Args"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -8178,8 +8186,8 @@
           "errors": ["No documented errors are declared for isAtomDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isAtomDefinition.",
           "examples": [
-            "import {\n  atomDef,\n  atomDefFactory,\n  previewSafeAtomDefFactory,\n  derivedDef,\n  writableDef,\n  isAtomDefinition,\n  assertNotThenable,\n  AtomKind\n} from '@migaia/store-keyed';",
-            "isAtomDefinition(count); // true\nisAtomDefinition({}); // false"
+            "import {\n  atomDef,\n  atomDefFactory,\n  previewSafeAtomDefFactory,\n  derivedDef,\n  writableDef,\n  isAtomDefinition,\n  assertNotThenable,\n  AtomKind\n} from '@migaia/store-keyed'",
+            "isAtomDefinition(count) // true\nisAtomDefinition({}) // false"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -8244,7 +8252,7 @@
           "errors": ["No documented errors are declared for IWritableAtomDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWritableAtomDefinition.",
           "examples": [
-            "type IFamilyDefOptions = {\n  readonly maxSize?: number; // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string; // 默认 'family' / 'derived-family'\n};\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D;\n  readonly size: number;\n  forget(key: K): boolean;\n  clear(): void;\n};\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>;\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>;"
+            "type IFamilyDefOptions = {\n  readonly maxSize?: number // 默认 4096，定义强缓存上限\n  readonly debugLabel?: string // 默认 'family' / 'derived-family'\n}\n\ntype IFamilyDef<K, T, D = IAtomDefinition<T>> = {\n  (key: K): D\n  readonly size: number\n  forget(key: K): boolean\n  clear(): void\n}\n\nfunction familyDef<K extends IFamilyKey, T>(\n  initial: (key: K) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T, IWritableAtomDefinition<T>>\n\nfunction derivedFamilyDef<K extends IFamilyKey, T>(\n  read: (key: K) => (get: IAtomGet) => T,\n  options?: IFamilyDefOptions\n): IFamilyDef<K, T>"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -8309,7 +8317,7 @@
           "errors": ["No documented errors are declared for IWritableDerivedDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWritableDerivedDefinition.",
           "examples": [
-            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus;\n  set(source: Source, focus: Focus): Source;\n};\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;",
+            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>",
             "focusDef(source, key1): IWritableDerivedDefinition<Source[key1], ...>;\nfocusDef(source, key1, key2): IWritableDerivedDefinition<Source[key1][key2], ...>;\nfocusDef(source, key1, key2, key3): IWritableDerivedDefinition<Source[key1][key2][key3], ...>;"
           ],
           "members": [],
@@ -8385,7 +8393,7 @@
           "returns": "IPrimitiveFactoryDefinition<T>",
           "errors": ["No documented errors are declared for previewSafeAtomDefFactory."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for previewSafeAtomDefFactory.",
-          "examples": ["const list = previewSafeAtomDefFactory(() => [], 'list');"],
+          "examples": ["const list = previewSafeAtomDefFactory(() => [], 'list')"],
           "members": [],
           "exportPath": "./atom/definition",
           "overloadSignatures": [
@@ -8488,7 +8496,7 @@
           "errors": ["No documented errors are declared for writableDef."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for writableDef.",
           "examples": [
-            "const filterText = writableDef(\n  (get) => get(state).filter,\n  (get, set, next) => set(state, (s) => ({ ...s, filter: next }))\n);"
+            "const filterText = writableDef(\n  (get) => get(state).filter,\n  (get, set, next) => set(state, (s) => ({ ...s, filter: next }))\n)"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -8601,12 +8609,12 @@
           "errors": ["No documented errors are declared for createAtomStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAtomStore.",
           "examples": [
-            "import { createRuntime } from '@migaia/reactive';\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed';\n\nconst store = createAtomStore(createRuntime());",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n});\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}));\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime);\n  const state = sessionBySessionId(sessionId);\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));\n  return store;\n}\n\n// —— 用法 ——\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false });\n\nconst item = todosSplit.of('t1');\nstore.set(item, (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef));\n});\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留\n\nunsubscribe();\ntodosSplit.remove(store, 't2');\ntodosSplit.prune(store); // 只清 splitDef 自己的 key 缓存\nstore.dispose(); // 释放这个作用域建出的全部实例",
-            "const store = createAtomStore(createRuntime());",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] });\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nstore.dispose(); // 释放这个作用域建出的全部实例",
-            "import { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport type { IRuntime } from '@migaia/reactive';\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }));\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime);\n  const state = sessionByChatId(chatId); // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }));\n  return store;\n}",
-            "import { createAtomStore, derivedDef } from '@migaia/store-keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst store = createAtomStore(createRuntime());\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留"
+            "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, defaultAtomStore } from '@migaia/store-keyed'\n\nconst store = createAtomStore(createRuntime())",
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "const store = createAtomStore(createRuntime())",
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "import { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport type { IRuntime } from '@migaia/reactive'\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }))\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime)\n  const state = sessionByChatId(chatId) // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }))\n  return store\n}",
+            "import { createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
           ],
           "members": [],
           "exportPath": "./atom/store",
@@ -8684,7 +8692,7 @@
           "returns": "IAtomStore",
           "errors": ["No documented errors are declared for defaultAtomStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defaultAtomStore.",
-          "examples": ["const store = defaultAtomStore(defaultRuntime);"],
+          "examples": ["const store = defaultAtomStore(defaultRuntime)"],
           "members": [],
           "exportPath": "./atom/store",
           "overloadSignatures": [
@@ -8756,9 +8764,9 @@
           "errors": ["No documented errors are declared for IAtomStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomStore.",
           "examples": [
-            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>;\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>;\n  of(key: Key): ISplitItemDef<T>;\n  insert(store: IAtomStore, item: T, index?: number): void;\n  remove(store: IAtomStore, key: Key): boolean;\n  prune(store: IAtomStore): number;\n};\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>;",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n});\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}));\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime);\n  const state = sessionBySessionId(sessionId);\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }));\n  return store;\n}\n\n// —— 用法 ——\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false });\n\nconst item = todosSplit.of('t1');\nstore.set(item, (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef));\n});\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n);\nconsole.log(store.get(doneCountDef)); // 999\nundo(); // 撤销后状态原样保留\n\nunsubscribe();\ntodosSplit.remove(store, 't2');\ntodosSplit.prune(store); // 只清 splitDef 自己的 key 缓存\nstore.dispose(); // 释放这个作用域建出的全部实例",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive';\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed';\n\ntype ITodo = { id: string; text: string; done: boolean };\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] };\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] });\nconst userNameDef = focusDef(sessionDef, 'user', 'name');\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id);\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n);\n\nconst runtime = createRuntime();\nconst store = createAtomStore(runtime);\n\nstore.set(userNameDef, 'ada');\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false });\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }));\nconsole.log(store.get(doneCountDef)); // 1\n\nstore.dispose(); // 释放这个作用域建出的全部实例"
+            "type ISplitDefinition<T, Key> = {\n  readonly source: IStandardWritableDef<readonly T[]>\n  readonly items: IDerivedDefinition<readonly ISplitItemDef<T>[]>\n  of(key: Key): ISplitItemDef<T>\n  insert(store: IAtomStore, item: T, index?: number): void\n  remove(store: IAtomStore, key: Key): boolean\n  prune(store: IAtomStore): number\n}\n\nfunction splitDef<T, Key = number>(\n  source: IStandardWritableDef<readonly T[]>,\n  keyOf: (item: T, index: number) => Key = (_item, index) => index as unknown as Key\n): ISplitDefinition<T, Key>",
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
           ],
           "members": [],
           "exportPath": "./atom/store",
@@ -8848,7 +8856,7 @@
           "errors": ["No documented errors are declared for atomGetter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for atomGetter.",
           "examples": [
-            "const get = atomGetter(runtime);\nget(someInstanceAtom); // 读取前校验 atom.runtime === runtime"
+            "const get = atomGetter(runtime)\nget(someInstanceAtom) // 读取前校验 atom.runtime === runtime"
           ],
           "members": [],
           "exportPath": "./reactive/atom",
@@ -8909,7 +8917,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -9098,9 +9106,7 @@
           "returns": "IAtomSetter",
           "errors": ["No documented errors are declared for atomSetter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for atomSetter.",
-          "examples": [
-            "const set = atomSetter(runtime);\nset(someWritableInstanceAtom, nextValue);"
-          ],
+          "examples": ["const set = atomSetter(runtime)\nset(someWritableInstanceAtom, nextValue)"],
           "members": [],
           "exportPath": "./reactive/atom",
           "overloadSignatures": [
@@ -9160,7 +9166,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const;\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode];"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -9344,7 +9350,7 @@
           "errors": ["No documented errors are declared for IAtomGetter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomGetter.",
           "examples": [
-            "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';"
+            "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
           ],
           "members": [],
           "exportPath": "./reactive/atom",
@@ -9468,7 +9474,7 @@
           "errors": ["No documented errors are declared for IAtomSetter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomSetter.",
           "examples": [
-            "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';"
+            "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
           ],
           "members": [],
           "exportPath": "./reactive/atom",
@@ -9533,7 +9539,7 @@
           "errors": ["No documented errors are declared for IAtomUpdate."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAtomUpdate.",
           "examples": [
-            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus;\n  set(source: Source, focus: Focus): Source;\n};\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>;"
+            "type IDefOptic<Source, Focus> = {\n  get(source: Source): Focus\n  set(source: Source, focus: Focus): Source\n}\n\nfunction opticDef<Source, Focus>(\n  source: IStandardWritableDef<Source>, // 标准 set(update) 写语义的可写定义\n  optic: IDefOptic<Source, Focus>\n): IWritableDerivedDefinition<Focus, readonly [IAtomUpdate<Focus>], void>"
           ],
           "members": [],
           "exportPath": "./reactive/atom",
@@ -9659,8 +9665,8 @@
           "errors": ["No documented errors are declared for IReadableAtom."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReadableAtom.",
           "examples": [
-            "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';",
-            "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';"
+            "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'",
+            "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
           ],
           "members": [],
           "exportPath": "./reactive/atom",
@@ -9725,8 +9731,8 @@
           "errors": ["No documented errors are declared for IWritableAtom."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWritableAtom.",
           "examples": [
-            "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';",
-            "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom';\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom';"
+            "import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'",
+            "import type {\n  IReadableAtom,\n  IWritableAtom,\n  IAtomGetter,\n  IAtomSetter\n} from '@migaia/store-keyed/reactive/atom'\nimport { atomGetter, atomSetter } from '@migaia/store-keyed/reactive/atom'"
           ],
           "members": [],
           "exportPath": "./reactive/atom",

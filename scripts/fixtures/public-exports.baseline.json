@@ -237,6 +237,7 @@
         "createSourceBinding",
         "createTrackedObserver",
         "currentRuntimeVersion",
+        "deferRuntimeCleanup",
         "getDefaultRuntime",
         "internalRuntimeOf",
         "invalidateObservable",

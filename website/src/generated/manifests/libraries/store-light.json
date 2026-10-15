@@ -105,7 +105,7 @@
                 "items": [
                   "`runtime?: IRuntime` —— 默认 `defaultRuntime`；显式隔离运行时（SSR 每请求、单测、多 root 互不串状态）",
                   "`debugName?: string` —— 默认 `'Store'`；仅用作内部节点 `debugName` 前缀，不参与语义",
-                  "`warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `console.warn` 提示\"只有首个 await 之前的写入被自动 batch\"",
+                  "`warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\"",
                   "`mutationPolicy?: IMutationPolicy` —— 默认无；接入 MobX 风格的严格写入守卫（见 USEGUIDE §7）"
                 ]
               },
@@ -361,6 +361,8 @@
               {
                 "type": "list",
                 "items": [
+                  "`runtime?: IRuntime` - owns idle cleanup and diagnostics; defaults to the lazy shared Runtime.",
+                  "`scheduler?: IScheduler` - owns cache and provisional-capture timers; defaults to `systemScheduler`, admitted once at creation.",
                   "`keepAliveMs?: number` —— 默认 `1000`；无持有者之后缓存值继续存活的毫秒数，必须是有限非负数",
                   "`dispose?: (value: T) => void | PromiseLike<void>` —— 自定义清理；提供后值必须是引用类型，否则抛 `TypeError`；不提供时若值自带 `$dispose` 方法会自动调用",
                   "`onError?: (error: unknown, phase: 'load' | 'dispose' | 'listener') => void` —— 观察三个阶段的失败",
@@ -455,6 +457,18 @@
               {
                 "type": "paragraph",
                 "text": "单独导入 Store light 不创建默认 Runtime。第一次未显式传入 `options.runtime` 的 store 创建才取得 reactive 的共享默认实例；显式 runtime 的构造路径直接使用给定 owner。该实例与随后导入 reactive root 的 `defaultRuntime` 保持同一 identity。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Store Actions keep their original return value or Promise outside the synchronous mutation callback. Only writes before the first await share that batch; use `$batch()` for continuation writes. Mutation-policy callbacks remain synchronous. With `warnAsyncActions`, the first thenable result reports `ACTION_BATCH_BOUNDARY` through the Store Runtime."
+              },
+              {
+                "type": "paragraph",
+                "text": "StoreResource uses its captured Runtime for idle cleanup and diagnostics, and its admitted scheduler for cache TTL and the 4000ms provisional capture window. `keepAliveMs: 0` still evicts synchronously. Missing `onError` forwards the original failure to Runtime; if a user reporter throws or rejects, both the primary and reporter failure reach that sink by identity."
+              },
+              {
+                "type": "paragraph",
+                "text": "No host console or global reportError fallback is used."
               }
             ]
           }
@@ -623,7 +637,7 @@
                     "`boolean`",
                     "可选",
                     "`false`",
-                    "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `console.warn` 提示\"只有首个 await 之前的写入被自动 batch\""
+                    "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\""
                   ],
                   [
                     "`mutationPolicy`",
@@ -980,6 +994,20 @@
                 "headers": ["字段", "类型", "必填性", "默认值", "说明"],
                 "rows": [
                   [
+                    "`runtime`",
+                    "`IRuntime`",
+                    "optional",
+                    "shared Runtime",
+                    "Owns deferred idle cleanup and diagnostics."
+                  ],
+                  [
+                    "`scheduler`",
+                    "`IScheduler`",
+                    "optional",
+                    "`systemScheduler`",
+                    "Captured once for cache TTL and provisional expiry; task cancellation and unref are preserved."
+                  ],
+                  [
                     "`keepAliveMs`",
                     "`number`",
                     "可选",
@@ -1001,14 +1029,14 @@
                     "无",
                     "观察 `'load' \\",
                     "'dispose' \\",
-                    "'listener'` 三个阶段的失败；reporter 自身抛错会被吞掉，不影响资源状态"
+                    "'listener'` 三个阶段的失败；reporter 自身抛错或拒绝时，原失败与 reporter 失败均由所属 Runtime 报告，资源状态不变"
                   ],
                   ["`onTerminal`", "`() => void`", "可选", "无", "资源到达终态时调用一次"]
                 ]
               },
               {
                 "type": "paragraph",
-                "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
+                "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
               },
               {
                 "type": "paragraph",
@@ -1289,6 +1317,18 @@
               {
                 "type": "paragraph",
                 "text": "单独导入 Store light 不创建默认 Runtime。第一次未显式传入 `options.runtime` 的 store 创建才取得 reactive 的共享默认实例；显式 runtime 的构造路径直接使用给定 owner。该实例与随后导入 reactive root 的 `defaultRuntime` 保持同一 identity。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Store Actions keep their original return value or Promise outside the synchronous mutation callback. Only writes before the first await share that batch; use `$batch()` for continuation writes. Mutation-policy callbacks remain synchronous. With `warnAsyncActions`, the first thenable result reports `ACTION_BATCH_BOUNDARY` through the Store Runtime."
+              },
+              {
+                "type": "paragraph",
+                "text": "StoreResource uses its captured Runtime for idle cleanup and diagnostics, and its admitted scheduler for cache TTL and the 4000ms provisional capture window. `keepAliveMs: 0` still evicts synchronously. Missing `onError` forwards the original failure to Runtime; if a user reporter throws or rejects, both the primary and reporter failure reach that sink by identity."
+              },
+              {
+                "type": "paragraph",
+                "text": "No host console or global reportError fallback is used."
               }
             ]
           }
@@ -1665,7 +1705,7 @@
                       "`boolean`",
                       "可选",
                       "`false`",
-                      "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `console.warn` 提示\"只有首个 await 之前的写入被自动 batch\""
+                      "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\""
                     ],
                     [
                       "`mutationPolicy`",
@@ -2432,7 +2472,7 @@
           "name": "createStoreResource",
           "kind": "function",
           "signature": "export declare function createStoreResource<T>(factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>, options?: IStoreResourceOptions<T>): IStoreResource<T>;",
-          "declarationLine": 57,
+          "declarationLine": 64,
           "source": "packages/store-light/dist/store-resource.d.ts",
           "purpose": "Suspense-safe owned async value. Factories transfer ownership to this resource; values with explicit disposers must have reference identity.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreResource.",
@@ -2525,7 +2565,7 @@
           "name": "createStoreResourceScope",
           "kind": "function",
           "signature": "export declare function createStoreResourceScope(): IStoreResourceScope;",
-          "declarationLine": 52,
+          "declarationLine": 59,
           "source": "packages/store-light/dist/store-resource.d.ts",
           "purpose": "createStoreResourceScope is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStoreResourceScope.",
@@ -2814,7 +2854,7 @@
                       "`boolean`",
                       "可选",
                       "`false`",
-                      "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `console.warn` 提示\"只有首个 await 之前的写入被自动 batch\""
+                      "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\""
                     ],
                     [
                       "`mutationPolicy`",
@@ -3322,7 +3362,7 @@
                       "`boolean`",
                       "可选",
                       "`false`",
-                      "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `console.warn` 提示\"只有首个 await 之前的写入被自动 batch\""
+                      "开启后，若某个 Action 返回了一个 thenable（说明它是 async 方法），首次调用时会 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示\"只有首个 await 之前的写入被自动 batch\""
                     ],
                     [
                       "`mutationPolicy`",
@@ -3533,7 +3573,7 @@
           "name": "IResourceCapture",
           "kind": "type",
           "signature": "export type IResourceCapture = object;",
-          "declarationLine": 3,
+          "declarationLine": 4,
           "source": "packages/store-light/dist/store-resource-captures.d.ts",
           "purpose": "Opaque capture token; version metadata remains private to the registry.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResourceCapture.",
@@ -3923,7 +3963,7 @@
           "name": "IStoreResource",
           "kind": "type",
           "signature": "export type IStoreResource<T> = { read(): T; preload(): void; retry(): void; /** @deprecated Use retainResource() or retainVersion(). */ retain(version?: number | IVersionToken): () => void; retainResource(): () => void; retainVersion(version: number | IVersionToken): () => void; /** Internal React bridge: protect version during render, then commit in layout. */ captureVersion(version: number): IResourceCapture; commitCapture(capture: IResourceCapture): () => void; dispose(): void; forceDispose(): void; /** Resolves once this resource reaches its terminal state. Never depends on GC. */ whenTerminal(): Promise<void>; subscribe(listener: () => void): () => void; getSnapshot(): number; readSnapshot(): IStoreResourceSnapshot<T>; captureSnapshot(existingLease?: object): { snapshot: IStoreResourceSnapshot<T>; capture?: IResourceCapture; }; };",
-          "declarationLine": 12,
+          "declarationLine": 15,
           "source": "packages/store-light/dist/store-resource.d.ts",
           "purpose": "Readable async value with separate resource and rendered-version leases.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResource.",
@@ -4030,7 +4070,7 @@
           "name": "IStoreResourceConfig",
           "kind": "type",
           "signature": "export type IStoreResourceConfig<T> = IStoreResourceOptions<T> & { load: IStoreResourceFactory<T>; };",
-          "declarationLine": 45,
+          "declarationLine": 52,
           "source": "packages/store-light/dist/store-resource.d.ts",
           "purpose": "Object-form Resource factory with the same options accepted by the function overload.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceConfig.",
@@ -4202,8 +4242,8 @@
         {
           "name": "IStoreResourceErrorPhase",
           "kind": "type",
-          "signature": "export type IStoreResourceErrorPhase = 'load' | 'dispose' | 'listener';",
-          "declarationLine": 35,
+          "signature": "export type IStoreResourceErrorPhase = StoreResourceErrorPhase;",
+          "declarationLine": 38,
           "source": "packages/store-light/dist/store-resource.d.ts",
           "purpose": "IStoreResourceErrorPhase is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceErrorPhase.",
@@ -4217,9 +4257,7 @@
           "members": [],
           "aliasOf": "IStoreResourceErrorPhase",
           "exportPath": ".",
-          "overloadSignatures": [
-            "export type IStoreResourceErrorPhase = 'load' | 'dispose' | 'listener';"
-          ],
+          "overloadSignatures": ["export type IStoreResourceErrorPhase = StoreResourceErrorPhase;"],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use IStoreResourceErrorPhase when its type contract and declared inputs match the result you need.",
@@ -4257,7 +4295,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/store-resource.d.ts:IStoreResourceErrorPhase:export type IStoreResourceErrorPhase = 'load' | 'dispose' | 'listener';",
+          "identity": "packages/store-light/dist/store-resource.d.ts:IStoreResourceErrorPhase:export type IStoreResourceErrorPhase = StoreResourceErrorPhase;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -4267,7 +4305,7 @@
           "name": "IStoreResourceFactory",
           "kind": "type",
           "signature": "export type IStoreResourceFactory<T> = (context: IStoreResourceLoadContext) => Promise<T> | T;",
-          "declarationLine": 43,
+          "declarationLine": 50,
           "source": "packages/store-light/dist/store-resource.d.ts",
           "purpose": "IStoreResourceFactory is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceFactory.",
@@ -4503,8 +4541,8 @@
         {
           "name": "IStoreResourceOptions",
           "kind": "type",
-          "signature": "export type IStoreResourceOptions<T> = { /** Cache TTL only; React render safety comes from capture/commit leases. */ keepAliveMs?: number; dispose?: (value: T) => void | PromiseLike<void>; onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void; onTerminal?: () => void; };",
-          "declarationLine": 36,
+          "signature": "export type IStoreResourceOptions<T> = { /** Owns deferred cleanup and diagnostic reporting; defaults to the lazy shared Runtime. */ runtime?: IRuntime; /** Owns cache TTL and provisional capture expiry, captured once at creation. */ scheduler?: IScheduler; /** Cache TTL only; React render safety comes from capture/commit leases. */ keepAliveMs?: number; dispose?: (value: T) => void | PromiseLike<void>; onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void; onTerminal?: () => void; };",
+          "declarationLine": 39,
           "source": "packages/store-light/dist/store-resource.d.ts",
           "purpose": "IStoreResourceOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceOptions.",
@@ -4519,7 +4557,7 @@
           "aliasOf": "IStoreResourceOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IStoreResourceOptions<T> = { /** Cache TTL only; React render safety comes from capture/commit leases. */ keepAliveMs?: number; dispose?: (value: T) => void | PromiseLike<void>; onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void; onTerminal?: () => void; };"
+            "export type IStoreResourceOptions<T> = { /** Owns deferred cleanup and diagnostic reporting; defaults to the lazy shared Runtime. */ runtime?: IRuntime; /** Owns cache TTL and provisional capture expiry, captured once at creation. */ scheduler?: IScheduler; /** Cache TTL only; React render safety comes from capture/commit leases. */ keepAliveMs?: number; dispose?: (value: T) => void | PromiseLike<void>; onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void; onTerminal?: () => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4558,7 +4596,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/store-resource.d.ts:IStoreResourceOptions:export type IStoreResourceOptions<T> = { /** Cache TTL only; React render safety comes from capture/commit leases. */ keepAliveMs?: number; dispose?: (value: T) => void | PromiseLike<void>; onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void; onTerminal?: () => void; };",
+          "identity": "packages/store-light/dist/store-resource.d.ts:IStoreResourceOptions:export type IStoreResourceOptions<T> = { /** Owns deferred cleanup and diagnostic reporting; defaults to the lazy shared Runtime. */ runtime?: IRuntime; /** Owns cache TTL and provisional capture expiry, captured once at creation. */ scheduler?: IScheduler; /** Cache TTL only; React render safety comes from capture/commit leases. */ keepAliveMs?: number; dispose?: (value: T) => void | PromiseLike<void>; onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void; onTerminal?: () => void; };",
           "guidance": [],
           "usageScore": 2,
           "configuration": [],
@@ -4568,7 +4606,7 @@
           "name": "IStoreResourceScope",
           "kind": "type",
           "signature": "export type IStoreResourceScope = { resource<T>(factory: IStoreResourceFactory<T> | IStoreResourceConfig<T>, options?: IStoreResourceOptions<T>): IStoreResource<T>; dispose(): void; };",
-          "declarationLine": 48,
+          "declarationLine": 55,
           "source": "packages/store-light/dist/store-resource.d.ts",
           "purpose": "IStoreResourceScope is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreResourceScope.",
