@@ -342,6 +342,46 @@ describe('PluginHost managed stage publication', () => {
     await host.dispose()
   })
 
+  it('PHC-T1 keeps token callables stable while retaining each publication liveness policy', async () => {
+    /** Full Host views and token views deliberately have different enablement boundaries. */
+    const host = new ManagedStageHost(hostOptions)
+    const composition = openComposition(host)
+    const admission = composition.createPluginAdmission({
+      name: 'stable-view',
+      install: () => ({
+        receiver() {
+          return this
+        }
+      })
+    })
+    const prepared = await composition.prepareAdmissions([
+      { admission, slot: composition.createDataOrderSlot('stable-view') }
+    ])
+    const [receipt] = composition.commitPreparedAdmissions(prepared)
+    /** Read the full view first to detect accidental sharing of its stronger liveness guard. */
+    const full = composition.getCurrentSnapshot().extensions.receiver as () => object
+    const token = createView(receipt).extensions.receiver as () => object
+    expect(createView(receipt).extensions.receiver).toBe(token)
+    expect(token()).toBe(host)
+    expect(full()).toBe(host)
+    await host.plugin.disable('stable-view')
+    expect(full).toThrowError(
+      expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
+    )
+    expect(token()).toBe(host)
+    expect(createView(receipt).extensions.receiver).toBe(token)
+    await host.plugin.enable('stable-view')
+    expect(composition.getCurrentSnapshot().extensions.receiver).toBe(full)
+    await composition.commitPreparedUnUseBatch(composition.prepareUnUseBatch([receipt]), {})
+    expect(token).toThrowError(
+      expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
+    )
+    expect(full).toThrowError(
+      expect.objectContaining({ code: PluginHostErrorCode.registrationRevoked })
+    )
+    await host.dispose()
+  })
+
   it('accepts a cleanup fence created in another realm', async () => {
     const host = new ManagedStageHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }

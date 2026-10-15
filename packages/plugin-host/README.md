@@ -20,6 +20,8 @@ pnpm add @migaia/plugin-host
 `IRegistrationToken`、`IRegistrationView<TPlugin>` 与 `createView(token)`。不要依赖 `src`/`dist`
 内部文件，也不要把 composition view 当成 Host mutation/config/shared 能力。托管组合 owner 可使用该子路径的 `openComposition()` 协议。
 
+同一注册的 token view 复用扩展函数引用，调用时保留 concrete Host receiver。token 权限随注册生命周期失效；`disable()` 期间仍有效。完整 Host view 在禁用期间拒绝访问，启用后恢复原函数引用；卸载会使两类视图同时失效。
+
 ## 目录
 
 - [核心心智模型：五分钟上手](#核心心智模型五分钟上手)
