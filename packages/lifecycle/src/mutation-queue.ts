@@ -1,8 +1,12 @@
-import { containAsyncRejection, createLifecycleError } from './errors.js'
+import {
+  attachLifecycleSecondaryErrors,
+  containAsyncRejection,
+  createLifecycleError
+} from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { resolveScheduler, resolveSchedulerOption } from './scheduler.js'
+import { LifecycleErrorText, LifecycleErrorTextFactory } from './error-text.js'
+import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
+import { defaultLifecycleScheduler, resolveSchedulerOption } from './scheduler.js'
 
 export type IMutationQueueOptions = {
   /**
@@ -51,26 +55,6 @@ type IMutationRecord = {
   queueIndex: number
 }
 
-/** Keeps a timeout task's cancellation failure attached to the timeout primary. */
-const appendCancellationError = (primary: unknown, cleanupError: unknown): unknown => {
-  if (primary !== null && (typeof primary === 'object' || typeof primary === 'function')) {
-    try {
-      Object.defineProperty(primary, 'errors', {
-        value: Object.freeze([cleanupError]),
-        enumerable: true
-      })
-      return primary
-    } catch {
-      // Frozen primary — fall through to a wrapper that keeps both identities reachable.
-    }
-  }
-  return createLifecycleError(
-    LifecycleErrorCode.queueAdmissionTimeout,
-    primary instanceof Error ? primary.message : LifecycleErrorText.mutationAdmissionTimedOut,
-    { cause: primary, errors: [cleanupError] }
-  )
-}
-
 /**
  * Serial FIFO queue, ported off `plugin-host`'s `#mutationQueue`/`#armQueueWatchdog` (already
  * verified as: strict FIFO, watchdog disarmed the instant a task settles, and — contrary to an
@@ -81,7 +65,7 @@ const appendCancellationError = (primary: unknown, cleanupError: unknown): unkno
 export function createMutationQueue(options: IMutationQueueOptions = {}): IMutationQueue {
   const defaultAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
   const admissionDiagnosticMs = options.admissionDiagnosticMs ?? 1000
-  const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
+  const scheduler = resolveSchedulerOption(options, defaultLifecycleScheduler)
   const queue: Array<IMutationRecord | undefined> = []
   let queueHead = 0
   let queuedCount = 0
@@ -136,7 +120,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
     ) {
       throw createLifecycleError(
         LifecycleErrorCode.invalidOption,
-        '[lifecycle] scheduler.schedule must return an object with a cancel() function'
+        LifecycleErrorText.schedulerTaskInvalid
       )
     }
   }
@@ -220,7 +204,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       }
       record.timeoutError = createLifecycleError(
         LifecycleErrorCode.queueAdmissionTimeout,
-        `[lifecycle] mutation waited in the queue for more than ${timeoutMs}ms`,
+        LifecycleErrorTextFactory.mutationAdmissionTimeout(timeoutMs),
         { detail: { owner: record.owner, waitedMs } }
       )
       if (record.admissionTimer !== undefined && !record.timeoutSettled) {
@@ -230,7 +214,12 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
         record.reject(
           cancelError === undefined
             ? record.timeoutError
-            : appendCancellationError(record.timeoutError, cancelError)
+            : attachLifecycleSecondaryErrors(
+                record.timeoutError,
+                [cancelError],
+                LifecycleErrorText.mutationAdmissionTimedOut,
+                LifecycleErrorCode.queueAdmissionTimeout
+              )
         )
       }
     }, timeoutMs)
@@ -242,7 +231,12 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       record.reject(
         cancelError === undefined
           ? record.timeoutError
-          : appendCancellationError(record.timeoutError, cancelError)
+          : attachLifecycleSecondaryErrors(
+              record.timeoutError,
+              [cancelError],
+              LifecycleErrorText.mutationAdmissionTimedOut,
+              LifecycleErrorCode.queueAdmissionTimeout
+            )
       )
     }
   }
@@ -295,7 +289,7 @@ export function createMutationQueue(options: IMutationQueueOptions = {}): IMutat
       return Promise.reject(
         createLifecycleError(
           LifecycleErrorCode.queueSelfDependency,
-          `[lifecycle] mutation with owner "${owner}" was enqueued while a mutation with the same owner is running`,
+          LifecycleErrorTextFactory.mutationSelfDependency(owner),
           { detail: { owner } }
         )
       )

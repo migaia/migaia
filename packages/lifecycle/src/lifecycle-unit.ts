@@ -6,6 +6,7 @@ import {
   probeThenable
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
 import { createTerminalController } from './terminal-controller.js'
 import { LifecycleState, LifecycleUnitState, ThenableProbeKind } from './state-constants.js'
 import { createGenerationController } from './generation-controller.js'
@@ -54,7 +55,7 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
     if (!report) return
     const tagged = createLifecycleError(
       LifecycleErrorCode.unitStartFailed,
-      '[lifecycle] start() failed',
+      LifecycleErrorText.unitStartFailed,
       {
         cause: rawError
       }
@@ -71,10 +72,10 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
 
   const assertOpen = (): void => {
     if (terminal.lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, '[lifecycle] unit is terminal')
+      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.unitTerminal)
     }
     if (terminal.lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] unit is closing')
+      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.unitClosing)
     }
   }
 
@@ -150,7 +151,12 @@ export function createLifecycleUnit<T>(options: ILifecycleUnitOptions = {}): ILi
     dispose() {
       if (terminal.lifecycle === LifecycleState.terminal) return
       terminal.close()
-      generations.dispose('unit disposed')
+      generations.dispose(
+        createLifecycleError(
+          LifecycleErrorCode.generationDisposed,
+          LifecycleErrorText.unitDisposedReason
+        )
+      )
       terminal.forceTerminal()
     }
   }

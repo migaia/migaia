@@ -8,13 +8,14 @@ import type {
 } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
 import { createDisposerContext } from './disposer-context.js'
-import { containAsyncRejection, createLifecycleError } from './errors.js'
+import { assertErrorPolicyReporter, containAsyncRejection, createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
+import { createOwnedEntryList } from './owned-entries.js'
 import { createTerminalController } from './terminal-controller.js'
 import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
 import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
-import { captureAbortControllerFactory } from './abort-factory.js'
+import { captureAbortControllerFactory, createLazyAbortController } from './abort-factory.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { resolveSchedulerOption } from './scheduler.js'
 
@@ -32,6 +33,11 @@ const finalizationRegistry: FinalizationRegistry<() => void> | undefined =
 
 export type ILifecycleScopeOptions = {
   readonly errorPolicy?: IErrorPolicy
+  /**
+   * Reporter for failures the error policy does not throw or collect. Required when `errorPolicy`
+   * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field:
+   * 'report'`.
+   */
   readonly report?: (error: unknown) => void
   /** Shared absolute deadline forwarded to every owned resource's release (L-T32). */
   readonly deadlineAt?: number
@@ -68,18 +74,23 @@ export type ILifecycleScope = ILifecycleOwner & {
  */
 export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILifecycleScope {
   const errorPolicy = options.errorPolicy ?? 'throw'
+  assertErrorPolicyReporter(errorPolicy, options.report)
   const scheduler = resolveSchedulerOption(options)
   const terminal = createTerminalController()
   const createController = captureAbortControllerFactory()
-  const closingController = createController()
+  /** Closing signal source; created only when a release transaction actually reads it (LC-P3). */
+  const closingController = createLazyAbortController(createController)
+  /** Whether `close()` already aborted the closing signal; avoids rebuilding the reason. */
+  let closingAborted = false
   /** Immutable owner-bound capability shared by this scope's release callbacks. */
   const disposerContext = createDisposerContext()
-  const entries: Array<{
+  /** Live owned resources in registration order with O(1) release lookup (LC-P1). */
+  const entries = createOwnedEntryList<{
     readonly resource: unknown
     readonly source: string
     readonly descriptor: IReleaseDescriptor
     readonly unregisterToken?: object
-  }> = []
+  }>()
   let nextId = 0
   let disposePromise: Promise<readonly ICollectedError[]> | undefined
   /**
@@ -152,10 +163,10 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
 
   const assertOpen = (): void => {
     if (terminal.lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, '[lifecycle] scope is terminal')
+      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
     }
     if (terminal.lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')
+      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
     }
   }
 
@@ -163,7 +174,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
     if (currentlyReleasing) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeReentrantOwn,
-        '[lifecycle] cannot call own() from within this scope’s own dispose()'
+        LifecycleErrorText.scopeReentrantOwn
       )
     }
     assertOpen()
@@ -209,18 +220,21 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
   }
 
   const release = (resource: unknown): boolean => {
-    const index = entries.findIndex((entry) => entry.resource === resource)
-    if (index < 0) return false
-    const [entry] = entries.splice(index, 1)
+    const entry = entries.release(resource)
+    if (entry === undefined) return false
     // The caller has already released this resource independently — the GC-fallback finalizer
     // must not run `force` a second time (L-T19).
-    unregisterGcFallback(entry?.unregisterToken)
+    unregisterGcFallback(entry.unregisterToken)
     return true
   }
 
   const close = (): void => {
     terminal.close()
-    closingController.abort('scope closed')
+    if (closingAborted) return
+    closingAborted = true
+    closingController.abort(
+      createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
+    )
   }
 
   const performDispose = async (): Promise<readonly ICollectedError[]> => {
@@ -228,7 +242,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
     // Atomic: nothing added between the snapshot and the loop, nothing skipped, nothing doubled
     // (L-T33). LIFO order; `DisposeTransaction`'s order-mode stable sort preserves this for
     // same-`order` items.
-    const snapshot = entries.splice(0).reverse()
+    const snapshot = entries.drain().reverse()
     // Every one of these is about to be explicitly released by the transaction below; the
     // GC-fallback finalizer must not also fire for any of them afterward.
     for (const entry of snapshot) unregisterGcFallback(entry.unregisterToken)
@@ -244,7 +258,8 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
           report: options.report,
           deadlineAt: options.deadlineAt,
           scheduler,
-          signal: closingController.signal,
+          // An empty snapshot runs no item, so it never needs the closing signal materialized.
+          signal: snapshot.length > 0 ? closingController.signal : undefined,
           disposer: disposerContext
         }
       )

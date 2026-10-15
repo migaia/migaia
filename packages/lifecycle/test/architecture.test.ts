@@ -183,6 +183,7 @@ describe('L-T20 cross-module: a downstream adapter uses only public primitives',
       if (
         name === 'index.ts' ||
         name === 'abort-factory.ts' ||
+        name === 'owned-entries.ts' ||
         name === 'disposal.ts' ||
         name === 'scope.ts' ||
         name === 'generation.ts' ||

@@ -1,5 +1,6 @@
 import { createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
+import { LifecycleErrorText } from './error-text.js'
 import type { IDisposer } from './types.js'
 
 export type IQuiescenceTracker<TKey> = {
@@ -56,7 +57,7 @@ function createTrackerCore<TKey>(store: IKeyStore<TKey, IKeyState>): IQuiescence
       if (existing?.sealed) {
         throw createLifecycleError(
           LifecycleErrorCode.quiescenceSealed,
-          '[lifecycle] cannot retain a sealed quiescence key'
+          LifecycleErrorText.quiescenceSealed
         )
       }
       const state = getOrCreate(key)
@@ -77,7 +78,7 @@ function createTrackerCore<TKey>(store: IKeyStore<TKey, IKeyState>): IQuiescence
       if (!existing?.sealed) {
         throw createLifecycleError(
           LifecycleErrorCode.quiescenceUnsealedWait,
-          '[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait'
+          LifecycleErrorText.quiescenceUnsealedWait
         )
       }
       if (existing.count === 0) return Promise.resolve()

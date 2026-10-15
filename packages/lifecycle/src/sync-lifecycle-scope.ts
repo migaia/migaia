@@ -6,9 +6,15 @@ import type {
   ILifecycleState
 } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
-import { createLifecycleError, createErrorCollector, probeThenable } from './errors.js'
+import {
+  assertErrorPolicyReporter,
+  createLifecycleError,
+  createErrorCollector,
+  probeThenable
+} from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
+import { createOwnedEntryList } from './owned-entries.js'
 import { createTerminalController } from './terminal-controller.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import { LifecycleState, ThenableProbeKind } from './state-constants.js'
@@ -21,6 +27,11 @@ export type ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: t
 
 export type ISyncLifecycleScopeOptions = {
   readonly errorPolicy?: IErrorPolicy
+  /**
+   * Reporter for failures the error policy does not throw or collect. Required when `errorPolicy`
+   * is `report` or `firstError`; otherwise the factory throws `INVALID_OPTION` with `detail.field:
+   * 'report'`.
+   */
   readonly report?: (error: unknown) => void
 }
 
@@ -53,7 +64,7 @@ function runSyncCallback(
       ok: false,
       error: createLifecycleError(
         LifecycleErrorCode.scopeSyncViolation,
-        '[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits'
+        LifecycleErrorText.syncCallbackReturnedThenable
       )
     }
   }
@@ -93,22 +104,24 @@ export function createSyncLifecycleScope(
 ): ISyncLifecycleScope {
   const createController = captureAbortControllerFactory()
   const errorPolicy = options.errorPolicy ?? 'throw'
+  assertErrorPolicyReporter(errorPolicy, options.report)
   const terminal = createTerminalController()
-  const entries: Array<{
+  /** Live owned resources in registration order with O(1) release lookup (LC-P1). */
+  const entries = createOwnedEntryList<{
     readonly resource: unknown
     readonly source: string
     readonly descriptor: ISyncReleaseDescriptor
-  }> = []
+  }>()
   let nextId = 0
   let disposed = false
   let currentlyReleasing = false
 
   const assertOpen = (): void => {
     if (terminal.lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, '[lifecycle] scope is terminal')
+      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
     }
     if (terminal.lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')
+      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
     }
   }
 
@@ -116,14 +129,14 @@ export function createSyncLifecycleScope(
     if (currentlyReleasing) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeReentrantOwn,
-        '[lifecycle] cannot call own() from within this scope’s own dispose()'
+        LifecycleErrorText.scopeReentrantOwn
       )
     }
     assertOpen()
     if (descriptor?.syncSafe !== true) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeSyncViolation,
-        '[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor'
+        LifecycleErrorText.syncScopeRequiresSyncSafe
       )
     }
     // Validation only, shared with the async path so a bad `order` or missing `force` gets the same
@@ -136,7 +149,7 @@ export function createSyncLifecycleScope(
     if (brand === true) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeSyncViolation,
-        '[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance'
+        LifecycleErrorText.syncScopeOwnsAsyncOwner
       )
     }
     entries.push({ resource, source: String(nextId++), descriptor })
@@ -144,10 +157,7 @@ export function createSyncLifecycleScope(
   }
 
   const release = (resource: unknown): boolean => {
-    const index = entries.findIndex((entry) => entry.resource === resource)
-    if (index < 0) return false
-    entries.splice(index, 1)
-    return true
+    return entries.release(resource) !== undefined
   }
 
   const close = (): void => {
@@ -166,7 +176,7 @@ export function createSyncLifecycleScope(
     }
     close()
     disposed = true
-    const released = entries.splice(0).reverse()
+    const released = entries.drain().reverse()
     const collector = createErrorCollector(errorPolicy, options.report)
     const admissionErrors: Array<{ readonly source: string; readonly error: unknown }> = []
     const admitted = released.flatMap((entry) => {
@@ -201,7 +211,9 @@ export function createSyncLifecycleScope(
       : admitted
     currentlyReleasing = true
     const controller = createController()
-    controller.abort('scope closed')
+    controller.abort(
+      createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
+    )
     try {
       for (const admissionError of admissionErrors)
         collector.add(admissionError.source, admissionError.error)
@@ -225,7 +237,7 @@ export function createSyncLifecycleScope(
       currentlyReleasing = false
       terminal.forceTerminal()
     }
-    return collector.finalize('[lifecycle] sync lifecycle scope disposal failed')
+    return collector.finalize(LifecycleErrorText.syncScopeDisposalFailed)
   }
 
   const scope: ISyncLifecycleScope = {

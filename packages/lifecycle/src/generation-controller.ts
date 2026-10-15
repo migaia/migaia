@@ -1,8 +1,11 @@
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
+  attachLifecycleSecondaryErrors,
   containAsyncRejection,
   createLifecycleError,
   createLifecycleFailure,
   createLifecycleTypeError,
+  safeReport,
   tagLifecycleError,
   type ILifecycleError
 } from './errors.js'
@@ -10,13 +13,17 @@ import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { type IAbortController } from './abort.js'
-import { captureAbortControllerFactory } from './abort-factory.js'
+import { captureAbortControllerFactory, createLazyAbortController } from './abort-factory.js'
 import {
   observeAbortSubscription,
   type IObservedAbortSubscription
 } from './observed-subscription.js'
-import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { resolveScheduler, resolveSchedulerOption, validateSchedulerDelay } from './scheduler.js'
+import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
+import {
+  defaultLifecycleScheduler,
+  resolveSchedulerOption,
+  validateSchedulerDelay
+} from './scheduler.js'
 
 export type IGenerationToken = object
 
@@ -45,6 +52,13 @@ export type IGenerationControllerOptions = {
    * `systemScheduler`.
    */
   readonly scheduler?: IScheduler
+  /**
+   * Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release
+   * failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by
+   * an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained.
+   * Without it those failures are dropped.
+   */
+  readonly report?: (error: unknown) => void
 }
 
 export type IGenerationController = {
@@ -70,8 +84,9 @@ export type IGenerationController = {
   /**
    * Adopts `value` under `token`'s generation. Returns `true` and keeps `value` with the caller if
    * that generation is still current. Otherwise releases `value` via `release` and returns `false`
-   * (L-T6) — a release failure is funneled to `onReleaseError` and never mutates controller state,
-   * so it cannot poison whichever generation is current now (L-T30).
+   * (L-T6) — a release failure is funneled to `onReleaseError` (or the controller `report` when
+   * omitted) and never mutates controller state, so it cannot poison whichever generation is
+   * current now (L-T30).
    */
   adopt<T>(
     token: IGenerationToken,
@@ -82,8 +97,12 @@ export type IGenerationController = {
   dispose(reason?: unknown): void
 }
 
-/** Appends cleanup failures while preserving each original failure object. */
-function appendCleanupErrors(target: unknown[], error: unknown): void {
+/**
+ * Pushes one cleanup failure onto a collection list, flattening a lifecycle-built AggregateError so
+ * each original failure object stays a direct entry. Builds the list only; attaching it to a
+ * primary goes through `attachLifecycleSecondaryErrors`.
+ */
+function flattenCleanupFailure(target: unknown[], error: unknown): void {
   if (error instanceof AggregateError) {
     target.push(...error.errors)
     return
@@ -91,33 +110,16 @@ function appendCleanupErrors(target: unknown[], error: unknown): void {
   target.push(error)
 }
 
-/** Appends secondary failures without replacing the primary cancellation failure or its order. */
-function appendFailureErrors(primary: unknown, cleanupErrors: readonly unknown[]): unknown {
-  if (cleanupErrors.length === 0) return primary
-  /** Previously attached secondary failures that must remain ahead of later cleanup failures. */
-  const existingErrors =
-    primary instanceof Error && Array.isArray((primary as ILifecycleError).errors)
-      ? [...((primary as ILifecycleError).errors ?? [])]
-      : []
-  /** Complete ordered secondary-failure list, excluding a duplicate primary object. */
-  const combinedErrors = [...existingErrors, ...cleanupErrors.filter((error) => error !== primary)]
-  if (combinedErrors.length === 0) return primary
-  if (primary instanceof Error) {
-    try {
-      Object.defineProperty(primary, 'errors', {
-        value: Object.freeze(combinedErrors),
-        enumerable: true,
-        configurable: true
-      })
-      return primary
-    } catch {
-      // Frozen or non-configurable errors require a wrapper; keep primary reachable through cause.
-    }
-  }
-  return createLifecycleError(
-    LifecycleErrorCode.generationCancellationFailed,
+/**
+ * Attaches cleanup failures to a cancellation primary through the package's single attach entry
+ * point; a fallback aggregate keeps the generation-cancellation code rather than the scope one.
+ */
+function attachCancellationErrors(primary: unknown, cleanupErrors: readonly unknown[]): unknown {
+  return attachLifecycleSecondaryErrors(
+    primary,
+    cleanupErrors,
     LifecycleErrorText.generationCancellationFailed,
-    { cause: primary, errors: combinedErrors }
+    LifecycleErrorCode.generationCancellationFailed
   )
 }
 
@@ -131,7 +133,7 @@ function createAdmissionFailure(
     LifecycleErrorText.generationCancellationFailed,
     primary
   )
-  return appendFailureErrors(failure, cleanupErrors) as ILifecycleError
+  return attachCancellationErrors(failure, cleanupErrors) as ILifecycleError
 }
 
 /**
@@ -142,9 +144,11 @@ function createAdmissionFailure(
 export function createGenerationController(
   options: IGenerationControllerOptions = {}
 ): IGenerationController {
-  const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
+  const scheduler = resolveSchedulerOption(options, defaultLifecycleScheduler)
   const createController = captureAbortControllerFactory()
   const parentSignal = options.parentSignal
+  /** Controller-level last-boundary reporter; see `IGenerationControllerOptions.report`. */
+  const report = options.report
   let generation = 0
   let currentToken: IGenerationToken | undefined
   let currentController: IAbortController | undefined
@@ -180,7 +184,7 @@ export function createGenerationController(
             parentRegistration.failures[0]
           )
         if (parentRegistration.failures.length > 1) {
-          throw appendFailureErrors(
+          throw attachCancellationErrors(
             createLifecycleFailure(
               LifecycleErrorCode.generationCancellationFailed,
               LifecycleErrorText.generationCancellationFailed,
@@ -220,46 +224,36 @@ export function createGenerationController(
     registration?.retryRegistrationCleanup()
     if (registration) {
       for (const failure of registration.failures.slice(knownRegistrationFailures)) {
-        appendCleanupErrors(cleanupErrors, failure)
+        flattenCleanupFailure(cleanupErrors, failure)
       }
     }
     try {
       releaseCurrent(primary)
     } catch (error) {
-      appendCleanupErrors(cleanupErrors, error)
+      flattenCleanupFailure(cleanupErrors, error)
     }
     if (
       primary !== null &&
       (typeof primary === 'object' || typeof primary === 'function') &&
       (primary as { code?: unknown }).code === LifecycleErrorCode.invalidOption
     ) {
-      if (cleanupErrors.length > 0) {
-        try {
-          Object.defineProperty(primary, 'errors', {
-            value: Object.freeze([...cleanupErrors]),
-            enumerable: true
-          })
-        } catch {
-          // Preserve invalid-option native type and identity even when cleanup diagnostics cannot attach.
-        }
-      }
+      // Preserve invalid-option native type and identity: the aggregate fallback for a frozen
+      // primary is deliberately not thrown, so cleanup diagnostics attach only when possible.
+      attachSecondaryErrors(primary, cleanupErrors)
       throw primary
     }
     throw createAdmissionFailure(primary, cleanupErrors)
   }
 
+  /**
+   * Routes an `adopt()` release failure to the per-call `onReleaseError`, else to the controller's
+   * `report`. Either callback is the last boundary; its own failures are contained by
+   * `safeReport`.
+   */
   const reportReleaseError = (
     onReleaseError: ((error: unknown) => void) | undefined,
     error: unknown
-  ): void => {
-    if (!onReleaseError) return
-    try {
-      onReleaseError(error)
-    } catch {
-      // The release-error callback is itself the last boundary; it must not manufacture a new
-      // unhandled failure by throwing back out.
-    }
-  }
+  ): void => safeReport(onReleaseError ?? report, error)
 
   return {
     get generation() {
@@ -272,7 +266,7 @@ export function createGenerationController(
       if (disposed) {
         throw createLifecycleError(
           LifecycleErrorCode.generationDisposed,
-          '[lifecycle] cannot begin a new generation on a disposed GenerationController'
+          LifecycleErrorText.generationDisposed
         )
       }
       let timeoutMs: number | undefined
@@ -286,10 +280,18 @@ export function createGenerationController(
         )
       }
       if (timeoutMs !== undefined) validateSchedulerDelay(timeoutMs, 'timeoutMs')
-      releaseCurrent('superseded by a new generation')
+      releaseCurrent(
+        currentToken === undefined
+          ? undefined
+          : createLifecycleError(
+              LifecycleErrorCode.generationSuperseded,
+              LifecycleErrorText.generationSupersededReason
+            )
+      )
       generation++
       const token: IGenerationToken = {}
-      const controller = createController()
+      /** Per-generation signal source, created on the first `request.signal` read (LC-P3). */
+      const controller = createLazyAbortController(createController)
       currentToken = token
       currentController = controller
       // parent abort 与 timeout 都原子作废当前 token（AF-14）：作废 = 取消 timer + 移除 parent listener。
@@ -333,20 +335,25 @@ export function createGenerationController(
             scheduled = scheduler.schedule(() => {
               firedSynchronously = scheduling
               try {
-                releaseCurrent('generation timed out')
+                releaseCurrent(
+                  createLifecycleError(
+                    LifecycleErrorCode.generationTimedOut,
+                    LifecycleErrorText.generationTimedOutReason
+                  )
+                )
               } catch (error) {
                 callbackFailed = true
                 callbackFailure = error
                 if (!scheduling) {
-                  // A host timer has no caller stack to receive cleanup failures. Observe the
-                  // rejection on a detached diagnostic chain rather than throwing through setTimeout.
-                  containAsyncRejection(Promise.reject(error), () => undefined)
+                  // A host timer has no caller stack to receive cleanup failures; hand them to the
+                  // controller's reporter rather than throwing through setTimeout.
+                  safeReport(report, error)
                 }
               }
             }, timeoutMs)
           } catch (error) {
             scheduling = false
-            if (callbackFailed) throw appendFailureErrors(callbackFailure, [error])
+            if (callbackFailed) throw attachCancellationErrors(callbackFailure, [error])
             throw error
           }
           scheduling = false
@@ -356,9 +363,9 @@ export function createGenerationController(
               // The task was acquired even when the callback failed; cancellation is exactly once.
               scheduled.cancel()
             } catch (error) {
-              appendCleanupErrors(cancelErrors, error)
+              flattenCleanupFailure(cancelErrors, error)
             }
-            if (callbackFailed) throw appendFailureErrors(callbackFailure, cancelErrors)
+            if (callbackFailed) throw attachCancellationErrors(callbackFailure, cancelErrors)
             if (cancelErrors.length > 0) throw cancelErrors[0]
           } else {
             currentTimer = scheduled
@@ -367,7 +374,15 @@ export function createGenerationController(
       } catch (error) {
         throw rollbackAdmission(error, admissionRegistration)
       }
-      return { generation, token, signal: controller.signal }
+      /** Generation number captured for this request; `generation` keeps advancing afterwards. */
+      const requestGeneration = generation
+      return {
+        generation: requestGeneration,
+        token,
+        get signal() {
+          return controller.signal
+        }
+      }
     },
     isCurrent(token) {
       return !disposed && currentToken === token
@@ -390,7 +405,7 @@ export function createGenerationController(
           options.onSuperseded(
             createLifecycleError(
               LifecycleErrorCode.generationSuperseded,
-              '[lifecycle] generation superseded before its result could be adopted'
+              LifecycleErrorText.generationSupersededBeforeAdopt
             )
           )
         } catch {

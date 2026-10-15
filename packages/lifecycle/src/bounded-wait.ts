@@ -1,6 +1,6 @@
-import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
+import type { IScheduler } from '@migaia/utils/scheduler'
 import {
-  resolveScheduler,
+  defaultLifecycleScheduler,
   resolveSchedulerOption,
   validateSchedulerDelay,
   validateSchedulerTime
@@ -20,7 +20,7 @@ export const boundedWait = async (
   deadlineAt: number,
   options?: { scheduler?: IScheduler }
 ): Promise<boolean> => {
-  const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
+  const scheduler = resolveSchedulerOption(options, defaultLifecycleScheduler)
   validateSchedulerTime(deadlineAt, 'deadlineAt')
   // Observe `task` unconditionally, before the deadline check below can return early. If the
   // deadline has already elapsed by the time this is called, returning `false` without ever
