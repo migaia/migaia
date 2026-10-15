@@ -60,6 +60,21 @@ describeShared('SharedInt32Signal：跨 Runtime 共享一段内存', () => {
     array.dispose()
   })
 
+  it('returns a write made by synchronous fanout while pulling a remote version', () => {
+    const runtime = syncRuntime()
+    const writer = sharedInt32(createRuntime(), 1)
+    const reader = sharedInt32(runtime, 0, writer.buffer)
+    const observer = runtime.effect(() => {
+      if (reader.value === 2) writer.value = 3
+    })
+    writer.value = 2
+    expect(reader.value).toBe(3)
+    expect(reader.peek()).toBe(3)
+    observer.dispose()
+    reader.dispose()
+    writer.dispose()
+  })
+
   it('propagates a write to a second runtime attached to the same buffer', () => {
     const writerRuntime = syncRuntime()
     const readerRuntime = syncRuntime()
