@@ -382,6 +382,7 @@ export class PluginHost<
       publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
       disposeRegistration: (registration, preserveErrorIdentity) =>
         this.#removalRuntime.disposeRegistration(registration, preserveErrorIdentity),
+      resetRegistration: (registration) => this.#removalRuntime.resetRegistration(registration),
       closeRegistrationSync: (registration, rollbackErrors) =>
         this.#closeRegistrationSync(registration, rollbackErrors),
       diagnostic: this.#diagnostic,
@@ -390,6 +391,8 @@ export class PluginHost<
     this.#removalRuntime = new PluginHostRemovalRuntime({
       registrations: this.#state.registrations,
       removeRegistration: (registration) => this.#state.closeRegistration(registration),
+      clearRegistrationPublication: (registration) =>
+        this.#state.clearRegistrationPublication(registration),
       pipelineLeases: this.#pipelineLeases,
       retireLeaseOwner: (registration) =>
         this.#state.lanes.retireLeaseOwner(registration, this.#pipelineLeases),
@@ -582,11 +585,17 @@ export class PluginHost<
         // The canonical owner retains this immutable getter across final withdrawal and reuse.
         if (Object.hasOwn(this, key)) return
         /** The concrete descriptor reads canonical state, never a facade-maintained registry. */
-        Object.defineProperty(this, key, {
-          enumerable: true,
-          configurable: false,
-          get: () => this.#state.readSharedExtension(key)
-        })
+        try {
+          Object.defineProperty(this, key, {
+            enumerable: true,
+            configurable: false,
+            get: () => this.#state.readSharedExtension(key)
+          })
+        } catch (error) {
+          // Defining this concrete Host's admitted key can fail with a native TypeError when
+          // it is non-extensible. Preserve that native failure while identifying publication.
+          throw tagPluginHostError(error as TypeError, PluginHostErrorCode.pluginInstallFailed)
+        }
       }
     })
     this.#configRuntime = new PluginHostConfigRuntime({

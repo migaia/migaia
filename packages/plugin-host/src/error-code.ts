@@ -102,7 +102,8 @@ export const PluginHostErrorCode = {
   pluginDefinitionInvalid: 'PLUGIN_DEFINITION_INVALID',
 
   /**
-   * Thrown when a plugin's `install()` fails. The original installation error always remains
+   * Thrown when plugin installation or publication fails. Native shared-publication TypeErrors
+   * retain their runtime type with this code. The original installation error always remains
    * primary and is reachable by identity through `cause`, as required by the error-code contract
    * §3.2.
    *

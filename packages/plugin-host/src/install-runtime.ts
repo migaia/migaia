@@ -1,4 +1,5 @@
 import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createAbortController,
@@ -74,6 +75,10 @@ type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly disposeRegistration: (
     registration: IRegistration<TDomainCore, TValue>,
     preserveErrorIdentity: boolean
+  ) => Promise<unknown[]>
+  /** Cleans a failed lazy attempt while retaining its cold registration for explicit retry. */
+  readonly resetRegistration: (
+    registration: IRegistration<TDomainCore, TValue>
   ) => Promise<unknown[]>
   readonly closeRegistrationSync: (
     registration: IRegistration<TDomainCore, TValue>,
@@ -276,17 +281,20 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         closeSetupAttempt(registration)
       } catch (error) {
         closeSetupAttempt(registration)
-        if (registration.provisional) await registration.provisional.rollback()
-        registration.provisional = undefined
-        for (const detach of [...registration.pipelineDisposers].reverse()) detach()
-        registration.pipelineDisposers = []
-        registration.stageEntries = []
-        for (const { key } of registration.extensions)
-          if (batch.extensionOwners.get(key) === registration) batch.extensionOwners.delete(key)
-        registration.extensions = []
-        registration.installed = false
-        registration.activated = false
-        throw error
+        /** The removal owner handles both provisional leftovers and any committed scope prefix. */
+        const rollbackErrors = await this.#port.resetRegistration(registration)
+        this.#reportRollbackFailure(registration.name, rollbackErrors)
+        /**
+         * Preserve the original primary; immutable failures retain it in the existing wrapper
+         * chain.
+         */
+        const primary = attachSecondaryErrors(error, rollbackErrors)
+        throw primary === error
+          ? error
+          : this.#installFailure(registration.name, primary, {
+              failedName: registration.name,
+              rollbackErrors: Object.freeze([...rollbackErrors])
+            })
       } finally {
         this.#port.setHookRegistration(undefined)
         registration.lifecycle = PluginHostRegistrationLifecycle.idle
@@ -476,7 +484,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       stale: false,
       lifecycle: PluginHostRegistrationLifecycle.install,
       lifecycleController: createAbortController(),
-      scope: createLifecycleScope({ errorPolicy: 'collect', scheduler: this.#port.scheduler }),
       featureExposeValid: true,
       featurePending: createPendingTracker()
     }
@@ -484,6 +491,13 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
 
   /** Opens operation, provisional owner, and hook guard before optional setup. */
   #beginInstall(registration: IRegistration<TDomainCore, TValue>, provisional: boolean): void {
+    // Cold lazy records own no resources. A failed attempt leaves a closed scope behind only
+    // until reset clears it; the next attempt gets a fresh owner and a fresh batch-bound core.
+    registration.scope ??= createLifecycleScope({
+      errorPolicy: 'collect',
+      scheduler: this.#port.scheduler
+    })
+    registration.featureExposeValid = true
     this.#port.beginOperation(registration)
     if (provisional)
       registration.provisional = createProvisionalScope({
