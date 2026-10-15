@@ -43,7 +43,7 @@ import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/servi
 import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
 import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'
 import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'
-import { createJsonRpcAdapterChannel, createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'
+import { createProcessJsonRpcChannel } from '@migaia/rpc-process'
 import { ProcessChannelDiagnostics } from '../../../rpc-process/src/process/diagnostics.js'
 import { bridgeFixture, request } from '../bridge/fixture.js'
 
@@ -58,14 +58,8 @@ type IInventoryInstance = Readonly<{
   transports: readonly Pick<IRpcTransport, 'observe' | 'send' | 'encodedType'>[]
   close(): void | Promise<void>
 }>
-/** The five carrier owners have no explicit exclusions in carriers R2. */
-const packages = [
-  'rpc-core',
-  'rpc-process',
-  'rpc-threads',
-  'rpc-browser',
-  'rpc-bridge-jsonrpc'
-] as const
+/** The four carrier owners have no explicit exclusions in carriers R2. */
+const packages = ['rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'] as const
 /** Repository root resolves package export metadata independently of the process working directory. */
 const root = fileURLToPath(new URL('../../../../', import.meta.url))
 /** Keep actual transport cleanup when a direct public factory returns only one transport. */
@@ -356,21 +350,12 @@ const inventory: readonly IInventoryEntry[] = [
       )
   },
   {
-    entry: '@migaia/rpc-bridge-jsonrpc',
-    symbol: 'createJsonRpcAdapterChannel',
+    entry: '@migaia/rpc-process',
+    symbol: 'createProcessJsonRpcChannel',
     async open() {
-      /** Existing integration fixture drives this exact exported constructor, not its alias. */
+      /** The existing foreign peer exercises the canonical Process presentation boundary. */
       const fixture = bridgeFixture()
-      return channelInstance(await createJsonRpcAdapterChannel(fixture.options))
-    }
-  },
-  {
-    entry: '@migaia/rpc-bridge-jsonrpc',
-    symbol: 'createJsonRpcRemoteChannel',
-    async open() {
-      /** The same real fixture verifies the separate public convenience factory. */
-      const fixture = bridgeFixture()
-      return channelInstance(await createJsonRpcRemoteChannel(fixture.options))
+      return channelInstance(await createProcessJsonRpcChannel(fixture.options))
     }
   }
 ]

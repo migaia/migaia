@@ -1,7 +1,10 @@
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { acceptRpcHandshake } from '@migaia/rpc-contract'
 import { normalizeRpcEnvelope } from '@migaia/rpc-contract'
-import { createJsonRpcRemoteChannel, type IJsonRpcBridgeOptions } from '@migaia/rpc-bridge-jsonrpc'
+import {
+  createProcessJsonRpcChannel,
+  type IProcessJsonRpcChannelOptions
+} from '@migaia/rpc-process'
 import type { IRemoteContract } from '@migaia/rpc-core/remote'
 import type { IProcessByteChannel } from '@migaia/rpc-process'
 import { createComposedEndpoint } from '@migaia/rpc-core/composed'
@@ -120,7 +123,7 @@ export function bridgeFixture(
       closes++
     }
   }
-  const options: IJsonRpcBridgeOptions = {
+  const options: IProcessJsonRpcChannelOptions = {
     byte: raw,
     peerId: 'peer',
     target: { kind: 'plugin', contract: BRIDGE_CONTRACT },
@@ -145,8 +148,8 @@ export function bridgeFixture(
     deliver,
     bytes: (chunk: Uint8Array) => data?.(chunk),
     eof: (reason?: unknown) => eof?.(reason),
-    open: (override: Partial<IJsonRpcBridgeOptions> = {}) =>
-      createJsonRpcRemoteChannel({ ...options, ...override }),
+    open: (override: Partial<IProcessJsonRpcChannelOptions> = {}) =>
+      createProcessJsonRpcChannel({ ...options, ...override }),
     get closes() {
       return closes
     },

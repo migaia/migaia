@@ -6,7 +6,6 @@ import legacyExports from '../fixtures/legacy-exports.json'
 import errorFormatDelta from '../fixtures/error-format-export-delta.json'
 import controlSemanticsDelta from '../fixtures/control-semantics-export-delta.json'
 import streamingDelta from '../fixtures/streaming-export-delta.json'
-import jsonrpcBridgeDelta from '../fixtures/jsonrpc-bridge-export-delta.json'
 import coreRefactorDelta from '../fixtures/core-refactor-export-delta.json'
 
 /** Package root whose manifest and built files define the new public surface. */
@@ -25,10 +24,8 @@ function splitEntry(name: string) {
           ? 'rpc-process'
           : domain === 'threads'
             ? 'rpc-threads'
-            : domain === 'bridge'
-              ? 'rpc-bridge-jsonrpc'
-              : 'rpc-browser'
-  const tail = domain === 'bridge' ? rest.slice(1).join('/') : rest.join('/')
+            : 'rpc-browser'
+  const tail = rest.join('/')
   const key = domain === 'remote' || domain === 'testing' ? `./${domain}` : tail ? `./${tail}` : '.'
   return { current, owner, root: join(packageRoot, owner), key }
 }
@@ -337,14 +334,7 @@ function compiledCoreFiles(directory: string): string[] {
 describe('A1 merged public exports', () => {
   it('preserves the merged runtime export sets and the layered transport kit', async () => {
     const manifests = Object.fromEntries(
-      [
-        'rpc-contract',
-        'rpc-core',
-        'rpc-process',
-        'rpc-threads',
-        'rpc-bridge-jsonrpc',
-        'rpc-browser'
-      ].map((owner) => [
+      ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'].map((owner) => [
         owner,
         JSON.parse(readFileSync(join(packageRoot, owner, 'package.json'), 'utf8')) as {
           exports: Record<string, { default: string; types: string }>
@@ -371,7 +361,6 @@ describe('A1 merged public exports', () => {
       '@migaia/rpc/process/adapters/electron-utility-process',
       '@migaia/rpc/process/adapters/windows-job',
       '@migaia/rpc/contract/framing/stream',
-      ...Object.keys(jsonrpcBridgeDelta.added),
       '@migaia/rpc/threads',
       ...['node', 'deno', 'bun', 'electron-main', 'electron-renderer', 'browser'].map(
         (name) => `@migaia/rpc/threads/adapters/${name}`
@@ -379,7 +368,7 @@ describe('A1 merged public exports', () => {
     ]
       .map((name) => (coreRefactorDelta.relocations as Record<string, string>)[name] ?? name)
       .sort()
-    expect(expected).toHaveLength(49)
+    expect(expected).toHaveLength(48)
     const currentEntries = expected.map((name) => {
       const entry = splitEntry(name)
       return `${entry.owner}:${entry.key}`
@@ -387,7 +376,7 @@ describe('A1 merged public exports', () => {
     for (const [owner, entries] of Object.entries(ordinaryEntries))
       currentEntries.push(...Object.keys(entries).map((key) => `${owner}:${key}`))
     currentEntries.push('rpc-contract:./schema/wire-error')
-    expect(currentEntries).toHaveLength(67)
+    expect(currentEntries).toHaveLength(66)
     expect(
       Object.entries(manifests)
         .flatMap(([owner, entry]) => Object.keys(entry.exports).map((key) => `${owner}:${key}`))
@@ -525,24 +514,11 @@ describe('A1 merged public exports', () => {
       coroutine: 'coroutine'
     })
     expect(remoteNamespace).not.toHaveProperty('RuntimePluginFamily')
-    for (const [name, names] of Object.entries(jsonrpcBridgeDelta.added)) {
-      const { owner, root: ownerRoot, key } = splitEntry(name)
-      const entry = manifests[owner]!.exports[key]
-      expect(entry).toEqual({
-        types: './dist/bridge/jsonrpc/index.d.ts',
-        default: './dist/bridge/jsonrpc/index.js'
-      })
-      expect(existsSync(join(ownerRoot, entry.types))).toBe(true)
-      expect(
-        Object.keys(await import(pathToFileURL(join(ownerRoot, entry.default)).href)).sort()
-      ).toEqual(
-        [
-          ...names.filter((name) => name !== 'JsonRpcBridgeErrorText'),
-          'JSONRPC_BRIDGE_ERROR_SOURCE',
-          'createJsonRpcAdapterChannel'
-        ].sort()
-      )
-    }
+    /** The retired package contributes no current entry; Contract retains the original codes. */
+    expect(existsSync(join(packageRoot, 'rpc-bridge-jsonrpc/package.json'))).toBe(false)
+    const framing = await import('@migaia/rpc-contract/framing/jsonrpc')
+    expect(framing.JSONRPC_BRIDGE_ERROR_SOURCE).toBe('@migaia/rpc/bridge/jsonrpc')
+    expect(Object.keys(framing.JsonRpcBridgeErrorCode)).toHaveLength(5)
     /** Former Core Process operations retain one exact namespace at their owning package root. */
     const processEntry = manifests['rpc-process']!.exports['.']!
     expect(
@@ -569,6 +545,7 @@ describe('A1 merged public exports', () => {
         'createNativeProcessOffer',
         'createProcessChannelClosedError',
         'createProcessPeer',
+        'createProcessJsonRpcChannel',
         'createProcessPlugin',
         'createProcessResilience',
         'createProcessTransport',
@@ -578,6 +555,10 @@ describe('A1 merged public exports', () => {
         'receiveAdapterBootstrap'
       ].sort()
     )
+    /** Both redundant factory names were removed instead of retained as aliases. */
+    const processNamespace = await import('@migaia/rpc-process')
+    expect(processNamespace).not.toHaveProperty('createJsonRpcAdapterChannel')
+    expect(processNamespace).not.toHaveProperty('createJsonRpcRemoteChannel')
     /** Moved raw native operations belong to the already-public native adapter entries. */
     const nodeProcesses = await import('@migaia/rpc-process/adapters/node-child-process')
     expect(Object.keys(nodeProcesses).sort()).toEqual(

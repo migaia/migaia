@@ -7,14 +7,9 @@ import { describe, expect, it } from 'vitest'
 /** Source root whose dependency direction is enforced by A2. */
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-core/src')
 /** Actual independent owner roots make the source-tree assertion non-vacuous after physical split. */
-const ownerRoots = [
-  'rpc-contract',
-  'rpc-core',
-  'rpc-process',
-  'rpc-threads',
-  'rpc-bridge-jsonrpc',
-  'rpc-browser'
-].map((owner) => ({ owner, root: resolve(import.meta.dirname, '../../..', owner, 'src') }))
+const ownerRoots = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser'].map(
+  (owner) => ({ owner, root: resolve(import.meta.dirname, '../../..', owner, 'src') })
+)
 /** Ordinary package entries are checked against real manifests, never against a wildcard path. */
 const ordinaryRpcEntries = new Set(
   ownerRoots.flatMap(({ root }) => {
@@ -27,13 +22,12 @@ const ordinaryRpcEntries = new Set(
     )
   })
 )
-/** The mandatory six-owner graph permits only inward ordinary RPC dependencies. */
+/** The mandatory five-owner graph permits only inward ordinary RPC dependencies. */
 const inwardOwners: Record<string, readonly string[]> = {
   'rpc-contract': [],
   'rpc-core': ['rpc-contract'],
   'rpc-process': ['rpc-core', 'rpc-contract'],
   'rpc-threads': ['rpc-core', 'rpc-contract'],
-  'rpc-bridge-jsonrpc': ['rpc-process', 'rpc-core', 'rpc-contract'],
   'rpc-browser': ['rpc-core', 'rpc-contract']
 }
 /**

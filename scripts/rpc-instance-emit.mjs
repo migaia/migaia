@@ -99,6 +99,7 @@ export const RPC_RESOURCE_POINTS = {
     'testing/index.ts': ['createPeerPair']
   },
   '@migaia/rpc-process': {
+    'process/jsonrpc-channel.ts': ['createProcessJsonRpcChannel'],
     'process/node-io.ts': [
       'createAdapterChildStdio',
       'createAdapterProcessStdio',
@@ -163,10 +164,6 @@ export const RPC_RESOURCE_POINTS = {
       'borrowNodeThreadParent'
     ],
     'threads/adapters/web.ts': ['createWebThreadLauncher', 'createWebThreadChannelFactory']
-  },
-  '@migaia/rpc-bridge-jsonrpc': {
-    'bridge/jsonrpc/index.ts': ['createJsonRpcRemoteChannel'],
-    'bridge/jsonrpc/channel.ts': ['createJsonRpcAdapterChannel']
   },
   '@migaia/rpc-browser': {
     'browser/peer.ts': ['createBrowserPeer'],

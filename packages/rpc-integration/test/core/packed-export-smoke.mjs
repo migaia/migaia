@@ -22,15 +22,8 @@ const integrationDirectory = resolve(fileURLToPath(new URL('../..', import.meta.
 const repositoryRoot = resolve(integrationDirectory, '../..')
 /** Canonical Core assertions and digest-pinned fixtures remain with their physical owner. */
 const packageDirectory = join(repositoryRoot, 'packages/rpc-core')
-/** Six lockstep artifacts are installed without an umbrella package. */
-const rpcOwners = [
-  'rpc-contract',
-  'rpc-core',
-  'rpc-process',
-  'rpc-threads',
-  'rpc-bridge-jsonrpc',
-  'rpc-browser'
-]
+/** Five lockstep artifacts are installed without an umbrella package. */
+const rpcOwners = ['rpc-contract', 'rpc-core', 'rpc-process', 'rpc-threads', 'rpc-browser']
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-rpc-packed-'))
 const extractDirectory = join(smokeDirectory, 'extract')
 const consumerDirectory = join(smokeDirectory, 'consumer')
@@ -44,7 +37,7 @@ const packageDependencies = [
   'supervision',
   'utils'
 ]
-/** Resolve every declared public path from all six real packed manifests. */
+/** Resolve every declared public path from all five real packed manifests. */
 const publicSubpaths = rpcOwners.flatMap((owner) => {
   const manifest = JSON.parse(
     readFileSync(join(repositoryRoot, 'packages', owner, 'package.json'), 'utf8')
@@ -84,7 +77,7 @@ async function main() {
     )
     const packedPackage = packedPackages['rpc-core']
     assertPackedOwnerManifests(packedPackages)
-    console.log('CHECK six-packed-artifacts PASS')
+    console.log('CHECK five-packed-artifacts PASS')
     assertIdentityObserverDeclarationsHidden(packedPackage)
     console.log('CHECK identity-observer-hidden PASS')
     assertDefineFeatureDocumentation(packedPackage)
@@ -147,7 +140,7 @@ async function main() {
     writeFileSync(consumerModule, createSmokeModule(), 'utf8')
     execFileSync(process.execPath, [consumerModule], { cwd: consumerDirectory, stdio: 'inherit' })
     await assertPackedDuplicateInstances(packedPackages, consumerDirectory)
-    console.log('CHECK six-owner-duplicate-instances PASS')
+    console.log('CHECK five-owner-duplicate-instances PASS')
   } finally {
     rmSync(smokeDirectory, { recursive: true, force: true })
   }
@@ -963,14 +956,15 @@ function assertPackedOwnerManifests(packedPackages) {
     'rpc-core': ['@migaia/rpc-contract'],
     'rpc-process': ['@migaia/rpc-contract', '@migaia/rpc-core'],
     'rpc-threads': ['@migaia/rpc-contract', '@migaia/rpc-core'],
-    'rpc-bridge-jsonrpc': ['@migaia/rpc-contract', '@migaia/rpc-core', '@migaia/rpc-process'],
     'rpc-browser': ['@migaia/rpc-core']
   }
   for (const [owner, directory] of Object.entries(packedPackages)) {
     const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
     if (
       manifest.name !== `@migaia/${owner}` ||
-      manifest.version !== '0.0.7' ||
+      manifest.version !==
+        JSON.parse(readFileSync(join(repositoryRoot, 'packages/rpc-contract/package.json'), 'utf8'))
+          .version ||
       manifest.private !== true
     )
       throw new Error(`Unexpected packed owner identity: ${owner}`)
@@ -1042,7 +1036,6 @@ function packedResourceEntry(owner, directory) {
     'rpc-core': './adapters/memory',
     'rpc-process': '.',
     'rpc-threads': '.',
-    'rpc-bridge-jsonrpc': '.',
     'rpc-browser': './adapters/broadcast-channel'
   }[owner]
   const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
@@ -1069,6 +1062,12 @@ async function buildDifferentVersionArtifacts(consumerDirectory) {
       join(scope, dependency),
       'dir'
     )
+  // Reuse the real compiler-only host declarations included by every RPC build config.
+  mkdirSync(join(root, 'packages/utils/types'), { recursive: true })
+  cpSync(
+    join(repositoryRoot, 'packages/utils/types/host-globals.d.ts'),
+    join(root, 'packages/utils/types/host-globals.d.ts')
+  )
   const directories = {}
   for (const owner of rpcOwners) {
     const original = join(repositoryRoot, 'packages', owner)
@@ -1106,7 +1105,7 @@ async function buildDifferentVersionArtifacts(consumerDirectory) {
   return directories
 }
 
-/** Six compiled owner constructors are exercised in independent processes, using held native I/O. */
+/** Five compiled owner constructors are exercised in independent processes, using held native I/O. */
 async function assertPackedDuplicateInstances(packedPackages, consumerDirectory) {
   const probe = join(consumerDirectory, 'duplicate-owner.mjs')
   writeFileSync(probe, createDuplicateOwnerProbe(), 'utf8')
@@ -1192,6 +1191,33 @@ const counts = { collections: 0, native: 0, getters: 0 }
 let inOwnerOperation = false
 function acquire(operation, observe) { inOwnerOperation = observe; try { return operation() } finally { inOwnerOperation = false } }
 
+/** Retain the original foreign-channel byte, cleanup and cross-copy assertions under Process. */
+async function constructProcessJsonRpc(selected, observe) {
+    const incoming = new PassThrough()
+    const outgoing = new PassThrough()
+    resources.push(() => { incoming.destroy(); outgoing.destroy() })
+    const decoder = createJsonRpcFrameDecoder()
+    const capabilities = ['runtime-api@1', 'batch@1', 'jsonrpc-bridge@1', 'abort@1', 'wire-error@1']
+    outgoing.on('data', (bytes) => {
+      for (const message of decoder.push(bytes)) {
+        const reply = message.method === 'migaia.hello'
+          ? { reply: acceptRpcHandshake({ versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities, peer: { id: 'peer', runtime: 'python' } }, message.params.hello).reply, methods: ['migaia.hello', 'migaia.describe', 'migaia.invoke', 'migaia.cancel'] }
+          : message.params.args
+        incoming.write(encodeJsonRpcFrame({ jsonrpc: '2.0', id: message.id, result: reply }))
+      }
+    })
+    const raw = {
+      kind: 'byte',
+      write: (bytes) => new Promise((resolve, reject) => outgoing.write(bytes, (error) => error ? reject(error) : resolve())),
+      onData: (listener) => { if (observe) counts.native++; incoming.on('data', listener); return () => incoming.off('data', listener) },
+      onClose: (listener) => { if (observe) counts.native++; incoming.on('close', listener); return () => incoming.off('close', listener) },
+      close: () => { incoming.destroy(); outgoing.destroy() }
+    }
+    const channel = await acquire(() => selected.createProcessJsonRpcChannel({ byte: raw, peerId: 'peer', target: { kind: 'plugin', contract: { schemaVersion: 1, plugin: 'p', features: { f: { methods: { request: { mode: 'request', idempotent: true } } } } } }, offer: { versions: [{ major: 1, minor: 1 }], capabilities: [], peer: { id: 'client', runtime: 'node' } }, token: 'packed-test-token', scheduler: systemScheduler, wallClock: systemWallClock, ipc: { connectionId: 'packed', sessionId: 'packed', log: () => undefined }, report: (error) => { throw error } }), observe)
+    return { checkpoint: async (text) => { const result = new Promise((resolve) => { const remove = channel.transport.subscribe((message) => { remove(); resolve(JSON.parse(message.data).data.payload) }) }); await channel.transport.send(JSON.stringify(normalizeRpcEnvelope({ kind: 'request', id: 'packed-' + text, method: 'p.f.request', data: { route: { profile: RpcRouteProfile, type: 'request', applicationVersion: '1.0.0', senderId: 'client', targetId: 'peer', receiverId: 'peer', sentAt: 0 }, payload: [text] } }))); assert.deepEqual(await result, [text]) }, close: () => channel.close() }
+
+}
+
 async function construct(selected, observe = false) {
   if (owner === 'rpc-contract') {
     const framer = await acquire(() => selected.createStringFramer(observe ? { get chunkSize() { counts.getters++; return 1024 } } : undefined), observe)
@@ -1229,31 +1255,10 @@ async function construct(selected, observe = false) {
       }
       channel = await acquire(() => selected.createProcessTransport(raw, { peerId: 'packed-peer', scheduler: systemScheduler, report: (error) => { throw error }, ipc: { connectionId: 'packed', sessionId: 'packed', log: () => undefined }, staticAgreement: { local: { codec: 'identity', capabilities: ['batch@1'] }, peer: { codec: 'identity', capabilities: ['batch@1'] } } }), observe)
     }
-    return { checkpoint: async (text) => { const result = new Promise((resolve) => ports.port2.once('message', resolve)); await channel.transport.send(text); assert.equal(await result, text) }, close: () => channel.close() }
-  }
-  if (owner === 'rpc-bridge-jsonrpc') {
-    const incoming = new PassThrough()
-    const outgoing = new PassThrough()
-    resources.push(() => { incoming.destroy(); outgoing.destroy() })
-    const decoder = createJsonRpcFrameDecoder()
-    const capabilities = ['runtime-api@1', 'batch@1', 'jsonrpc-bridge@1', 'abort@1', 'wire-error@1']
-    outgoing.on('data', (bytes) => {
-      for (const message of decoder.push(bytes)) {
-        const reply = message.method === 'migaia.hello'
-          ? { reply: acceptRpcHandshake({ versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities, peer: { id: 'peer', runtime: 'python' } }, message.params.hello).reply, methods: ['migaia.hello', 'migaia.describe', 'migaia.invoke', 'migaia.cancel'] }
-          : message.params.args
-        incoming.write(encodeJsonRpcFrame({ jsonrpc: '2.0', id: message.id, result: reply }))
-      }
-    })
-    const raw = {
-      kind: 'byte',
-      write: (bytes) => new Promise((resolve, reject) => outgoing.write(bytes, (error) => error ? reject(error) : resolve())),
-      onData: (listener) => { if (observe) counts.native++; incoming.on('data', listener); return () => incoming.off('data', listener) },
-      onClose: (listener) => { if (observe) counts.native++; incoming.on('close', listener); return () => incoming.off('close', listener) },
-      close: () => { incoming.destroy(); outgoing.destroy() }
-    }
-    const channel = await acquire(() => selected.createJsonRpcRemoteChannel({ byte: raw, peerId: 'peer', target: { kind: 'plugin', contract: { schemaVersion: 1, plugin: 'p', features: { f: { methods: { request: { mode: 'request', idempotent: true } } } } } }, offer: { versions: [{ major: 1, minor: 1 }], capabilities: [], peer: { id: 'client', runtime: 'node' } }, token: 'packed-test-token', scheduler: systemScheduler, wallClock: systemWallClock, ipc: { connectionId: 'packed', sessionId: 'packed', log: () => undefined }, report: (error) => { throw error } }), observe)
-    return { checkpoint: async (text) => { const result = new Promise((resolve) => { const remove = channel.transport.subscribe((message) => { remove(); resolve(JSON.parse(message.data).data.payload) }) }); await channel.transport.send(JSON.stringify(normalizeRpcEnvelope({ kind: 'request', id: 'packed-' + text, method: 'p.f.request', data: { route: { profile: RpcRouteProfile, type: 'request', applicationVersion: '1.0.0', senderId: 'client', targetId: 'peer', receiverId: 'peer', sentAt: 0 }, payload: [text] } }))); assert.deepEqual(await result, [text]) }, close: () => channel.close() }
+    const native = { checkpoint: async (text) => { const result = new Promise((resolve) => ports.port2.once('message', resolve)); await channel.transport.send(text); assert.equal(await result, text) }, close: () => channel.close() }
+    if (owner === 'rpc-threads') return native
+    const foreign = await constructProcessJsonRpc(selected, observe)
+    return { checkpoint: async (text) => { await native.checkpoint(text); await foreign.checkpoint(text) }, close: async () => { await native.close(); await foreign.close() } }
   }
   throw new Error('Unknown actual owner constructor: ' + owner)
 }
@@ -1265,13 +1270,12 @@ try {
     await original.checkpoint('realm')
     parentPort.postMessage('realm-independent')
   } else {
-    const other = await import(second)
     const NativeCollections = [globalThis.Map, globalThis.Set, globalThis.WeakMap, globalThis.WeakSet]
     const names = ['Map', 'Set', 'WeakMap', 'WeakSet']
     names.forEach((name, index) => { globalThis[name] = new Proxy(NativeCollections[index], { construct(target, args, newTarget) { if (inOwnerOperation) counts.collections++; return Reflect.construct(target, args, newTarget) } }) })
     let failure
     let unexpected
-    try { unexpected = await construct(other, true) } catch (error) { failure = error }
+    try { const other = await import(second); unexpected = await construct(other, true) } catch (error) { failure = error }
     finally { names.forEach((name, index) => { globalThis[name] = NativeCollections[index] }) }
     await unexpected?.close()
     assert.equal(failure?.source, '@migaia/rpc/core')
@@ -1281,11 +1285,15 @@ try {
     assert.deepEqual(counts, { collections: 0, native: 0, getters: 0 }, 'second owner must reject before resource acquisition')
     const helperURL = new URL(second)
     const suffix = '/dist/'
-    const helperRoot = fileURLToPath(helperURL).slice(0, fileURLToPath(helperURL).lastIndexOf(suffix))
+    const selectedRoot = fileURLToPath(helperURL).slice(0, fileURLToPath(helperURL).lastIndexOf(suffix))
+    // A higher native owner may reject while importing its different-version Core dependency.
+    const coreRoot = selectedRoot.slice(0, selectedRoot.lastIndexOf('/')) + '/rpc-core'
+    const helperRoot = [selectedRoot, coreRoot].find((root) => failure.stack.includes(root + '/src/internal/module-instance.ts:'))
+    assert.ok(helperRoot, 'the actual rejecting owner must be this artifact or its inward Core')
     const map = JSON.parse(readFileSync(helperRoot + '/dist/internal/module-instance.js.map', 'utf8'))
     const source = map.sourcesContent.find((value) => value.includes('const error = new Error('))
     const line = source.slice(0, source.indexOf('const error = new Error(')).split('\\n').length
-    assert.ok(failure.stack.includes(helperRoot + '/src/internal/module-instance.ts:' + line + ':'), 'the rejected owner itself must use its true compiler source map')
+    assert.ok(failure.stack.includes(helperRoot + '/src/internal/module-instance.ts:' + line + ':'), 'the actual rejected owner must use its true compiler source map')
     await original.checkpoint('after')
     const worker = new Worker(new URL(import.meta.url), { workerData: { owner, first: second, mode: 'realm' } })
     const workerResult = new Promise((resolve, reject) => { worker.once('message', resolve); worker.once('error', reject) })

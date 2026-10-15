@@ -468,10 +468,10 @@ async function session(physicalSide = side) {
   const a = await api()
   const connect = foreign
     ? async (context) => {
-        const { createJsonRpcRemoteChannel } = await import(
-          new URL('./rpc-bridge-jsonrpc/src/bridge/jsonrpc/index.ts', sourceRoot).href
+        const { createProcessJsonRpcChannel } = await import(
+          new URL('./rpc-process/src/process/jsonrpc-channel.ts', sourceRoot).href
         )
-        return createJsonRpcRemoteChannel({
+        return createProcessJsonRpcChannel({
           byte: raw,
           peerId: peerRuntime + '-peer',
           target: {

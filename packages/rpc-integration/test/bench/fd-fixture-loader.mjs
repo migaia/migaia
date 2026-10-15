@@ -108,7 +108,6 @@ function writePrepared(fixture, contents, filename) {
     'rpc-contract',
     'rpc-process',
     'rpc-threads',
-    'rpc-bridge-jsonrpc',
     'rpc-browser',
     'supervision'
   ]) {

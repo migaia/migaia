@@ -6,7 +6,6 @@ import rpcContractReference from '../src/generated/manifests/libraries/rpc-contr
 import rpcProcessReference from '../src/generated/manifests/libraries/rpc-process.json'
 import rpcThreadsReference from '../src/generated/manifests/libraries/rpc-threads.json'
 import rpcBrowserReference from '../src/generated/manifests/libraries/rpc-browser.json'
-import rpcBridgeReference from '../src/generated/manifests/libraries/rpc-bridge-jsonrpc.json'
 import { isCallableApiSymbol, type IApiSymbol } from './content-contract.js'
 
 /** All six public owners use the canonical generated API projection schema. */
@@ -20,8 +19,7 @@ const rpcReferences: Readonly<Record<string, IRpcReference>> = {
   'rpc-contract': rpcContractReference as unknown as IRpcReference,
   'rpc-process': rpcProcessReference as unknown as IRpcReference,
   'rpc-threads': rpcThreadsReference as unknown as IRpcReference,
-  'rpc-browser': rpcBrowserReference as unknown as IRpcReference,
-  'rpc-bridge-jsonrpc': rpcBridgeReference as unknown as IRpcReference
+  'rpc-browser': rpcBrowserReference as unknown as IRpcReference
 }
 
 export type IGuideLocale = 'en' | 'zh'
@@ -3226,30 +3224,6 @@ const runtimeCompletionApiGuides = {
     avoidZh: [
       '不要另装第二个 reader 消费同一份物理字节。',
       '不要从 bootstrap 内容推导 parent 所有权或 launch 权限。'
-    ]
-  }),
-  'rpc-bridge-jsonrpc:index:createJsonRpcAdapterChannel': createStorageContractGuide({
-    purposeEn:
-      'Builds the complete gated remote channel over held JSON-RPC byte I/O using the supplied offer, peer identity and issued authentication token. The authenticated hello precedes describe/invoke traffic; Core owns the generic channel while Bridge owns JSON-RPC framing, correlation and cleanup, and the returned channel must be closed by its connection owner.',
-    purposeZh:
-      '在持有的 JSON-RPC byte I/O 上，使用实际 offer、peer 身份及已签发 token 建立完整 gated remote channel。authenticated hello 先于 describe/invoke，Core 拥有通用 channel，Bridge 拥有 JSON-RPC framing、correlation 与 cleanup；返回 channel 由连接 owner 关闭。',
-    quickStart:
-      "import { createJsonRpcAdapterChannel } from '@migaia/rpc-bridge-jsonrpc'\n\n/** Options contain the held byte connection and credentials issued for that peer. */\nexport async function establishForeignLanguageAdapter(options: Parameters<typeof createJsonRpcAdapterChannel>[0]) {\n  const channel = await createJsonRpcAdapterChannel(options)\n  console.log(channel.peerId, channel.agreement)\n  // The deployment retains this exact channel and later awaits channel.close().\n  return channel\n}",
-    scenariosEn: [
-      'An authenticated foreign-language service supplies an ordered JSON-RPC byte connection.',
-      'A carrier adapter needs Core to own hello, frame decoding and response correlation.'
-    ],
-    scenariosZh: [
-      '已认证外部语言服务提供有序 JSON-RPC byte 连接。',
-      '载体 adapter 需要 Core 统一拥有 hello、frame decoding 与响应 correlation。'
-    ],
-    avoidEn: [
-      'Do not use copied tokens or capability labels to qualify another transport.',
-      'Do not advertise server streaming when the JSON-RPC bridge does not support it.'
-    ],
-    avoidZh: [
-      '不要用复制的 token 或 capability label 为另一 transport 授权。',
-      '不要宣称 JSON-RPC bridge 支持其未实现的 server stream。'
     ]
   }),
   'rpc-process:adapters-node-child-process:createAdapterChildStdio': createStorageContractGuide({

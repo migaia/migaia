@@ -459,8 +459,7 @@ const ARCHITECTURE_FAMILIES = [
       'rpc-threads',
       'rpc-process',
       'rpc-pool',
-      'rpc-devtools',
-      'rpc-bridge-jsonrpc'
+      'rpc-devtools'
     ]
   },
   {
@@ -2486,7 +2485,6 @@ const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
   'plugin-host': '为库或应用安装和卸载插件，配置共享能力与处理步骤，并在安装失败时回滚。',
   reactive: '让状态变化自动更新派生值和副作用，并为不同使用场景隔离状态。',
   resource: '随输入变化加载异步数据，取消过期请求、重试失败请求并刷新缓存。',
-  'rpc-bridge-jsonrpc': '通过 JSON-RPC 调用 Python、Go、Rust 等语言实现的子进程或本机服务。',
   'rpc-browser': '在浏览器窗口、iframe、SharedWorker 与可靠有序的 WebRTC 通道之间调用函数。',
   'rpc-contract': '为自定义 RPC 实现校验和编解码消息，让不同对端按同一协议通信。',
   'rpc-core': '跨运行时调用远程函数，并为调用设置超时、取消和流式结果处理。',
@@ -2578,8 +2576,6 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
   /** The pool architecture page explains which scheduling and native resources each layer owns. */
   'rpc-pool':
     '用于把多个公开线程或进程 Peer 组成有限并发池。池管理客户端调用槽、有限 FIFO、惰性 stream、扩缩容和闲置成员回收；原 Peer 负责原生启动、崩溃恢复与关闭。stats 记录池内派发，失败的业务调用交给调用方处理。',
-  'rpc-bridge-jsonrpc':
-    '用于与 Python、Go、Rust 等外部语言 peer 进行 JSON-RPC 调用的场景。桥接器使用 Process 提供的实际有序字节通道，完成原握手、帧解析、请求相关与取消规则，并传递有界错误链；业务按已协商的能力调用，不为对端缺失的模式增加隐式降级。',
   'rpc-browser':
     '用于 Window、共享 Worker、ServiceWorker、BroadcastChannel、WebTransport 或 RTCDataChannel 两端需要 RPC 的场景。各适配器持有实际浏览器通道及其监听器，保留来源校验、传输能力与关闭边界；Endpoint 和协议工具由 Core、Contract 复用，应用按实际通道选择适配器。',
   'rpc-devtools':
@@ -2604,8 +2600,6 @@ const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
     'Update derived values and effects when state changes and keep state separate across contexts.',
   resource:
     'Load asynchronous data as inputs change, cancel stale requests, retry failures, and refresh cached results.',
-  'rpc-bridge-jsonrpc':
-    'Call child processes or local services implemented in Python, Go, Rust, and other languages through JSON-RPC.',
   'rpc-browser':
     'Call functions across browser windows, iframes, SharedWorkers, and reliable ordered WebRTC channels.',
   'rpc-contract':

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { IRpcCarrierProbe } from '@migaia/rpc-core/probe'
-import { bridgeFixture, flush, request } from '../../../rpc-integration/test/bridge/fixture.js'
+import { bridgeFixture, flush, request } from './fixture.js'
 
 describe('JSON-RPC carrier observation', () => {
   it('[carriers:A1/R1] exposes direct observation on the canonical translation transport', async () => {

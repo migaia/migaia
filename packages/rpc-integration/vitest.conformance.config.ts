@@ -5,10 +5,7 @@ import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs'
 export default defineConfig(
   withDistFreshness({
     test: {
-      include: [
-        'test/process/conformance*.test.ts',
-        '../rpc-bridge-jsonrpc/test/bridge/conformance-faults.test.ts'
-      ],
+      include: ['test/process/conformance*.test.ts', 'test/bridge/conformance-faults.test.ts'],
       exclude: [...configDefaults.exclude],
       fileParallelism: false,
       maxWorkers: 1,

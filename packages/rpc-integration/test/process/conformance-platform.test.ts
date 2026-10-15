@@ -194,14 +194,6 @@ describe('conformance toolchain and platform evidence boundaries', () => {
             },
             nativeOptional: { electron: { optional: true } }
           },
-          'rpc-bridge-jsonrpc': {
-            peers: {
-              '@migaia/rpc-contract': 'workspace:*',
-              '@migaia/rpc-core': 'workspace:*',
-              '@migaia/rpc-process': 'workspace:*'
-            },
-            nativeOptional: {}
-          },
           'rpc-browser': { peers: { '@migaia/rpc-core': 'workspace:*' }, nativeOptional: {} }
         }
         /** The RPC family releases in lockstep; every owner shares rpc-contract's version. */

@@ -38,8 +38,8 @@ const threads = (await import(
 
 /** The foreign-language adapter is observed through its declared package entry. */
 const jsonrpc = (await import(
-  adapterRequire.resolve('@migaia/rpc-bridge-jsonrpc')
-)) as typeof import('../../../rpc-bridge-jsonrpc/dist/bridge/jsonrpc/index.js')
+  adapterRequire.resolve('@migaia/rpc-process')
+)) as typeof import('../../../rpc-process/dist/process/index.js')
 
 /** Every assertion observes only public construction and private read-only facts, never a writer. */
 const publicEntries = [core, adapterSdk, adapter, jsonrpc, threads, remote, provider]

@@ -27,7 +27,6 @@ export default defineConfig({
       '@migaia/rpc-core',
       '@migaia/rpc-process',
       '@migaia/rpc-threads',
-      '@migaia/rpc-bridge-jsonrpc',
       '@migaia/rpc-browser'
     ]
   },

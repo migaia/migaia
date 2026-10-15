@@ -13,10 +13,10 @@
 | ------------------------------------------------- | ------------------------------------------------------------------------ |
 | 调用子进程或本机其它进程                          | [`@migaia/rpc-process`](../rpc-process/README.md)                        |
 | 调用 Worker 线程                                  | [`@migaia/rpc-threads`](../rpc-threads/README.md)                        |
-| 在同进程运行受监督的 task                        | 本包 `./remote` 的 `createCoroutinePlugin`                             |
+| 在同进程运行受监督的 task                         | 本包 `./remote` 的 `createCoroutinePlugin`                               |
 | iframe、SharedWorker、可靠有序的 RTCDataChannel   | [`@migaia/rpc-browser`](../rpc-browser/README.md) 的 `createBrowserPeer` |
 | 标签页广播、Service Worker、WebTransport datagram | `rpc-browser` transport + 本包的 Endpoint                                |
-| 调用 Python / Go / Rust 服务                      | [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md)          |
+| 调用 Python / Go / Rust 服务                      | [`@migaia/rpc-process`](../rpc-process/README.md)                        |
 | 在单元测试里模拟两个对端                          | 本包 `./testing` 的 `createPeerPair`                                     |
 | 已有 `MessagePort` 或 Dedicated Worker            | 本包 `./adapters/message-port`、`./adapters/web-worker` + Endpoint       |
 | 为新平台或新载体写适配器                          | 本包 `./adapter`                                                         |
@@ -46,7 +46,7 @@ pnpm add @migaia/rpc-core @migaia/rpc-contract
 | `./plugins/log`、`./plugins/send-queue`、`./plugins/flow-control` | IPC 日志、发送队列等可选中间件                                                                                                                                                                 |
 | `./transport-kit`、`./transport-constants`                        | 编写自定义 transport 的工具与常量                                                                                                                                                              |
 | `./adapter`                                                       | `defineMessageAdapter`、`defineByteAdapter`：运行时适配器作者的任务级构造函数（见 USEGUIDE 第 9 节）                                                                                           |
-| `./probe`                                                         | Probe 类型、数值常量与名称表、`defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey` 与 Endpoint 安装入口 `probePlugin`                                                                              |
+| `./probe`                                                         | Probe 类型、数值常量与名称表、`defineProbe`、`snapshotProbeEvent`、`rpcProbeSampleKey` 与 Endpoint 安装入口 `probePlugin`                                                                      |
 
 ## 快速开始
 
@@ -118,13 +118,16 @@ const host = { name: 'metrics' }
 /** 同步计数确认示例实际收到了元数据，未保留复用 view。 */
 let observedEvents = 0
 /** 此 Probe 只读 message 元数据，不捕获业务内容。 */
-const probe = defineProbe({
-  stages: ['message'],
-  emit(view) {
-    observedEvents += 1
-    console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)
-  }
-}, host)
+const probe = defineProbe(
+  {
+    stages: ['message'],
+    emit(view) {
+      observedEvents += 1
+      console.log(RpcProbeStageName[view.stage], view.method, view.durationMs)
+    }
+  },
+  host
+)
 console.log(probe === host, Object.isFrozen(host), probe.name) // true, true, 'metrics'
 
 /** 创建方拥有实际 MessagePort；Peer 只负责自己的 Endpoint。 */
@@ -132,16 +135,22 @@ const { port1, port2 } = new MessageChannel()
 try {
   const [client, server] = await Promise.all([
     createThreadPeer<{ echo(value: string): string }>({
-      self: { name: 'client', instanceId: 'probe-client' }, probe,
-      connect: async (context) => createNodeThreadChannel(port1, 'probe-server', {
-        scheduler: systemScheduler, capabilities: context.capabilities
-      })
+      self: { name: 'client', instanceId: 'probe-client' },
+      probe,
+      connect: async (context) =>
+        createNodeThreadChannel(port1, 'probe-server', {
+          scheduler: systemScheduler,
+          capabilities: context.capabilities
+        })
     }),
     createThreadPeer({
-      self: { name: 'server', instanceId: 'probe-server' }, provide: { echo: (value: string) => value },
-      connect: async (context) => createNodeThreadChannel(port2, 'probe-client', {
-        scheduler: systemScheduler, capabilities: context.capabilities
-      })
+      self: { name: 'server', instanceId: 'probe-server' },
+      provide: { echo: (value: string) => value },
+      connect: async (context) =>
+        createNodeThreadChannel(port2, 'probe-client', {
+          scheduler: systemScheduler,
+          capabilities: context.capabilities
+        })
     })
   ])
   await using observed = client
@@ -164,11 +173,25 @@ import { defineProbe, probePlugin } from '@migaia/rpc-core/probe'
 
 /** 在同步回调中读标量，不保留复用 view。 */
 let events = 0
-const probe = defineProbe({ stages: ['message'], emit() { events += 1 } })
+const probe = defineProbe({
+  stages: ['message'],
+  emit() {
+    events += 1
+  }
+})
 const [left, right] = createMemoryTransportPair()
-const server = await createEndpoint({ id: 'server', transport: right, middlewares: [connect({ transport: right })] })
+const server = await createEndpoint({
+  id: 'server',
+  transport: right,
+  middlewares: [connect({ transport: right })]
+})
 server.provide('echo', (context) => context.success(context.data))
-const client = await createEndpoint({ id: 'client', targetIds: ['server'], transport: left, middlewares: [probePlugin(probe), connect({ transport: left })] })
+const client = await createEndpoint({
+  id: 'client',
+  targetIds: ['server'],
+  transport: left,
+  middlewares: [probePlugin(probe), connect({ transport: left })]
+})
 try {
   assert.equal(await client.send('server', 'echo', 'ready'), 'ready')
   assert.ok(events > 0)
@@ -220,14 +243,13 @@ Runtime Peer 支持 `await using`，其 `Symbol.asyncDispose` 就是原来的 `c
 
 ## 相关包
 
-| 包                                                              | 关系                                 |
-| --------------------------------------------------------------- | ------------------------------------ |
-| [`@migaia/rpc-contract`](../rpc-contract/README.md)             | 线上格式与协议工具；peer 依赖        |
-| [`@migaia/rpc-process`](../rpc-process/README.md)               | 跨进程                               |
-| [`@migaia/rpc-threads`](../rpc-threads/README.md)               | Worker 线程                          |
-| [`@migaia/rpc-browser`](../rpc-browser/README.md)               | 浏览器 Runtime Peer 与 Endpoint 载体 |
-| [`@migaia/rpc-bridge-jsonrpc`](../rpc-bridge-jsonrpc/README.md) | 其它语言                             |
-| [`@migaia/plugin-host`](../plugin-host/README.md)               | `createRuntimePlugin` 安装的宿主     |
+| 包                                                  | 关系                                 |
+| --------------------------------------------------- | ------------------------------------ |
+| [`@migaia/rpc-contract`](../rpc-contract/README.md) | 线上格式与协议工具；peer 依赖        |
+| [`@migaia/rpc-process`](../rpc-process/README.md)   | 跨进程与外部语言 JSON-RPC            |
+| [`@migaia/rpc-threads`](../rpc-threads/README.md)   | Worker 线程                          |
+| [`@migaia/rpc-browser`](../rpc-browser/README.md)   | 浏览器 Runtime Peer 与 Endpoint 载体 |
+| [`@migaia/plugin-host`](../plugin-host/README.md)   | `createRuntimePlugin` 安装的宿主     |
 
 完整用法见 [USEGUIDE](./USEGUIDE.md)。
 

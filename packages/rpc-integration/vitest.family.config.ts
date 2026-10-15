@@ -8,11 +8,10 @@ const testOwners = [
   'rpc-core',
   'rpc-process',
   'rpc-threads',
-  'rpc-bridge-jsonrpc',
   'rpc-browser',
   'rpc-integration'
 ]
-/** Runtime coverage belongs to exactly the six final Source owners; integration has no runtime API. */
+/** Runtime coverage belongs to exactly the five final Source owners; integration has no runtime API. */
 const runtimeOwners = testOwners.filter((owner) => owner !== 'rpc-integration')
 /** Preserve the existing test discovery origin while each owner supplies its TS transformer. */
 const familyDirectory = fileURLToPath(new URL('.', import.meta.url))
@@ -20,7 +19,8 @@ const familyDirectory = fileURLToPath(new URL('.', import.meta.url))
 const excluded = [
   ...configDefaults.exclude,
   'test/process/conformance*.test.ts',
-  '../rpc-bridge-jsonrpc/test/bridge/conformance-faults.test.ts',
+  'test/bridge/conformance-faults.test.ts',
+  'test/bridge/conformance-faults.test.ts',
   'test/merge/suite-parity.test.ts'
 ]
 

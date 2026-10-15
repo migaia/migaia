@@ -123,8 +123,6 @@ describe('process package layering and exports', () => {
         '../rpc-process/dist/**/*.js',
         '../rpc-threads/src/**/*.{ts,tsx}',
         '../rpc-threads/dist/**/*.js',
-        '../rpc-bridge-jsonrpc/src/**/*.{ts,tsx}',
-        '../rpc-bridge-jsonrpc/dist/**/*.js',
         '../rpc-browser/src/**/*.{ts,tsx}',
         '../rpc-browser/dist/**/*.js'
       ].map((pattern) => resolve(packageRoot, '../rpc-integration', pattern))

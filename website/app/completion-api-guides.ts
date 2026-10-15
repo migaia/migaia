@@ -161,30 +161,6 @@ export const completionApiGuides: Readonly<
 > = {
   'utils:scheduler:deferTask': schedulerDeferGuide,
   'utils:index:deferTask': schedulerDeferGuide,
-  'rpc-bridge-jsonrpc:index:createJsonRpcRemoteChannel': guide({
-    purposeEn:
-      'Adapts an authenticated JSON-RPC byte stream into the maintained remote channel, mapping hello, describe, invoke, cancel and errors while rejecting optional operations the foreign peer cannot implement.',
-    purposeZh:
-      '把已认证 JSON-RPC 字节流接入维护中的 remote channel，映射 hello、describe、invoke、cancel 和错误，并拒绝外国 peer 未实现的可选操作。',
-    quickStart:
-      "import { createJsonRpcRemoteChannel } from '@migaia/rpc-bridge-jsonrpc'\n\nexport function invokeConfiguredBoundary(...args: Parameters<typeof createJsonRpcRemoteChannel>) {\n  return createJsonRpcRemoteChannel(...args)\n}",
-    scenariosEn: [
-      'A library adapter must assemble the explicit source, contract or runtime policy named above.',
-      'The application needs to retain the original channel/Host lifecycle while validating inputs at its own integration boundary.'
-    ],
-    scenariosZh: [
-      '库适配器需要装配上述明确的来源、契约或运行时策略。',
-      '应用需要保留原 channel/Host 生命周期，并在自己的集成边界校验输入。'
-    ],
-    avoidEn: [
-      'Prefer the four process/thread Peer or Plugin factories for ordinary application RPC.',
-      'Do not treat this low-level operation as permission to bypass expose, source authentication or cleanup ownership.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 优先使用四个 process/thread Peer 或 Plugin 工厂。',
-      '不要把底层操作当作绕过 expose、source 鉴权或资源清理归属的权限。'
-    ]
-  }),
   'rpc-core:index:createRpcIdempotencyStore': guide({
     purposeEn:
       'Creates the RPC-owned idempotency/result store used by request keys and outcome lookup. Retention is local to its owner unless the application supplies durable storage and reconciliation.',
