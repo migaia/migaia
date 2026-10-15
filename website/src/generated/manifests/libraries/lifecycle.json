@@ -148,7 +148,7 @@
                   "静默追踪与租约：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`",
                   "事务性所有权：`createProvisionalScope`",
                   "变更队列：`createMutationQueue`",
-                  "调度器、中止与有界等待：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`",
+                  "调度器、中止与有界等待：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`",
                   "错误基础设施：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`",
                   "状态常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                   "按需导入与 tree-shaking",
@@ -690,7 +690,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
               },
               {
                 "type": "code",
@@ -699,15 +699,15 @@
               },
               {
                 "type": "paragraph",
-                "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
               },
               {
                 "type": "paragraph",
-                "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
               },
               {
                 "type": "paragraph",
-                "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
               },
               {
                 "type": "paragraph",
@@ -832,6 +832,29 @@
                 "text": "验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在 `test/` 下检索到对应用例。"
               }
             ]
+          },
+          {
+            "id": "可中止的相对延时",
+            "heading": "可中止的相对延时",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`abortableDelay(scheduler, ms, signal, reportCleanup?)` 从 `@migaia/lifecycle` 根入口导入。 `scheduler` 负责计时，`ms` 必须有限且非负；`signal` 可以传 `undefined`。 返回 `Promise<boolean>`：到期为 `true`，abort 事件先到为 `false`；调用方决定取消是否应变成领域 AbortError。 监听器注册与 scheduler 接纳结束前不提交同步 callback 的结果；接纳失败保持 primary，原始错误实例或 cause 链可追溯。 任务句柄最多 cancel 一次，abort 监听由 canonical observed-subscription 管理。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
+              },
+              {
+                "type": "paragraph",
+                "text": "清理失败默认使 wait 拒绝；提供 `reportCleanup(error)` 后，清理失败走该观察渠道，不替换已完成或已取消的结果。 注册或调度失败仍拒绝，`DELAY_FAILED` 保留 native Error 的身份与 stack，不能附加身份时用 cause 保留原值。 无效时长或 cleanup reporter 在接纳前以 `INVALID_OPTION` 拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`boundedWait(task, deadlineAt, { scheduler, reportCleanup? })` 仍负责绝对截止时间与任务竞争，不会取消 task。 它的默认清理失败行为不变；可选 `reportCleanup` 允许 logger flush 把 timer 清理失败作为诊断，保留任务或 deadline winner。 批处理 debounce、health 周期调度与预算授予定时器不等同于一次性相对延时，不强行转换其 owner 语义。"
+              }
+            ]
           }
         ]
       },
@@ -860,11 +883,11 @@
                   "静默追踪与租约模块：`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`",
                   "事务性所有权模块：`createProvisionalScope`",
                   "变更队列模块：`createMutationQueue`",
-                  "调度器、中止与有界等待模块：`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`",
+                  "调度器、中止与有界等待模块：`snapshotScheduler`、`resolveScheduler`、`resolveSchedulerOption`、`validateSchedulerDelay`、`validateSchedulerTime`、`addSchedulerTime`、`createAbortController`、`abortableDelay`、`boundedWait`、`createTerminalController`",
                   "错误基础设施模块：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`createLifecycleTypeError`、`createLifecycleFailure`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`",
                   "状态常量模块：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`",
                   "按需导入与 tree-shaking",
-                  "错误码：`LifecycleErrorCode`（20 个码）逐条语义",
+                  "错误码：`LifecycleErrorCode`（22 个码）逐条语义",
                   "诊断消息：`LifecycleErrorText`",
                   "高阶组合示例",
                   "全部公开 API 索引",
@@ -1406,7 +1429,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
+                "text": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
               },
               {
                 "type": "paragraph",
@@ -1883,7 +1906,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "稳定错误码表，20 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
+                "text": "稳定错误码表，22 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
               },
               {
                 "type": "code",
@@ -1894,6 +1917,11 @@
                 "type": "table",
                 "headers": ["`LifecycleErrorCode` 键", "码值", "触发条件"],
                 "rows": [
+                  [
+                    "`delayFailed`",
+                    "`DELAY_FAILED`",
+                    "相对延时无法注册、调度或清理；原错误保持可追溯，取消本身返回 false 而非错误"
+                  ],
                   [
                     "`scopeClosed`",
                     "`SCOPE_CLOSED`",
@@ -1943,6 +1971,11 @@
                     "`generationDisposed`",
                     "`GENERATION_DISPOSED`",
                     "在已 `dispose()` 的 `GenerationController` 上调用 `begin()`"
+                  ],
+                  [
+                    "`generationTimedOut`",
+                    "`GENERATION_TIMED_OUT`",
+                    "当前 generation 的 timeoutMs 预算到期；signal.reason 为带码 Error"
                   ],
                   ["`quiescenceSealed`", "`QUIESCENCE_SEALED`", "`seal()` 之后又调用 `retain()`"],
                   [
@@ -2126,7 +2159,7 @@
               {
                 "type": "list",
                 "items": [
-                  "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
+                  "构造/执行：`createAbortController`、`createSyncStartedDisposalLedger`、`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`abortableDelay`、`boundedWait`、`createTerminalController`、`createLifecycleScope`、`createSyncLifecycleScope`、`createLifecycleUnit`、`createGenerationController`、`createQuiescenceTracker`、`createStringQuiescenceTracker`、`createObjectLeaseRegistry`、`createStringLeaseRegistry`、`createPendingTracker`、`createProvisionalScope`、`createMutationQueue`、`executeReleaseDescriptor`、`createDisposeTransaction`。",
                   "常量：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`、`LifecycleErrorCode`、`LifecycleErrorText`、`LIFECYCLE_SOURCE`。",
                   "类型：`IDisposer`、`ILifecycleOwner`、`ILifecycleState`、`IUnitState`、`IDisposerContext`、`IReleaseContext`、`IReleaseDescriptor`、`ICollectedError`、`IErrorPolicy`、`ILifecycleStateValue`、`ILifecycleUnitStateValue`、`ILifecycleErrorPolicy`、`IDisposeTransactionKind`、`IAbortSignal`、`IAbortController`、`ISyncStartedDisposalLedger`、`ISyncStartedDisposalOutcome`、`ILifecycleErrorCode`、`ILifecycleErrorText`、`ILifecycleError`、`IErrorCollector`、`ITerminalController`、`ILifecycleScope`、`ILifecycleScopeOptions`、`ISyncLifecycleScope`、`ISyncLifecycleScopeOptions`、`ISyncReleaseDescriptor`、`ILifecycleUnit`、`ILifecycleUnitOptions`、`IGenerationController`、`IGenerationControllerOptions`、`IGenerationRequest`、`IGenerationToken`、`IQuiescenceTracker`、`ILeaseRegistry`、`IPendingTracker`、`IProvisionalScope`、`IProvisionalScopeOptions`、`IMutationQueue`、`IMutationQueueOptions`、`IEnqueueOptions`、`IDisposeItem`、`IDisposeTransaction`、`IDisposeTransactionMode`、`IDisposeTransactionOptions`。"
                 ]
@@ -2165,6 +2198,29 @@
                 "text": "验收矩阵（L-T1 ~ L-T44）见 `docs/lifecycle/lifecycle-extraction.sdd.md` §5.4；每个 `L-T` 编号都能在 `test/` 下检索到对应用例。"
               }
             ]
+          },
+          {
+            "id": "可中止的相对延时",
+            "heading": "可中止的相对延时",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`abortableDelay(scheduler, ms, signal, reportCleanup?)` 从 `@migaia/lifecycle` 根入口导入。 `scheduler` 负责计时，`ms` 必须有限且非负；`signal` 可以传 `undefined`。 返回 `Promise<boolean>`：到期为 `true`，abort 事件先到为 `false`；调用方决定取消是否应变成领域 AbortError。 监听器注册与 scheduler 接纳结束前不提交同步 callback 的结果；接纳失败保持 primary，原始错误实例或 cause 链可追溯。 任务句柄最多 cancel 一次，abort 监听由 canonical observed-subscription 管理。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
+              },
+              {
+                "type": "paragraph",
+                "text": "清理失败默认使 wait 拒绝；提供 `reportCleanup(error)` 后，清理失败走该观察渠道，不替换已完成或已取消的结果。 注册或调度失败仍拒绝，`DELAY_FAILED` 保留 native Error 的身份与 stack，不能附加身份时用 cause 保留原值。 无效时长或 cleanup reporter 在接纳前以 `INVALID_OPTION` 拒绝。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`boundedWait(task, deadlineAt, { scheduler, reportCleanup? })` 仍负责绝对截止时间与任务竞争，不会取消 task。 它的默认清理失败行为不变；可选 `reportCleanup` 允许 logger flush 把 timer 清理失败作为诊断，保留任务或 deadline winner。 批处理 debounce、health 周期调度与预算授予定时器不等同于一次性相对延时，不强行转换其 owner 语义。"
+              }
+            ]
           }
         ]
       }
@@ -2188,10 +2244,125 @@
       "architecturePath": "/en/docs/lifecycle",
       "symbols": [
         {
+          "name": "abortableDelay",
+          "kind": "function",
+          "signature": "export declare function abortableDelay(scheduler: IScheduler, ms: number, signal: IAbortSignal | undefined, reportCleanup?: (error: unknown) => void): Promise<boolean>;",
+          "declarationLine": 13,
+          "source": "packages/lifecycle/dist/abortable-delay.d.ts",
+          "purpose": "abortableDelay is part of this module's public function contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for abortableDelay.",
+          "advanced": "No additional advanced behavior is declared for abortableDelay.",
+          "parameters": [
+            "scheduler: IScheduler",
+            "ms: number",
+            "signal: IAbortSignal | undefined",
+            "reportCleanup: (error: unknown) => void (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false
+            },
+            {
+              "name": "ms",
+              "type": "number",
+              "optional": false
+            },
+            {
+              "name": "signal",
+              "type": "IAbortSignal | undefined",
+              "optional": false
+            },
+            {
+              "name": "reportCleanup",
+              "type": "(error: unknown) => void",
+              "optional": true
+            }
+          ],
+          "returns": "Promise<boolean>",
+          "errors": ["No documented errors are declared for abortableDelay."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for abortableDelay.",
+          "examples": [
+            "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
+          ],
+          "members": [],
+          "aliasOf": "abortableDelay",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function abortableDelay(scheduler: IScheduler, ms: number, signal: IAbortSignal | undefined, reportCleanup?: (error: unknown) => void): Promise<boolean>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "scheduler",
+                "type": "IScheduler",
+                "optional": false
+              },
+              {
+                "name": "ms",
+                "type": "number",
+                "optional": false
+              },
+              {
+                "name": "signal",
+                "type": "IAbortSignal | undefined",
+                "optional": false
+              },
+              {
+                "name": "reportCleanup",
+                "type": "(error: unknown) => void",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Promise<boolean>"],
+          "whenToUse": "Use abortableDelay when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when abortableDelay does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "abortableDelay is part of this module's public function contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import abortableDelay from @migaia/lifecycle, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use abortableDelay when its function contract and declared inputs match the result you need. Choose a different public symbol when abortableDelay does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for abortableDelay."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for abortableDelay."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/lifecycle/dist/abortable-delay.d.ts:abortableDelay:export declare function abortableDelay(scheduler: IScheduler, ms: number, signal: IAbortSignal | undefined, reportCleanup?: (error: unknown) => void): Promise<boolean>;",
+          "guidance": [],
+          "usageScore": 44,
+          "configuration": [],
+          "fragment": "lifecycle-index--abortableDelay"
+        },
+        {
           "name": "boundedWait",
           "kind": "const",
-          "signature": "export declare const boundedWait: (task: PromiseLike<unknown>, deadlineAt: number, options?: { scheduler?: IScheduler; }) => Promise<boolean>;",
-          "declarationLine": 11,
+          "signature": "export declare const boundedWait: (task: PromiseLike<unknown>, deadlineAt: number, options?: { scheduler?: IScheduler; reportCleanup?: (error: unknown) => void; }) => Promise<boolean>;",
+          "declarationLine": 12,
           "source": "packages/lifecycle/dist/bounded-wait.d.ts",
           "purpose": "boundedWait is part of this module's public const contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for boundedWait.",
@@ -2211,7 +2382,7 @@
           "aliasOf": "boundedWait",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const boundedWait: (task: PromiseLike<unknown>, deadlineAt: number, options?: { scheduler?: IScheduler; }) => Promise<boolean>;"
+            "export declare const boundedWait: (task: PromiseLike<unknown>, deadlineAt: number, options?: { scheduler?: IScheduler; reportCleanup?: (error: unknown) => void; }) => Promise<boolean>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2250,7 +2421,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/bounded-wait.d.ts:boundedWait:export declare const boundedWait: (task: PromiseLike<unknown>, deadlineAt: number, options?: { scheduler?: IScheduler; }) => Promise<boolean>;",
+          "identity": "packages/lifecycle/dist/bounded-wait.d.ts:boundedWait:export declare const boundedWait: (task: PromiseLike<unknown>, deadlineAt: number, options?: { scheduler?: IScheduler; reportCleanup?: (error: unknown) => void; }) => Promise<boolean>;",
           "guidance": [
             {
               "id": "boundedwait",
@@ -2277,7 +2448,7 @@
               ]
             }
           ],
-          "usageScore": 62,
+          "usageScore": 68,
           "configuration": [],
           "fragment": "lifecycle-index--boundedWait"
         },
@@ -2578,9 +2749,9 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.",
+              "description": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.",
               "descriptionEn": "Uses a runtime-neutral scheduler for watchdog timing and clock reads instead of host timers. * Defaults to `systemScheduler`.",
-              "descriptionZh": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
+              "descriptionZh": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
             }
           ],
           "fragment": "lifecycle-index--createMutationQueue"
@@ -2997,7 +3168,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -3006,15 +3177,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -3504,7 +3675,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -3513,15 +3684,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -3906,7 +4077,7 @@
           "name": "ILifecycleErrorCode",
           "kind": "type",
           "signature": "export type ILifecycleErrorCode = (typeof LifecycleErrorCode)[keyof typeof LifecycleErrorCode];",
-          "declarationLine": 149,
+          "declarationLine": 155,
           "source": "packages/lifecycle/dist/error-code.d.ts",
           "purpose": "ILifecycleErrorCode is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleErrorCode.",
@@ -3975,7 +4146,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，20 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "稳定错误码表，22 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -3986,6 +4157,11 @@
                   "type": "table",
                   "headers": ["`LifecycleErrorCode` 键", "码值", "触发条件"],
                   "rows": [
+                    [
+                      "`delayFailed`",
+                      "`DELAY_FAILED`",
+                      "相对延时无法注册、调度或清理；原错误保持可追溯，取消本身返回 false 而非错误"
+                    ],
                     [
                       "`scopeClosed`",
                       "`SCOPE_CLOSED`",
@@ -4035,6 +4211,11 @@
                       "`generationDisposed`",
                       "`GENERATION_DISPOSED`",
                       "在已 `dispose()` 的 `GenerationController` 上调用 `begin()`"
+                    ],
+                    [
+                      "`generationTimedOut`",
+                      "`GENERATION_TIMED_OUT`",
+                      "当前 generation 的 timeoutMs 预算到期；signal.reason 为带码 Error"
                     ],
                     ["`quiescenceSealed`", "`QUIESCENCE_SEALED`", "`seal()` 之后又调用 `retain()`"],
                     [
@@ -4163,7 +4344,7 @@
           "name": "ILifecycleErrorText",
           "kind": "type",
           "signature": "export type ILifecycleErrorText = (typeof LifecycleErrorText)[keyof typeof LifecycleErrorText];",
-          "declarationLine": 123,
+          "declarationLine": 127,
           "source": "packages/lifecycle/dist/error-text.d.ts",
           "purpose": "ILifecycleErrorText is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleErrorText.",
@@ -5656,7 +5837,7 @@
         {
           "name": "LifecycleErrorCode",
           "kind": "const",
-          "signature": "export declare const LifecycleErrorCode: { /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\"; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\"; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\"; /** * Tags the `AggregateError` when multiple releases fail under the `throw` policy. Inspect each * original failure in `error.errors`. A single failure is thrown unchanged and does not use this * code. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: \"UNIT_START_FAILED\"; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: \"GENERATION_SUPERSEDED\"; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\"; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: \"GENERATION_DISPOSED\"; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: \"GENERATION_TIMED_OUT\"; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: \"QUIESCENCE_SEALED\"; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\"; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: \"PROVISIONAL_SETTLED\"; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\"; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\"; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\"; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\"; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Rejects invalid scheduler or task options at the lifecycle boundary. Examples include throwing * accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction `unref`. Also rejects * nonfinite time values, nonfinite or negative delays, or addition that overflows. Enforces * scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative * delays in R-9. Correct the scheduler or delay instead of retrying the same invalid input. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "signature": "export declare const LifecycleErrorCode: { /** * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code. */ readonly delayFailed: \"DELAY_FAILED\"; /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\"; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\"; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\"; /** * Tags the `AggregateError` when multiple releases fail under the `throw` policy. Inspect each * original failure in `error.errors`. A single failure is thrown unchanged and does not use this * code. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: \"UNIT_START_FAILED\"; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: \"GENERATION_SUPERSEDED\"; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\"; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: \"GENERATION_DISPOSED\"; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: \"GENERATION_TIMED_OUT\"; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: \"QUIESCENCE_SEALED\"; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\"; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: \"PROVISIONAL_SETTLED\"; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\"; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\"; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\"; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\"; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Rejects invalid scheduler or task options at the lifecycle boundary. Examples include throwing * accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction `unref`. Also rejects * nonfinite time values, nonfinite or negative delays, or addition that overflows. Enforces * scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative * delays in R-9. Correct the scheduler or delay instead of retrying the same invalid input. */ readonly invalidOption: \"INVALID_OPTION\"; };",
           "declarationLine": 7,
           "source": "packages/lifecycle/dist/error-code.d.ts",
           "purpose": "Owns the error-code declarations for `@migaia/lifecycle`. Under `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/lifecycle'`. Throw sites reference these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change.",
@@ -5680,7 +5861,7 @@
           "aliasOf": "LifecycleErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LifecycleErrorCode: { /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\"; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\"; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\"; /** * Tags the `AggregateError` when multiple releases fail under the `throw` policy. Inspect each * original failure in `error.errors`. A single failure is thrown unchanged and does not use this * code. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: \"UNIT_START_FAILED\"; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: \"GENERATION_SUPERSEDED\"; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\"; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: \"GENERATION_DISPOSED\"; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: \"GENERATION_TIMED_OUT\"; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: \"QUIESCENCE_SEALED\"; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\"; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: \"PROVISIONAL_SETTLED\"; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\"; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\"; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\"; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\"; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Rejects invalid scheduler or task options at the lifecycle boundary. Examples include throwing * accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction `unref`. Also rejects * nonfinite time values, nonfinite or negative delays, or addition that overflows. Enforces * scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative * delays in R-9. Correct the scheduler or delay instead of retrying the same invalid input. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+            "export declare const LifecycleErrorCode: { /** * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code. */ readonly delayFailed: \"DELAY_FAILED\"; /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\"; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\"; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\"; /** * Tags the `AggregateError` when multiple releases fail under the `throw` policy. Inspect each * original failure in `error.errors`. A single failure is thrown unchanged and does not use this * code. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: \"UNIT_START_FAILED\"; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: \"GENERATION_SUPERSEDED\"; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\"; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: \"GENERATION_DISPOSED\"; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: \"GENERATION_TIMED_OUT\"; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: \"QUIESCENCE_SEALED\"; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\"; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: \"PROVISIONAL_SETTLED\"; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\"; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\"; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\"; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\"; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Rejects invalid scheduler or task options at the lifecycle boundary. Examples include throwing * accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction `unref`. Also rejects * nonfinite time values, nonfinite or negative delays, or addition that overflows. Enforces * scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative * delays in R-9. Correct the scheduler or delay instead of retrying the same invalid input. */ readonly invalidOption: \"INVALID_OPTION\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5719,7 +5900,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/error-code.d.ts:LifecycleErrorCode:export declare const LifecycleErrorCode: { /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\"; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\"; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\"; /** * Tags the `AggregateError` when multiple releases fail under the `throw` policy. Inspect each * original failure in `error.errors`. A single failure is thrown unchanged and does not use this * code. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: \"UNIT_START_FAILED\"; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: \"GENERATION_SUPERSEDED\"; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\"; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: \"GENERATION_DISPOSED\"; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: \"GENERATION_TIMED_OUT\"; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: \"QUIESCENCE_SEALED\"; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\"; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: \"PROVISIONAL_SETTLED\"; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\"; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\"; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\"; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\"; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Rejects invalid scheduler or task options at the lifecycle boundary. Examples include throwing * accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction `unref`. Also rejects * nonfinite time values, nonfinite or negative delays, or addition that overflows. Enforces * scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative * delays in R-9. Correct the scheduler or delay instead of retrying the same invalid input. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "identity": "packages/lifecycle/dist/error-code.d.ts:LifecycleErrorCode:export declare const LifecycleErrorCode: { /** * An abortable delay cannot register, schedule, or clean up its owned wait resources. Enforces * cross-cutting review 1c / LG-C2: retain the original failure while the owner decides whether to * retry or stop. Cancellation itself resolves the wait and does not use this code. */ readonly delayFailed: \"DELAY_FAILED\"; /** * Reports `own()` after `close()`, or `retain()` on a closed registry. The container no longer * accepts work. Create a new scope instead of reusing it. Enforces the two-phase contract in * §4.1. `close()` changes state synchronously, cannot fail, and does not call user code. Also * tags the `signal.reason` of a `LifecycleScope`/`SyncLifecycleScope` aborted by `close()` or * `dispose()`, so cancelled work observes a coded Error with a stack instead of a string. */ readonly scopeClosed: \"SCOPE_CLOSED\"; /** * Rejects registration or activation after `dispose()` reaches `terminal`. This is stronger than * `SCOPE_CLOSED` because `terminal` is irreversible. Create a new container instead of retrying. */ readonly scopeTerminal: \"SCOPE_TERMINAL\"; /** * Reports a disposer reentering its own scope's `dispose()`. The error propagates through the * triggering disposer's normal error path. Other resources still finish releasing. Move this * cleanup outside the disposer so a resource does not dispose the scope releasing it. */ readonly scopeReentrantDispose: \"SCOPE_REENTRANT_DISPOSE\"; /** * Reports a disposer synchronously calling its own scope's `own()`. The error belongs to the * triggering disposer, as with reentrant disposal. The container is already `closing`. It cannot * take ownership of new resources during release. Outside that synchronous callback frame, a * caller observes `SCOPE_CLOSED` while teardown is pending. */ readonly scopeReentrantOwn: \"SCOPE_REENTRANT_OWN\"; /** * Rejects a descriptor without `syncSafe: true` at registration in `SyncLifecycleScope`. Also * rejects a `LifecycleScope` or `ProvisionalScope` instance as an owned resource. The check runs * at registration, before release. Use an asynchronous `LifecycleScope`, or explicitly mark a * suitable descriptor `syncSafe: true`. Its `force` and `graceful` callbacks must never return a * thenable. */ readonly scopeSyncViolation: \"SCOPE_SYNC_VIOLATION\"; /** * Tags the `AggregateError` when multiple releases fail under the `throw` policy. Inspect each * original failure in `error.errors`. A single failure is thrown unchanged and does not use this * code. */ readonly scopeDisposalFailed: \"SCOPE_DISPOSAL_FAILED\"; /** * Reports a start failure when `LifecycleUnit` enters `failed`. The failure can be a synchronous * throw or a rejected thenable. Call `start()` or `restart()` to retry with a new generation. * Call `close()` to stop new work and `dispose()` to reach `terminal`. The `failed` state still * permits these transitions. */ readonly unitStartFailed: \"UNIT_START_FAILED\"; /** * Identifies a result discarded at commit because a newer generation supersedes it. This is * normal race handling rather than an operation failure. Callers usually ignore it unless * diagnostics need to observe the event. Also tags the `signal.reason` of a generation aborted * because `begin()` started a newer one, so cancelled work observes a coded Error with a stack. */ readonly generationSuperseded: \"GENERATION_SUPERSEDED\"; /** * Reports timer, parent-listener, or signal cleanup failure during generation cancellation or * completion. Invalidation first converges state, then preserves cleanup failures in registration * order. Enforces `lifecycle-extraction.sdd.md` §4.10.2. Handle the error and use a new * generation. Do not revive the old generation. */ readonly generationCancellationFailed: \"GENERATION_CANCELLATION_FAILED\"; /** * Rejects `begin()` on a disposed `GenerationController`. The controller cannot be reused. Create * a new controller. Also tags the `signal.reason` of the active generation aborted when a * `LifecycleUnit` is disposed; the work it carried must stop and is not retried. */ readonly generationDisposed: \"GENERATION_DISPOSED\"; /** * Tags the `signal.reason` of a generation aborted because its `begin({ timeoutMs })` budget * elapsed. The generation is no longer current; start a new generation to retry, or raise the * budget. Not thrown by the controller itself; consumers see it through the aborted signal. */ readonly generationTimedOut: \"GENERATION_TIMED_OUT\"; /** * Rejects `retain()` after `seal()`. Sealing stops new leases. Finish retaining before sealing, * or use the nonexclusive `whenZeroOnce()` path. */ readonly quiescenceSealed: \"QUIESCENCE_SEALED\"; /** * Rejects strict `whenZero(key)` synchronously when `seal(key)` has not run. It does not return a * rejected Promise. Strict zero-lease waiting first stops new leases so its guarantee holds. Call * `seal()` first, or use `whenZeroOnce()` and perform the second check yourself. */ readonly quiescenceUnsealedWait: \"QUIESCENCE_UNSEALED_WAIT\"; /** * Rejects `own()` or `commitTo()` after a provisional scope commits or rolls back. Also rejects * `rollback()` after a successful commit. Repeated rollback reuses the same Promise, including * rollback after failed-commit compensation. Commit and rollback are alternative terminal * actions. Check callers that try to register or commit again. Also tags the provisional * `signal.reason` aborted by `commitTo()` or `rollback()`; the message names which one. */ readonly provisionalSettled: \"PROVISIONAL_SETTLED\"; /** * Reports `commitTo()` when the target parent is `closing` or `terminal` and refuses ownership. * Resources already transferred remain owned by the parent. This call releases the remaining * resources automatically. The caller does not need to call `rollback()` manually. */ readonly provisionalParentClosed: \"PROVISIONAL_PARENT_CLOSED\"; /** * Rejects and removes a mutation that waits longer than `queueAdmissionTimeoutMs`. This admission * timeout is configurable and does not apply when omitted. Check for an earlier task blocking the * queue, or increase the threshold. */ readonly queueAdmissionTimeout: \"QUEUE_ADMISSION_TIMEOUT\"; /** * Rejects a submission whose owner label matches the currently running mutation's owner. The * check does not depend on whether the caller awaits the submitted task. Awaiting a successor * inside that mutation would deadlock the FIFO queue. Avoid waiting for another queued task with * the same owner. Split the work into separate top-level calls when needed. */ readonly queueSelfDependency: \"QUEUE_SELF_DEPENDENCY\"; /** * Reports a throw or rejection from a descriptor's `force` callback. The contract requires * `force` to finish unconditionally. The current error policy collects or reports the failure, * and release still reaches `terminal`. Treat it as an unrecoverable resource-leak risk rather * than a transient failure to retry. */ readonly releaseForceFailed: \"RELEASE_FORCE_FAILED\"; /** * Identifies a new graceful phase requested after the shared absolute deadline passes, or a * synchronous `graceful` that returned only after its budget (that release still succeeds and * `force` does not run). Both are reported through `context.report` as diagnostics, never thrown. * Normal graceful-timeout fallback to `force` is a degradation path and does not use this code. */ readonly deadlineExceeded: \"DEADLINE_EXCEEDED\"; /** * Reports a missing or noncompliant host `AbortController` through the abort factory. Scope, * generation, and disposal paths fail immediately when they need that capability. Missing * scheduler capabilities are reported by `@migaia/utils/scheduler` as utils `ENV_UNSUPPORTED`. * Use an environment with `AbortController`, or an API that does not require it. */ readonly envUnsupported: \"ENV_UNSUPPORTED\"; /** * Rejects invalid scheduler or task options at the lifecycle boundary. Examples include throwing * accessors, missing `now`, `schedule`, or `cancel`, and a nonfunction `unref`. Also rejects * nonfinite time values, nonfinite or negative delays, or addition that overflows. Enforces * scheduler admission in `lifecycle-scheduler-convergence.sdd.md` R5 and finite nonnegative * delays in R-9. Correct the scheduler or delay instead of retrying the same invalid input. */ readonly invalidOption: \"INVALID_OPTION\"; };",
           "guidance": [
             {
               "id": "createlifecycleerror",
@@ -5804,7 +5985,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，20 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "稳定错误码表，22 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -5815,6 +5996,11 @@
                   "type": "table",
                   "headers": ["`LifecycleErrorCode` 键", "码值", "触发条件"],
                   "rows": [
+                    [
+                      "`delayFailed`",
+                      "`DELAY_FAILED`",
+                      "相对延时无法注册、调度或清理；原错误保持可追溯，取消本身返回 false 而非错误"
+                    ],
                     [
                       "`scopeClosed`",
                       "`SCOPE_CLOSED`",
@@ -5864,6 +6050,11 @@
                       "`generationDisposed`",
                       "`GENERATION_DISPOSED`",
                       "在已 `dispose()` 的 `GenerationController` 上调用 `begin()`"
+                    ],
+                    [
+                      "`generationTimedOut`",
+                      "`GENERATION_TIMED_OUT`",
+                      "当前 generation 的 timeoutMs 预算到期；signal.reason 为带码 Error"
                     ],
                     ["`quiescenceSealed`", "`QUIESCENCE_SEALED`", "`seal()` 之后又调用 `retain()`"],
                     [
@@ -6047,7 +6238,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -6056,15 +6247,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -6159,7 +6350,7 @@
         {
           "name": "LifecycleErrorText",
           "kind": "const",
-          "signature": "export declare const LifecycleErrorText: { /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };",
+          "signature": "export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };",
           "declarationLine": 2,
           "source": "packages/lifecycle/dist/error-text.d.ts",
           "purpose": "Stable lifecycle diagnostics shared by scheduler and cancellation boundaries.",
@@ -6179,7 +6370,7 @@
           "aliasOf": "LifecycleErrorText",
           "exportPath": ".",
           "overloadSignatures": [
-            "export declare const LifecycleErrorText: { /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };"
+            "export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6218,7 +6409,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/error-text.d.ts:LifecycleErrorText:export declare const LifecycleErrorText: { /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };",
+          "identity": "packages/lifecycle/dist/error-text.d.ts:LifecycleErrorText:export declare const LifecycleErrorText: { /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */ readonly delayFailed: \"[lifecycle] abortable delay failed\"; /** Rejects a malformed optional wait-cleanup channel before any resource admission. */ readonly waitCleanupReporterInvalid: \"[lifecycle] wait cleanup reporter must be a function\"; /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */ readonly provisionalCleanupFailed: \"[lifecycle] provisional cleanup failed\"; /** Stable finalization message for transaction-level failures. */ readonly disposeTransactionFailed: \"[lifecycle] dispose transaction failed\"; /** Explains that a disposer attempted to join the scope disposal that is waiting for it. */ readonly scopeReentrantDispose: \"[lifecycle] cannot join the same scope disposal from its disposer\"; /** Stable message for a descriptor that cannot be admitted into a release transaction. */ readonly disposeDescriptorInvalid: \"[lifecycle] release descriptor admission failed\"; /** * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its * budget. The release still counts as successful and `force` does not run; consumed by * dispose-transaction's graceful race. */ readonly syncGracefulOverBudget: \"[lifecycle] synchronous graceful completed after its deadline\"; /** Fallback message for a queue timeout wrapper around a non-Error primary. */ readonly mutationAdmissionTimedOut: \"[lifecycle] mutation admission timed out\"; /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */ readonly generationCancellationFailed: \"[lifecycle] generation cancellation failed\"; /** Explains that a disposal ledger no longer accepts new item callbacks. */ readonly disposalLedgerClosed: \"[lifecycle] disposal ledger is sealed\"; /** Explains that a disposal ledger operation re-entered its active item boundary. */ readonly disposalLedgerReentrant: \"[lifecycle] disposal ledger operation is reentrant\"; /** Explains that the host lacks a usable native AbortController capability. */ readonly envUnsupported: \"[lifecycle] required host capability is unavailable\"; /** Explains that an observed cancellation source lacks its required listener methods. */ readonly abortSignalInvalid: \"[lifecycle] abort signal is invalid\"; /** Explains that a scheduled task's cancel accessor threw during admission. */ readonly schedulerTaskCancelGetterFailed: \"[lifecycle] scheduler task cancel getter failed\"; /** Explains that a scheduler returned a task without the required cancel function. */ readonly schedulerTaskInvalid: \"[lifecycle] scheduler.schedule must return an object with a cancel() function\"; /** Explains that reading a scheduler's methods failed at an injection boundary. */ readonly schedulerAccessorFailed: \"[lifecycle] scheduler accessor failed\"; /** Explains that an injected value is not a valid lifecycle scheduler. */ readonly schedulerInvalid: \"[lifecycle] scheduler must provide now() and schedule() functions\"; /** Stable message for scheduler values whose runtime type is not numeric. */ readonly schedulerNumberType: \"[lifecycle] scheduler time value must be a number\"; /** Stable message for scheduler values outside the finite numeric domain. */ readonly schedulerNumberRange: \"[lifecycle] scheduler time value must be finite\"; /** Stable message for scheduler delays that are finite but negative. */ readonly schedulerDelayRange: \"[lifecycle] scheduler delay must be non-negative\"; /** Stable message for scheduler arithmetic whose finite operands produce an infinite target. */ readonly schedulerTimeOverflow: \"[lifecycle] scheduler time arithmetic must remain finite\"; /** * Explains that the `report`/`firstError` error policy was chosen without a `report` callback. * Thrown at creation by `createDisposeTransaction`, `createLifecycleScope` and * `createSyncLifecycleScope` (X2=a) instead of silently dropping the failures later. */ readonly errorPolicyReporterMissing: \"[lifecycle] errorPolicy \\\"report\\\" and \\\"firstError\\\" require a report callback\"; /** `signal.reason` message for a generation aborted by a newer `begin()` (GENERATION_SUPERSEDED). */ readonly generationSupersededReason: \"[lifecycle] superseded by a new generation\"; /** * `signal.reason` message for a generation whose `timeoutMs` budget elapsed * (GENERATION_TIMED_OUT). */ readonly generationTimedOutReason: \"[lifecycle] generation timed out\"; /** * `signal.reason` message for a lifecycle unit's generation aborted by `dispose()` * (GENERATION_DISPOSED). */ readonly unitDisposedReason: \"[lifecycle] unit disposed\"; /** * `signal.reason` message for a scope's closing signal aborted by `close()`/`dispose()` * (SCOPE_CLOSED). */ readonly scopeClosedReason: \"[lifecycle] scope closed\"; /** `signal.reason` message for a provisional scope aborted by `rollback()` (PROVISIONAL_SETTLED). */ readonly provisionalRolledBackReason: \"[lifecycle] provisional scope rolled back\"; /** `signal.reason` message for a provisional scope aborted by `commitTo()` (PROVISIONAL_SETTLED). */ readonly provisionalCommittedReason: \"[lifecycle] provisional scope committed\"; /** * Explains that `retain()` hit a sealed quiescence key (QUIESCENCE_SEALED); thrown by the * quiescence tracker. */ readonly quiescenceSealed: \"[lifecycle] cannot retain a sealed quiescence key\"; /** * Explains that strict `whenZero()` ran before `seal()` (QUIESCENCE_UNSEALED_WAIT); thrown by the * quiescence tracker. */ readonly quiescenceUnsealedWait: \"[lifecycle] whenZero() requires seal() first — use whenZeroOnce() for a non-exclusive wait\"; /** Explains that a provisional scope was used after commit or rollback (PROVISIONAL_SETTLED). */ readonly provisionalSettled: \"[lifecycle] provisional scope has already committed or rolled back\"; /** Explains that `commitTo()` found its parent closing or terminal (PROVISIONAL_PARENT_CLOSED). */ readonly provisionalParentClosed: \"[lifecycle] commitTo() target is already closing or terminal\"; /** Wrapper message for a `LifecycleUnit` start failure (UNIT_START_FAILED). */ readonly unitStartFailed: \"[lifecycle] start() failed\"; /** Explains that a terminal `LifecycleUnit` refused new work (SCOPE_TERMINAL). */ readonly unitTerminal: \"[lifecycle] unit is terminal\"; /** Explains that a closing `LifecycleUnit` refused new work (SCOPE_CLOSED). */ readonly unitClosing: \"[lifecycle] unit is closing\"; /** Explains that `begin()` ran on a disposed `GenerationController` (GENERATION_DISPOSED). */ readonly generationDisposed: \"[lifecycle] cannot begin a new generation on a disposed GenerationController\"; /** Diagnostic carried to `onSuperseded` when `adopt()` sees a stale token (GENERATION_SUPERSEDED). */ readonly generationSupersededBeforeAdopt: \"[lifecycle] generation superseded before its result could be adopted\"; /** Diagnostic reported when a graceful phase starts after the shared deadline (DEADLINE_EXCEEDED). */ readonly sharedDeadlinePassed: \"[lifecycle] shared deadline already passed before this graceful phase could start\"; /** Diagnostic wrapper reported when a descriptor's `force` fails (RELEASE_FORCE_FAILED). */ readonly releaseForceFailed: \"[lifecycle] force() failed\"; /** * Explains that a `syncSafe` callback returned a thenable to `SyncLifecycleScope` * (SCOPE_SYNC_VIOLATION). */ readonly syncCallbackReturnedThenable: \"[lifecycle] a syncSafe descriptor callback returned a thenable — SyncLifecycleScope never awaits\"; /** Explains that a terminal scope refused `own()` (SCOPE_TERMINAL); shared by both scope kinds. */ readonly scopeTerminal: \"[lifecycle] scope is terminal\"; /** Explains that a closing scope refused `own()` (SCOPE_CLOSED); shared by both scope kinds. */ readonly scopeClosing: \"[lifecycle] scope is closing\"; /** Explains that a disposer called its own scope's `own()` (SCOPE_REENTRANT_OWN). */ readonly scopeReentrantOwn: \"[lifecycle] cannot call own() from within this scope’s own dispose()\"; /** * Explains that `SyncLifecycleScope.own()` got a descriptor without `syncSafe: true` * (SCOPE_SYNC_VIOLATION). */ readonly syncScopeRequiresSyncSafe: \"[lifecycle] SyncLifecycleScope requires an explicit `syncSafe: true` descriptor\"; /** Explains that `SyncLifecycleScope.own()` got an async owner as resource (SCOPE_SYNC_VIOLATION). */ readonly syncScopeOwnsAsyncOwner: \"[lifecycle] SyncLifecycleScope cannot own a LifecycleScope or ProvisionalScope instance\"; /** Aggregate message for multiple `SyncLifecycleScope` release failures (SCOPE_DISPOSAL_FAILED). */ readonly syncScopeDisposalFailed: \"[lifecycle] sync lifecycle scope disposal failed\"; /** Explains that a generation timeout option could not be read at its admission boundary. */ readonly generationTimeoutAccessorFailed: \"[lifecycle] generation timeout option getter failed\"; };",
           "guidance": [
             {
               "id": "错误基础设施模块",
@@ -6348,7 +6539,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -6357,15 +6548,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -6938,7 +7129,8 @@
           "errors": ["No documented errors are declared for createAbortController."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAbortController.",
           "examples": [
-            "const controller = createAbortController()\ncontroller.signal.addEventListener('abort', () => console.log('aborted'))\ncontroller.abort('reason')"
+            "const controller = createAbortController()\ncontroller.signal.addEventListener('abort', () => console.log('aborted'))\ncontroller.abort('reason')",
+            "import { abortableDelay, createAbortController } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst controller = createAbortController()\nconst waiting = abortableDelay(scheduler, 250, controller.signal)\ncontroller.abort()\nconsole.log(await waiting) // false；没有遗留 timer"
           ],
           "members": [],
           "exportPath": "./abort",
@@ -7027,7 +7219,7 @@
               ]
             }
           ],
-          "usageScore": 82,
+          "usageScore": 106,
           "configuration": [],
           "fragment": "lifecycle-abort--createAbortController"
         },
@@ -7671,7 +7863,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -7680,15 +7872,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -8685,7 +8877,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -8694,15 +8886,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -8976,7 +9168,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -8985,15 +9177,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -9281,7 +9473,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -9290,15 +9482,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -9566,7 +9758,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -9575,15 +9767,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -9871,7 +10063,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -9880,15 +10072,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -10160,7 +10352,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -10169,15 +10361,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -10434,7 +10626,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "稳定错误码表，20 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "稳定错误码表，22 个码，唯一声明处 `src/error-code.ts`，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -10445,6 +10637,11 @@
                   "type": "table",
                   "headers": ["`LifecycleErrorCode` 键", "码值", "触发条件"],
                   "rows": [
+                    [
+                      "`delayFailed`",
+                      "`DELAY_FAILED`",
+                      "相对延时无法注册、调度或清理；原错误保持可追溯，取消本身返回 false 而非错误"
+                    ],
                     [
                       "`scopeClosed`",
                       "`SCOPE_CLOSED`",
@@ -10494,6 +10691,11 @@
                       "`generationDisposed`",
                       "`GENERATION_DISPOSED`",
                       "在已 `dispose()` 的 `GenerationController` 上调用 `begin()`"
+                    ],
+                    [
+                      "`generationTimedOut`",
+                      "`GENERATION_TIMED_OUT`",
+                      "当前 generation 的 timeoutMs 预算到期；signal.reason 为带码 Error"
                     ],
                     ["`quiescenceSealed`", "`QUIESCENCE_SEALED`", "`seal()` 之后又调用 `retain()`"],
                     [
@@ -10770,7 +10972,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -10779,15 +10981,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -11061,7 +11263,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（20 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
+                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
                 },
                 {
                   "type": "code",
@@ -11070,15 +11272,15 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、"
+                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`generationDisposed`(`GENERATION_DISPOSED`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、"
+                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
+                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
                 },
                 {
                   "type": "paragraph",
@@ -11283,9 +11485,9 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.",
+              "description": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail.",
               "descriptionEn": "Uses a runtime-neutral scheduler for `begin({ timeoutMs })` timing. Defaults to * `systemScheduler`.",
-              "descriptionZh": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
+              "descriptionZh": "调度器契约 `IScheduler`/`IScheduledTask`/`IManualScheduler`、默认实现 `systemScheduler`（`performance.now()` 单调时钟）与 `createManualScheduler` 只由 `@migaia/utils/scheduler` 导出，本包不再导出或再导出它们。本包保留注入准入层：`createMutationQueue`、`createGenerationController`、`abortableDelay`、`boundedWait` 与 dispose transaction 未注入 scheduler 时，使用 `resolveScheduler(systemScheduler)` 的快照，所以非法延迟仍以 lifecycle `INVALID_OPTION`（`detail."
             },
             {
               "name": "report",
