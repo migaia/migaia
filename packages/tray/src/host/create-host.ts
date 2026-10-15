@@ -69,6 +69,14 @@ type IAdmissionRecord = {
 }
 type IGraph = IDynamicCapabilityGraph<IAdmissionRecord>
 
+/** Adjust one name's nesting count; missing/last releases erase membership just as before. */
+function changeNameCount(names: Map<string, number>, name: string, delta: 1 | -1): void {
+  /** Zero membership, rather than a zero-valued entry, determines mutation/quiescence admission. */
+  const count = (names.get(name) ?? 0) + delta
+  if (count <= 0) names.delete(name)
+  else names.set(name, count)
+}
+
 /** The module-local claim records the sole managed session for each concrete Host. */
 const claims = new WeakMap<object, object>()
 /** Monotonic private anchor sequence; anchors never enter the managed Graph namespace. */
@@ -304,21 +312,17 @@ export async function createHost<
         })
       },
       beginRun: (name) => {
-        activeRuntimeNames.set(name, (activeRuntimeNames.get(name) ?? 0) + 1)
+        changeNameCount(activeRuntimeNames, name, 1)
       },
       endRun: (name) => {
-        const count = activeRuntimeNames.get(name) ?? 0
-        if (count <= 1) activeRuntimeNames.delete(name)
-        else activeRuntimeNames.set(name, count - 1)
+        changeNameCount(activeRuntimeNames, name, -1)
         notifyRuntimeQuiescence()
       },
       enterCallback: (name) => {
-        callbackRuntimeNames.set(name, (callbackRuntimeNames.get(name) ?? 0) + 1)
+        changeNameCount(callbackRuntimeNames, name, 1)
       },
       exitCallback: (name) => {
-        const count = callbackRuntimeNames.get(name) ?? 0
-        if (count <= 1) callbackRuntimeNames.delete(name)
-        else callbackRuntimeNames.set(name, count - 1)
+        changeNameCount(callbackRuntimeNames, name, -1)
       },
       assertMutationAllowed: (name) => {
         if (callbackRuntimeNames.has(name)) throw createTrayError(TrayErrorCode.unavailable)
