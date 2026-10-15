@@ -147,7 +147,7 @@ const failures = await scope.dispose() // 逆序释放，'throw' 策略下失败
 
 边界行为：
 
-- `own(resource, descriptor)`：容器处于 `closing`/`terminal` 时抛 `SCOPE_CLOSED`/`SCOPE_TERMINAL`；在 disposer 内部重入调用抛 `SCOPE_REENTRANT_OWN`。
+- `own(resource, descriptor)`：容器处于 `closing`/`terminal` 时抛 `SCOPE_CLOSED`/`SCOPE_TERMINAL`；在 disposer 内部重入调用抛 `SCOPE_REENTRANT_OWN`；descriptor 形状非法（`order`/`custom`/`graceful`/`gracefulTimeoutMs`/`force`，规则同 dispose 时的 descriptor 校验）时在注册时就抛 `INVALID_OPTION`，访问器抛错则原样抛出。
 - `release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。
 - `close()`：同步、幂等；`open → closing`。
 - `dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。
@@ -186,6 +186,7 @@ const failures = scope.dispose() // 同步返回
 约束与边界：
 
 - 每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在**注册时**（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`。
+- descriptor 形状校验与异步版本相同：`order` 非有限数、`force` 缺失等非法值在 `own()` 时抛 `INVALID_OPTION`。
 - 不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例（内部品牌检测），命中同样抛 `SCOPE_SYNC_VIOLATION`。
 - 某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。
 - 降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。
@@ -571,7 +572,7 @@ try {
 
 边界行为：
 
-- `own(resource, descriptor)`：已 commit/rollback 后调用抛 `PROVISIONAL_SETTLED`。
+- `own(resource, descriptor)`：已 commit/rollback 后调用抛 `PROVISIONAL_SETTLED`；descriptor 形状非法时抛 `INVALID_OPTION`（不读取 `order`，commit 时由 parent 的 `own()` 校验）。
 - `commitTo(parent)`：按注册顺序逐个调用 `parent.own(resource, descriptor)`；某项失败时，已转移给 parent 的部分保留在 parent 名下，尚未转移的部分由本作用域**逆序释放并 await 完成**后才重新抛出原错误——不会有资源被两边都不持有，也不会有资源留给"none"；若失败原因是 `parent` 已处于 `closing`/`terminal`（错误码为 `SCOPE_CLOSED`/`SCOPE_TERMINAL`），额外包一层 `PROVISIONAL_PARENT_CLOSED`，原错误仍在 `cause`，遗留资源的释放失败列表挂在 `errors`。
 - `rollback()`：逆序释放全部已注册资源，聚合失败为携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`；幂等——并发/重复调用复用同一个 settle Promise。
 - `commitTo`/`rollback` 二次调用（或 commit 后 rollback / rollback 后 commit）一律抛 `PROVISIONAL_SETTLED`（`rollback()` 以 rejected Promise 形式返回，不是同步抛出）。

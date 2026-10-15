@@ -13,7 +13,7 @@ import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createTerminalController } from './terminal-controller.js'
 import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
-import { createDisposeTransaction } from './dispose-transaction.js'
+import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { resolveSchedulerOption } from './scheduler.js'
@@ -108,8 +108,9 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
 
   /**
    * Wraps release callbacks lazily so self-dispose is fail-fast without rejecting external joiners.
-   * The facade must not read or spread descriptor fields here: DisposeTransaction owns the single
-   * per-item admission read and receives any hostile getter failure for policy handling.
+   * The facade must not read or spread descriptor fields here: `own()` already validated the shape,
+   * and DisposeTransaction owns the dispose-time snapshot read, so a getter that fails only at
+   * dispose still reaches the error policy.
    */
   const guardDescriptor = (descriptor: IReleaseDescriptor): IReleaseDescriptor => {
     /** Lazy field facade consumed by DisposeTransaction's descriptor admission boundary. */
@@ -166,6 +167,10 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
       )
     }
     assertOpen()
+    // Validation only: an invalid shape fails here at the call site instead of at dispose time.
+    // Release still snapshots the descriptor through DisposeTransaction admission.
+    const admission = admitDescriptor(descriptor, true)
+    if (!admission.ok) throw admission.error
     let unregisterToken: object | undefined
     if (
       descriptor.gcFallback &&

@@ -330,8 +330,11 @@ const invalidDescriptor = (field: string): unknown =>
  * failure remains the caller's original error; an invalid value receives the lifecycle
  * invalid-option code. Order is read only for order-mode transactions, preserving plan-mode's
  * order-blind contract.
+ *
+ * Package-internal (not exported from the index): scope `own()` calls it as a validation-only entry
+ * check and discards the snapshot; release still re-admits the descriptor at dispose time.
  */
-const admitDescriptor = (
+export const admitDescriptor = (
   descriptor: IReleaseDescriptor,
   includeOrder: boolean
 ): IDescriptorAdmission => {

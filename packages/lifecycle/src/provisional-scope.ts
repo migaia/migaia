@@ -3,7 +3,7 @@ import { ASYNC_OWNER_BRAND } from './types.js'
 import { createLifecycleError, tagLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { createDisposeTransaction } from './dispose-transaction.js'
+import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import {
@@ -118,6 +118,10 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
 
   const own = <T>(resource: T, descriptor: IReleaseDescriptor): T => {
     assertPending()
+    // Validation only, with the same order-blind admission as this scope's plan-mode release; the
+    // parent's own() validates `order` again on commit.
+    const admission = admitDescriptor(descriptor, false)
+    if (!admission.ok) throw admission.error
     entries.push({ resource, source: String(nextId++), descriptor })
     return resource
   }
