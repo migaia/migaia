@@ -27,7 +27,7 @@ const pipeline: IMiddlewarePipeline<typeof MiddlewarePipelineMode.async, string>
 - `onViolation`：可选，接收 `late` 或 `duplicate`；省略时为空操作。
 - `assertActive`：可选，由 host 提供的生命周期断言，在入口和每个 stage 后执行。
 - `signal`：可选，所有调用的默认取消信号。
-- `signals`：可选，generator 三个 sentinel 的兼容注入。
+- `signals`：可选，generator 三个互不相同的 symbol sentinel；创建时读取并快照，不再访问调用方对象。
 - `combineStageAndDownstreamError`：可选，仅异步洋葱帧同时失败时组合两个错误。
 
 选项会被读取并冻结。无效模式、无效回调、无效 sentinel 集或不支持的提升方向都会产生原生 `TypeError`；错误附带：

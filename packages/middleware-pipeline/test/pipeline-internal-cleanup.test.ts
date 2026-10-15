@@ -129,13 +129,54 @@ const expectInvalidOption = (
 const sourceDirectory = fileURLToPath(new URL('../src/', import.meta.url))
 
 describe('pipeline internal cleanup', () => {
+  it.each(Object.values(MiddlewarePipelineMode))(
+    'codes an aborted getter failure after admission in %s mode',
+    async (mode) => {
+      /** Admission succeeds; the first stage makes the next supported signal read fail. */
+      let failed = false
+      /** Exact getter failure must remain reachable through the public TypeError cause. */
+      const cause = new Error('later aborted read')
+      /** Structural signal exposes the same getter throughout the run. */
+      const signal: IAbortSignal = {
+        get aborted() {
+          if (failed) throw cause
+          return false
+        },
+        addEventListener() {},
+        removeEventListener() {}
+      }
+      /** Neither downstream nor done may start after cancellation can no longer be read. */
+      const downstream = vi.fn()
+      const done = vi.fn()
+      /** Drives the existing public mode helper without creating an internal test seam. */
+      const run = () =>
+        runMode(
+          mode,
+          signal,
+          () => {
+            failed = true
+          },
+          downstream,
+          done
+        )
+      /** Retains synchronous timing for sync modes and rejected-Promise timing for async modes. */
+      const failure =
+        mode === MiddlewarePipelineMode.sync || mode === MiddlewarePipelineMode.generator
+          ? thrown(run)
+          : await (run() as Promise<void>).catch((error: unknown) => error)
+      expectInvalidOption(failure, 'middleware pipeline signal option is invalid', cause, true)
+      expect(downstream).not.toHaveBeenCalled()
+      expect(done).not.toHaveBeenCalled()
+    }
+  )
+
   it('A1 preserves invalid-option text, native type, and own cause for seven admissions', () => {
     const invalidMode = 'middleware pipeline mode is invalid'
     const invalidSignal = 'middleware pipeline signal option is invalid'
     const unsupportedLift = 'middleware pipeline stage cannot be lifted to the target mode'
     expectInvalidOption(
       thrown(() => createPipeline(null as never)),
-      invalidMode
+      'middleware pipeline options must be an object'
     )
     expectInvalidOption(
       thrown(() => createPipeline({ mode: 'parallel' } as never)),

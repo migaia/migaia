@@ -3,6 +3,7 @@ import {
   createPipeline,
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
+  GENERATOR_UNDEFINED,
   MIDDLEWARE_PIPELINE_SOURCE,
   MiddlewarePipelineErrorCode,
   MiddlewarePipelineMode,
@@ -14,6 +15,57 @@ import {
 } from '../src/index.js'
 
 describe('createPipeline', () => {
+  it.each([0, 1, 2])('rejects overlapping sentinel identities (%s)', (pair) => {
+    /** Each pair must be rejected before any generator can misinterpret its terminal value. */
+    const sentinels = [Symbol('first'), Symbol('second'), Symbol('third')]
+    sentinels[(pair + 1) % 3] = sentinels[pair]
+    expect(() =>
+      createPipeline({
+        mode: MiddlewarePipelineMode.generator,
+        signals: { undefined: sentinels[0], halt: sentinels[1], continue: sentinels[2] }
+      })
+    ).toThrow(expect.objectContaining({ code: MiddlewarePipelineErrorCode.invalidOption }))
+  })
+
+  it('captures sentinel getters once and ignores later caller mutation', () => {
+    /** Counts construction reads separately from subsequent dispatches. */
+    const reads = [0, 0, 0]
+    /** Caller-controlled backing value changes after the pipeline has committed its snapshot. */
+    let continueValue: symbol = GENERATOR_CONTINUE
+    /** Getter-based options prove that no stage re-enters caller-owned sentinel properties. */
+    const signals = {
+      get undefined() {
+        reads[0] += 1
+        return GENERATOR_UNDEFINED
+      },
+      get halt() {
+        reads[1] += 1
+        return GENERATOR_HALT
+      },
+      get continue() {
+        reads[2] += 1
+        return continueValue
+      }
+    }
+    /** Public generator entry is the only admission boundary under test. */
+    const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.generator, signals })
+    continueValue = Symbol('replacement')
+    /** Final values detect any accidental re-read or misclassification of the old sentinel. */
+    const values: number[] = []
+    pipeline.run(
+      [
+        function* (value) {
+          yield value + 1
+          return GENERATOR_CONTINUE
+        }
+      ],
+      1,
+      (value) => values.push(value)
+    )
+    expect(values).toEqual([2])
+    expect(reads).toEqual([1, 1, 1])
+  })
+
   it('A1 runs all modes through one stable argument list', async () => {
     /** Values committed by each mode's terminal callback. */
     const values: number[] = []

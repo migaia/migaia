@@ -160,9 +160,19 @@ const admit = (signal: IAbortSignal | undefined): IMiddlewarePipelineContext | u
   if (admission.aborted) throw makeAbortError(signal)
   return Object.freeze({ signal })
 }
+/** Reads cancellation at every supported structural-signal boundary with coded getter failures. */
+const readAborted = (signal: IAbortSignal): boolean => {
+  /** Structural signals may fail on a later read; preserve that failure on the coded boundary. */
+  const aborted = tryReadProperty(signal, 'aborted')
+  if (aborted.threw)
+    throw createMiddlewarePipelineInvalidOptionError(MiddlewarePipelineSignalText.invalidOption, {
+      cause: aborted.error
+    })
+  return Boolean(aborted.value)
+}
 /** Rechecks cooperative cancellation between public runner transitions. */
 const check = (context: IMiddlewarePipelineContext | undefined): void => {
-  if (context?.signal.aborted) throw makeAbortError(context.signal)
+  if (context && readAborted(context.signal)) throw makeAbortError(context.signal)
 }
 
 type IAsyncControlPath = {
@@ -416,7 +426,8 @@ export const runAsyncMiddleware = async <TValue>(
       throw activeError
     }
     if (hasStageError && hasDownstreamError) {
-      if (context?.signal.aborted && stageError === downstreamError) throw downstreamError
+      if (context && stageError === downstreamError && readAborted(context.signal))
+        throw downstreamError
       if (options.combineStageAndDownstreamError) {
         throw options.combineStageAndDownstreamError(stageError, downstreamError)
       }
