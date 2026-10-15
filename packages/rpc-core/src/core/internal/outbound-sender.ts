@@ -223,8 +223,8 @@ export class RpcOutboundSender {
     | undefined
   /** Busy physical writes accumulate ready requests and responses in this single owner. */
   #writing = false
-  /** FIFO contains semantic settlements, never serialized per-member size estimates. */
-  #queued: IQueuedEnvelope[] = []
+  /** Insertion-ordered semantic settlements support direct cancellation without queue scans. */
+  #queued = new Set<IQueuedEnvelope>()
   /** One owner callback releases an idle physical write before its caller continuation. */
   #idleWriteCompleted = (): void => {
     this.#finishWriting()
@@ -718,21 +718,17 @@ export class RpcOutboundSender {
             if (signal) {
               /** Cancellation releases the existing gate's capacity before the held writer drains. */
               const cancel = () => {
-                const index = this.#queued.indexOf(entry)
-                if (index < 0) return
-                this.#queued.splice(index, 1)
+                if (!this.#queued.delete(entry)) return
                 entry.cancelQueued?.()
                 reject(resolveAbortReason(signal))
               }
               signal.addEventListener('abort', cancel, { once: true })
               entry.cancelQueued = () => signal.removeEventListener('abort', cancel)
             }
-            this.#queued.push(entry)
+            this.#queued.add(entry)
             /** Gate closure releases only this not-yet-started member through the same queue owner. */
             const releaseGate = guard?.((reason) => {
-              const index = this.#queued.indexOf(entry)
-              if (index < 0) return
-              this.#queued.splice(index, 1)
+              if (!this.#queued.delete(entry)) return
               entry.cancelQueued?.()
               reject(reason)
             })
@@ -771,7 +767,7 @@ export class RpcOutboundSender {
   }
 
   /** Starts an idle singleton synchronously; only an existing physical write creates a queue. */
-  #flush(entries: readonly IQueuedEnvelope[]): void {
+  #flush(entries: Iterable<IQueuedEnvelope>): void {
     this.#writing = true
     /** Cancellation/close failures remove only their own logical member before preparation. */
     const admitted = this.#admitBatch(entries, true)
@@ -814,13 +810,14 @@ export class RpcOutboundSender {
   /** Releases physical ownership before caller continuation and drains exactly one ready snapshot. */
   #finishWriting(): void {
     this.#writing = false
+    if (this.#queued.size === 0) return
     const queued = this.#queued
-    this.#queued = []
-    if (queued.length) this.#flush(queued)
+    this.#queued = new Set()
+    this.#flush(queued)
   }
 
   /** Every supported cancellation/close is checked through the original operation/gate owners. */
-  #admitBatch(entries: readonly IQueuedEnvelope[], refresh: boolean): IQueuedEnvelope[] {
+  #admitBatch(entries: Iterable<IQueuedEnvelope>, refresh: boolean): IQueuedEnvelope[] {
     /** Rejected members cannot abort or reorder the survivors. */
     const admitted: IQueuedEnvelope[] = []
     for (const entry of entries) {
