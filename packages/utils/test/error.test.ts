@@ -1,14 +1,36 @@
+import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import {
   attachErrorIdentity,
   attachSecondaryErrors,
   combineErrors,
+  isNativeErrorValue,
   toError,
   UtilsErrorCode,
   walkErrorCauses
 } from '../src/error.js'
 
 describe('error primitives', () => {
+  it('recognizes native error families across realms without invoking hostile methods', () => {
+    /** Cross-realm native failures must retain their original constructor and stack. */
+    const foreign = runInNewContext('new TypeError("foreign")') as unknown
+    /** Revocation makes even prototype inspection fail; detection remains non-throwing. */
+    const revoked = Proxy.revocable({}, {})
+    revoked.revoke()
+    expect(isNativeErrorValue(new Error('local'))).toBe(true)
+    expect(isNativeErrorValue(foreign)).toBe(true)
+    expect(isNativeErrorValue(revoked.proxy)).toBe(false)
+    expect(
+      isNativeErrorValue({
+        name: 'Error',
+        toString: () => {
+          throw new Error('unused')
+        }
+      })
+    ).toBe(false)
+    expect(isNativeErrorValue(null)).toBe(false)
+  })
+
   it('preserves error identity and rejects conflicting tags', () => {
     const error = new Error('x')
     expect(attachErrorIdentity(error, { source: '@test', code: 'X' })).toBe(error)

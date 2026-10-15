@@ -21,6 +21,39 @@ export function tryReadProperty<T extends object, K extends keyof T>(
   }
 }
 
+/**
+ * Recognizes Error-family prototype chains across realms for native identity preservation. This is
+ * a diagnostic shape check, not proof of trust or native internal slots. It never invokes caller
+ * methods and returns false when a revoked proxy or hostile prototype cannot be inspected.
+ */
+export function isNativeErrorValue(value: unknown): value is Error {
+  if ((typeof value !== 'object' || value === null) && typeof value !== 'function') return false
+  try {
+    if (value instanceof Error) return true
+    /** Bound prototype traversal so malformed chains cannot hold error handling indefinitely. */
+    let prototype: object | null = Object.getPrototypeOf(value)
+    for (let depth = 0; prototype !== null && depth < 32; depth += 1) {
+      /** Descriptor inspection avoids invoking a caller-defined constructor getter. */
+      const constructor = Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value
+      /** A matching constructor/prototype pair identifies the Error-family prototype shape. */
+      const constructorPrototype =
+        typeof constructor === 'function'
+          ? Object.getOwnPropertyDescriptor(constructor, 'prototype')?.value
+          : undefined
+      /** Native Error.prototype owns its name and toString as data properties. */
+      const name = Object.getOwnPropertyDescriptor(prototype, 'name')?.value
+      /** Only inspect the method descriptor; invoking it would execute caller-owned code. */
+      const toString = Object.getOwnPropertyDescriptor(prototype, 'toString')?.value
+      if (constructorPrototype === prototype && name === 'Error' && typeof toString === 'function')
+        return true
+      prototype = Object.getPrototypeOf(prototype)
+    }
+  } catch {
+    return false
+  }
+  return false
+}
+
 /** Base error retaining the utils source and stable semantic code. */
 export abstract class UtilsError extends Error {
   readonly source = '@migaia/utils' as const
