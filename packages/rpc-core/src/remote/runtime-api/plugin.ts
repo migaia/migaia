@@ -52,7 +52,7 @@ import { createProviderAdmissionScope } from '../../core/features/provider.js'
 import { attachProviderPreflight } from '../../core/internal/provider.js'
 import { registerLocalErrorWireSummary } from '../../core/internal/error-wire-metadata.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
-import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
+import { defaultRpcReporter } from '../../core/default-reporter.js'
 
 /** A private extension uses the original atomic shared-slot owner across both adapter families. */
 const providerAdmissionSlot = Symbol('runtime-provider-admission')

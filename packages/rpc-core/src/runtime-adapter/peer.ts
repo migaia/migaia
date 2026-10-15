@@ -29,7 +29,7 @@ import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
 import { createAdapterListenerPreparation, type IAdapterListenerPreparation } from './listener.js'
 import { createAdapterBytePeer, type IAdapterBytePeerOptions } from './byte/peer.js'
 import type { IRuntimeByteIO } from './byte/types.js'
-import { defaultRpcReporter } from '../core/internal/diagnostic-reporter.js'
+import { defaultRpcReporter } from '../core/default-reporter.js'
 
 /** Adapter deployment objects are ordinary configuration; resource factories remain adapter-owned. */
 export type IAdapterPeerOptions = Omit<

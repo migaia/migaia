@@ -32,7 +32,7 @@ import {
   type IRuntimePeerOptions,
   type IRuntimePeer
 } from './peer.js'
-import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
+import { defaultRpcReporter } from '../../core/default-reporter.js'
 
 /** Exact facade provenance points to the original generation owner and duplicates no state. */
 const managedRegistrations = new WeakMap<

@@ -43,7 +43,7 @@ import { readRuntimeProviderGovernor } from './provider/governor.js'
 import { createRuntimeEventPublisher, runtimeReadyEvent } from '../remote/runtime-api/events.js'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { IpcReporterContext } from './data.js'
-import { defaultRpcReporter } from '../core/internal/diagnostic-reporter.js'
+import { defaultRpcReporter } from '../core/default-reporter.js'
 
 /** The original session owner stores this actual callable Peer and closes its same resource. */
 export type IAdapterListenerService = IRemoteServePluginHandle & Readonly<{ peer: IRuntimePeer }>

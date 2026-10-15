@@ -10,7 +10,7 @@ import {
   type ICoroutineSupervisorPolicy
 } from './coroutine-binding.js'
 import type { ICoroutineConnect, ICoroutineUserTask } from './coroutine-task.js'
-import { defaultRpcReporter } from '../../core/internal/diagnostic-reporter.js'
+import { defaultRpcReporter } from '../../core/default-reporter.js'
 
 /** This physical owner retains the stable token for the real Host coroutine slot. */
 const coroutineRuntimeSlotFamily = Object.freeze({})
