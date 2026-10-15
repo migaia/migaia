@@ -1,3 +1,4 @@
+import { memoryView } from './memory-view.js'
 import type { IDisposable } from '@migaia/reactive'
 import {
   allocateOwnedSync,
@@ -27,7 +28,6 @@ export function number(): IFieldBuilder<IWasmNumberField> {
         if (signal.aborted)
           throw createStoreWasmError(StoreWasmErrorCode.initAborted, StoreWasmErrorText.initAborted)
         source = createSource('WasmNumber')
-        const view = () => new DataView(memory.buffer)
         let disposed = false
         let disposing = false
 
@@ -42,7 +42,7 @@ export function number(): IFieldBuilder<IWasmNumberField> {
                 StoreWasmErrorText.fieldDisposed
               )
             source!.track()
-            return view().getFloat64(ptr, true)
+            return memoryView(memory).getFloat64(ptr, true)
           },
           set value(v) {
             if (disposed)
@@ -55,9 +55,9 @@ export function number(): IFieldBuilder<IWasmNumberField> {
                 StoreWasmErrorCode.invalidOption,
                 StoreWasmErrorText.valueType('number', 'number')
               )
-            const memoryView = view()
-            if (Object.is(memoryView.getFloat64(ptr, true), v)) return
-            source!.commit(() => memoryView.setFloat64(ptr, v, true))
+            const currentView = memoryView(memory)
+            if (Object.is(currentView.getFloat64(ptr, true), v)) return
+            source!.commit(() => memoryView(memory).setFloat64(ptr, v, true))
           },
           get disposed() {
             return disposed

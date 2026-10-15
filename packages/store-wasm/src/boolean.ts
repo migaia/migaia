@@ -1,3 +1,4 @@
+import { memoryView } from './memory-view.js'
 import type { IDisposable } from '@migaia/reactive'
 import {
   allocateOwnedSync,
@@ -27,7 +28,6 @@ export function boolean(): IFieldBuilder<IWasmBooleanField> {
         if (signal.aborted)
           throw createStoreWasmError(StoreWasmErrorCode.initAborted, StoreWasmErrorText.initAborted)
         source = createSource('WasmBoolean')
-        const view = () => new DataView(memory.buffer)
         let disposed = false
         let disposing = false
 
@@ -42,7 +42,7 @@ export function boolean(): IFieldBuilder<IWasmBooleanField> {
                 StoreWasmErrorText.fieldDisposed
               )
             source!.track()
-            return view().getUint8(ptr) !== 0
+            return memoryView(memory).getUint8(ptr) !== 0
           },
           set value(v) {
             if (disposed)
@@ -55,10 +55,10 @@ export function boolean(): IFieldBuilder<IWasmBooleanField> {
                 StoreWasmErrorCode.invalidOption,
                 StoreWasmErrorText.valueType('boolean', 'boolean')
               )
-            const memoryView = view()
+            const currentView = memoryView(memory)
             const next = v ? 1 : 0
-            if (memoryView.getUint8(ptr) === next) return
-            source!.commit(() => memoryView.setUint8(ptr, next))
+            if (currentView.getUint8(ptr) === next) return
+            source!.commit(() => memoryView(memory).setUint8(ptr, next))
           },
           get disposed() {
             return disposed

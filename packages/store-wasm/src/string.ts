@@ -1,3 +1,4 @@
+import { memoryView } from './memory-view.js'
 import type { IDisposable } from '@migaia/reactive'
 import {
   allocateOwnedSync,
@@ -44,11 +45,10 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWas
         if (signal.aborted)
           throw createStoreWasmError(StoreWasmErrorCode.initAborted, StoreWasmErrorText.initAborted)
         source = createSource('WasmString')
-        const view = () => new DataView(memory.buffer)
         let disposed = false
         let disposing = false
         const readValue = () => {
-          const len = view().getUint32(ptr, true)
+          const len = memoryView(memory).getUint32(ptr, true)
           if (len > maxBytes)
             throw createStoreWasmError(
               StoreWasmErrorCode.allocationFailed,
@@ -90,7 +90,7 @@ export function string(maxBytes: number = DEFAULT_MAX_BYTES): IFieldBuilder<IWas
             }
             if (readValue() === v) return
             source!.commit(() => {
-              view().setUint32(ptr, bytes.length, true)
+              memoryView(memory).setUint32(ptr, bytes.length, true)
               new Uint8Array(memory.buffer, ptr + 4, bytes.length).set(bytes)
             })
           },
