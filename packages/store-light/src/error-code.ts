@@ -83,7 +83,8 @@ export const StoreLightErrorCode = {
    * A diagnostic reports that writes after the first `await` in an asynchronous action are outside
    * its batch.
    *
-   * This code is reported through `console.warn`, not thrown. Wrap subsequent writes in `$batch()`.
+   * This code is reported through `Runtime.reportError`, not thrown. Wrap subsequent writes in
+   * `$batch()`.
    */
   actionBatchBoundary: 'ACTION_BATCH_BOUNDARY',
 

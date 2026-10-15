@@ -1,3 +1,6 @@
+import type { IRuntime } from '@migaia/reactive'
+import { deferRuntimeCleanup } from '@migaia/reactive/extension'
+
 /** Small keyed container shared by collection-like reactive nodes. */
 export class KeyedCellRegistry<K, C> {
   #cells = new Map<K, C>()
@@ -45,12 +48,13 @@ type ICellRegistry<K, C> = {
  * collection implementations from drifting on abandoned render cleanup semantics.
  */
 export function scheduleLazyCellRelease<K, C>(
+  runtime: IRuntime,
   registry: ICellRegistry<K, C>,
   key: K,
   cell: C,
   release: () => boolean
 ): void {
-  queueMicrotask(() => {
+  deferRuntimeCleanup(runtime, () => {
     if (registry.get(key) === cell && release()) registry.delete(key)
   })
 }

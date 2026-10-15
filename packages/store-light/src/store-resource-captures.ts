@@ -1,3 +1,4 @@
+import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import { createStoreLightError, StoreLightErrorCode } from './errors.js'
 import { StoreLightErrorText } from './error-text.js'
 
@@ -32,8 +33,8 @@ type ICaptureToken = {
    */
   provisional?: boolean
   /** Explicit-expiry timer set alongside `provisional`; see PROVISIONAL_COMMIT_WINDOW_MS. */
-  /** Host timer handle; opaque, so declarations need no Node or DOM timer types. */
-  expireTimer?: unknown
+  /** Cancelable expiry handle; native timer references stay inside the scheduler. */
+  expireTimer?: IScheduledTask
 }
 type ICapturableOperation = Promise<unknown> & { [CAPTURES]?: Set<ICaptureToken> }
 
@@ -58,9 +59,14 @@ export class ResourceCaptureRegistry {
   #byVersion = new Map<number, Array<WeakRef<object>>>()
   #finalizer: FinalizationRegistry<number>
   #onChanged: (version: number) => void
-  #expireTimers = new Set<ReturnType<typeof setTimeout>>()
+  /** One admitted scheduler preserves cancellation and optional native unref. */
+  readonly #scheduler: IScheduler
+  /** Terminal clear cancels every outstanding explicit provisional expiry. */
+  #expireTimers = new Set<IScheduledTask>()
 
-  constructor(onChanged?: (version: number) => void) {
+  /** Uses factory-admitted timers; explicit expiry remains independent of GC telemetry. */
+  constructor(onChanged?: (version: number) => void, scheduler: IScheduler = systemScheduler) {
+    this.#scheduler = scheduler
     if (typeof WeakRef !== 'function' || typeof FinalizationRegistry !== 'function')
       throw createStoreLightError(
         StoreLightErrorCode.envUnsupported,
@@ -124,7 +130,7 @@ export class ResourceCaptureRegistry {
    * GC collection would, so callers don't need to know which path actually retired the token.
    */
   #scheduleProvisionalExpiry(token: ICaptureToken, version: number): void {
-    const timer = setTimeout(() => {
+    const timer = this.#scheduler.schedule(() => {
       this.#expireTimers.delete(timer)
       if (!token.provisional || !this.#captures.has(token) || this.#committed.has(token)) {
         return
@@ -134,16 +140,15 @@ export class ResourceCaptureRegistry {
       this.#onChanged(version)
     }, PROVISIONAL_COMMIT_WINDOW_MS)
     // Node/tests must not be kept alive by a housekeeping timer.
-    ;(timer as unknown as { unref?: () => void }).unref?.()
     this.#expireTimers.add(timer)
     token.expireTimer = timer
+    timer.unref?.()
   }
 
   #cancelProvisionalExpiry(token: ICaptureToken): void {
     if (token.expireTimer === undefined) return
-    /** The opaque public field always holds the handle this owner stored from `setTimeout`. */
-    const timer = token.expireTimer as ReturnType<typeof setTimeout>
-    clearTimeout(timer)
+    const timer = token.expireTimer
+    timer.cancel()
     this.#expireTimers.delete(timer)
     token.expireTimer = undefined
   }
@@ -208,7 +213,7 @@ export class ResourceCaptureRegistry {
     this.#byVersion.clear()
     this.#captures = new WeakSet()
     this.#committed = new WeakSet()
-    for (const timer of this.#expireTimers) clearTimeout(timer)
+    for (const timer of this.#expireTimers) timer.cancel()
     this.#expireTimers.clear()
   }
   #track(version: number, token: object): void {

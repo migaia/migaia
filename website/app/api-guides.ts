@@ -2010,7 +2010,7 @@ const storeLightCreationOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
     {
       name: 'warnAsyncActions',
       description:
-        'Warns once when a Store Action returns a thenable because only writes before its first await are automatically batched.',
+        'Reports ACTION_BATCH_BOUNDARY once through the Store Runtime when an Action returns a thenable because only writes before its first await are automatically batched.',
       defaultValue: 'false',
       type: 'boolean',
       whenToUse:
@@ -2057,7 +2057,7 @@ const storeLightCreationOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
     {
       name: 'warnAsyncActions',
       description:
-        'Store Action 返回 thenable 时仅警告一次，因为只有首次 await 之前的写入会自动 batch。',
+        'Store Action 返回 thenable 时经所属 Runtime 报告一次 ACTION_BATCH_BOUNDARY，因为只有首次 await 之前的写入会自动 batch。',
       defaultValue: 'false',
       type: 'boolean',
       whenToUse: '开发期把异步 method 迁移到显式 action boundary 时开启。',
@@ -2078,6 +2078,22 @@ const storeLightCreationOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
 /** Store Resource loader and lifecycle options shared by function and object-form factories. */
 const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOptionGuide[]>> = {
   en: [
+    {
+      name: 'runtime',
+      description: 'Owns deferred cleanup and diagnostics.',
+      defaultValue: 'defaultRuntime',
+      type: 'IRuntime',
+      whenToUse: 'Use an isolated Runtime for this resource owner.',
+      example: '{ runtime }'
+    },
+    {
+      name: 'scheduler',
+      description: 'Captured timer owner for cache TTL and provisional capture expiry.',
+      defaultValue: 'systemScheduler',
+      type: 'IScheduler',
+      whenToUse: 'Control timer scheduling, cancellation and optional unref in the host.',
+      example: '{ scheduler }'
+    },
     {
       name: 'factory',
       description:
@@ -2110,7 +2126,7 @@ const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
     {
       name: 'onError',
       description:
-        'Observes contained failures from load, value disposal, or subscriber notification without replacing the Resource state transition.',
+        'Observes contained failures from load, value disposal, or subscriber notification without replacing the Resource state transition; absent or failed reporters forward failures to the Runtime.',
       defaultValue: 'undefined',
       type: '(error: unknown, phase: IStoreResourceErrorPhase) => void',
       whenToUse: 'Attach diagnostics for load, dispose, and listener phases.',
@@ -2126,6 +2142,22 @@ const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
     }
   ],
   zh: [
+    {
+      name: 'runtime',
+      description: '拥有延迟清理和诊断出口。',
+      defaultValue: 'defaultRuntime',
+      type: 'IRuntime',
+      whenToUse: '为资源 owner 配置隔离 Runtime。',
+      example: '{ runtime }'
+    },
+    {
+      name: 'scheduler',
+      description: '创建时捕获的 timer owner，负责缓存 TTL 与 provisional capture 过期。',
+      defaultValue: 'systemScheduler',
+      type: 'IScheduler',
+      whenToUse: '控制宿主的 timer 调度、取消与可选 unref。',
+      example: '{ scheduler }'
+    },
     {
       name: 'factory',
       description:
@@ -2156,7 +2188,7 @@ const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
     {
       name: 'onError',
       description:
-        '观察 load、value dispose 或 subscriber notification 中被隔离的 failure，不替换 Resource state transition。',
+        '观察 load、value dispose 或 subscriber notification 中被隔离的 failure，不替换 Resource state transition；缺省或失败的 reporter 会把失败转交 Runtime。',
       defaultValue: 'undefined',
       type: '(error: unknown, phase: IStoreResourceErrorPhase) => void',
       whenToUse: '为 load、dispose 与 listener phase 接入诊断。',

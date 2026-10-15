@@ -90,7 +90,7 @@ class SharedInt32Signal implements IObservable, IDisposable {
   set value(next: number)
   peek(): number
   sync(): boolean
-  watch(): IDisposer
+  watch(scheduler?: IScheduler): IDisposer
   onObserved(): void
   onUnobserved(): void
   isStale(): boolean
@@ -107,7 +107,7 @@ class SharedInt32Signal implements IObservable, IDisposable {
 - **`value`**（setter）—— `#assertActive()` → `asInt32(next, 'shared signal value')` 校验（不合法抛 `RangeError`,`invalidOption`）→ 以无条件写方式 `writeLocked`；若返回 `undefined`（新值与当前值经 `Atomics` 比较相同,未变）则直接返回,不推进版本号、不通知、不唤醒;若返回新版本,则更新本地 `#observedSharedVersion`、调用 `internalsOf(runtime).notify(this)` 通知本地观察者、并 `Atomics.notify` 唤醒可能正在 `watch()` 挂起的其他线程。已释放时抛 `Error`（`signalDisposed`）。
 - **`peek(): number`** —— `#assertActive()` → 直接一致读并返回 `value`,**不**调用 `sync()`（不主动拉取远端更新,只读本地视图截至上次已知状态）、**不**登记依赖追踪。适合诊断/日志等不希望产生响应式依赖或触发通知的读取场景。
 - **`sync(): boolean`** —— `#assertActive()` → 一致读当前共享内存的 `version`;若与本地记录的 `#observedSharedVersion` 相同返回 `false`（无变化）;否则更新本地记录、调用 `internalsOf(runtime).notify(this)` 通知观察者,返回 `true`。这是"手动拉取远端写入"的入口,`watch()` 内部也是靠调它完成同步。
-- **`watch(): IDisposer`** —— `#assertActive()` → 若已经在 watch,直接返回同一个停止函数(不会叠加第二条回路);否则在 seq slot 上起一条 `Atomics.waitAsync` 唤醒回路:每次被唤醒就调用 `sync()`（如果此时未 disposed）,唤醒回调抛错会经 `reportSharedWatchFailure` 上报（优先 `runtime.reportError`,失败再退回全局 `reportError`/`console.error`,不会让跨线程 Promise 边界吞掉诊断信息）。环境不支持 `Atomics.waitAsync` → 抛 `Error`（`envUnsupported`）。返回的停止函数调用时会 `Atomics.notify` 唤醒挂起中的 `waitAsync`,让它尽快 settle 并释放对共享内存视图的引用,而不是一直等到下一次真正的远端写入。`dispose()` 也会自动调用这个停止函数。
+- **`watch(scheduler?: IScheduler): IDisposer`** —— `#assertActive()` → 若已经在 watch,直接返回同一个停止函数(不会叠加第二条回路);否则在 seq slot 上起一条 `Atomics.waitAsync` 唤醒回路:每次被唤醒就调用 `sync()`（如果此时未 disposed）,唤醒回调抛错会经 `reportSharedWatchFailure` 上报（只经 `runtime.reportError`，宿主诊断由该 Runtime 的 adapter 负责）。环境不支持 `Atomics.waitAsync` → 抛 `Error`（`envUnsupported`）。返回的停止函数调用时会 `Atomics.notify` 唤醒挂起中的 `waitAsync`,让它尽快 settle 并释放对共享内存视图的引用,而不是一直等到下一次真正的远端写入。`dispose()` 也会自动调用这个停止函数。
 - **`onObserved()` / `onUnobserved()`** —— `IObservable` 接口要求的钩子,本类实现为空操作(信号本身没有"被观察/不再被观察"时需要额外处理的资源)。
 - **`isStale(): boolean`** —— 直接比较一致读到的 `version` 与本地记录的 `#observedSharedVersion` 是否不同,**不**做 `#assertActive()` 校验（即使已经 `dispose()` 之后调用也不会抛错,因为它只读取底层视图,不依赖响应式追踪状态）。
 - **`dispose(): void`** —— 幂等；置位 `#disposed`、停止 `watch()` 回路（若存在）、从所属 `Runtime` 的追踪器断开（`tracker.disconnectObservable(this, 'dispose')`）。释放之后再调用 `value`/`sync()`/`watch()`/`peek()` 会抛 `Error`（`signalDisposed`）；`isStale()`/`buffer`/`runtime` 字段仍可安全访问。
@@ -178,7 +178,7 @@ class SharedInt32Array implements IDisposable {
   set(index: number, value: number): void
   update(index: number, update: (current: number) => number): number
   sync(index?: number): number
-  watch(): IDisposer
+  watch(scheduler?: IScheduler): IDisposer
   snapshot(): Int32Array
   dispose(): void
   assertActive(): void
@@ -197,7 +197,7 @@ class SharedInt32Array implements IDisposable {
 - **`sync(index?): number`**
   - 传 `index`：先做下标校验；比较该下标的一致读版本号与本地记录，未变返回 `0`；变了则更新记录、若已物化 cell 则调用其 `sync()`（触发通知），返回 `1`。
   - 不传：先比较 64 位 generation；未变返回 0，变化后在一次 `runtime.batch()` 内扫描全部格的 seqlock。每个读者使用独立版本游标，统计所有变化下标（含无观察者格），只通知已物化 cell。
-- **`watch(): IDisposer`** —— 语义与 `SharedInt32Signal.watch()` 一致，但监听的是头部 **epoch slot** 而不是逐格 seq（一格一个 waiter 在长数组上不可行）；唤醒后调用整体 `sync()`（不带 `index`）。已在 watch 时重复调用返回同一停止函数；环境不支持 `waitAsync` 抛 `Error`（`envUnsupported`）。
+- **`watch(scheduler?: IScheduler): IDisposer`** —— 语义与 `SharedInt32Signal.watch()` 一致，但监听的是头部 **epoch slot** 而不是逐格 seq（一格一个 waiter 在长数组上不可行）；唤醒后调用整体 `sync()`（不带 `index`）。已在 watch 时重复调用返回同一停止函数；环境不支持 `waitAsync` 抛 `Error`（`envUnsupported`）。
 - **`snapshot(): Int32Array`** —— `assertActive()` 后遍历 `[0, length)`，对每个下标 `readCell(i).value`，写入一个新分配的 `Int32Array(length)` 并返回。返回值是**普通、非共享**的数组，修改它不会影响共享内存。
 - **`dispose(): void`** —— 幂等；停止 `watch()`、把所有已物化 cell 从追踪器断开。释放之后调用 `get`/`set`/`update`/`sync`/`watch`/`snapshot` 等会抛 `Error`（`arrayDisposed`）。
 - **`assertActive(): void`** —— 已释放则抛 `Error`（`arrayDisposed`，消息 `[store] shared array is disposed`）；公开方法，正常业务代码不需要直接调用，供组合式底层用法（如包装类）复用同一校验。
@@ -375,7 +375,7 @@ ABI v2 包含版本化 header、一个 64 位 generation，以及每格 value/se
 - **两者都是 `IObservable`**：通过 `@migaia/reactive/extension` 的 `createSourceBinding` 绑定原节点身份与只读版本/订阅者元数据，用受控source操作接入所属 `Runtime` 的依赖图，行为和普通的 `Signal`/`Computed` 节点一致——可以被 `Effect`/`Computed` 追踪，`isStale()` 可查询是否有未同步的远端变化。
 - **单一归属**：构造时调用 `claimOwnership(this, runtime)` 登记归属；同一个 JS 对象不能被登记到第二个 `Runtime`（会抛 `@migaia/reactive` 所有权系统的错误）。**这意味着共享的是 `SharedArrayBuffer`，而不是 JS 对象本身**——另一个线程/`Runtime` 要读同一份数据，必须用同一个 `buffer` 单独 `new` 一份自己的实例。
 - **`SharedInt32Array` 的按需物化**：`get(index)` 只有在检测到当前处于依赖追踪上下文（`internalsOf(runtime).tracker.isTracking()` 为真，即身处 `Effect`/`Computed` 内部）时才会为该下标创建一个内部的响应式 cell 并登记依赖；在追踪上下文之外调用 `get()`（比如普通同步代码里的一次性读取）走直读路径，不产生任何 cell 对象。
-- **cell 的自动回收**：最后一个观察者退订时，canonical `onUnobserved` 立即回收该 cell。`Effect`/`Computed` 可能在提交观察之前就放弃一次"投机读"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在下一个微任务里检查是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。
+- **cell 的自动回收**：最后一个观察者退订时，canonical `onUnobserved` 立即回收该 cell。`Effect`/`Computed` 可能在提交观察之前就放弃一次"投机读"（比如 `Computed` 重新计算时依赖发生了变化）。为此新物化的 cell 会在所属 Runtime 的 idle 清理阶段检查（默认微任务）是否仍有订阅者，没有就自动断开并从内部 Map 里移除，不需要手动处理。
 
 ---
 
@@ -490,3 +490,7 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 ```
 
 测试覆盖 seqlock 一致读、跨 Runtime 同步、`watch()` 生命周期、数组稀疏同步与错误码（`test/shared-state.test.ts`、`test/error-code.test.ts`）。
+
+`watch(scheduler?: IScheduler)` captures an injected scheduler on the first watch call; it defaults to `systemScheduler`. The scheduler owns zero-delay yielding and cancellation between waitAsync wakeups. Repeated calls return the active stop handle and retain its scheduler. Errors are reported only through the owning Runtime. Abandoned cells use that Runtime idle channel (default microtasks).
+
+Import `IScheduler` or `systemScheduler` from `@migaia/utils/scheduler` when supplying the optional watch timer owner.

@@ -2247,7 +2247,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 items: [
                   'Effect/Computed 中 get(index) 才物化 Cell。',
                   '追踪外 get 走轻量一致读。',
-                  '放弃的投机读取会在微任务检查后自动回收无订阅 Cell。',
+                  '放弃的投机读取交给所属 Runtime 的 idle 清理（默认微任务）。',
                   '高频轮换下标的 cell 在最后一个观察者退订后自动释放。'
                 ]
               }
@@ -9885,7 +9885,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\n\nconst loadStatus = async () => 'ready' as const\nconst store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.status = next\n    }\n  },\n  { warnAsyncActions: true }\n)\n\nawait store.refresh()\nconsole.log(store.status)\nawait store.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\n\nconst loadStatus = async () => 'ready' as const\nconst store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.$batch((draft) => { draft.status = next })\n    }\n  },\n  { warnAsyncActions: true }\n)\n\nawait store.refresh()\nconsole.log(store.status)\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -9969,7 +9969,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\n\nconst loadStatus = async () => 'ready' as const\nconst store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.status = next\n    }\n  },\n  { warnAsyncActions: true }\n)\n\nawait store.refresh()\nconsole.log(store.status)\nawait store.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\n\nconst loadStatus = async () => 'ready' as const\nconst store = createStore(\n  {\n    status: 'idle',\n    async refresh() {\n      this.status = 'loading'\n      const next = await loadStatus()\n      this.$batch((draft) => { draft.status = next })\n    }\n  },\n  { warnAsyncActions: true }\n)\n\nawait store.refresh()\nconsole.log(store.status)\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',

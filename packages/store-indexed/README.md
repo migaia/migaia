@@ -314,3 +314,5 @@ pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test &
 ```bash
 pnpm run typecheck:e2e && pnpm run test:e2e
 ```
+
+Abandoned speculative cells use their owning Runtime idle channel (`scheduleIdle`, default microtasks). Observed cells still follow the canonical observer lifecycle.

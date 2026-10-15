@@ -66,7 +66,7 @@ store.count // 1
 
 - `runtime?: IRuntime` —— 默认 `defaultRuntime`；显式隔离运行时（SSR 每请求、单测、多 root 互不串状态）
 - `debugName?: string` —— 默认 `'Store'`；仅用作内部节点 `debugName` 前缀，不参与语义
-- `warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `console.warn` 提示"只有首个 await 之前的写入被自动 batch"
+- `warnAsyncActions?: boolean` —— 默认 `false`；开启后若某个 Action 返回 thenable（即 async 方法），首次调用 `Runtime.reportError` (`ACTION_BATCH_BOUNDARY`) 提示"只有首个 await 之前的写入被自动 batch"
 - `mutationPolicy?: IMutationPolicy` —— 默认无；接入 MobX 风格的严格写入守卫（见 [USEGUIDE §7](./USEGUIDE.md#7-写入守卫imutationguard--imutationpolicy)）
 
 **`createAsyncStore`｜10 秒上手** —— 定义里含异步 `FieldBuilder` 时使用，返回的 Promise resolve 时全部字段已就绪：
@@ -262,6 +262,8 @@ userResource.preload() // 提前触发加载
 
 第二参数 `IStoreResourceOptions<T>` 全部字段（也可作为第一参数对象形式 `{ load, ...options }` 传入）：
 
+- `runtime?: IRuntime` - owns idle cleanup and diagnostics; defaults to the lazy shared Runtime.
+- `scheduler?: IScheduler` - owns cache and provisional-capture timers; defaults to `systemScheduler`, admitted once at creation.
 - `keepAliveMs?: number` —— 默认 `1000`；无持有者之后缓存值继续存活的毫秒数，必须是有限非负数
 - `dispose?: (value: T) => void | PromiseLike<void>` —— 自定义清理；提供后值必须是引用类型，否则抛 `TypeError`；不提供时若值自带 `$dispose` 方法会自动调用
 - `onError?: (error: unknown, phase: 'load' | 'dispose' | 'listener') => void` —— 观察三个阶段的失败
@@ -399,3 +401,7 @@ pnpm run typecheck:e2e && pnpm run test:e2e
 ```
 
 单独导入 Store light 不创建默认 Runtime。第一次未显式传入 `options.runtime` 的 store 创建才取得 reactive 的共享默认实例；显式 runtime 的构造路径直接使用给定 owner。该实例与随后导入 reactive root 的 `defaultRuntime` 保持同一 identity。
+
+Store Actions keep their original return value or Promise outside the synchronous mutation callback. Only writes before the first await share that batch; use `$batch()` for continuation writes. Mutation-policy callbacks remain synchronous. With `warnAsyncActions`, the first thenable result reports `ACTION_BATCH_BOUNDARY` through the Store Runtime.
+
+StoreResource uses its captured Runtime for idle cleanup and diagnostics, and its admitted scheduler for cache TTL and the 4000ms provisional capture window. `keepAliveMs: 0` still evicts synchronously. Missing `onError` forwards the original failure to Runtime; if a user reporter throws or rejects, both the primary and reporter failure reach that sink by identity. No host console or global reportError fallback is used.

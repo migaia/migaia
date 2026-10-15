@@ -27,3 +27,16 @@ export type IStoreResourceDataKind =
   (typeof StoreResourceDataKind)[keyof typeof StoreResourceDataKind]
 export type IStoreInitializationStatus =
   (typeof StoreInitializationStatus)[keyof typeof StoreInitializationStatus]
+
+/** Stable failure phases passed to StoreResource user diagnostics. */
+export const StoreResourceErrorPhase = {
+  /** Loading or validating a factory-produced value failed. */
+  load: 'load',
+  /** Releasing a value or invoking terminal housekeeping failed. */
+  dispose: 'dispose',
+  /** Publishing a revision reached a throwing or rejecting subscriber. */
+  listener: 'listener'
+} as const
+
+/** Diagnostic phase keys shared by the StoreResource callback contract. */
+export type StoreResourceErrorPhase = keyof typeof StoreResourceErrorPhase

@@ -1,46 +1,47 @@
+import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import { createStoreLightRangeError, StoreLightErrorCode } from './errors.js'
 import { StoreLightErrorText } from './error-text.js'
 
-/** Maximum single delay accepted by Web/Node timers. */
-const MAX_TIMER_DELAY_MS = 2_147_483_647
-
+/** Owns a cache expiry task; the canonical scheduler owns host timers and long-delay segmentation. */
 export class ResourceCachePolicy {
+  /** Cache duration admitted before any timer or value is owned. */
   readonly #keepAliveMs: number
-  /** Absolute eviction deadline retained so oversized delays can be segmented safely. */
-  #evictionAt = 0
-  #evictionTimer: ReturnType<typeof setTimeout> | undefined
+  /** The resource factory already admitted and captured these scheduler methods. */
+  readonly #scheduler: IScheduler
+  /** One cancelable expiry, cleared before user eviction can reenter this policy. */
+  #evictionTimer: IScheduledTask | undefined
 
-  constructor(keepAliveMs: number) {
+  /** Accepts one finite TTL and the resource factory's admitted timer owner. */
+  constructor(keepAliveMs: number, scheduler: IScheduler = systemScheduler) {
     if (!Number.isFinite(keepAliveMs) || keepAliveMs < 0)
       throw createStoreLightRangeError(
         StoreLightErrorCode.invalidOption,
         StoreLightErrorText.keepAlive
       )
     this.#keepAliveMs = keepAliveMs
+    this.#scheduler = scheduler
   }
 
+  /** Replaces the previous expiry while retaining the existing synchronous zero-TTL boundary. */
   scheduleEviction(evict: () => void): void {
     this.cancelEviction()
-    this.#evictionAt = Date.now() + this.#keepAliveMs
-    const arm = (): void => {
-      const remaining = this.#evictionAt - Date.now()
-      if (remaining <= 0) {
-        this.#evictionTimer = undefined
-        evict()
-        return
-      }
-      this.#evictionTimer = setTimeout(arm, Math.min(MAX_TIMER_DELAY_MS, remaining))
+    if (this.#keepAliveMs === 0) {
+      evict()
+      return
     }
-    arm()
+    this.#evictionTimer = this.#scheduler.schedule(() => {
+      this.#evictionTimer = undefined
+      evict()
+    }, this.#keepAliveMs)
   }
 
+  /** Cancels only this resource's pending cache expiry. */
   cancelEviction(): void {
-    if (this.#evictionTimer === undefined) return
-    clearTimeout(this.#evictionTimer)
+    this.#evictionTimer?.cancel()
     this.#evictionTimer = undefined
-    this.#evictionAt = 0
   }
 
+  /** Ends cache housekeeping without owning the cached value's disposal. */
   dispose(): void {
     this.cancelEviction()
   }

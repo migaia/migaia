@@ -31,6 +31,7 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
   },
   "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
     "@migaia/reactive": "workspace:^",
     "@migaia/utils": "workspace:^"
   },

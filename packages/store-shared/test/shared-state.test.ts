@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
+import { createManualScheduler } from '@migaia/utils/scheduler'
 import { sharedInt32, sharedInt32Array } from '../src/shared-state'
 
 /** Runs notifications immediately so cross-runtime assertions observe committed writes. */
@@ -781,6 +782,31 @@ describeShared('waitAsync 推送：远端写入不必靠 pump', () => {
       if (original !== undefined) {
         ;(Atomics as unknown as { waitAsync: unknown }).waitAsync = original
       }
+    }
+  })
+})
+
+describeShared('ST-C5 watch scheduler ownership', () => {
+  it('uses and cancels an injected scheduler for both watch loops', () => {
+    const scheduler = createManualScheduler()
+    const wait = vi
+      .spyOn(Atomics, 'waitAsync')
+      .mockReturnValue({ async: false, value: 'not-equal' } as never)
+    const signal = sharedInt32(syncRuntime(), 0)
+    const array = sharedInt32Array(syncRuntime(), 1)
+    try {
+      const stopSignal = signal.watch(scheduler)
+      const stopArray = array.watch(scheduler)
+      expect(scheduler.pendingCount).toBe(2)
+      expect(signal.watch()).toBe(stopSignal)
+      expect(array.watch()).toBe(stopArray)
+      stopSignal()
+      stopArray()
+      expect(scheduler.pendingCount).toBe(0)
+    } finally {
+      signal.dispose()
+      array.dispose()
+      wait.mockRestore()
     }
   })
 })
