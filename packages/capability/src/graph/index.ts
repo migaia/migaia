@@ -311,7 +311,8 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
     node.token = requestToken
     const provisional = createProvisionalScope({ parentSignal: requestSignal })
     const declared = new Set(node.dependencies.map((dependency) => dependency.provider))
-    const auxiliaryResources: unknown[] = []
+    /** Identity lookup avoids rescanning every admitted auxiliary resource for the primary value. */
+    const auxiliaryResources = new Set<unknown>()
     let contextActive = true
     const assertContextActive = (): void => {
       if (
@@ -364,7 +365,8 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
         }
       })
       const owned = provisional.own(resource, orderedDescriptor)
-      auxiliaryResources.push(resource)
+      // The previous strict-equality scan never matched NaN; preserve that supported primitive case.
+      if (!Number.isNaN(resource)) auxiliaryResources.add(resource)
       return owned
     }
     const context: IGraphStartContext = {
@@ -418,7 +420,7 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
       if (result === null || typeof result !== 'object' || typeof release !== 'function')
         throw fail(CapabilityGraphErrorCode.invalidNode, { nodeId: node.id })
       const releaseMethod = release as IGraphNodeInstance<unknown>['release']
-      if (auxiliaryResources.some((resource) => resource === value))
+      if (auxiliaryResources.has(value))
         throw fail(CapabilityGraphErrorCode.invalidNode, { nodeId: node.id })
       if (!generations.isCurrent(requestToken) || graphState !== CapabilityGraphState.starting) {
         await provisional.rollback()
