@@ -116,7 +116,7 @@ scope.own(handle, {
   graceful: (ctx) => flush(), // 优雅释放；异步超时只放弃等待，仍会跑 force；同步返回即算成功
   gracefulTimeoutMs: 200,
   force: (ctx) => handle.close(), // 必填，必须无条件完成
-  gcFallback: true // 显式释放时自动 unregister 的 FinalizationRegistry 兜底
+  gcFallback: true // 遗忘整个异步 scope 后的尽力 GC 兜底；显式释放会 unregister
 })
 ```
 
