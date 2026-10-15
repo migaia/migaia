@@ -159,3 +159,6 @@ pnpm add @migaia/resource
 5. **默认 `keepAlive: false` 时，Resource 长时间无人观察会自动休眠**（清理依赖登记、让缓存过期），下次被观察时会重新发起请求；需要"没人看也保持热数据"就显式传 `keepAlive: true`。
 
 更完整的配置项、每个 API 的精确语义、错误与异常的完整表格、生产级示例，见 **[USEGUIDE.md](./USEGUIDE.md)**。
+
+
+同一请求在所有 Suspense 等待阶段复用同一个 pending Promise。fetcher 抛出的 thenable 完成后，经注入 scheduler 的 0ms 任务继续执行；Suspense 不计入 retry 次数，也不设计数上限。即使 fetcher 连续抛立即完成的 thenable，取消任务仍可执行，cancel/dispose 会停止后续调用。
