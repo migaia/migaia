@@ -15,6 +15,10 @@
 
 ### Behavior
 
+- Calling lifecycle scope `own()` from outside a synchronous disposer callback
+  while teardown is pending reports `SCOPE_CLOSED`. Previously it incorrectly
+  reported `SCOPE_REENTRANT_OWN`; actual synchronous disposer reentry retains that
+  dedicated code.
 - Lifecycle callback-result observation uses the canonical utils thenable
   boundary. It still reads `.then` once and preserves its receiver. A reporter
   throwing while handling a throwing `.then` getter is contained, consistently

@@ -94,13 +94,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
   }>()
   let nextId = 0
   let disposePromise: Promise<readonly ICollectedError[]> | undefined
-  /**
-   * True for the whole duration of the teardown loop (from the first item's release call to the
-   * last). Reentrant `own()`/`dispose()` calls made from inside a disposer happen while this is
-   * true; the throw they trigger propagates up through that disposer's own await/try, so normal
-   * call-stack unwinding — not per-item bookkeeping here — attributes the error to the right item.
-   */
-  let currentlyReleasing = false
+  /** Marks only the active disposer call frame, so unrelated callers observe the scope state. */
   let activeDisposerSynchronously = false
 
   /** Invokes one user callback while marking only its synchronous call frame as active. */
@@ -172,7 +166,7 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
   }
 
   const own = <T>(resource: T, descriptor: IReleaseDescriptor): T => {
-    if (currentlyReleasing) {
+    if (activeDisposerSynchronously) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeReentrantOwn,
         LifecycleErrorText.scopeReentrantOwn
@@ -247,10 +241,6 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
     // Every one of these is about to be explicitly released by the transaction below; the
     // GC-fallback finalizer must not also fire for any of them afterward.
     for (const entry of snapshot) unregisterGcFallback(entry.unregisterToken)
-    // Only meaningful when there is at least one disposer to run — an empty scope never invokes
-    // user code, so a second concurrent dispose() call on it is unambiguously not reentrant with
-    // respect to any disposer and must reuse the same promise (L-T29).
-    currentlyReleasing = snapshot.length > 0
     try {
       const transaction = createDisposeTransaction(
         { kind: DisposeTransactionKind.order },
@@ -271,7 +261,6 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
         }))
       )
     } finally {
-      currentlyReleasing = false
       terminal.forceTerminal()
     }
   }

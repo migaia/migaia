@@ -59,7 +59,7 @@ describe('L-T2 LifecycleScope: own/release/dispose', () => {
         'b',
         forceDescriptor(() => {})
       )
-    ).toThrowError(expect.objectContaining({ code: LifecycleErrorCode.scopeReentrantOwn }))
+    ).toThrowError(expect.objectContaining({ code: LifecycleErrorCode.scopeClosed }))
     await disposePromise
     expect(() =>
       scope.own(
