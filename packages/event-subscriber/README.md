@@ -428,6 +428,8 @@ channel.subscribe((event) => {
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
 ```
 
-### channel 移除策略
+### 固定 Hub 策略与 channel 移除策略
+
+Hub 的内部 channel 固定使用 recursive 派发、multiple 准入、handle 移除、每次 publish 100000 listener 调用预算及非严格 aborted 准入；它不暴露内部 channel，也不接受单 channel 的策略配置。需要选择 dispatchPolicy、admissionPolicy、publishBudget 或 throwOnAborted 时，直接创建 channel。
 
 `EventRemovalPolicy.handle` 仅释放当前 registration；`EventRemovalPolicy.listenerAll` 释放相同 listener identity 的全部登记。logger hook 会复用同一 hook 对应的 listener，所以 listenerAll 在真实 hook 注销路径生效。
