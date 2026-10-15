@@ -3043,7 +3043,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错"
+                  "code": "const snap = snapshotScheduler(candidate) // 缺少必要方法时返回 undefined；getter 或已提供的 defer 无效时抛出带码错误"
                 },
                 {
                   "type": "paragraph",
@@ -3406,6 +3406,10 @@
                 {
                   "type": "paragraph",
                   "text": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Scheduler admission also captures the optional `defer` method once and retains its original receiver. Existing two-method clocks remain usable. A new optional-method getter failure or non-callable defer is rejected with lifecycle INVALID_OPTION before resource work starts. Strict proxies must permit this known property; returned snapshots expose the captured capability when present."
                 }
               ]
             }
@@ -4714,6 +4718,20 @@
                 {
                   "type": "paragraph",
                   "text": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。"
+                }
+              ]
+            },
+            {
+              "id": "deferred-method-capture",
+              "heading": "Deferred method capture",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`resolveScheduler`/`snapshotScheduler` preserve an admitted `IScheduler.defer` alongside now/schedule. Later method replacement cannot redirect registered owners; raw getters are read during admission. Missing required methods still make snapshotScheduler return undefined, while getter failures preserve cause and a supplied malformed deferred method throws a coded TypeError."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "This does not add a second clock or alter deadline cancellation. A legacy object may omit defer and use the utils deferred helper's zero-delay fallback."
                 }
               ]
             }
@@ -11935,6 +11953,20 @@
                   "text": "完整用法见 USEGUIDE。"
                 }
               ]
+            },
+            {
+              "id": "deferred-scheduling-ownership",
+              "heading": "Deferred scheduling ownership",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Memory transport delivery and deferred remote/governor control work use the existing scheduler contract. Default scheduling retains native microtasks. `createMemoryTransportPair({ scheduler })` controls only pair delivery; endpoint deadline clocks remain a separate constructor choice. Injected manual clocks must advance zero-time work for deferred reconciliation, departure notifications and policy close."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Ordinary deadline `schedule(0)` behavior is unchanged."
+                }
+              ]
             }
           ]
         },
@@ -13031,6 +13063,25 @@
                   "code": "import { defineProbe, readProbeStages, subscribeProbeStages } from '@migaia/rpc-core/probe'\n\n/** 冷控制读取实际订阅；host 的初始公开字段不作为当前状态。 */\nconst probe = defineProbe({ stages: ['message'], emit() {} }, {})\n/** 解除控制订阅不改变业务资源或 Probe 身份。 */\nconst release = subscribeProbeStages(probe, () => console.log(readProbeStages(probe)))\nprobe.setStages(['message', 'carrier'])\nconsole.log(readProbeStages(probe)) // 66\nrelease()"
                 }
               ]
+            },
+            {
+              "id": "controlling-asynchronous-memory-delivery",
+              "heading": "Controlling asynchronous memory delivery",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst clock = createManualScheduler()\nconst [sender, receiver] = createMemoryTransportPair({ scheduler: clock })\nconst messages: unknown[] = []\nconst stop = receiver.subscribe(({ data }) => { messages.push(data) })\nsender.send('payload')\nclock.advance(0)\nconsole.log(messages) // ['payload']\nstop()\nawait sender.close()"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "This is a deterministic in-process adapter example. The factory returns both transport ends, not one endpoint transport. Its optional scheduler is captured before subscriptions are acquired. Zero-argument construction keeps the original delivery-before-later-Promise order. Remote bindings and provider governors defer through their own already captured scheduler; custom clocks own those control jobs as well as timers."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "An old two-method clock receives deferred jobs through schedule(callback,0); drive it while awaiting manually controlled setup/readiness. Deferred notifications keep their existing post-close checks and callback error reporting."
+                }
+              ]
             }
           ]
         }
@@ -13549,6 +13600,10 @@
                 {
                   "type": "paragraph",
                   "text": "只依赖 rpc-core、rpc-process、rpc-threads 的公开入口。没有工作窃取、跨机器池或另一套 RPC/native supervision。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Pool options accept `scheduler?: IScheduler` for idle retirement. This controls the pool's own timers, while Peer restart/deadline policy still belongs to the original spawn sources. Idle handles cancel on reservation, retirement and close, and request optional unref so housekeeping alone does not keep a host alive. Current idleTimeoutMs bounds remain unchanged."
                 }
               ]
             }
@@ -13623,6 +13678,20 @@
                 {
                   "type": "paragraph",
                   "text": "支持环境继承原工厂。当前文档执行使用 Node 24 的真实 Process/Worker；Bun、Deno、浏览器线程仍受原入口、权限与 native lifetime 限制，不把 Node 文档结果当作其他运行时验证。"
+                }
+              ]
+            },
+            {
+              "id": "idle-clock-injection",
+              "heading": "Idle clock injection",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Pass a host or manual scheduler in the common options of createThreadPool/createProcessPool. The option and scheduler methods are captured before invoking a native Peer factory. Advancing a manual clock drives idle expiry; reserving a member and closing the pool remove their previous tasks. Task unref is a liveness hint, not a change to timeout duration."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Native Peer methods and close results retain their original ownership and identity. This option does not replace a member's own supervision scheduler."
                 }
               ]
             }
@@ -35630,6 +35699,21 @@
                   "code": "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
                 }
               ]
+            },
+            {
+              "id": "deferred-scheduler-work",
+              "heading": "Deferred scheduler work",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`deferTask(scheduler, callback)` registers a non-cancellable asynchronous job. `systemScheduler` uses a native microtask; manual clocks run it at the existing zero-time deadline when advanced. A scheduler with only `now`/`schedule` still works through its zero-delay registration. The separate `schedule(callback, 0)` timer behavior stays unchanged."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'\n\nconst clock = createManualScheduler()\nlet delivered = false\ndeferTask(clock, () => { delivered = true })\nconsole.log(delivered) // false\nclock.advance(0)\nconsole.log(delivered) // true"
+                }
+              ]
             }
           ]
         },
@@ -36827,6 +36911,28 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
+                }
+              ]
+            },
+            {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
                 }
               ]
             }

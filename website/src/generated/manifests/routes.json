@@ -5691,6 +5691,12 @@
       "library": "rpc-core"
     },
     {
+      "path": "/en/docs/rpc-core/api/adapters/memory/IMemoryTransportOptions",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
       "path": "/en/docs/rpc-core/api/adapters/memory/createMemoryTransportPair",
       "locale": "en",
       "domain": "docs",
@@ -15225,6 +15231,12 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/api/scheduler/deferTask",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/api/scheduler/systemScheduler",
       "locale": "en",
       "domain": "docs",
@@ -21184,6 +21196,12 @@
     },
     {
       "path": "/zh/docs/rpc-core/api/adapters/memory/IMemoryTransport",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/zh/docs/rpc-core/api/adapters/memory/IMemoryTransportOptions",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
@@ -30718,6 +30736,12 @@
     },
     {
       "path": "/zh/docs/utils/api/scheduler/createManualScheduler",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/scheduler/deferTask",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"

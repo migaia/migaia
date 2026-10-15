@@ -1070,6 +1070,21 @@
                 "code": "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
               }
             ]
+          },
+          {
+            "id": "deferred-scheduler-work",
+            "heading": "Deferred scheduler work",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`deferTask(scheduler, callback)` registers a non-cancellable asynchronous job. `systemScheduler` uses a native microtask; manual clocks run it at the existing zero-time deadline when advanced. A scheduler with only `now`/`schedule` still works through its zero-delay registration. The separate `schedule(callback, 0)` timer behavior stays unchanged."
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'\n\nconst clock = createManualScheduler()\nlet delivered = false\ndeferTask(clock, () => { delivered = true })\nconsole.log(delivered) // false\nclock.advance(0)\nconsole.log(delivered) // true"
+              }
+            ]
           }
         ]
       },
@@ -2269,6 +2284,28 @@
                 "code": "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
               }
             ]
+          },
+          {
+            "id": "defertask-and-optional-deferred-capability",
+            "heading": "deferTask and optional deferred capability",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+              },
+              {
+                "type": "paragraph",
+                "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+              },
+              {
+                "type": "paragraph",
+                "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+              },
+              {
+                "type": "paragraph",
+                "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+              }
+            ]
           }
         ]
       }
@@ -3047,6 +3084,16 @@
           "ownerFragment": "utils-promise--deferred"
         },
         {
+          "identity": "packages/utils/dist/scheduler.d.ts:deferTask:export declare function deferTask(scheduler: IScheduler, callback: () => void): void;",
+          "name": "deferTask",
+          "signature": "export declare function deferTask(scheduler: IScheduler, callback: () => void): void;",
+          "source": "packages/utils/dist/scheduler.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./scheduler",
+          "ownerModule": "scheduler",
+          "ownerFragment": "utils-scheduler--deferTask"
+        },
+        {
           "identity": "packages/utils/dist/error-chain.d.ts:deserializeErrorChain:export declare function deserializeErrorChain(value: unknown, strategy?: IErrorChainStrategy, options?: INormalizeErrorChainOptions): Error;",
           "name": "deserializeErrorChain",
           "signature": "export declare function deserializeErrorChain(value: unknown, strategy?: IErrorChainStrategy, options?: INormalizeErrorChainOptions): Error;",
@@ -3777,9 +3824,9 @@
           "ownerFragment": "utils-scheduler--IScheduledTask"
         },
         {
-          "identity": "packages/utils/dist/scheduler.d.ts:IScheduler:export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };",
+          "identity": "packages/utils/dist/scheduler.d.ts:IScheduler:export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(callback: () => void): void; };",
           "name": "IScheduler",
-          "signature": "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };",
+          "signature": "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(callback: () => void): void; };",
           "source": "packages/utils/dist/scheduler.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./scheduler",
@@ -19356,6 +19403,28 @@
               ]
             },
             {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            },
+            {
               "id": "error-模块",
               "heading": "/error 模块",
               "blocks": [
@@ -21840,9 +21909,31 @@
                   "code": "const { promise, resolve } = deferred<number>();\nsetTimeout(() => resolve(42), 0);\nawait promise; // 42"
                 }
               ]
+            },
+            {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
             }
           ],
-          "usageScore": 46,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "utils-promise--deferred"
         },
@@ -23084,6 +23175,28 @@
               ]
             },
             {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            },
+            {
               "id": "config-模块",
               "heading": "/config 模块",
               "blocks": [
@@ -23240,7 +23353,7 @@
               ]
             }
           ],
-          "usageScore": 130,
+          "usageScore": 134,
           "configuration": [],
           "fragment": "utils-promise--retry"
         },
@@ -23673,7 +23786,7 @@
           "name": "createManualScheduler",
           "kind": "function",
           "signature": "export declare function createManualScheduler(): IManualScheduler;",
-          "declarationLine": 48,
+          "declarationLine": 60,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Creates a deterministic scheduler over a virtual clock that starts at `0`. Due callbacks run in ascending due time and, for equal due times, registration order; callbacks scheduled during an `advance()` that fall due within it run in the same `advance()`. Arguments are validated and overflow is rejected before any state changes; nested `advance()` calls are rejected so `now()` never moves backwards.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createManualScheduler.",
@@ -23687,7 +23800,8 @@
             "const scheduler = createManualScheduler();\nconst task = scheduler.schedule(() => console.log('fired'), 100);\nscheduler.advance(50); // 未触发\nscheduler.advance(50); // 触发，打印 'fired'",
             "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(initial, { debug: CONFIG_DELETE });\nconst publicConfig = readonlyConfig(next);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return publicConfig.endpoint;\n      },\n      { maxAttempts: publicConfig.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\n\nscheduler.advance(100);\nawait request.catch(() => undefined);",
             "const scheduler = createManualScheduler();\nconst p = withTimeout(op, { timeoutMs: 100, scheduler });\nscheduler.advance(100); // 手动触发超时，无需真实等待",
-            "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);"
+            "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);",
+            "import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'\n\nconst clock = createManualScheduler()\nlet delivered = false\ndeferTask(clock, () => { delivered = true })\nconsole.log(delivered) // false\nclock.advance(0)\nconsole.log(delivered) // true"
           ],
           "members": [],
           "exportPath": "./scheduler",
@@ -23768,15 +23882,127 @@
               ]
             }
           ],
-          "usageScore": 60,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "utils-scheduler--createManualScheduler"
+        },
+        {
+          "name": "deferTask",
+          "kind": "function",
+          "signature": "export declare function deferTask(scheduler: IScheduler, callback: () => void): void;",
+          "declarationLine": 45,
+          "source": "packages/utils/dist/scheduler.d.ts",
+          "purpose": "Register one deferred job through its scheduler receiver. Older two-method schedulers use schedule(callback, 0); default System jobs retain native microtask order. This does not await callback results or create a cancellation owner. Registration failures propagate by identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for deferTask.",
+          "advanced": "No additional advanced behavior is declared for deferTask.",
+          "parameters": ["scheduler: IScheduler", "callback: () => void"],
+          "parameterDetails": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false
+            },
+            {
+              "name": "callback",
+              "type": "() => void",
+              "optional": false
+            }
+          ],
+          "returns": "void",
+          "errors": ["No documented errors are declared for deferTask."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for deferTask.",
+          "examples": [
+            "import { createManualScheduler, deferTask } from '@migaia/utils/scheduler'\n\nconst clock = createManualScheduler()\nlet delivered = false\ndeferTask(clock, () => { delivered = true })\nconsole.log(delivered) // false\nclock.advance(0)\nconsole.log(delivered) // true"
+          ],
+          "members": [],
+          "exportPath": "./scheduler",
+          "overloadSignatures": [
+            "export declare function deferTask(scheduler: IScheduler, callback: () => void): void;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "scheduler",
+                "type": "IScheduler",
+                "optional": false
+              },
+              {
+                "name": "callback",
+                "type": "() => void",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["void"],
+          "whenToUse": "Use deferTask when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when deferTask does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Register one deferred job through its scheduler receiver. Older two-method schedulers use schedule(callback, 0); default System jobs retain native microtask order. This does not await callback results or create a cancellation owner. Registration failures propagate by identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import deferTask from @migaia/utils/scheduler, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use deferTask when its function contract and declared inputs match the result you need. Choose a different public symbol when deferTask does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for deferTask."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for deferTask."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/scheduler.d.ts:deferTask:export declare function deferTask(scheduler: IScheduler, callback: () => void): void;",
+          "guidance": [
+            {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            }
+          ],
+          "usageScore": 28,
+          "configuration": [],
+          "fragment": "utils-scheduler--deferTask"
         },
         {
           "name": "IManualScheduler",
           "kind": "type",
           "signature": "export type IManualScheduler = IScheduler & { advance(ms: number): void; readonly pendingCount: number; };",
-          "declarationLine": 23,
+          "declarationLine": 29,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Deterministic scheduler for tests and simulations. `advance(ms)` moves virtual time forward and synchronously flushes due callbacks; `pendingCount` counts tasks neither run nor cancelled.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IManualScheduler.",
@@ -23906,7 +24132,7 @@
         {
           "name": "IScheduler",
           "kind": "type",
-          "signature": "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };",
+          "signature": "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(callback: () => void): void; };",
           "declarationLine": 15,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "The only scheduler contract. `now()` is monotonic non-decreasing milliseconds (two reads may be equal) and is only meaningful as a difference. `schedule()` accepts a finite non-negative `delayMs`, runs the callback at most once, and never runs it synchronously inside `schedule()`.",
@@ -23927,7 +24153,7 @@
           "members": [],
           "exportPath": "./scheduler",
           "overloadSignatures": [
-            "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };"
+            "export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(callback: () => void): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -23966,9 +24192,32 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/utils/dist/scheduler.d.ts:IScheduler:export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; };",
-          "guidance": [],
-          "usageScore": 72,
+          "identity": "packages/utils/dist/scheduler.d.ts:IScheduler:export type IScheduler = { now(): number; schedule(callback: () => void, delayMs: number): IScheduledTask; /** * Optional non-cancellable deferred job registration. System uses native microtasks; manual * clocks use their existing zero-time queue. Registration is synchronous, callbacks are * asynchronous and any returned callback Promise belongs to its caller. */ defer?(callback: () => void): void; };",
+          "guidance": [
+            {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            }
+          ],
+          "usageScore": 76,
           "configuration": [],
           "fragment": "utils-scheduler--IScheduler"
         },
@@ -23976,7 +24225,7 @@
           "name": "IWallClock",
           "kind": "type",
           "signature": "export type IWallClock = { timestamp(): number; };",
-          "declarationLine": 31,
+          "declarationLine": 37,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Wall clock for diagnostic timestamps only. `timestamp()` returns epoch milliseconds as a safe integer and must never take part in deadline, expiry, or replay-window comparisons.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IWallClock.",
@@ -24040,7 +24289,7 @@
           "name": "systemScheduler",
           "kind": "const",
           "signature": "export declare const systemScheduler: IScheduler;",
-          "declarationLine": 40,
+          "declarationLine": 52,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Default scheduler: `performance.now()` as the monotonic clock and host `setTimeout` / `clearTimeout` for timers. Host capabilities are checked lazily on each call and a missing or non-finite capability fails with `ENV_UNSUPPORTED` instead of silently degrading. The object is deliberately a plain mutable object so tests can spy on its methods.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for systemScheduler.",
@@ -24097,8 +24346,31 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/utils/dist/scheduler.d.ts:systemScheduler:export declare const systemScheduler: IScheduler;",
-          "guidance": [],
-          "usageScore": 38,
+          "guidance": [
+            {
+              "id": "defertask-and-optional-deferred-capability",
+              "heading": "deferTask and optional deferred capability",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Resource retry/Suspense yields continue using the ordinary timer API."
+                }
+              ]
+            }
+          ],
+          "usageScore": 44,
           "configuration": [],
           "fragment": "utils-scheduler--systemScheduler"
         },
@@ -24106,7 +24378,7 @@
           "name": "systemWallClock",
           "kind": "const",
           "signature": "export declare const systemWallClock: IWallClock;",
-          "declarationLine": 50,
+          "declarationLine": 62,
           "source": "packages/utils/dist/scheduler.d.ts",
           "purpose": "Default wall clock: `Date.now()` epoch milliseconds, for diagnostic timestamps only.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for systemWallClock.",

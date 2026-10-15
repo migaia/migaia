@@ -59552,6 +59552,36 @@
       "type": "architecture-symbol"
     },
     {
+      "from": "/en/docs/rpc-core/api/adapters/memory",
+      "to": "/en/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "to": "/en/docs/rpc-core/api/adapters/memory",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "to": "/en/docs/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/rpc-core/getting-started",
+      "to": "/en/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "to": "/en/docs/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/rpc-core",
+      "to": "/en/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "type": "architecture-symbol"
+    },
+    {
       "from": "/zh/docs/rpc-core/api/adapters/memory",
       "to": "/zh/docs/rpc-core/getting-started",
       "type": "api-guide"
@@ -59629,6 +59659,36 @@
     {
       "from": "/zh/docs/rpc-core",
       "to": "/zh/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransport",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/api/adapters/memory",
+      "to": "/zh/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "to": "/zh/docs/rpc-core/api/adapters/memory",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "to": "/zh/docs/rpc-core/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/rpc-core/getting-started",
+      "to": "/zh/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
+      "to": "/zh/docs/rpc-core",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/rpc-core",
+      "to": "/zh/docs/rpc-core/api/adapters/memory#rpc-core-adapters/memory--IMemoryTransportOptions",
       "type": "architecture-symbol"
     },
     {
@@ -135792,6 +135852,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/utils/api#deferTask",
+      "to": "/en/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "to": "/en/docs/utils/api#deferTask",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/utils/api#deserializeErrorChain",
       "to": "/en/docs/utils/api/error#utils-error--deserializeErrorChain",
       "type": "symbol-alias"
@@ -137519,6 +137589,16 @@
     {
       "from": "/zh/docs/utils/api/promise#utils-promise--deferred",
       "to": "/zh/docs/utils/api#deferred",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api#deferTask",
+      "to": "/zh/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "to": "/zh/docs/utils/api#deferTask",
       "type": "alias-symbol"
     },
     {
@@ -147743,6 +147823,36 @@
     },
     {
       "from": "/en/docs/utils/api/scheduler",
+      "to": "/en/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "to": "/en/docs/utils/api/scheduler",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "to": "/en/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/utils/getting-started",
+      "to": "/en/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "to": "/en/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/scheduler",
       "to": "/en/docs/utils/api/scheduler#utils-scheduler--IManualScheduler",
       "type": "api-symbol"
     },
@@ -147969,6 +148079,36 @@
     {
       "from": "/zh/docs/utils",
       "to": "/zh/docs/utils/api/scheduler#utils-scheduler--createManualScheduler",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/scheduler",
+      "to": "/zh/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "to": "/zh/docs/utils/api/scheduler",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "to": "/zh/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/utils/getting-started",
+      "to": "/zh/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/scheduler#utils-scheduler--deferTask",
+      "to": "/zh/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils/api/scheduler#utils-scheduler--deferTask",
       "type": "architecture-symbol"
     },
     {

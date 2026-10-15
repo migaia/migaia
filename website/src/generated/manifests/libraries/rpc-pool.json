@@ -96,6 +96,10 @@
               {
                 "type": "paragraph",
                 "text": "只依赖 rpc-core、rpc-process、rpc-threads 的公开入口。没有工作窃取、跨机器池或另一套 RPC/native supervision。"
+              },
+              {
+                "type": "paragraph",
+                "text": "Pool options accept `scheduler?: IScheduler` for idle retirement. This controls the pool's own timers, while Peer restart/deadline policy still belongs to the original spawn sources. Idle handles cancel on reservation, retirement and close, and request optional unref so housekeeping alone does not keep a host alive. Current idleTimeoutMs bounds remain unchanged."
               }
             ]
           }
@@ -170,6 +174,20 @@
               {
                 "type": "paragraph",
                 "text": "支持环境继承原工厂。当前文档执行使用 Node 24 的真实 Process/Worker；Bun、Deno、浏览器线程仍受原入口、权限与 native lifetime 限制，不把 Node 文档结果当作其他运行时验证。"
+              }
+            ]
+          },
+          {
+            "id": "idle-clock-injection",
+            "heading": "Idle clock injection",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Pass a host or manual scheduler in the common options of createThreadPool/createProcessPool. The option and scheduler methods are captured before invoking a native Peer factory. Advancing a manual clock drives idle expiry; reserving a member and closing the pool remove their previous tasks. Task unref is a liveness hint, not a change to timeout duration."
+              },
+              {
+                "type": "paragraph",
+                "text": "Native Peer methods and close results retain their original ownership and identity. This option does not replace a member's own supervision scheduler."
               }
             ]
           }
@@ -269,7 +287,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-pool/dist/index.d.ts:createProcessPool:export declare function createProcessPool<TRemote = Record<never, never>>(options: IProcessPoolOptions): Promise<IProcessPool<TRemote>>;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "rpc-pool-index--createProcessPool"
         },
@@ -348,7 +366,7 @@
           "declaredConfiguration": [],
           "identity": "packages/rpc-pool/dist/index.d.ts:createThreadPool:export declare function createThreadPool<TRemote = Record<never, never>>(options: IThreadPoolOptions): Promise<IThreadPool<TRemote>>;",
           "guidance": [],
-          "usageScore": 34,
+          "usageScore": 38,
           "configuration": [],
           "fragment": "rpc-pool-index--createThreadPool"
         },
@@ -356,7 +374,7 @@
           "name": "IProcessPool",
           "kind": "type",
           "signature": "export type IProcessPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createProcessPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;",
-          "declarationLine": 21,
+          "declarationLine": 22,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Process call options retain the public owner's prohibition on native transfer lists.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessPool.",
@@ -420,7 +438,7 @@
           "name": "IProcessPoolOptions",
           "kind": "type",
           "signature": "export type IProcessPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>; /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeProcessPeerOptions['probe']; }>;",
-          "declarationLine": 35,
+          "declarationLine": 38,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Every Process member receives this exact original source value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IProcessPoolOptions.",
@@ -484,7 +502,7 @@
           "name": "IRpcPoolControls",
           "kind": "type",
           "signature": "export type IRpcPoolControls = Readonly<{ stats(): IRpcPoolStats; resize(size: number): Promise<void>; close(): Promise<void>; }>;",
-          "declarationLine": 13,
+          "declarationLine": 14,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Pool controls own only the Peers created by their corresponding public factory.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolControls.",
@@ -612,7 +630,7 @@
           "name": "IRpcPoolStats",
           "kind": "type",
           "signature": "export type IRpcPoolStats = Readonly<{ targetSize: number; memberCount: number; inFlight: number; queued: number; state: RpcPoolState; }>;",
-          "declarationLine": 5,
+          "declarationLine": 6,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "This snapshot measures pool client slots and FIFO entries, never provider concurrency.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRpcPoolStats.",
@@ -676,7 +694,7 @@
           "name": "IThreadPool",
           "kind": "type",
           "signature": "export type IThreadPool<TRemote = Record<never, never>> = Pick<Awaited<ReturnType<typeof createThreadPeer<TRemote>>>, 'request' | 'notify' | 'stream'> & IRpcPoolControls;",
-          "declarationLine": 19,
+          "declarationLine": 20,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Thread payload, method and transfer types remain exactly those of its public Peer.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPool.",
@@ -740,7 +758,7 @@
           "name": "IThreadPoolOptions",
           "kind": "type",
           "signature": "export type IThreadPoolOptions = IRpcPoolOptions & Readonly<{ spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>; /** Every member receives the same source probe without cloning its handle. */ probe?: IRuntimeThreadPeerOptions['probe']; }>;",
-          "declarationLine": 29,
+          "declarationLine": 32,
           "source": "packages/rpc-pool/dist/types.d.ts",
           "purpose": "Every Thread member receives this exact original source value.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IThreadPoolOptions.",
