@@ -181080,8 +181080,8 @@
               "name": "stop",
               "type": "{ /** Optional cancellable drain callback invoked before profile-specific termination. */ readonly beforeTerminate?: (unit: THandle, signal: IAbortSignal, remainingMs: () => number) => PromiseLike<void>; /** Maximum application drain time before termination proceeds; defaults to 5000 milliseconds. */ readonly drainTimeoutMs?: number; /** Maximum wait for graceful actual exit before hard termination; defaults to 5000 milliseconds. */ readonly exitTimeoutMs?: number; /** Maximum wait for actual exit after hard termination; defaults to 5000 milliseconds. */ readonly reapTimeoutMs?: number; }",
               "optional": true,
-              "description": "Ordered shutdown policy for draining application work, requesting exit and finally reaping the * unit.",
-              "descriptionEn": "Ordered shutdown policy for draining application work, requesting exit and finally reaping the * unit.",
+              "description": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit.",
+              "descriptionEn": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit.",
               "descriptionZh": ""
             },
             {
@@ -181160,8 +181160,8 @@
               "name": "isolation",
               "type": "IsolationMode",
               "optional": true,
-              "description": "Requires declared launcher capabilities or explicitly accepts cooperative isolation; defaults * to required.",
-              "descriptionEn": "Requires declared launcher capabilities or explicitly accepts cooperative isolation; defaults * to required.",
+              "description": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit.",
+              "descriptionEn": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit.",
               "descriptionZh": ""
             },
             {
@@ -188312,8 +188312,8 @@
               "name": "restart",
               "type": "{ /** Selects never, on-failure or always restart after exit; defaults to on-failure. */ readonly mode?: RestartMode; /** First automatic restart delay in scheduler milliseconds; defaults to 250. */ readonly initialDelayMs?: number; /** Multiplier for successive restart delays; defaults to 2 and remains bounded by maxDelayMs. */ readonly factor?: number; /** Upper bound on exponential restart delay in milliseconds; defaults to 30000. */ readonly maxDelayMs?: number; /** Maximum restart attempts in the sliding window before the supervisor enters terminal state. */ readonly maxRestarts?: number; /** Sliding scheduler-time window used to count restart attempts; defaults to 60000 milliseconds. */ readonly windowMs?: number; }",
               "optional": true,
-              "description": "Restart mode and bounded exponential backoff after profile-classified retryable exit.",
-              "descriptionEn": "Restart mode and bounded exponential backoff after profile-classified retryable exit.",
+              "description": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit.",
+              "descriptionEn": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit.",
               "descriptionZh": ""
             },
             {
@@ -188392,8 +188392,8 @@
               "name": "stop",
               "type": "{ /** Optional cancellable drain callback invoked before profile-specific termination. */ readonly beforeTerminate?: (unit: THandle, signal: IAbortSignal, remainingMs: () => number) => PromiseLike<void>; /** Maximum application drain time before termination proceeds; defaults to 5000 milliseconds. */ readonly drainTimeoutMs?: number; /** Maximum wait for graceful actual exit before hard termination; defaults to 5000 milliseconds. */ readonly exitTimeoutMs?: number; /** Maximum wait for actual exit after hard termination; defaults to 5000 milliseconds. */ readonly reapTimeoutMs?: number; }",
               "optional": true,
-              "description": "Ordered shutdown policy for draining application work, requesting exit and finally reaping the * unit.",
-              "descriptionEn": "Ordered shutdown policy for draining application work, requesting exit and finally reaping the * unit.",
+              "description": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit.",
+              "descriptionEn": "Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit.",
               "descriptionZh": ""
             },
             {
