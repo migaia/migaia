@@ -33,6 +33,15 @@ export function createResourceError(
  * Both support attached readonly properties at runtime.
  */
 export function tagResourceError<E extends object>(error: E, code: string): E {
+  /** Some DOMException hosts omit stacks; preserve every existing nonempty native stack. */
+  const native = error as Error
+  if (typeof native.stack !== 'string' || native.stack.length === 0) {
+    Object.defineProperty(error, 'stack', {
+      value: new Error(native.message).stack,
+      configurable: true,
+      writable: true
+    })
+  }
   return attachErrorIdentity(error as Error, { source: RESOURCE_SOURCE, code }) as E
 }
 import { attachErrorIdentity } from '@migaia/utils/error'

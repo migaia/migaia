@@ -6,7 +6,7 @@ import { createRuntime } from '@migaia/reactive'
 import { Resource } from '../src'
 import { ResourceErrorCode } from '../src/error-code'
 import { RESOURCE_SOURCE } from '../src/errors'
-import { createResourceError } from '../src/errors'
+import { createResourceError, tagResourceError } from '../src/errors'
 import { deferred, flushAsync } from './helpers'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
@@ -51,6 +51,15 @@ describe('M-T37 (§3.7.2): every declared code has a real trigger', () => {
     )
   })
 
+  it('preserves an existing native stack and the exact tagged error', () => {
+    /** Caller/native provenance must not be replaced while adding package identity. */
+    const error = new RangeError('native provenance')
+    /** Exact stack text is the contract, not just the presence of a new stack. */
+    const stack = error.stack
+    expect(tagResourceError(error, ResourceErrorCode.invalidOption)).toBe(error)
+    expect(error.stack).toBe(stack)
+  })
+
   it('REQUEST_ABORTED / REQUEST_CANCELLED: cancel() while a request is pending', async () => {
     const runtime = createRuntime()
     const blocking = deferred<number>()
@@ -59,13 +68,15 @@ describe('M-T37 (§3.7.2): every declared code has a real trigger', () => {
     resource.cancel()
     await expect(promise).rejects.toMatchObject({
       name: 'AbortError',
-      code: ResourceErrorCode.requestAborted
+      code: ResourceErrorCode.requestAborted,
+      stack: expect.any(String)
     })
     expect(resource.state.status).toBe('cancelled')
     if (resource.state.status === 'cancelled') {
       expect(resource.state.error).toMatchObject({
         name: 'AbortError',
-        code: ResourceErrorCode.requestCancelled
+        code: ResourceErrorCode.requestCancelled,
+        stack: expect.any(String)
       })
     }
     resource.dispose()
