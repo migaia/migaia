@@ -31,6 +31,8 @@ describe('A12 coroutine profile', () => {
     const broken = createCoroutineSupervisor({
       id: 'broken',
       report: () => undefined,
+      // Without restart, start() settles on the crash instead of waiting out a backoff.
+      restart: { mode: 'never' },
       spec: { task: () => Promise.reject(boom) },
       budget: createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false, scheduler }),
       scheduler

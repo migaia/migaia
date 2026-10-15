@@ -55,6 +55,8 @@ describe('A14 in-memory exposed port', () => {
     const supervisor = createCoroutineSupervisor<number>({
       id: 'duplicate',
       report: () => undefined,
+      // Without restart, start() settles on the failed attempt instead of waiting out a backoff.
+      restart: { mode: 'never' },
       spec: {
         task: ({ expose }) => {
           expose(1)
