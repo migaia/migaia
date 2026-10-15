@@ -99,3 +99,6 @@ count.dispose();
 7. **`defaultRuntime` 是进程级单例**，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。
 
 更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 **[USEGUIDE.md](./USEGUIDE.md)**。
+
+
+跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。

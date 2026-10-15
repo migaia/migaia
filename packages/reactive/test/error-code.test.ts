@@ -123,7 +123,7 @@ describe('M-T36 (§3.7.1): every declared code has a real trigger', () => {
   })
 
   it('BRAND_CORRUPTED: the ownership-copy brand holds a non-symbol value', () => {
-    const key = Symbol.for('@morning-watch/store.ownership-copy')
+    const key = Symbol.for('@migaia/reactive.ownership-copy')
     const node = {}
     Object.defineProperty(node, key, { value: 'not-a-symbol', configurable: true })
     expect(() => brandOwnedValue(node)).toThrowError(
