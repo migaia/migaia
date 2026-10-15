@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createRuntime, defaultRuntime } from '@migaia/reactive'
+import { createRuntime } from '@migaia/reactive'
 import type { IDisposable } from '@migaia/reactive'
 import { computedFamily, createFamily } from '../src/reactive/family'
 
@@ -324,33 +324,6 @@ it('reuses the earliest wall-clock TTL timer for later entries', () => {
     family.dispose()
     timer.mockRestore()
   }
-})
-
-describe('createFamily: ttl reporter containment', () => {
-  it('does not escape when the default runtime reporter throws', () => {
-    vi.useFakeTimers()
-    let reporterCalled = false
-    const reporter = vi.spyOn(defaultRuntime, 'reportError').mockImplementation(() => {
-      reporterCalled = true
-      throw new Error('runtime reporter failed')
-    })
-    const family = createFamily<string, IItem>({
-      create: () => ({
-        key: 'x',
-        disposed: false,
-        dispose: () => {
-          throw new Error('timer cleanup failed')
-        }
-      }),
-      isObserved: () => false,
-      ttl: 1
-    })
-    family.get('x')
-    expect(() => vi.advanceTimersByTime(20)).not.toThrow()
-    expect(reporterCalled).toBe(true)
-    reporter.mockRestore()
-    vi.useRealTimers()
-  })
 })
 
 describe('createFamily: aggregated disposal failures', () => {

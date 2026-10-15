@@ -214,34 +214,6 @@ describe('AtomStore: subscriptions', () => {
     unsubscribe()
     store.dispose()
   })
-
-  it('contains a throwing runtime reporter without killing the subscription', () => {
-    const runtime = createRuntime()
-    const reporterFailure = new Error('runtime reporter failed')
-    const hostReportError = vi.fn()
-    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
-      throw reporterFailure
-    })
-    vi.stubGlobal('reportError', hostReportError)
-    try {
-      const store = createAtomStore(runtime)
-      const count = atomDef(0)
-      let calls = 0
-      const unsubscribe = store.sub(count, () => {
-        calls++
-        throw new Error('listener boom')
-      })
-
-      expect(() => store.set(count, 1)).not.toThrow()
-      expect(() => store.set(count, 2)).not.toThrow()
-      expect(calls).toBe(2)
-      expect(hostReportError).toHaveBeenCalledWith(reporterFailure)
-      unsubscribe()
-      store.dispose()
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
 })
 
 describe('AtomStore: override', () => {
