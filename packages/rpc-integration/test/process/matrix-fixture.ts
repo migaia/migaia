@@ -9,7 +9,7 @@ import {
 } from '@migaia/supervision/process'
 import { defineFeature, definePlugin, PluginHost } from '@migaia/plugin-host'
 import { vi } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/scheduler'
+import { createManualScheduler, systemScheduler } from '@migaia/utils/scheduler'
 import { createComposedEndpoint } from '@migaia/rpc-core/composed'
 import { createCanonicalChunkFeature } from '@migaia/rpc-core/stream'
 import { createControlFeature } from '@migaia/rpc-core/features/control'
@@ -111,8 +111,9 @@ export async function matrixFixture(
   const host = new PluginHost<Record<string, never>>({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
   })
-  /** The parent clock drives only canonical supervision timers. */
-  const scheduler = createManualScheduler()
+  /** Virtual timers control supervision; native process events retain host deferred ordering. */
+  /** Policy timers are virtual; original native generation jobs retain host ordering. */
+  const scheduler = { ...createManualScheduler(), defer: systemScheduler.defer }
   /** Real process leases enforce each replacement admission case. */
   const budget = createUnitBudget({
     kind: 'process',

@@ -1,3 +1,4 @@
+import { systemScheduler } from '@migaia/utils/scheduler'
 import { PluginHost } from '@migaia/plugin-host'
 import { CapabilityLevel, createUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle, IProcessSpec } from '@migaia/supervision/process'
@@ -28,7 +29,10 @@ function controlledProcess(fingerprint: string) {
 describe('process plugin generation lifetime', () => {
   it('[A5] revokes on child exit and rebinds the same feature after a new describe', async () => {
     const fixture = remoteHarness()
+    /** Preserve this existing clock identity shared by the channel and binding. */
     const scheduler = fixture.binding.scheduler
+    // This fixture controls backoff timers while generation observers use host ordering.
+    scheduler.defer = systemScheduler.defer
     const token = 'generation-token'
     const spec: IProcessSpec = {
       command: 'memory-child',
