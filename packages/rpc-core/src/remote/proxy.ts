@@ -2,7 +2,7 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { createRpcAbortError, createRpcError, isRpcRemoteError } from '../core/errors.js'
 import { createRuntimeBindingCalls } from './internal/runtime-call.js'
 import type { IRuntimeCallOptions } from './runtime-api/typing.js'
-import { SupervisorState, type ISupervisor } from '@migaia/supervision'
+import { SupervisorState, type IReadyOutcome, type ISupervisor } from '@migaia/supervision'
 import {
   runtimeConnectionDetail,
   runtimeDetail,
@@ -498,6 +498,49 @@ class RemoteRegistration<TUnit, TSpec> {
     }
   }
 
+  /**
+   * Starts an idle supervisor for the first generation. A first launch that fails is final: as soon
+   * as the supervisor arms a restart backoff, the proxy stops it and answers `stopped`, so the
+   * caller gets the launch failure at its own deadline instead of after every restart attempt.
+   * `signal` cancels the wait; the supervisor itself is released with the proxy.
+   */
+  #startFirstGeneration<THandle, TSpec>(
+    supervisor: ISupervisor<THandle, TSpec>,
+    signal: IAbortSignal
+  ): Promise<IReadyOutcome<THandle>> {
+    if (signal.aborted) return Promise.reject(resolveAbortReason(signal))
+    return new Promise<IReadyOutcome<THandle>>((resolve, reject) => {
+      /** Detaches the backoff watch and the abort listener once the wait settles. */
+      const settle = (): void => {
+        unsubscribe()
+        signal.removeEventListener('abort', onAbort)
+      }
+      /** Rejects the wait with the caller's abort reason. */
+      const onAbort = (): void => {
+        settle()
+        reject(resolveAbortReason(signal))
+      }
+      /** Ends the first start on its first failed attempt instead of waiting out the backoff. */
+      const unsubscribe = supervisor.subscribe((event) => {
+        if (event.type !== 'state' || event.to !== SupervisorState.backoff) return
+        settle()
+        void supervisor.stop().catch((error: unknown) => this.#options.report(error))
+        resolve({ state: SupervisorState.stopped })
+      })
+      signal.addEventListener('abort', onAbort, { once: true })
+      supervisor.start().then(
+        (outcome) => {
+          settle()
+          resolve(outcome)
+        },
+        (error: unknown) => {
+          settle()
+          reject(error)
+        }
+      )
+    })
+  }
+
   /** Same preparation path is called by first setup and later rebinding. */
   async prepareGeneration(
     signal: IAbortSignal,
@@ -506,7 +549,9 @@ class RemoteRegistration<TUnit, TSpec> {
     if (this.#releasePromise) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     const supervisor = this.#options.binding.supervisor
     const outcome =
-      supervisor.state === 'idle' ? await supervisor.start() : await supervisor.whenReady(signal)
+      supervisor.state === SupervisorState.idle
+        ? await this.#startFirstGeneration(supervisor, signal)
+        : await supervisor.whenReady(signal)
     if (signal.aborted) throw resolveAbortReason(signal)
     if (this.#releasePromise) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     if (outcome.state !== 'ready') {
