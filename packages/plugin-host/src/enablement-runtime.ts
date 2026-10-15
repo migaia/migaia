@@ -1,4 +1,4 @@
-import { containAsyncRejection } from '@migaia/lifecycle'
+import { containAsyncRejection, createAbortController } from '@migaia/lifecycle'
 import {
   DependencyAction,
   DependencyMutationKind,
@@ -159,7 +159,7 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
       )
     }
     const context = Object.freeze({
-      signal: registration.lifecycleController!.signal
+      signal: (registration.lifecycleController ??= createAbortController()).signal
     }) satisfies IPluginRegistrationContext
     try {
       containAsyncRejection(

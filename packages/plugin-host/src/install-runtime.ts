@@ -495,7 +495,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       suspended: false,
       stale: false,
       lifecycle: PluginHostRegistrationLifecycle.install,
-      lifecycleController: createAbortController(),
       featureExposeValid: true
     }
   }
