@@ -77,9 +77,11 @@ describe('LC-C2 shared release admission', () => {
       scope.own('kept', { syncSafe: true, force: kept })
       scope.own('changed', {
         syncSafe: true,
+        /** Registration sees a valid order; disposal must reject its later invalid value. */
         get order() {
           return mutated && field === 'order' ? NaN : 0
         },
+        /** A previously valid callback can disappear before the descriptor is re-admitted. */
         get force() {
           return mutated && field === 'force' ? (undefined as never) : rejected
         }

@@ -30,6 +30,7 @@ describe('L-T7 QuiescenceTracker: unsealed whenZero()', () => {
 
 describe('L-T8 QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnce()', () => {
   it('LC-B7 does not retain an idle string key after a loose wait', async () => {
+    /** Retention is observable through forget(), without relying on heap timing. */
     const tracker = createStringQuiescenceTracker()
     await tracker.whenZeroOnce('never-retained')
     expect(tracker.forget('never-retained')).toBe(false)
