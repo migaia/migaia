@@ -327,7 +327,7 @@ import { systemScheduler, createManualScheduler, type IScheduler } from '@migaia
 **`snapshotScheduler`｜5 秒上手** —— 把任意 duck-typed 值快照成标准 `IScheduler`（校验并锁定 accessor，防止 hostile getter 二次读取；任务的 `cancel`/`unref` 按此顺序各读一次，函数 `unref` 以原任务为接收者转发，非函数 `unref` 在回滚已启动的注入 timer 后以 `INVALID_OPTION` 拒绝）：
 
 ```ts
-const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错
+const snap = snapshotScheduler(candidate) // 缺少必要方法时返回 undefined；getter 或已提供的 defer 无效时抛出带码错误
 ```
 
 单参数 `value: unknown`，无选项；`now`/`schedule` 都不是函数时返回 `undefined`；读取 `now`/`schedule` 属性本身抛错时抛 `TypeError`（`INVALID_OPTION`）。
@@ -662,3 +662,5 @@ console.log(await waiting) // false；没有遗留 timer
 `createLifecycleUnit` 及其 option/result types 不再从 package 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay`、`tagLifecycleError`、`createLifecycleRangeError` 只供包内部使用，root 与 leaf 均不再暴露。`/scheduler` 的 snapshot/resolve/addSchedulerTime 与 `/errors` 的其它既有公开构造器保持可用。
 
 Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。
+
+Scheduler admission also captures the optional `defer` method once and retains its original receiver. Existing two-method clocks remain usable. A new optional-method getter failure or non-callable defer is rejected with lifecycle INVALID_OPTION before resource work starts. Strict proxies must permit this known property; returned snapshots expose the captured capability when present.

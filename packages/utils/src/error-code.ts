@@ -4,9 +4,9 @@ export const UtilsErrorCode = {
    * A caller passed an argument outside its documented domain: a non-finite or negative delay or
    * timeout, a non-positive limiter concurrency, a Base64 decode target with the wrong genuine
    * Uint8Array brand or decoded length, or a scheduler `delayMs`/`advance(ms)` that is not a finite
-   * non-negative number or overflows the virtual clock/shared absolute deadline (FP4). The native
-   * `TypeError`/`RangeError` type is kept; the caller must fix the argument, retrying the same
-   * value fails again.
+   * non-negative number or overflows the virtual clock/shared absolute deadline (FP4), or a
+   * deferred callback/scheduler method that is not callable. The native `TypeError`/`RangeError`
+   * type is kept; the caller must fix the argument, retrying the same value fails again.
    */
   invalidArgument: 'INVALID_ARGUMENT',
   /**
@@ -17,8 +17,8 @@ export const UtilsErrorCode = {
   /**
    * A host capability this package needs is missing or misbehaves: `structuredClone`, or for the
    * default scheduler `performance.now` (missing or returning a non-finite value) and
-   * `setTimeout`/`clearTimeout`. The caller must run on a host that provides it or inject its own
-   * implementation (for example a custom `IScheduler`).
+   * `setTimeout`/`clearTimeout`/`queueMicrotask`. The caller must run on a host that provides it or
+   * inject its own implementation (for example a custom `IScheduler`).
    */
   envUnsupported: 'ENV_UNSUPPORTED',
   /**

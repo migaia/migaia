@@ -6,14 +6,22 @@ export const UtilsErrorText = {
   envUnsupported: (capability: string) => `[utils] host capability is unavailable: ${capability}`,
   /**
    * Stable capability labels passed to `envUnsupported(capability)` by the default scheduler in
-   * `scheduler.ts`; they name which host capability (monotonic clock, finite clock reading, timers)
-   * was missing so the message stays identical across hosts.
+   * `scheduler.ts`; they name which host capability (monotonic clock, finite clock reading, timers,
+   * deferred queue) was missing so the message stays identical across hosts.
    */
   schedulerCapability: {
     monotonicClock: 'performance.now',
     finiteClock: 'finite performance.now value',
-    timers: 'setTimeout/clearTimeout'
+    timers: 'setTimeout/clearTimeout',
+    /** Default deferred work requires this host queue while custom schedulers may supply their own. */
+    microtasks: 'queueMicrotask'
   },
+  /** The deferred-work entry rejects a non-function before any scheduler registration. */
+  deferredCallback: '[utils] deferred callback must be a function',
+  /** One scheduler receiver must provide its optional deferred method or the ordinary timer method. */
+  deferredScheduler: '[utils] scheduler must provide a callable defer or schedule method',
+  /** Failed method capture retains the caller's original getter error through cause. */
+  deferredAccessor: '[utils] failed to read scheduler deferred methods',
   aborted: '[utils] operation aborted',
   deadlineExceeded: (scope: string, timeoutMs: number) =>
     `[utils] ${scope} deadline exceeded after ${timeoutMs}ms`,

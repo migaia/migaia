@@ -1229,3 +1229,7 @@ console.log(await waiting) // false；没有遗留 timer
 `createLifecycleUnit` 及其 option/result types 不再从 package 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay`、`tagLifecycleError`、`createLifecycleRangeError` 只供包内部使用，root 与 leaf 均不再暴露。`/scheduler` 的 snapshot/resolve/addSchedulerTime 与 `/errors` 的其它既有公开构造器保持可用。
 
 Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。
+
+### Deferred method capture
+
+`resolveScheduler`/`snapshotScheduler` preserve an admitted `IScheduler.defer` alongside now/schedule. Later method replacement cannot redirect registered owners; raw getters are read during admission. Missing required methods still make snapshotScheduler return undefined, while getter failures preserve cause and a supplied malformed deferred method throws a coded TypeError. This does not add a second clock or alter deadline cancellation. A legacy object may omit defer and use the utils deferred helper's zero-delay fallback.

@@ -156,9 +156,12 @@ export function snapshotScheduler(value: unknown): IScheduler | undefined {
   const receiver = value
   let now: unknown
   let schedule: unknown
+  /** Optional deferred method is captured with the same receiver as clock and timers. */
+  let deferred: unknown
   try {
     now = (value as { now?: unknown }).now
     schedule = (value as { schedule?: unknown }).schedule
+    deferred = (value as { defer?: unknown }).defer
   } catch (error) {
     throw createLifecycleTypeError(
       LifecycleErrorCode.invalidOption,
@@ -167,8 +170,20 @@ export function snapshotScheduler(value: unknown): IScheduler | undefined {
     )
   }
   if (typeof now !== 'function' || typeof schedule !== 'function') return undefined
+  if (deferred !== undefined && typeof deferred !== 'function')
+    throw createLifecycleTypeError(
+      LifecycleErrorCode.invalidOption,
+      LifecycleErrorText.schedulerDeferInvalid
+    )
   return {
     now: () => validateSchedulerTime(Reflect.apply(now, receiver, []), 'now()'),
+    ...(typeof deferred === 'function'
+      ? {
+          defer: (callback: () => void) => {
+            Reflect.apply(deferred, receiver, [callback])
+          }
+        }
+      : {}),
     schedule: (callback, delayMs) => {
       const validDelay = validateSchedulerDelay(delayMs)
       return snapshotScheduledTask(Reflect.apply(schedule, receiver, [callback, validDelay]))

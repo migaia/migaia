@@ -1305,3 +1305,9 @@ import { isNativeErrorValue } from '@migaia/utils/error'
 const failure: unknown = new TypeError('invalid input')
 if (isNativeErrorValue(failure)) console.log(failure.stack)
 ```
+
+### `deferTask` and optional deferred capability
+
+The existing `IScheduler` may expose `defer(callback): void` for jobs distinct from cancellable deadlines. Use `deferTask(clock, callback)` to select that capability or the legacy `schedule(callback, 0)` fallback. The root convenience entry and `/scheduler` subpath export the same function. System's queue keeps native microtask ordering; a custom implementation chooses its own deferred delivery. Callback Promise completion belongs to the caller, and registration errors retain identity. This API supplies no new queue or cancellation handle.
+
+Invalid callback/method input produces native `TypeError` with `@migaia/utils / INVALID_ARGUMENT`; a failed method getter remains on cause. Missing native `queueMicrotask` is `ENV_UNSUPPORTED` when using the default deferred owner. Explicit manual/host clocks can operate without that global. A spread of systemScheduler copies its defer method too: override defer when overriding deferred delivery. Resource retry/Suspense yields continue using the ordinary timer API.

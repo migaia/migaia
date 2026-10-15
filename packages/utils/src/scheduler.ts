@@ -29,6 +29,12 @@ export type IScheduledTask = { cancel(): void; unref?(): void }
 export type IScheduler = {
   now(): number
   schedule(callback: () => void, delayMs: number): IScheduledTask
+  /**
+   * Optional non-cancellable deferred job registration. System uses native microtasks; manual
+   * clocks use their existing zero-time queue. Registration is synchronous, callbacks are
+   * asynchronous and any returned callback Promise belongs to its caller.
+   */
+  defer?(callback: () => void): void
 }
 
 /**
@@ -51,6 +57,7 @@ type ISchedulerHostGlobals = {
   readonly performance?: { readonly now?: unknown }
   readonly setTimeout?: unknown
   readonly clearTimeout?: unknown
+  readonly queueMicrotask?: unknown
 }
 
 /** Host timer registration function shape, admitted only after a `typeof` check. */
@@ -89,9 +96,50 @@ function hostGlobals(): ISchedulerHostGlobals {
 function schedulerError(
   Constructor: ISchedulerErrorConstructor,
   code: IUtilsErrorCode,
-  message: string
+  message: string,
+  options?: ErrorOptions
 ): Error {
-  return attachErrorIdentity(new Constructor(message), { source: '@migaia/utils', code })
+  return attachErrorIdentity(new Constructor(message, options), { source: '@migaia/utils', code })
+}
+
+/**
+ * Register one deferred job through its scheduler receiver. Older two-method schedulers use
+ * schedule(callback, 0); default System jobs retain native microtask order. This does not await
+ * callback results or create a cancellation owner. Registration failures propagate by identity.
+ */
+export function deferTask(scheduler: IScheduler, callback: () => void): void {
+  if (typeof callback !== 'function')
+    throw schedulerError(TypeError, UtilsErrorCode.invalidArgument, UtilsErrorText.deferredCallback)
+  if ((typeof scheduler !== 'object' && typeof scheduler !== 'function') || scheduler === null)
+    throw schedulerError(
+      TypeError,
+      UtilsErrorCode.invalidArgument,
+      UtilsErrorText.deferredScheduler
+    )
+  /** Capture only the method required for this operation, retaining its original receiver. */
+  let deferred: unknown
+  /** Legacy schedulers need their ordinary zero-time registration only when no defer exists. */
+  let scheduled: unknown
+  try {
+    deferred = scheduler.defer
+    if (deferred === undefined) scheduled = scheduler.schedule
+  } catch (cause) {
+    throw schedulerError(
+      TypeError,
+      UtilsErrorCode.invalidArgument,
+      UtilsErrorText.deferredAccessor,
+      { cause }
+    )
+  }
+  /** Both paths invoke exactly one captured method after admission. */
+  const register = deferred === undefined ? scheduled : deferred
+  if (typeof register !== 'function')
+    throw schedulerError(
+      TypeError,
+      UtilsErrorCode.invalidArgument,
+      UtilsErrorText.deferredScheduler
+    )
+  Reflect.apply(register, scheduler, deferred === undefined ? [callback, 0] : [callback])
 }
 
 /**
@@ -304,6 +352,20 @@ export const systemScheduler: IScheduler = {
       )
     return value
   },
+  /** Default deferred work stays a native microtask, independently of timer/deadline strategy. */
+  defer(callback) {
+    /** Read the host on each call, matching the existing timer substitution contract. */
+    const host = hostGlobals()
+    /** Native microtask registration is a host capability, not another library queue. */
+    const enqueue = host.queueMicrotask
+    if (typeof enqueue !== 'function')
+      throw schedulerError(
+        Error,
+        UtilsErrorCode.envUnsupported,
+        UtilsErrorText.envUnsupported(UtilsErrorText.schedulerCapability.microtasks)
+      )
+    Reflect.apply(enqueue, host, [callback])
+  },
   schedule(callback, delayMs) {
     if (
       this !== systemScheduler &&
@@ -458,7 +520,8 @@ export function createManualScheduler(): IManualScheduler {
     if (index > 0 && compareTasks(tasks[Math.floor((index - 1) / 2)]!, last) > 0) siftUp(index)
     else siftDown(index)
   }
-  return {
+  /** Public capabilities share this instance's one existing task heap. */
+  const scheduler: IManualScheduler = {
     now: () => current,
     schedule(callback, delayMs) {
       assertDelay(delayMs, 'delayMs')
@@ -475,6 +538,10 @@ export function createManualScheduler(): IManualScheduler {
         },
         unref: () => undefined
       }
+    },
+    /** Reuse the captured registration method; replacing the public slot cannot redirect this job. */
+    defer: (callback) => {
+      schedule(callback, 0)
     },
     advance(ms) {
       if (advancing)
@@ -512,6 +579,9 @@ export function createManualScheduler(): IManualScheduler {
       return tasks.length
     }
   }
+  /** Deferred work retains the original queue method even after a caller replaces the public slot. */
+  const schedule = scheduler.schedule
+  return scheduler
 }
 
 /** Default wall clock: `Date.now()` epoch milliseconds, for diagnostic timestamps only. */

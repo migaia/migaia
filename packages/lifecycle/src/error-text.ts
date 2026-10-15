@@ -39,6 +39,8 @@ export const LifecycleErrorText = {
     '[lifecycle] scheduler.schedule must return an object with a cancel() function',
   /** Explains that reading a scheduler's methods failed at an injection boundary. */
   schedulerAccessorFailed: '[lifecycle] scheduler accessor failed',
+  /** Optional deferred registration must be callable before a scheduler owns any work. */
+  schedulerDeferInvalid: '[lifecycle] scheduler.defer must be a function when provided',
   /** Explains that an injected value is not a valid lifecycle scheduler. */
   schedulerInvalid: '[lifecycle] scheduler must provide now() and schedule() functions',
   /** Stable message for scheduler values whose runtime type is not numeric. */
