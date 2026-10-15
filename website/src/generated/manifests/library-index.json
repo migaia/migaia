@@ -59,12 +59,6 @@
       "exports": ["."]
     },
     {
-      "slug": "rpc-bridge-jsonrpc",
-      "description": "RPC bridge-jsonrpc owner.",
-      "version": "0.0.9",
-      "exports": ["."]
-    },
-    {
       "slug": "rpc-browser",
       "description": "RPC browser owner.",
       "version": "0.0.9",

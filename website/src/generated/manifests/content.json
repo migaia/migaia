@@ -241,13 +241,6 @@
     },
     {
       "locale": "zh",
-      "library": "rpc-bridge-jsonrpc",
-      "source": "src/content/zh/packages/rpc-bridge-jsonrpc/overview.mdx",
-      "slug": "overview",
-      "format": "mdx"
-    },
-    {
-      "locale": "zh",
       "library": "rpc-browser",
       "source": "src/content/zh/packages/rpc-browser/overview.mdx",
       "slug": "overview",

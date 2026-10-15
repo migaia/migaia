@@ -203,7 +203,6 @@
       "ReactiveErrorPhase": "@migaia/reactive/extension"
     },
     "@migaia/resource": {},
-    "@migaia/rpc-bridge-jsonrpc": {},
     "@migaia/rpc-browser": {
       "createBroadcastChannelTransport": "@migaia/rpc-browser/adapters/broadcast-channel",
       "createRtcDataChannelTransport": "@migaia/rpc-browser/adapters/rtc-data-channel",

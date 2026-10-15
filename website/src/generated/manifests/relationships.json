@@ -282,16 +282,6 @@
       "type": "content-route"
     },
     {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/overview",
-      "to": "src/content/zh/packages/rpc-bridge-jsonrpc/overview.mdx",
-      "type": "route-content"
-    },
-    {
-      "from": "src/content/zh/packages/rpc-bridge-jsonrpc/overview.mdx",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/overview",
-      "type": "content-route"
-    },
-    {
       "from": "/zh/docs/rpc-browser/overview",
       "to": "src/content/zh/packages/rpc-browser/overview.mdx",
       "type": "route-content"
@@ -31589,466 +31579,6 @@
     {
       "from": "/zh/docs/resource",
       "to": "/zh/docs/resource/api#resource-index--ResourceStatus",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api",
-      "to": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api",
-      "type": "guide-api"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api",
-      "to": "/en/docs/rpc-bridge-jsonrpc",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "to": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "to": "/en/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "to": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "to": "/en/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "to": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "to": "/en/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "to": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "to": "/en/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "to": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "to": "/en/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "to": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "to": "/en/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "to": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "to": "/en/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/rpc-bridge-jsonrpc",
-      "to": "/en/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "api-guide"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "type": "guide-api"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "to": "/zh/docs/rpc-bridge-jsonrpc",
-      "type": "api-architecture"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "type": "architecture-api"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "to": "/zh/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcAdapterChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "to": "/zh/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--createJsonRpcRemoteChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "to": "/zh/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeErrorCode",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "to": "/zh/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IJsonRpcBridgeOptions",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "to": "/zh/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--IProcessByteChannel",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "to": "/zh/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JSONRPC_BRIDGE_ERROR_SOURCE",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/getting-started",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
-      "to": "/zh/docs/rpc-bridge-jsonrpc",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/rpc-bridge-jsonrpc",
-      "to": "/zh/docs/rpc-bridge-jsonrpc/api#rpc-bridge-jsonrpc-index--JsonRpcBridgeErrorCode",
       "type": "architecture-symbol"
     },
     {
@@ -75213,6 +74743,36 @@
     },
     {
       "from": "/en/docs/rpc-process/api",
+      "to": "/en/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "to": "/en/docs/rpc-process/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "to": "/en/docs/rpc-process/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/rpc-process/getting-started",
+      "to": "/en/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "to": "/en/docs/rpc-process",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/rpc-process",
+      "to": "/en/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-process/api",
       "to": "/en/docs/rpc-process/api#rpc-process-index--createProcessPeer",
       "type": "api-symbol"
     },
@@ -75809,6 +75369,36 @@
     {
       "from": "/en/docs/rpc-process",
       "to": "/en/docs/rpc-process/api#rpc-process-index--IProcessHostRegistrations",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-process/api",
+      "to": "/en/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "to": "/en/docs/rpc-process/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "to": "/en/docs/rpc-process/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/rpc-process/getting-started",
+      "to": "/en/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "to": "/en/docs/rpc-process",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/rpc-process",
+      "to": "/en/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
       "type": "architecture-symbol"
     },
     {
@@ -77783,6 +77373,36 @@
     },
     {
       "from": "/zh/docs/rpc-process/api",
+      "to": "/zh/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "to": "/zh/docs/rpc-process/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "to": "/zh/docs/rpc-process/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/rpc-process/getting-started",
+      "to": "/zh/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "to": "/zh/docs/rpc-process",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/rpc-process",
+      "to": "/zh/docs/rpc-process/api#rpc-process-index--createProcessJsonRpcChannel",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-process/api",
       "to": "/zh/docs/rpc-process/api#rpc-process-index--createProcessPeer",
       "type": "api-symbol"
     },
@@ -78379,6 +77999,36 @@
     {
       "from": "/zh/docs/rpc-process",
       "to": "/zh/docs/rpc-process/api#rpc-process-index--IProcessHostRegistrations",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-process/api",
+      "to": "/zh/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "to": "/zh/docs/rpc-process/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "to": "/zh/docs/rpc-process/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/rpc-process/getting-started",
+      "to": "/zh/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
+      "to": "/zh/docs/rpc-process",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/rpc-process",
+      "to": "/zh/docs/rpc-process/api#rpc-process-index--IProcessJsonRpcChannelOptions",
       "type": "architecture-symbol"
     },
     {
