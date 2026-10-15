@@ -1,0 +1,11 @@
+node_modules
+build
+.react-router
+.bun-tmp
+test
+scripts
+.npmrc
+.env
+.env.*
+*.log
+.DS_Store
