@@ -1,5 +1,5 @@
 # VPS deployment of the documentation image. The image is private on GHCR:
-#   docker login ghcr.io -u <github-user>   # token needs read:packages
+#   docker login ghcr.io -u kimboyeme-maker   # token needs read:packages
 #   docker compose pull && docker compose up -d
 # Pin MIGAIA_WEBSITE_TAG to a sha-<commit> tag for a fixed release; it defaults to main.
 # The reverse proxy forwards /migaia and /migaia/* unchanged (no prefix strip) to 127.0.0.1:${MIGAIA_WEBSITE_PORT}.
