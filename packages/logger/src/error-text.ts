@@ -49,8 +49,10 @@ export const LoggerErrorText = {
   /** `extends()` would create a cycle back to the current logger. */
   extendsCycle: (id: string): string =>
     `[logger] extends() 会形成循环引用：目标 logger 已经能沿着它自己的 extends 链路 转发回当前 logger (id=${id})，已阻止这次调用`,
-  /** Synchronous admission failure when the lossless bounded delivery window is full. */
+  /** Reported when the bounded delivery window is full and the oldest queued batch was dropped. */
   batchOverflow: 'logger batch pending capacity is exhausted',
+  /** Batcher dispose discarded entries that its final drain did not hand to the batch callback. */
+  batchDisposeDropped: 'logger batch dispose dropped undelivered entries',
   /** File plugin cannot deliver without an injected or Node default append capability. */
   fileSinkUnavailable: 'logger file sink is unavailable',
   /** File sink write failed; original fs error remains on the cause chain. */

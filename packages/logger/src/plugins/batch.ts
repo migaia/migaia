@@ -2,11 +2,14 @@ import type { IEmptyPluginExt, ILoggerPluginCore, ILoggerPlugin } from '../typin
 import { defineFeature, definePlugin, type IMiddlewarePipelineMode } from '@migaia/plugin-host'
 import { boundedWait } from '@migaia/lifecycle'
 import type { IScheduledTask } from '@migaia/utils/scheduler'
+import { attachErrorIdentity } from '@migaia/utils/error'
 import {
   createLoggerCleanupError,
   createLoggerError,
+  LOGGER_SOURCE,
   LoggerErrorCode,
-  tagLoggerError
+  tagLoggerError,
+  type ILoggerErrorCode
 } from '../errors.js'
 import { LoggerErrorText } from '../error-text.js'
 
@@ -15,8 +18,16 @@ export type IBatchPluginConfig = {
   maxWaitMs?: number
   /** Maximum number of batches executing at once. Defaults to one for lossless delivery. */
   maxConcurrentBatches?: number
-  /** Maximum number of queued or executing batches. Defaults to 1024. */
+  /**
+   * Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops
+   * the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`.
+   */
   maxPendingBatches?: number
+  /**
+   * Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults
+   * to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.
+   */
+  flushTimeoutMs?: number
   /**
    * Schedules a full-batch callback asynchronously when enabled. Defaults to `true`;
    * timer-triggered callbacks are already asynchronous.
@@ -116,9 +127,12 @@ class BatchPlugin implements ILoggerPlugin<
       perCallConfig.maxConcurrentBatches ?? defaultConfig.maxConcurrentBatches ?? 1
     const maxPendingBatches =
       perCallConfig.maxPendingBatches ?? defaultConfig.maxPendingBatches ?? 1024
+    const flushTimeoutMs = perCallConfig.flushTimeoutMs ?? defaultConfig.flushTimeoutMs ?? 3000
     if (!Number.isSafeInteger(maxConcurrentBatches) || maxConcurrentBatches < 1)
       throw createLoggerError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidOption)
     if (!Number.isSafeInteger(maxPendingBatches) || maxPendingBatches < 1)
+      throw createLoggerError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidOption)
+    if (!Number.isFinite(flushTimeoutMs) || flushTimeoutMs < 0)
       throw createLoggerError(LoggerErrorCode.invalidOption, LoggerErrorText.invalidOption)
 
     let buffer: T[] = []
@@ -138,7 +152,7 @@ class BatchPlugin implements ILoggerPlugin<
       if (!active) return
       if (flushing) return flushing
       flushing = (async () => {
-        const deadline = core.scheduler.now() + 3000
+        const deadline = core.scheduler.now() + flushTimeoutMs
         do {
           await flushBatch()
           // A full batch may be queued behind the logger's asynchronous defer boundary. Flush
@@ -219,7 +233,19 @@ class BatchPlugin implements ILoggerPlugin<
     const enqueue = (batch: T[], immediate: boolean): Promise<void> | undefined => {
       if (!active) return
       if (!immediate && queue.length + inFlight.size >= maxPendingBatches) {
-        throw createLoggerError(LoggerErrorCode.batchOverflow, LoggerErrorText.batchOverflow)
+        /**
+         * Oldest batch not yet handed to onBatch. When every pending batch is already in flight,
+         * the incoming batch is the oldest undelivered data and is dropped instead.
+         */
+        const dropped = queue.length > 0 ? queue.shift()! : batch
+        reportBatchFailure(
+          createDroppedEntriesError(
+            LoggerErrorCode.batchOverflow,
+            LoggerErrorText.batchOverflow,
+            dropped.length
+          )
+        )
+        if (dropped === batch) return
       }
       queue.push(batch)
       if (immediate) return pump()
@@ -285,12 +311,7 @@ class BatchPlugin implements ILoggerPlugin<
         cancelTimer()
         const fullBatch = buffer
         buffer = []
-        try {
-          return enqueue(fullBatch, false)
-        } catch (error) {
-          buffer = fullBatch
-          throw error
-        }
+        return enqueue(fullBatch, false)
       }
       if (!timer) {
         // 从缓冲区第一条数据进来起，最多等 maxWaitMs 就必须 flush 一次
@@ -332,6 +353,20 @@ class BatchPlugin implements ILoggerPlugin<
       } catch (error) {
         cleanupErrors.push(error)
       }
+      /**
+       * Entries never handed to onBatch, because the drain hit flushTimeoutMs or failed. Batches
+       * already in flight stay owned by onBatch and are not counted.
+       */
+      let dropped = buffer.length
+      for (const queued of queue) dropped += queued.length
+      if (dropped > 0)
+        cleanupErrors.push(
+          createDroppedEntriesError(
+            LoggerErrorCode.pluginUninstallCleanupFailed,
+            LoggerErrorText.batchDisposeDropped,
+            dropped
+          )
+        )
       active = false
       buffer = []
       queue.length = 0
@@ -358,6 +393,19 @@ class BatchPlugin implements ILoggerPlugin<
       dispose: () => []
     }
   }
+}
+
+/** Builds a logger error whose `detail.dropped` counts the entries the batcher discarded. */
+function createDroppedEntriesError(
+  code: ILoggerErrorCode,
+  message: string,
+  dropped: number
+): Error {
+  return attachErrorIdentity(createLoggerError(code, message), {
+    source: LOGGER_SOURCE,
+    code,
+    detail: { dropped }
+  })
 }
 
 /** Definition-only reference authority for consumers that do not own the batch implementation. */
