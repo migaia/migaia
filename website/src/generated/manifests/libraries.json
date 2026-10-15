@@ -2732,7 +2732,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`own(resource, descriptor)` 返回的方法：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`。环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                  "text": "`own(resource, descriptor)` 返回的方法：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`；descriptor 形状非法时 `own()` 在注册时抛 `INVALID_OPTION`。环境支持时自动挂载 `[Symbol.asyncDispose]`。"
                 },
                 {
                   "type": "paragraph",
@@ -2745,7 +2745,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部选项（`ISyncLifecycleScopeOptions`）：`errorPolicy?`（同上，默认 `'throw'`）、`report?`（同上）。约束：每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`；某个 callback 若返回 thenable，同样在释放时抛 `SCOPE_SYNC_VIOLATION`。不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例。环境支持时挂载 `[Symbol.dispose]`。"
+                  "text": "全部选项（`ISyncLifecycleScopeOptions`）：`errorPolicy?`（同上，默认 `'throw'`）、`report?`（同上）。约束：每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`；descriptor 形状非法（如 `order` 非有限数、缺 `force`）在 `own()` 时抛 `INVALID_OPTION`，与异步 scope 一致；某个 callback 若返回 thenable，同样在释放时抛 `SCOPE_SYNC_VIOLATION`。不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例。环境支持时挂载 `[Symbol.dispose]`。"
                 },
                 {
                   "type": "paragraph",
@@ -2754,7 +2754,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "scope.own(handle, {\n  syncSafe: false,\n  order: 10, // 大的先释放；只在 order 模式事务里生效\n  graceful: (ctx) => flush(), // 优雅释放；超时只放弃等待，仍会跑 force\n  gracefulTimeoutMs: 200,\n  force: (ctx) => handle.close(), // 必填，必须无条件完成\n  gcFallback: true // 显式释放时自动 unregister 的 FinalizationRegistry 兜底\n})"
+                  "code": "scope.own(handle, {\n  syncSafe: false,\n  order: 10, // 大的先释放；只在 order 模式事务里生效\n  graceful: (ctx) => flush(), // 优雅释放；异步超时只放弃等待，仍会跑 force；同步返回即算成功\n  gracefulTimeoutMs: 200,\n  force: (ctx) => handle.close(), // 必填，必须无条件完成\n  gcFallback: true // 显式释放时自动 unregister 的 FinalizationRegistry 兜底\n})"
                 },
                 {
                   "type": "paragraph",
@@ -3461,7 +3461,7 @@
                   "items": [
                     "`syncSafe?: boolean` —— 声明该 descriptor 可被 `SyncLifecycleScope` 接受，不改变 `LifecycleScope` 本身的静态类型（同/异步由构造的具体类型决定，不由 descriptor 推断）。",
                     "`order?: number` —— 释放排序键，缺省按 `0`；只在 `DisposeTransaction` 的 `order` 模式下生效，数值大者先释放（往「释放顺序的下方」沉降，与分配顺序相反）。",
-                    "`graceful?` —— 优雅释放；超时只放弃等待（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。",
+                    "`graceful?` —— 优雅释放；超时只放弃等待（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。同步返回的 `graceful` 视为已完成释放：即使超过预算也不再跑 `force`，只通过 `context.report` 上报一条 `DEADLINE_EXCEEDED` 诊断。",
                     "`gracefulTimeoutMs?: number` —— 优雅阶段自己的预算，会被事务共享的绝对 `deadlineAt` 进一步封顶（取两者较小值）。",
                     "`force: (context) => void | PromiseLike<void>`（必填）—— 必须无条件完成，不得依赖任何前置条件。",
                     "`gcFallback?: boolean` —— 置为 `true` 时向内部 `FinalizationRegistry` 注册一个不强引用 `resource`/闭包 target 的兜底；显式释放（`dispose()`/`release()`）会自动 unregister 它。",
@@ -3503,7 +3503,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`own(resource, descriptor)`：容器处于 `closing`/`terminal` 时抛 `SCOPE_CLOSED`/`SCOPE_TERMINAL`；在 disposer 内部重入调用抛 `SCOPE_REENTRANT_OWN`。",
+                    "`own(resource, descriptor)`：容器处于 `closing`/`terminal` 时抛 `SCOPE_CLOSED`/`SCOPE_TERMINAL`；在 disposer 内部重入调用抛 `SCOPE_REENTRANT_OWN`；descriptor 形状非法（`order`/`custom`/`graceful`/`gracefulTimeoutMs`/`force`，规则同 dispose 时的 descriptor 校验）时在注册时就抛 `INVALID_OPTION`，访问器抛错则原样抛出。",
                     "`release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。",
                     "`close()`：同步、幂等；`open → closing`。",
                     "`dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。",
@@ -3538,6 +3538,7 @@
                   "type": "list",
                   "items": [
                     "每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`。",
+                    "descriptor 形状校验与异步版本相同：`order` 非有限数、`force` 缺失等非法值在 `own()` 时抛 `INVALID_OPTION`。",
                     "不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例（内部品牌检测），命中同样抛 `SCOPE_SYNC_VIOLATION`。",
                     "某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。",
                     "降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。",
@@ -3870,7 +3871,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`own(resource, descriptor)`：已 commit/rollback 后调用抛 `PROVISIONAL_SETTLED`。",
+                    "`own(resource, descriptor)`：已 commit/rollback 后调用抛 `PROVISIONAL_SETTLED`；descriptor 形状非法时抛 `INVALID_OPTION`（不读取 `order`，commit 时由 parent 的 `own()` 校验）。",
                     "`commitTo(parent)`：按注册顺序逐个调用 `parent.own(resource, descriptor)`；某项失败时，已转移给 parent 的部分保留在 parent 名下，尚未转移的部分由本作用域逆序释放并 await 完成后才重新抛出原错误——不会有资源被两边都不持有，也不会有资源留给\"none\"；若失败原因是 `parent` 已处于 `closing`/`terminal`（错误码为 `SCOPE_CLOSED`/`SCOPE_TERMINAL`），额外包一层 `PROVISIONAL_PARENT_CLOSED`，原错误仍在 `cause`，遗留资源的释放失败列表挂在 `errors`。",
                     "`rollback()`：逆序释放全部已注册资源，聚合失败为携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`；幂等——并发/重复调用复用同一个 settle Promise。",
                     "`commitTo`/`rollback` 二次调用（或 commit 后 rollback / rollback 后 commit）一律抛 `PROVISIONAL_SETTLED`（`rollback()` 以 rejected Promise 形式返回，不是同步抛出）。",
@@ -4507,7 +4508,7 @@
                     [
                       "`deadlineExceeded`",
                       "`DEADLINE_EXCEEDED`",
-                      "共享绝对 deadline 已过去，但仍有资源被要求进入新的 graceful 阶段（诊断码，正常降级路径不抛这个码）"
+                      "共享绝对 deadline 已过去，但仍有资源被要求进入新的 graceful 阶段；或同步 `graceful` 超过预算才返回（仍算成功，不跑 `force`）。两者都只经 `report` 上报，正常降级路径不用这个码"
                     ],
                     [
                       "`envUnsupported`",
@@ -5960,7 +5961,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "同步 stage 不调用 `next()` 时短路。异步模式保留洋葱模型：`next()` 立即启动下游并返回同一个下游 Promise。"
+                  "text": "同步 stage 不调用 `next()` 时短路。同步模式是线性 reduce：`next()` 只提交值，stage 返回后才执行下游。异步模式保留洋葱模型：`next()` 立即启动下游并返回同一个下游 Promise。"
                 }
               ]
             },
@@ -5975,17 +5976,28 @@
                 },
                 {
                   "type": "table",
-                  "headers": ["`mode`", "stage", "`run()` 返回值"],
+                  "headers": ["`mode`", "stage", "`run()` 返回值", "下游何时开始"],
                   "rows": [
-                    ["`sync`", "`(value, next, context?) => void`", "`void`"],
+                    [
+                      "`sync`",
+                      "`(value, next, context?) => void`",
+                      "`void`",
+                      "stage 返回后；`next()` 只提交值"
+                    ],
                     [
                       "`async`",
                       "`(value, next, context?) => void \\",
                       "Promise<void>`",
-                      "`Promise<void>`"
+                      "`Promise<void>`",
+                      "调用 `next()` 时（洋葱模型）"
                     ],
-                    ["`generator`", "generator function", "`void`"],
-                    ["`async-generator`", "async generator function", "`Promise<void>`"]
+                    ["`generator`", "generator function", "`void`", "stage 结束后"],
+                    [
+                      "`async-generator`",
+                      "async generator function",
+                      "`Promise<void>`",
+                      "stage 结束后"
+                    ]
                   ]
                 },
                 {
@@ -6016,6 +6028,10 @@
                   "type": "code",
                   "language": "ts",
                   "code": "const pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.async })\nconst trim = pipeline.lift((value, next) => next(value.trim()), MiddlewarePipelineMode.sync)\n\nawait pipeline.run([trim], '  ready  ', async (result) => {\n  console.log(result) // ready\n})"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "提升不改变 sync stage 的线性 reduce 语义：在任何目标模式中，sync stage 里写在 `next()` 之后的代码总是先于下游执行；stage 抛错时下游不启动。"
                 },
                 {
                   "type": "paragraph",
@@ -9022,7 +9038,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value; // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state; // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n  if (state.status === ResourceStatus.error) console.error(state.error);\n});\n\nexport function selectUser(id: string): void {\n  userId.value = id;\n}\n\nselectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}"
+                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value; // 在返回 Promise 前读取：Runtime 建立 userId → user 依赖边\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state; // 建立 user.state → 当前渲染任务的依赖边\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n  if (state.status === ResourceStatus.error) console.error(state.error);\n});\n\nexport function selectUser(id: string): void {\n  userId.value = id;\n}\n\nselectUser('2'); // 标脏 Resource；当前请求被替换，新请求使用 id = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose();\n  user.dispose();\n  userId.dispose();\n}"
                 },
                 {
                   "type": "paragraph",
@@ -9158,7 +9174,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value;\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state;\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n});\n\nuserId.value = '2';\n\nexport function disposeUserPanel(): void {\n  stopRendering();\n  user.dispose();\n  userId.dispose();\n}"
+                  "code": "import { Resource, ResourceStatus } from '@migaia/resource';\nimport { createRuntime } from '@migaia/reactive';\nimport { fetchUser } from './user-api.js';\n\nconst runtime = createRuntime();\nconst userId = runtime.signal('1');\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value;\n    return fetchUser(id, { signal });\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n);\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state;\n  if (state.status === ResourceStatus.pending) console.log('loading user');\n  if (state.status === ResourceStatus.success) console.log('render', state.data);\n});\n\nuserId.value = '2';\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose();\n  user.dispose();\n  userId.dispose();\n}"
                 },
                 {
                   "type": "paragraph",
@@ -28984,7 +29000,7 @@
                     "`signalDisposed`(`'SIGNAL_DISPOSED'`) —— `SharedInt32Signal` 已 `dispose()` 后继续读写；同上，新建 signal",
                     "`bufferTooSmall`(`'BUFFER_TOO_SMALL'`) —— 传入的 `SharedArrayBuffer` 太小，放不下要求的 cell 布局；调用方应分配更大的 buffer，这是构造期参数错误，不要重试同一 buffer",
                     "`indexOutOfRange`(`'INDEX_OUT_OF_RANGE'`) —— `SharedInt32Array` 下标越界；调用方检查下标是否在 `[0, length)`，这是永久性参数错误",
-                    "`contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 在自旋上限内未 settle（cell 未稳定/锁未获取/`update` 持续失败）；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer",
+                    "`contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 持续约 1 秒仍未 settle（cell 未稳定/锁未获取，期间按轮自旋并退避），或 `update` 在自旋上限内持续写入失败；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer",
                     "`envUnsupported`(`'ENV_UNSUPPORTED'`) —— `Atomics.waitAsync` 在当前环境不可用；调用方改用 `sync()` 自行拉取，或换支持 `waitAsync` 的运行时，库不做静默降级",
                     "`invalidOption`(`'INVALID_OPTION'`) —— 构造/写入口参非法（长度非负整数、int32 范围等）；调用方修正入参，这是永久性参数错误"
                   ]
@@ -29438,8 +29454,8 @@
               ]
             },
             {
-              "id": "6-1-读-一致性校验-有限自旋",
-              "heading": "6.1 读：一致性校验 + 有限自旋",
+              "id": "6-1-读-一致性校验-有界自旋退避",
+              "heading": "6.1 读：一致性校验 + 有界自旋退避",
               "blocks": [
                 {
                   "type": "code",
@@ -29448,7 +29464,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "只要 `before === after` 且为偶数，就能保证这次读到的 `value` 和 `version` 出自同一次已完成的写入。自旋次数上限是 65536（`1 << 16`）次；超限说明可能有写者在持锁期间异常终止（线程被杀、页面崩溃），此时无限自旋会把当前线程也拖死，所以到限直接抛 `Error`（`contentionLimit`，消息含 `did not settle before the contention limit`），把\"共享内存可能已经写坏\"暴露出来，而不是静默卡死。"
+                  "text": "只要 `before === after` 且为偶数，就能保证这次读到的 `value` 和 `version` 出自同一次已完成的写入。每轮最多自旋 65536（`1 << 16`）次；一轮用完后先退避：worker 线程用 `Atomics.wait` 阻塞至多 1 ms 等 seq 变化，不允许阻塞的线程（浏览器主线程）直接再自旋一轮。写者只是被操作系统抢占时，很快就会放锁，读者随之成功。持续争用满 约 1 秒（`CONTENTION_TIMEOUT_MS`）仍未 settle，才判定可能有写者在持锁期间异常终止（线程被杀、页面崩溃）；此时无限等待会把当前线程也拖死，所以抛 `Error`（`contentionLimit`，消息含 `did not settle before the contention limit`），把\"共享内存可能已经写坏\"暴露出来，而不是静默卡死。"
                 }
               ]
             },
@@ -29463,7 +29479,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "获锁同样有 65536 次自旋上限，超限抛 `Error`（`contentionLimit`，消息含 `lock was not acquired before the contention limit`）。写入过程中不会调用任何用户代码——`update()` 的用户回调在锁外执行，所以持锁期间不存在\"回调抛错导致锁卡在奇数\"的问题。"
+                  "text": "获锁使用同样的自旋退避与约 1 秒的持续争用上限，超限抛 `Error`（`contentionLimit`，消息含 `lock was not acquired before the contention limit`）。写入过程中不会调用任何用户代码——`update()` 的用户回调在锁外执行，所以持锁期间不存在\"回调抛错导致锁卡在奇数\"的问题。"
                 },
                 {
                   "type": "paragraph",
@@ -29578,7 +29594,7 @@
                     ],
                     [
                       "`CONTENTION_LIMIT`",
-                      "一致读自旋 65536 次未 settle，或获取写锁自旋 65536 次未成功，或 `update()` 的 CAS 重试自旋 65536 次仍未写入",
+                      "一致读持续约 1 秒未 settle，或获取写锁持续约 1 秒未成功（两者均按轮自旋并退避），或 `update()` 的 CAS 重试自旋 65536 次仍未写入",
                       "`Error`"
                     ],
                     [

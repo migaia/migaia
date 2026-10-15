@@ -643,6 +643,7 @@
         "createFullOneWayEndpoint",
         "createRpcIdempotencyStore",
         "createRuntimeApiEndpoint",
+        "defaultRpcReporter",
         "defineFeature",
         "defineMiddleware",
         "deserializeRpcError",

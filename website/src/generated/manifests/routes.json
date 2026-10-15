@@ -5943,6 +5943,12 @@
       "library": "rpc-core"
     },
     {
+      "path": "/en/docs/rpc-core/api/defaultRpcReporter",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
       "path": "/en/docs/rpc-core/api/defineFeature",
       "locale": "en",
       "domain": "docs",
@@ -21532,6 +21538,12 @@
     },
     {
       "path": "/zh/docs/rpc-core/api/createRuntimeApiEndpoint",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
+      "path": "/zh/docs/rpc-core/api/defaultRpcReporter",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-core"
