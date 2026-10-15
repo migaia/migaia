@@ -3339,12 +3339,6 @@
       "library": "resource"
     },
     {
-      "path": "/en/docs/resource/api/IResourceFetchStatus",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
       "path": "/en/docs/resource/api/IResourceFetcher",
       "locale": "en",
       "domain": "docs",
@@ -3369,12 +3363,6 @@
       "library": "resource"
     },
     {
-      "path": "/en/docs/resource/api/IResourceStatus",
-      "locale": "en",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
       "path": "/en/docs/resource/api/RESOURCE_SOURCE",
       "locale": "en",
       "domain": "docs",
@@ -3388,6 +3376,12 @@
     },
     {
       "path": "/en/docs/resource/api/ResourceErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/api/ResourceFetchStatus",
       "locale": "en",
       "domain": "docs",
       "library": "resource"
@@ -18903,12 +18897,6 @@
       "library": "resource"
     },
     {
-      "path": "/zh/docs/resource/api/IResourceFetchStatus",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
       "path": "/zh/docs/resource/api/IResourceFetcher",
       "locale": "zh",
       "domain": "docs",
@@ -18933,12 +18921,6 @@
       "library": "resource"
     },
     {
-      "path": "/zh/docs/resource/api/IResourceStatus",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "resource"
-    },
-    {
       "path": "/zh/docs/resource/api/RESOURCE_SOURCE",
       "locale": "zh",
       "domain": "docs",
@@ -18952,6 +18934,12 @@
     },
     {
       "path": "/zh/docs/resource/api/ResourceErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/api/ResourceFetchStatus",
       "locale": "zh",
       "domain": "docs",
       "library": "resource"

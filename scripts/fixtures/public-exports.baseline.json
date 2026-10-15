@@ -259,6 +259,7 @@
         "RESOURCE_SOURCE",
         "Resource",
         "ResourceErrorCode",
+        "ResourceFetchStatus",
         "ResourceStatus"
       ]
     },
