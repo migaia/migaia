@@ -428,7 +428,10 @@ describe('A1 merged public exports', () => {
             ...((errorFormatDelta.added as Record<string, string[]>)[name] ?? []),
             ...((controlSemanticsDelta.added as Record<string, string[]>)[name] ?? []),
             ...((streamingDelta.added as Record<string, string[]>)[name] ?? []),
-            ...(name === '@migaia/rpc/core' ? ['RpcProviderRejectionReason'] : []),
+            // Cross-package runtime adapters consume the same canonical fallback reporter.
+            ...(name === '@migaia/rpc/core'
+              ? ['RpcProviderRejectionReason', 'defaultRpcReporter']
+              : []),
             ...(name === '@migaia/rpc/contract'
               ? ['RPC_CONTRACT_SOURCE', 'RpcBatchPhysical', 'classifyRpcContractError']
               : []),
