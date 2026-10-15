@@ -21,7 +21,11 @@ import {
   resolveAdmissionDefinitions,
   type IDataOrderSlotState
 } from './composition.js'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, {
+  PluginHostError,
+  createPluginHostTypeError,
+  PluginHostInternalText
+} from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { reportDiagnostic } from './diagnostic-report.js'
 import { PluginHostCleanupMode } from './state-constants.js'
@@ -232,7 +236,7 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
   prepareUnUseBatch(receipts: readonly IPluginRegistrationReceipt[]): IPluginPreparedRemovalBatch {
     this.#port.assertActive()
     if (!Array.isArray(receipts))
-      throw createPluginHostTypeError('registration receipts must be an array')
+      throw createPluginHostTypeError(PluginHostInternalText.REGISTRATION_RECEIPTS_ARRAY)
     const seen = new Set<IRegistration<TDomainCore, TValue>>()
     const registrations = receipts.map((receipt) => {
       /** Exact registration and issuing host bound to this opaque receipt. */

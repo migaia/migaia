@@ -12,7 +12,8 @@ import {
 import ERROR_TEXT, {
   PluginHostError,
   attachPluginHostIdentity,
-  createPluginHostTypeError
+  createPluginHostTypeError,
+  PluginHostInternalText
 } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IDataOrderSlotState } from './composition.js'
@@ -74,7 +75,7 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
 ): void => {
   const { stage, owner } = options
   if (typeof stage !== 'function')
-    throw createPluginHostTypeError('pipeline stage must be a function')
+    throw createPluginHostTypeError(PluginHostInternalText.PIPELINE_STAGE_FUNCTION)
   if (owner && owner.lifecycle !== PluginHostRegistrationLifecycle.install)
     throw new PluginHostError(
       PluginHostErrorCode.resourceOutsideInstall,

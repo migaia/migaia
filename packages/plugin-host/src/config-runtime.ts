@@ -1,5 +1,9 @@
 import { copyConfigWithPatch, parseConfigPath, readConfigPath } from './config.js'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, {
+  PluginHostError,
+  createPluginHostTypeError,
+  PluginHostInternalText
+} from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { invokeCaptured } from './invocation.js'
 import type { IRegistration } from './registry.js'
@@ -66,7 +70,7 @@ export class PluginHostConfigRuntime<
   #read(path: string): unknown {
     this.#port.assertActive()
     if (typeof path !== 'string' || path.length === 0)
-      throw createPluginHostTypeError('config path must be a non-empty string')
+      throw createPluginHostTypeError(PluginHostInternalText.CONFIG_PATH_REQUIRED)
     /** Plugin names cannot contain dots, so the first path segment is an exact map key. */
     const separator = path.indexOf('.')
     const name = separator < 0 ? path : path.slice(0, separator)

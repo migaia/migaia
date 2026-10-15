@@ -4,7 +4,11 @@ import type { IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
 import { createPluginCore, type IPluginRuntimeIntegration } from './core.js'
 import { resolveDisposer } from './disposal.js'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, {
+  PluginHostError,
+  createPluginHostTypeError,
+  PluginHostInternalText
+} from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import type { IRegistration } from './registry.js'
@@ -98,7 +102,11 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
       registration.provisional ?? registration.scope!
     owner.own(
       disposer,
-      this.#port.cleanupRuntime.createStepDescriptor('resource disposer', disposer, registration)
+      this.#port.cleanupRuntime.createStepDescriptor(
+        PluginHostInternalText.RESOURCE_DISPOSER_PHASE,
+        disposer,
+        registration
+      )
     )
   }
 }

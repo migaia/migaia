@@ -323,3 +323,96 @@ const ERROR_TEXT = {
 } as const
 
 export default ERROR_TEXT
+
+/**
+ * Package-private validation and composition text. Existing native TypeError messages intentionally
+ * keep their unprefixed spelling; the root's public ERROR_TEXT object remains unchanged.
+ */
+export const PluginHostInternalText = {
+  /** Optional budget validation used during Host option admission. */
+  TIMEOUT_OPTION: (label: string): string =>
+    `${label} must be false or a non-negative finite number`,
+  /** Mandatory execution budgets must be supplied explicitly rather than defaulted. */
+  TIMEOUT_REQUIRED: (label: string): string =>
+    `${label} must be provided as false or a non-negative finite number`,
+  /** Config record admission rejects arrays and non-plain prototypes with the same native text. */
+  RECORD_OBJECT: (label: string): string => `${label} must be a plain object`,
+  /** Config snapshots cannot retain symbol keys across the public string-path boundary. */
+  RECORD_SYMBOL_KEYS: (label: string): string => `${label} symbol keys are not allowed`,
+  /** Names the rejected prototype-sensitive key without changing the admission error type. */
+  RECORD_KEY: (label: string, key: string): string => `${label} key "${key}" is not allowed`,
+  /** Record admission snapshots values without running accessor callbacks. */
+  RECORD_DATA: (label: string): string => `${label} properties must be data properties`,
+  /** Wraps the canonical utils path parser failure while keeping it on cause. */
+  CONFIG_PATH_INVALID: 'config path is invalid',
+  /** Config get/update reject an empty path before resolving a registration. */
+  CONFIG_PATH_REQUIRED: 'config path must be a non-empty string',
+  /** A registered pipeline stage must be callable before it can own a lane entry. */
+  PIPELINE_STAGE_FUNCTION: 'pipeline stage must be a function',
+  /** Domain facades admit only plain data records, independent of Host lifecycle capabilities. */
+  DOMAIN_CORE_OBJECT: 'domain core must be a plain object',
+  /** Domain-provided fields cannot replace lifecycle or pipeline capabilities owned by Host. */
+  DOMAIN_CORE_RESERVED: (key: PropertyKey): string =>
+    `domain core key "${String(key)}" is reserved`,
+  /** Domain properties are captured once instead of publishing live accessors. */
+  DOMAIN_CORE_DATA: 'domain core must contain enumerable data properties',
+  /** Construction requires independent mutation and pipeline-drain budgets. */
+  EXECUTION_REQUIRED: 'execution must provide mutation and pipeline drain budgets',
+  /** Scheduler admission needs both clock and scheduling capabilities. */
+  SCHEDULER_FUNCTIONS: 'scheduler must provide now() and schedule() functions',
+  /** Functional plugin definition fields are read from own data descriptors only. */
+  PLUGIN_PROPERTY_DATA: (key: PropertyKey): string =>
+    `plugin ${String(key)} must be a data property`,
+  /** Functional definition names use the existing non-empty, dot-free public grammar. */
+  PLUGIN_NAME_STRICT: 'plugin name must be a non-empty string without "."',
+  /** Raw admission reports an omitted name before testing the dot restriction. */
+  PLUGIN_NAME_REQUIRED: 'plugin name must be a non-empty string',
+  /** Raw names cannot introduce a config-path segment delimiter. */
+  PLUGIN_NAME_DOT: 'plugin name must not contain "."',
+  /** Both raw and functional definitions require a callable installer. */
+  PLUGIN_INSTALL_FUNCTION: 'plugin install must be a function',
+  /** Optional lifecycle hooks are captured as functions before installation starts. */
+  PLUGIN_HOOK_FUNCTION: (key: string): string => `plugin ${key} must be a function`,
+  /** Symbol disposer diagnostics name the captured key rather than reading the owner again. */
+  PLUGIN_DISPOSER_FUNCTION: (key: PropertyKey): string =>
+    `plugin disposer ${String(key)} must be a function`,
+  /** Extra definition metadata cannot retain hidden fields or accessors. */
+  PLUGIN_METADATA_DATA: 'plugin metadata must be enumerable data properties',
+  /** Managed removal snapshots exact receipts before accepting the batch. */
+  REGISTRATION_RECEIPTS_ARRAY: 'registration receipts must be an array',
+  /** Install output must be an object before extension descriptors are inspected. */
+  EXTENSION_OBJECT: 'plugin install() must return an object',
+  /** Extension publication cannot inherit capabilities from a custom prototype. */
+  EXTENSION_PLAIN_OBJECT: 'plugin install() must return a plain object',
+  /** Captured extension descriptors must support the publication overlay transaction. */
+  EXTENSION_DATA: 'extension property must be a configurable data property',
+  /** Adds the original install failure text while the caller preserves the raw cause object. */
+  PLUGIN_INSTALL_FAILURE_DETAIL: (name: string, cause: unknown): string =>
+    `${ERROR_TEXT.PLUGIN_INSTALL_FAILED(name)}: ${cause instanceof Error ? cause.message : String(cause)}`,
+  /** Secondary messages preserve rollback order; raw failures remain in the diagnostic aggregate. */
+  PLUGIN_ROLLBACK_FAILURE_DETAIL: (name: string, errors: readonly unknown[]): string => {
+    /** Display-only collation never changes the original error list or its identities. */
+    const detail = errors
+      .map((error) => (error instanceof Error ? error.message : String(error)))
+      .join('; ')
+    return `${ERROR_TEXT.PLUGIN_ROLLBACK_FAILED(name)}: ${detail}`
+  },
+  /** Identifies the plugin-first release step in cleanup diagnostics and late error provenance. */
+  PLUGIN_DISPOSE_PHASE: 'plugin dispose hook',
+  /** Scope resources share this phase across registration and final error projection. */
+  RESOURCE_DISPOSER_PHASE: 'resource disposer',
+  /** Public detail.reason for unsupported symbol-valued config leaves. */
+  CONFIG_REASON_SYMBOL: 'symbol',
+  /** Public detail.reason for a repeated ancestor in the config value graph. */
+  CONFIG_REASON_CYCLE: 'cycle',
+  /** Public detail.reason for config values with a custom prototype. */
+  CONFIG_REASON_PROTOTYPE: 'prototype',
+  /** Public detail.reason for array properties outside canonical numeric indices. */
+  CONFIG_REASON_ARRAY_KEY: 'array-key',
+  /** Public detail.reason for a symbol or prototype-sensitive record key. */
+  CONFIG_REASON_KEY: 'key',
+  /** Public detail.reason for non-enumerable or accessor config descriptors. */
+  CONFIG_REASON_DESCRIPTOR: 'descriptor',
+  /** Public detail.reason for config records that would participate in Promise assimilation. */
+  CONFIG_REASON_THENABLE: 'thenable'
+} as const
