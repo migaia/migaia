@@ -1055,6 +1055,21 @@
                 "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
               }
             ]
+          },
+          {
+            "id": "跨-realm-error-识别",
+            "heading": "跨 realm Error 识别",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`isNativeErrorValue(value)` 从 `@migaia/utils/error`（或 root）导入。它识别 Error-family 的 prototype chain，帮助边界保留原 Error identity；不会调用输入的方法，无法检查的 proxy 返回 false。它只是诊断形状检查，不能用于认证不可信输入。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
+              }
+            ]
           }
         ]
       },
@@ -2237,6 +2252,21 @@
                 "type": "code",
                 "language": "bash",
                 "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+              }
+            ]
+          },
+          {
+            "id": "跨-realm-error-识别",
+            "heading": "跨 realm Error 识别",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "`isNativeErrorValue(value)` 从 `@migaia/utils/error`（或 root）导入。它识别 Error-family 的 prototype chain，帮助边界保留原 Error identity；不会调用输入的方法，无法检查的 proxy 返回 false。它只是诊断形状检查，不能用于认证不可信输入。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
               }
             ]
           }
@@ -3785,6 +3815,16 @@
           "ownerExportPath": "./object",
           "ownerModule": "object",
           "ownerFragment": "utils-object--ISnapshotDiagnostic"
+        },
+        {
+          "identity": "packages/utils/dist/error.d.ts:isNativeErrorValue:export declare function isNativeErrorValue(value: unknown): value is Error;",
+          "name": "isNativeErrorValue",
+          "signature": "export declare function isNativeErrorValue(value: unknown): value is Error;",
+          "source": "packages/utils/dist/error.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./error",
+          "ownerModule": "error",
+          "ownerFragment": "utils-error--isNativeErrorValue"
         },
         {
           "identity": "packages/utils/dist/value.d.ts:isNullish:export declare const isNullish: (value: unknown) => value is null | undefined;",
@@ -10816,7 +10856,7 @@
           "name": "attachErrorIdentity",
           "kind": "function",
           "signature": "export declare function attachErrorIdentity<T extends object>(error: T, identity: IErrorIdentity, hooks?: IErrorIdentityHooks<T>): T;",
-          "declarationLine": 64,
+          "declarationLine": 70,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Attaches stable identity without replacing the original object. Optional hooks let a module preserve its own fallback semantics for conflicts and non-extensible targets.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for attachErrorIdentity.",
@@ -11174,7 +11214,7 @@
           "name": "attachSecondaryErrors",
           "kind": "function",
           "signature": "export declare function attachSecondaryErrors(primary: unknown, secondaryErrors: readonly unknown[]): unknown;",
-          "declarationLine": 69,
+          "declarationLine": 75,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Appends secondary failures to a primary without changing primary identity. A hostile or non-extensible primary receives an `AggregateError` fallback whose first entry is the primary.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for attachSecondaryErrors.",
@@ -11261,7 +11301,7 @@
           "name": "combineErrors",
           "kind": "function",
           "signature": "export declare function combineErrors(errors: Iterable<unknown>, message: string): Error | undefined;",
-          "declarationLine": 81,
+          "declarationLine": 87,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Combines zero, one, or many errors while preserving iteration failures.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for combineErrors.",
@@ -11834,7 +11874,7 @@
           "name": "IErrorIdentity",
           "kind": "type",
           "signature": "export type IErrorIdentity = { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; };",
-          "declarationLine": 36,
+          "declarationLine": 42,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Stable identity fields shared by module-boundary native errors.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IErrorIdentity.",
@@ -11897,7 +11937,7 @@
           "name": "IErrorIdentityHooks",
           "kind": "type",
           "signature": "export type IErrorIdentityHooks<T extends object> = { readonly onConflict?: (context: { readonly target: T; readonly key: string; readonly existing: unknown; readonly incoming: unknown; }) => T; readonly onFailure?: (context: { readonly target: T; readonly key: string; readonly incoming: unknown; readonly cause: unknown; }) => T; };",
-          "declarationLine": 46,
+          "declarationLine": 52,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Caller-owned recovery for an identity attachment conflict or descriptor write failure. Each hook returns the target that receives any remaining identity fields.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IErrorIdentityHooks.",
@@ -12183,10 +12223,105 @@
           "fragment": "utils-error--ISerializedErrorChain"
         },
         {
+          "name": "isNativeErrorValue",
+          "kind": "function",
+          "signature": "export declare function isNativeErrorValue(value: unknown): value is Error;",
+          "declarationLine": 20,
+          "source": "packages/utils/dist/error.d.ts",
+          "purpose": "Recognizes Error-family prototype chains across realms for native identity preservation. This is a diagnostic shape check, not proof of trust or native internal slots. It never invokes caller methods and returns false when a revoked proxy or hostile prototype cannot be inspected.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isNativeErrorValue.",
+          "advanced": "No additional advanced behavior is declared for isNativeErrorValue.",
+          "parameters": ["value: unknown"],
+          "parameterDetails": [
+            {
+              "name": "value",
+              "type": "unknown",
+              "optional": false
+            }
+          ],
+          "returns": "value is Error",
+          "errors": ["No documented errors are declared for isNativeErrorValue."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isNativeErrorValue.",
+          "examples": [
+            "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
+          ],
+          "members": [],
+          "exportPath": "./error",
+          "overloadSignatures": [
+            "export declare function isNativeErrorValue(value: unknown): value is Error;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "value",
+                "type": "unknown",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["value is Error"],
+          "whenToUse": "Use isNativeErrorValue when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when isNativeErrorValue does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Recognizes Error-family prototype chains across realms for native identity preservation. This is a diagnostic shape check, not proof of trust or native internal slots. It never invokes caller methods and returns false when a revoked proxy or hostile prototype cannot be inspected."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import isNativeErrorValue from @migaia/utils/error, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use isNativeErrorValue when its function contract and declared inputs match the result you need. Choose a different public symbol when isNativeErrorValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isNativeErrorValue."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for isNativeErrorValue."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/utils/dist/error.d.ts:isNativeErrorValue:export declare function isNativeErrorValue(value: unknown): value is Error;",
+          "guidance": [
+            {
+              "id": "跨-realm-error-识别",
+              "heading": "跨 realm Error 识别",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`isNativeErrorValue(value)` 从 `@migaia/utils/error`（或 root）导入。它识别 Error-family 的 prototype chain，帮助边界保留原 Error identity；不会调用输入的方法，无法检查的 proxy 返回 false。它只是诊断形状检查，不能用于认证不可信输入。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { isNativeErrorValue } from '@migaia/utils/error'\n\nconst failure: unknown = new TypeError('invalid input')\nif (isNativeErrorValue(failure)) console.log(failure.stack)"
+                }
+              ]
+            }
+          ],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "utils-error--isNativeErrorValue"
+        },
+        {
           "name": "isUtilsAbortError",
           "kind": "function",
           "signature": "export declare function isUtilsAbortError(value: unknown): value is UtilsAbortError;",
-          "declarationLine": 83,
+          "declarationLine": 89,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "isUtilsAbortError is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUtilsAbortError.",
@@ -12505,7 +12640,7 @@
           "name": "isUtilsError",
           "kind": "function",
           "signature": "export declare function isUtilsError(value: unknown): value is UtilsError;",
-          "declarationLine": 82,
+          "declarationLine": 88,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "isUtilsError is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUtilsError.",
@@ -12824,7 +12959,7 @@
           "name": "isUtilsTimeoutError",
           "kind": "function",
           "signature": "export declare function isUtilsTimeoutError(value: unknown): value is UtilsTimeoutError;",
-          "declarationLine": 84,
+          "declarationLine": 90,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "isUtilsTimeoutError is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUtilsTimeoutError.",
@@ -13349,7 +13484,7 @@
           "name": "safeErrorReason",
           "kind": "function",
           "signature": "export declare function safeErrorReason(error: unknown, fallback: string): string;",
-          "declarationLine": 71,
+          "declarationLine": 77,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Reads an arbitrary failure's diagnostic reason once, returning a caller-owned safe fallback.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for safeErrorReason.",
@@ -13640,7 +13775,7 @@
           "name": "toError",
           "kind": "function",
           "signature": "export declare function toError(value: unknown, options?: { readonly message?: string; }): Error;",
-          "declarationLine": 73,
+          "declarationLine": 79,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Converts arbitrary thrown values while preserving the original as cause.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for toError.",
@@ -14356,7 +14491,7 @@
           "name": "UtilsAbortError",
           "kind": "class",
           "signature": "export declare class UtilsAbortError extends UtilsError { readonly name: \"AbortError\"; constructor(reason?: unknown); }",
-          "declarationLine": 24,
+          "declarationLine": 30,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Error representing cooperative cancellation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for UtilsAbortError.",
@@ -14686,7 +14821,7 @@
           "name": "UtilsError",
           "kind": "class",
           "signature": "export declare abstract class UtilsError extends Error { readonly source: \"@migaia/utils\"; readonly code: IUtilsErrorCode; protected constructor(code: IUtilsErrorCode, message: string, options?: { readonly cause?: unknown; }); }",
-          "declarationLine": 16,
+          "declarationLine": 22,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Base error retaining the utils source and stable semantic code.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for UtilsError.",
@@ -15090,7 +15225,7 @@
           "name": "UtilsTimeoutError",
           "kind": "class",
           "signature": "export declare class UtilsTimeoutError extends UtilsError { readonly scope: 'operation' | 'attempt' | 'total'; readonly timeoutMs: number; readonly name: \"TimeoutError\"; constructor(scope: 'operation' | 'attempt' | 'total', timeoutMs: number); }",
-          "declarationLine": 29,
+          "declarationLine": 35,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Error representing an operation, attempt, or total deadline.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for UtilsTimeoutError.",
@@ -15446,7 +15581,7 @@
           "name": "walkErrorCauses",
           "kind": "function",
           "signature": "export declare function walkErrorCauses(error: unknown, options?: { readonly maxDepth?: number; }): readonly unknown[];",
-          "declarationLine": 77,
+          "declarationLine": 83,
           "source": "packages/utils/dist/error.d.ts",
           "purpose": "Walks cause and AggregateError chains with bounded identity deduplication.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for walkErrorCauses.",

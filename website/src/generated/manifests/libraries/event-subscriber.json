@@ -43,7 +43,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "提供两个入口：root `@migaia/event-subscriber`，以及订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。"
+                "text": "提供两个入口：root `@migaia/event-subscriber`（channel/Hub 与 invoke helper），以及唯一的订阅 helper 子路径 `@migaia/event-subscriber/subscriber`。唯一的 workspace 运行时依赖是 `@migaia/utils`。"
               }
             ]
           },
@@ -111,7 +111,7 @@
                 "type": "list",
                 "items": [
                   "`subscribe(listener, options?: { taskId?: string }): subscription` —— 返回可直接调用的 handle；handle 同时提供 `unsubscribe` 自身别名与链式 `subscribe`。styled handle 还提供对应的 subscribe/cancellation aliases（如 `on`/`off`）。解除会按逆序释放整条 chain；关闭后再扩展抛 `SUBSCRIPTION_CLOSED`。显式 `unique` 只改变 listener admission，不改变同步失败的 `PUBLISH_FAILED` 聚合。",
-                  "`subscribeOnce` / `subscribeUntil`（见下方 Helper 模块，channel 上也直接暴露同名方法）",
+                  "一次性与 signal 订阅使用 `@migaia/event-subscriber/subscriber` 的独立 helper（见下方）。",
                   "`publish(value: T): void` —— 按快照顺序同步调用全部 listener，不等待 Promise；默认同步重入 publish 递归交付，`dispatchPolicy: 'queued'` 才会排队到当前快照完成后再交付；同步失败以 `PUBLISH_FAILED` 的 `AggregateError` 抛出",
                   "`filterTaskId(taskId: string): IFilteredEventChannel<T, R>` —— 创建只读 task 选择 view，交给异步发布 helper",
                   "`clear(): void` —— 清空全部 registration，不执行 listener 自身的 cleanup",
@@ -175,7 +175,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel；但它们不读取 style 配置，函数名固定为 `subscribeOnce` / `subscribeUntil` / `subscribeSubscriber`，返回值固定为 canonical `IUnsubscribe`，不会带上 `off`、`dispose`、`unlisten` 等 style alias。需要 styled handle 时，请直接调用 channel 自己的 `subscribeOnce()` / `subscribeUntil()` 方法。"
+                "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel；但它们不读取 style 配置，函数名固定为 `subscribeOnce` / `subscribeUntil` / `subscribeSubscriber`，返回值固定为 canonical `IUnsubscribe`，不会带上 `off`、`dispose`、`unlisten` 等 style alias。需要 styled 链式 handle 时，使用 channel.subscribe()；这些独立 helper 统一返回 canonical IUnsubscribe。"
               },
               {
                 "type": "paragraph",
@@ -449,7 +449,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
+                "code": "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
               }
             ]
           },
@@ -471,7 +471,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
+                "code": "import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
               }
             ]
           },
@@ -498,6 +498,20 @@
                 "type": "code",
                 "language": "bash",
                 "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+              }
+            ]
+          },
+          {
+            "id": "固定-hub-策略与-channel-移除策略",
+            "heading": "固定 Hub 策略与 channel 移除策略",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Hub 的内部 channel 固定使用 recursive 派发、multiple 准入、handle 移除、每次 publish 100000 listener 调用预算及非严格 aborted 准入；它不暴露内部 channel，也不接受单 channel 的策略配置。需要选择 dispatchPolicy、admissionPolicy、publishBudget 或 throwOnAborted 时，直接创建 channel。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`EventRemovalPolicy.handle` 仅释放当前 registration；`EventRemovalPolicy.listenerAll` 释放相同 listener identity 的全部登记。logger hook 会复用同一 hook 对应的 listener，所以 listenerAll 在真实 hook 注销路径生效。"
               }
             ]
           }
@@ -694,7 +708,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel，不要求是 `createEventChannel()` 产出的实例。但 helper 本身不读取 style 配置：导出名固定，返回值固定为 canonical `IUnsubscribe`，不会投影 `off`、`dispose`、`unlisten` 等 alias。需要 styled handle 时，直接调用 channel 实例上的 `subscribeOnce()` / `subscribeUntil()`。"
+                "text": "这三个 helper 只调用 canonical `subscribe(listener, options?)`，因此可接收保留该方法的 styled channel，也能用于结构兼容的第三方 channel，不要求是 `createEventChannel()` 产出的实例。但 helper 本身不读取 style 配置：导出名固定，返回值固定为 canonical `IUnsubscribe`，不会投影 `off`、`dispose`、`unlisten` 等 alias。需要 styled 链式 handle 时，使用 channel.subscribe()；独立 helper 统一返回 canonical IUnsubscribe。"
               }
             ]
           },
@@ -1158,7 +1172,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
+                "code": "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
               }
             ]
           },
@@ -1180,7 +1194,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
+                "code": "import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
               }
             ]
           },
@@ -1226,6 +1240,20 @@
                 "type": "code",
                 "language": "bash",
                 "code": "pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test"
+              }
+            ]
+          },
+          {
+            "id": "固定-hub-策略与-channel-移除策略",
+            "heading": "固定 Hub 策略与 channel 移除策略",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Hub 的内部 channel 固定使用 recursive 派发、multiple 准入、handle 移除、每次 publish 100000 listener 调用预算及非严格 aborted 准入；它不暴露内部 channel，也不接受单 channel 的策略配置。需要选择 dispatchPolicy、admissionPolicy、publishBudget 或 throwOnAborted 时，直接创建 channel。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`EventRemovalPolicy.handle` 仅释放当前 registration；`EventRemovalPolicy.listenerAll` 释放相同 listener identity 的全部登记。logger hook 会复用同一 hook 对应的 listener，所以 listenerAll 在真实 hook 注销路径生效。"
               }
             ]
           }
@@ -1327,8 +1355,8 @@
             "import { createEventChannel, invokeTaskSettled } from '@migaia/event-subscriber'\n\ntype IEmailJob = { readonly recipient: string; readonly template: 'welcome' }\ntype IEmailReceipt = { readonly messageId: string }\n\nconst tasks = createEventChannel<IEmailJob, IEmailReceipt>()\ntasks.subscribe(\n  async ({ value: job }) => {\n    const response = await fetch('/api/email', {\n      method: 'POST',\n      headers: { 'content-type': 'application/json' },\n      body: JSON.stringify(job)\n    })\n    return response.json() as Promise<IEmailReceipt>\n  },\n  { taskId: 'email' }\n)\n\nconst job: IEmailJob = { recipient: 'ada@example.com', template: 'welcome' }\nconst result = await invokeTaskSettled(tasks, 'email', job)\n// result 是 { status: 'fulfilled', value: { messageId } }\n// 或 { status: 'rejected', reason }",
             "import { createEventChannel, invokeTask } from '@migaia/event-subscriber'\n\nconst jobs = createEventChannel<string, string>()\njobs.subscribe((event) => `email:${event.value}`, { taskId: 'email' })\njobs.subscribe((event) => `audit:${event.value}`, { taskId: 'audit' })\n\nconst emailResult = await invokeTask(jobs, 'email', 'created')",
             "import { createEventChannel, invokeParallelSettled } from '@migaia/event-subscriber'\n\nconst checks = createEventChannel<string, boolean>({\n  terminalReport: (diagnostic) => emergencySink.capture(diagnostic)\n})\nchecks.subscribe(async (event) => event.value.length > 0)\nchecks.subscribe(async (event) => event.value.startsWith('usr_'))\n\nconst results = await invokeParallelSettled(checks, 'usr_42')",
-            "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')",
-            "import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')",
+            "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')",
+            "import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')",
             "type IEvent = { readonly data: { readonly id: number } }\nconst valueConfig = { readPath: 'data.id', alias: 'resource' } as const\nconst channel = createEventChannel<IEvent, void, undefined, typeof valueConfig>({ valueConfig })\nchannel.subscribe((event) => {\n  event.value // 原始 published value\n  event.resource // number | undefined\n  event.abort() // 原有 context controls 保留\n})",
             "const events = createEventChannel<number>({ style: 'on-emit' })\nconst stop = events.on((event) => console.log(event.value))\nevents.emit(1)\nstop.off()",
             "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()",
@@ -1479,7 +1507,7 @@
             },
             {
               "name": "removalPolicy",
-              "type": "'handle' | 'listener-all'",
+              "type": "IEventRemovalPolicy",
               "optional": true,
               "description": "Controls whether one subscription handle removes only itself or all matching listeners."
             },
@@ -1732,7 +1760,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
+                  "code": "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
                 }
               ]
             },
@@ -1813,7 +1841,7 @@
             },
             {
               "name": "removalPolicy",
-              "type": "'handle' | 'listener-all'",
+              "type": "IEventRemovalPolicy",
               "optional": true,
               "description": "`removalPolicy` 决定调用一个订阅句柄时解除多少登记。默认 `handle` 只解除该句柄所属的单次登记；`listener-all` 会同时解除同一 listener 在该 channel 上的全部登记。需要精确管理重复订阅时保持默认值；只有兼容“按函数整体移除”的调用方才选择 `listener-all`。其他值在构造阶段以 `INVALID_OPTIONS` 拒绝。",
               "descriptionEn": "Controls whether one subscription handle removes only itself or all matching listeners.",
@@ -2782,6 +2810,70 @@
           "fragment": "event-subscriber-index--EventDispatchPolicy"
         },
         {
+          "name": "EventRemovalPolicy",
+          "kind": "const",
+          "signature": "export declare const EventRemovalPolicy: { readonly handle: \"handle\"; readonly listenerAll: \"listener-all\"; };",
+          "declarationLine": 21,
+          "source": "packages/event-subscriber/dist/state-constants.d.ts",
+          "purpose": "Controls whether a channel handle releases one registration or every equal listener identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for EventRemovalPolicy.",
+          "advanced": "No additional advanced behavior is declared for EventRemovalPolicy.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for EventRemovalPolicy."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for EventRemovalPolicy.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "EventRemovalPolicy",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const EventRemovalPolicy: { readonly handle: \"handle\"; readonly listenerAll: \"listener-all\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use EventRemovalPolicy when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when EventRemovalPolicy does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Controls whether a channel handle releases one registration or every equal listener identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import EventRemovalPolicy from @migaia/event-subscriber, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use EventRemovalPolicy when its const contract and declared inputs match the result you need. Choose a different public symbol when EventRemovalPolicy does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for EventRemovalPolicy."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for EventRemovalPolicy."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/event-subscriber/dist/state-constants.d.ts:EventRemovalPolicy:export declare const EventRemovalPolicy: { readonly handle: \"handle\"; readonly listenerAll: \"listener-all\"; };",
+          "guidance": [],
+          "usageScore": 12,
+          "configuration": [],
+          "fragment": "event-subscriber-index--EventRemovalPolicy"
+        },
+        {
           "name": "EventSubscriberErrorCode",
           "kind": "const",
           "signature": "export declare const EventSubscriberErrorCode: { /** Invalid listener/reporter or terminal reporter input; caller must pass a function. */ readonly invalidListener: \"INVALID_LISTENER\"; /** Invalid report/terminalReport function; caller must provide a callable reporter or omit it. */ readonly invalidReporter: \"INVALID_REPORTER\"; /** A helper received a malformed or non-canonical channel; caller must use a factory channel. */ readonly invalidChannel: \"INVALID_CHANNEL\"; /** * A signal-like value failed structural validation or abort rollback; caller must provide a valid * signal. */ readonly invalidSignal: \"INVALID_SIGNAL\"; /** A canonical channel was subscribed with an already-aborted signal under strict admission. */ readonly aborted: \"ABORTED\"; /** An object subscriber lacks handle(); caller must implement the typing contract. */ readonly invalidSubscriber: \"INVALID_SUBSCRIBER\"; /** A hub key is not string, number, or symbol; caller must use a valid property key. */ readonly invalidEventKey: \"INVALID_EVENT_KEY\"; /** Strict task publish found no registration; caller must fix the taskId or registration lifetime. */ readonly taskNotFound: \"TASK_NOT_FOUND\"; /** Strict task publish found multiple registrations; caller must make the taskId unique. */ readonly taskNotUnique: \"TASK_NOT_UNIQUE\"; /** * A task label is empty or not a string; caller must pass a non-empty string or undefined where * allowed. */ readonly invalidTaskId: \"INVALID_TASK_ID\"; /** A public options object or field is malformed; caller must correct the option shape. */ readonly invalidOptions: \"INVALID_OPTIONS\"; /** One or more listeners failed after the full target snapshot was processed. */ readonly publishFailed: \"PUBLISH_FAILED\"; /** A configured value path was missing, blocked, or threw while delivering an event. */ readonly valueProjectionFailed: \"VALUE_PROJECTION_FAILED\"; /** * A fire-and-forget listener failure reached terminal diagnostics after report handling failed or * was absent. */ readonly unhandledListenerFailure: \"UNHANDLED_LISTENER_FAILURE\"; /** A callable subscription chain was closed; caller must retain a live handle. */ readonly subscriptionClosed: \"SUBSCRIPTION_CLOSED\"; /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ /** * Handle descriptor projection failed after registration; the module rolls back the first * registration and preserves the projection failure as the primary cause. */ readonly subscriptionHandleProjectionFailed: \"SUBSCRIPTION_HANDLE_PROJECTION_FAILED\"; /** A captured invocation was called after completion or more than once. */ readonly invocationClosed: \"INVOCATION_CLOSED\"; /** * Closing a subscription chain ran every disposer and more than one failed. The AggregateError * keeps the original failures in run order on `errors`; a single failure is rethrown unchanged. */ readonly subscriptionDisposeFailed: \"SUBSCRIPTION_DISPOSE_FAILED\"; };",
@@ -3112,7 +3204,7 @@
           "name": "ICanonicalEventChannel",
           "kind": "type",
           "signature": "export type ICanonicalEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = IEventChannel<T, R, S, V> & { readonly [canonicalChannelBrand]: true; };",
-          "declarationLine": 134,
+          "declarationLine": 127,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "ICanonicalEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICanonicalEventChannel.",
@@ -3377,8 +3469,8 @@
         {
           "name": "IEventChannel",
           "kind": "type",
-          "signature": "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
-          "declarationLine": 109,
+          "signature": "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
+          "declarationLine": 108,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannel.",
@@ -3397,7 +3489,7 @@
           "aliasOf": "IEventChannel",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };"
+            "export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3436,7 +3528,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannel:export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; subscribeOnce(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; subscribeUntil(signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
+          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannel:export type IEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IEventChannelSubscription<T, R, S, V>; publish(value: T): void; filterTaskId(taskId: string): IFilteredEventChannel<T, R, V>; clear(): void; readonly size: number; };",
           "guidance": [],
           "usageScore": 32,
           "configuration": [],
@@ -3445,8 +3537,8 @@
         {
           "name": "IEventChannelOptions",
           "kind": "type",
-          "signature": "export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Selects whether one listener identity has one registration or each subscribe owns a new one. */ readonly admissionPolicy?: IEventAdmissionPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };",
-          "declarationLine": 176,
+          "signature": "export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Selects whether one listener identity has one registration or each subscribe owns a new one. */ readonly admissionPolicy?: IEventAdmissionPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: IEventRemovalPolicy; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };",
+          "declarationLine": 174,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelOptions is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelOptions.",
@@ -3464,7 +3556,7 @@
           "aliasOf": "IEventChannelOptions",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Selects whether one listener identity has one registration or each subscribe owns a new one. */ readonly admissionPolicy?: IEventAdmissionPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };"
+            "export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Selects whether one listener identity has one registration or each subscribe owns a new one. */ readonly admissionPolicy?: IEventAdmissionPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: IEventRemovalPolicy; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3503,7 +3595,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannelOptions:export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Selects whether one listener identity has one registration or each subscribe owns a new one. */ readonly admissionPolicy?: IEventAdmissionPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: 'handle' | 'listener-all'; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };",
+          "identity": "packages/event-subscriber/dist/types.d.ts:IEventChannelOptions:export type IEventChannelOptions<T, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventReport<T, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; /** Controls synchronous nested publishes while preserving listener snapshot semantics. */ readonly dispatchPolicy?: IEventDispatchPolicy; /** Selects whether one listener identity has one registration or each subscribe owns a new one. */ readonly admissionPolicy?: IEventAdmissionPolicy; /** Controls whether one subscription handle removes only itself or all matching listeners. */ readonly removalPolicy?: IEventRemovalPolicy; /** Maximum listener invocations in one top-level synchronous publish transaction. */ readonly publishBudget?: number; /** * Opt in to throwing on already-aborted canonical-channel admission after owned cleanup; the * default returns a rejected receipt without invoking listeners. */ readonly throwOnAborted?: boolean; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<T, V>; };",
           "guidance": [],
           "usageScore": 26,
           "configuration": [],
@@ -3513,7 +3605,7 @@
           "name": "IEventChannelSubscription",
           "kind": "type",
           "signature": "export type IEventChannelSubscription<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = IUnsubscribe & { readonly unsubscribe: IEventChannelSubscription<T, R, S, V>; readonly subscribe: (listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IEventChannelSubscription<T, R, S, V>; } & IEventChannelSubscriptionStyleProjection<T, R, S, V>;",
-          "declarationLine": 23,
+          "declarationLine": 22,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelSubscription is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelSubscription.",
@@ -3644,7 +3736,7 @@
           "name": "IEventHub",
           "kind": "type",
           "signature": "export type IEventHub<C extends IEventMap, S extends IEventApiStyle | undefined = undefined, V = undefined> = { subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>): IEventHubSubscription<C, IEventHubNextUsedKey<C, never, K>, S, V>; publish<K extends keyof C>(key: K, value: C[K]): void; clear(key?: keyof C): void; size(key?: keyof C): number; };",
-          "declarationLine": 151,
+          "declarationLine": 149,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHub is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHub.",
@@ -3713,9 +3805,9 @@
           "name": "IEventHubOptions",
           "kind": "type",
           "signature": "export type IEventHubOptions<C extends IEventMap, S extends IEventApiStyle | undefined = undefined, V = undefined> = { readonly report?: (failure: IEventHubReport<C, V>) => void | PromiseLike<void>; readonly terminalReport?: (error: unknown) => void | PromiseLike<void>; readonly style?: IEventApiStyleOption<S>; readonly valueConfig?: IValidatedEventValueConfig<C[keyof C], V>; };",
-          "declarationLine": 145,
+          "declarationLine": 143,
           "source": "packages/event-subscriber/dist/types.d.ts",
-          "purpose": "IEventHubOptions is part of this module's public type contract.",
+          "purpose": "A keyed fanout hub deliberately fixes recursive dispatch, multiple admission, handle removal, a 100000-invocation publish budget and non-throwing aborted admission on its private channels. Use createEventChannel when dispatch/admission/budget/abort policies must be selected by the owner.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubOptions.",
           "advanced": "No additional advanced behavior is declared for IEventHubOptions.",
           "parameters": ["This type declaration has no parameters."],
@@ -3742,7 +3834,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "IEventHubOptions is part of this module's public type contract."
+              "content": "A keyed fanout hub deliberately fixes recursive dispatch, multiple admission, handle removal, a 100000-invocation publish budget and non-throwing aborted admission on its private channels. Use createEventChannel when dispatch/admission/budget/abort policies must be selected by the owner."
             },
             {
               "id": "getting-started",
@@ -3781,7 +3873,7 @@
           "name": "IEventHubReport",
           "kind": "type",
           "signature": "export type IEventHubReport<C extends IEventMap, V = undefined> = { [K in keyof C]: { readonly key: K; readonly event: IProjectedEventContext<C[K], IEventValueForKey<C[K], V>>; readonly error: unknown; }; }[keyof C];",
-          "declarationLine": 138,
+          "declarationLine": 131,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHubReport is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubReport.",
@@ -3848,7 +3940,7 @@
           "name": "IEventHubSubscription",
           "kind": "type",
           "signature": "export type IEventHubSubscription<C extends IEventMap, UsedKeys = never, S extends IEventApiStyle | undefined = undefined, V = undefined> = IUnsubscribe & { readonly unsubscribe: IEventHubSubscription<C, UsedKeys, S, V>; readonly subscribe: <K extends IEventHubAvailableKey<C, UsedKeys>>(key: K, listener: IEventListener<C[K], void, IEventValueForKey<C[K], V>>) => IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S, V>; } & IEventHubSubscriptionStyleProjection<C, UsedKeys, S, V>;",
-          "declarationLine": 29,
+          "declarationLine": 28,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventHubSubscription is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventHubSubscription.",
@@ -3915,7 +4007,7 @@
           "name": "IEventInvocation",
           "kind": "type",
           "signature": "export type IEventInvocation<R> = { readonly taskId: string | undefined; invoke(): R | PromiseLike<R>; };",
-          "declarationLine": 59,
+          "declarationLine": 58,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Opaque invocation entry used by consumers that must not receive listener ownership.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventInvocation.",
@@ -3979,7 +4071,7 @@
           "name": "IEventInvocationVisitor",
           "kind": "type",
           "signature": "export type IEventInvocationVisitor<R> = (entries: readonly IEventInvocation<R>[]) => void | PromiseLike<void>;",
-          "declarationLine": 64,
+          "declarationLine": 63,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "Callback supplied to the module-owned invocation scope.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventInvocationVisitor.",
@@ -4043,7 +4135,7 @@
           "name": "IEventMap",
           "kind": "type",
           "signature": "export type IEventMap = object;",
-          "declarationLine": 137,
+          "declarationLine": 130,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventMap is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventMap.",
@@ -4106,10 +4198,74 @@
           "fragment": "event-subscriber-index--IEventMap"
         },
         {
+          "name": "IEventRemovalPolicy",
+          "kind": "type",
+          "signature": "export type IEventRemovalPolicy = (typeof EventRemovalPolicy)[keyof typeof EventRemovalPolicy];",
+          "declarationLine": 25,
+          "source": "packages/event-subscriber/dist/state-constants.d.ts",
+          "purpose": "IEventRemovalPolicy is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventRemovalPolicy.",
+          "advanced": "No additional advanced behavior is declared for IEventRemovalPolicy.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IEventRemovalPolicy."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventRemovalPolicy.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "IEventRemovalPolicy",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IEventRemovalPolicy = (typeof EventRemovalPolicy)[keyof typeof EventRemovalPolicy];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IEventRemovalPolicy when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IEventRemovalPolicy does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IEventRemovalPolicy is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IEventRemovalPolicy from @migaia/event-subscriber, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IEventRemovalPolicy when its type contract and declared inputs match the result you need. Choose a different public symbol when IEventRemovalPolicy does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventRemovalPolicy."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IEventRemovalPolicy."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/event-subscriber/dist/state-constants.d.ts:IEventRemovalPolicy:export type IEventRemovalPolicy = (typeof EventRemovalPolicy)[keyof typeof EventRemovalPolicy];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "event-subscriber-index--IEventRemovalPolicy"
+        },
+        {
           "name": "IEventReport",
           "kind": "type",
           "signature": "export type IEventReport<T, V = undefined> = { readonly event: IProjectedEventContext<T, V>; readonly error: unknown; };",
-          "declarationLine": 69,
+          "declarationLine": 68,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventReport is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventReport.",
@@ -4386,7 +4542,7 @@
           "name": "IEventValueConfig",
           "kind": "type",
           "signature": "export type IEventValueConfig<T> = { readonly readPath: IObjectPath<T> | ''; readonly alias: string; };",
-          "declarationLine": 7,
+          "declarationLine": 6,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventValueConfig is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventValueConfig.",
@@ -4450,7 +4606,7 @@
           "name": "IFilteredEventChannel",
           "kind": "type",
           "signature": "export type IFilteredEventChannel<T, R = void, V = undefined> = { readonly [filteredChannelBrand]: { readonly value: T; readonly result: R; readonly config: V; }; };",
-          "declarationLine": 127,
+          "declarationLine": 120,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IFilteredEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IFilteredEventChannel.",
@@ -4519,7 +4675,7 @@
           "name": "IListenerResult",
           "kind": "type",
           "signature": "export type IListenerResult<R> = { readonly status: typeof EventSubscriberState.fulfilled; readonly value: Awaited<R>; } | { readonly status: typeof EventSubscriberState.rejected; readonly reason: unknown; };",
-          "declarationLine": 73,
+          "declarationLine": 72,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IListenerResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IListenerResult.",
@@ -4914,7 +5070,7 @@
           "examples": [
             "import {\n  invokeParallel,\n  invokeParallelSettled,\n  invokeSerial,\n  invokeSerialSettled,\n  invokeTask,\n  invokeTaskSettled,\n  withSnapshotEntries,\n  type IListenerResult\n} from '@migaia/event-subscriber'",
             "function invokeSerialSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeSerial<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
-            "import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')",
+            "import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')",
             "const values = await invokeSerial(channel, payload)"
           ],
           "members": [],
@@ -5472,7 +5628,7 @@
           "name": "IStyledEventChannel",
           "kind": "type",
           "signature": "export type IStyledEventChannel<T, R = void, S extends IEventApiStyle | undefined = undefined, V = undefined> = IEventChannel<T, R, S, V> & IEventChannelStyleProjection<T, R, S, V>;",
-          "declarationLine": 124,
+          "declarationLine": 117,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IStyledEventChannel is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStyledEventChannel.",
@@ -5536,7 +5692,7 @@
           "name": "IStyledEventHub",
           "kind": "type",
           "signature": "export type IStyledEventHub<C extends IEventMap, S extends IEventApiStyle | undefined = undefined, V = undefined> = IEventHub<C, S, V> & IEventHubStyleProjection<C, S, V>;",
-          "declarationLine": 175,
+          "declarationLine": 173,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IStyledEventHub is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStyledEventHub.",
@@ -5724,36 +5880,6 @@
           "ownerExportPath": "./subscriber",
           "ownerModule": "subscriber",
           "ownerFragment": "event-subscriber-subscriber--IUnsubscribe"
-        },
-        {
-          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeOnce:export declare const subscribeOnce: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
-          "name": "subscribeOnce",
-          "signature": "export declare const subscribeOnce: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
-          "source": "packages/event-subscriber/dist/channel.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./subscriber",
-          "ownerModule": "subscriber",
-          "ownerFragment": "event-subscriber-subscriber--subscribeOnce"
-        },
-        {
-          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeSubscriber:export declare const subscribeSubscriber: <T, R>(channel: IEventChannelLike<T, R>, subscriber: { readonly handle?: unknown; }) => IUnsubscribe;",
-          "name": "subscribeSubscriber",
-          "signature": "export declare const subscribeSubscriber: <T, R>(channel: IEventChannelLike<T, R>, subscriber: { readonly handle?: unknown; }) => IUnsubscribe;",
-          "source": "packages/event-subscriber/dist/channel.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./subscriber",
-          "ownerModule": "subscriber",
-          "ownerFragment": "event-subscriber-subscriber--subscribeSubscriber"
-        },
-        {
-          "identity": "packages/event-subscriber/dist/channel.d.ts:subscribeUntil:export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
-          "name": "subscribeUntil",
-          "signature": "export declare const subscribeUntil: <T, R, V = undefined>(channel: IEventChannelLike<T, R, V>, signal: IAbortSignal, listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }) => IUnsubscribe;",
-          "source": "packages/event-subscriber/dist/channel.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./subscriber",
-          "ownerModule": "subscriber",
-          "ownerFragment": "event-subscriber-subscriber--subscribeUntil"
         }
       ]
     },
@@ -5777,7 +5903,7 @@
           "name": "IEventChannelLike",
           "kind": "type",
           "signature": "export type IEventChannelLike<T, R = void, V = undefined> = { subscribe(listener: IEventListener<T, R, V>, options?: { readonly taskId?: string; }): IUnsubscribe; };",
-          "declarationLine": 80,
+          "declarationLine": 79,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventChannelLike is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventChannelLike.",
@@ -5846,7 +5972,7 @@
           "name": "IEventContext",
           "kind": "type",
           "signature": "export type IEventContext<T> = { readonly value: T; readonly aborted: boolean; readonly abortReason: unknown; readonly taskId: string | undefined; abort(reason?: unknown): void; setTaskId(taskId: string | undefined): void; };",
-          "declarationLine": 38,
+          "declarationLine": 37,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventContext.",
@@ -5917,7 +6043,7 @@
           "name": "IEventListener",
           "kind": "type",
           "signature": "export type IEventListener<T, R = void, V = undefined> = (event: IProjectedEventContext<T, V>) => R | PromiseLike<R>;",
-          "declarationLine": 65,
+          "declarationLine": 64,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventListener is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventListener.",
@@ -5987,7 +6113,7 @@
           "name": "IEventSubscriber",
           "kind": "type",
           "signature": "export type IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R>; };",
-          "declarationLine": 66,
+          "declarationLine": 65,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IEventSubscriber is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IEventSubscriber.",
@@ -6199,7 +6325,7 @@
           "name": "IUnsubscribe",
           "kind": "type",
           "signature": "export type IUnsubscribe = () => void;",
-          "declarationLine": 6,
+          "declarationLine": 5,
           "source": "packages/event-subscriber/dist/types.d.ts",
           "purpose": "IUnsubscribe is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUnsubscribe.",
@@ -6259,7 +6385,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/types.d.ts:IUnsubscribe:export type IUnsubscribe = () => void;",
           "guidance": [],
-          "usageScore": 78,
+          "usageScore": 84,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--IUnsubscribe"
         },
@@ -6393,7 +6519,7 @@
               ]
             }
           ],
-          "usageScore": 88,
+          "usageScore": 80,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--subscribeOnce"
         },
@@ -6415,7 +6541,7 @@
             "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber/subscriber'",
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }",
             "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber, type IEventSubscriber } from '@migaia/event-subscriber/subscriber'\n\nclass Counter implements IEventSubscriber<number> {\n  total = 0\n  handle(event: { readonly value: number }) {\n    this.total += event.value\n  }\n}\nconst channel = createEventChannel<number>()\nsubscribeSubscriber(channel, new Counter())",
-            "import { createEventChannel, subscribeSubscriber, invokeSerial } from '@migaia/event-subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
+            "import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')"
           ],
           "members": [],
           "aliasOf": "subscribeSubscriber",
@@ -6616,7 +6742,7 @@
             "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber/subscriber'",
             "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "const controller = new AbortController()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\ncontroller.abort('owner closed')",
-            "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
+            "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
           ],
           "members": [],
           "aliasOf": "subscribeUntil",
@@ -6792,7 +6918,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createEventChannel, subscribeUntil } from '@migaia/event-subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
+                  "code": "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeUntil } from '@migaia/event-subscriber/subscriber'\n\nconst controller = new AbortController()\nconst channel = createEventChannel<number>()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\n// 组件卸载 / 请求结束时统一中止\ncontroller.abort('scope closed')"
                 }
               ]
             },
@@ -6837,7 +6963,7 @@
               ]
             }
           ],
-          "usageScore": 144,
+          "usageScore": 136,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--subscribeUntil"
         }

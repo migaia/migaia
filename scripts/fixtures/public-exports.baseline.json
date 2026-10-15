@@ -47,6 +47,7 @@
         "EventAdmissionPolicy",
         "EventApiStyle",
         "EventDispatchPolicy",
+        "EventRemovalPolicy",
         "EventSubscriberErrorCode",
         "EventSubscriberState",
         "createEventChannel",
@@ -59,9 +60,6 @@
         "invokeSerialSettled",
         "invokeTask",
         "invokeTaskSettled",
-        "subscribeOnce",
-        "subscribeSubscriber",
-        "subscribeUntil",
         "withSnapshotEntries"
       ],
       "./subscriber": [
@@ -1549,6 +1547,7 @@
         "isArrayBuffer",
         "isBlankString",
         "isEmptyValue",
+        "isNativeErrorValue",
         "isNullish",
         "isPlainObject",
         "isPrimitive",
@@ -1623,6 +1622,7 @@
         "attachSecondaryErrors",
         "combineErrors",
         "deserializeErrorChain",
+        "isNativeErrorValue",
         "isUtilsAbortError",
         "isUtilsError",
         "isUtilsTimeoutError",
