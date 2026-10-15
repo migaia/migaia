@@ -473,16 +473,14 @@ test('lifecycle boundedWait explains a complete production shutdown flow', () =>
   assert.doesNotMatch(guide.quickStart, /systemScheduler|boundedWait\(flush\(\)/)
 })
 
-test('lifecycle createLifecycleUnit defines its production configuration loader', () => {
-  const guide = findApiGuide('lifecycle', 'index', 'createLifecycleUnit', 'zh')
-  assert.ok(guide?.quickStart)
-  assert.match(guide.purpose, /旧结果覆盖新结果/)
-  assert.match(guide.quickStart, /async function requestRuntimeConfig/)
-  assert.match(guide.quickStart, /fetch\('\/api\/runtime-config'/)
-  assert.match(guide.quickStart, /runtimeConfig\.start\(requestRuntimeConfig\)/)
-  assert.match(guide.quickStart, /runtimeConfig\.restart\(requestRuntimeConfig\)/)
-  assert.match(guide.quickStart, /runtimeConfig\.state === 'loaded'/)
-  assert.doesNotMatch(guide.quickStart, /fetchConfig|logger\./)
+test('lifecycle keeps retired unit loading out of the public API and guides', () => {
+  const root = typedApiManifest.apis.find(
+    (api) => api.library === 'lifecycle' && api.module === 'index'
+  )
+  assert.ok(root)
+  assert.ok(!root.symbols.some((symbol) => symbol.name === 'createLifecycleUnit'))
+  assert.equal(findApiGuide('lifecycle', 'index', 'createLifecycleUnit', 'zh'), undefined)
+  assert.equal(findApiGuide('lifecycle', 'index', 'createLifecycleUnit', 'en'), undefined)
 })
 
 test('logger setLoggerRuntimeManager runs a complete scoped logging scenario', () => {

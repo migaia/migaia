@@ -15,12 +15,12 @@ export default defineConfig(withDistFreshness({
       input: {
         index: 'src/index.ts',
         abort: 'src/abort.ts',
-        scheduler: 'src/scheduler.ts',
+        'scheduler-entry': 'src/scheduler-entry.ts',
         'quiescence-tracker': 'src/quiescence-tracker.ts',
         'lifecycle-scope': 'src/lifecycle-scope.ts',
         'generation-controller': 'src/generation-controller.ts',
         disposal: 'src/disposal.ts',
-        errors: 'src/errors.ts'
+        'errors-entry': 'src/errors-entry.ts'
       },
       output: {
         preserveModules: true,

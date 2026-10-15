@@ -1,5 +1,6 @@
+import { createLifecycleUnit } from '../src/lifecycle-unit.js'
 import { describe, expect, it, vi } from 'vitest'
-import { boundedWait, createLifecycleUnit, createProvisionalScope } from '../src/index.js'
+import { boundedWait, createProvisionalScope } from '../src/index.js'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 import { observeAbortSubscription } from '../src/observed-subscription.js'
 

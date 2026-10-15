@@ -23,8 +23,8 @@
       "default": "./dist/abort.js"
     },
     "./scheduler": {
-      "types": "./dist/scheduler.d.ts",
-      "default": "./dist/scheduler.js"
+      "types": "./dist/scheduler-entry.d.ts",
+      "default": "./dist/scheduler-entry.js"
     },
     "./quiescence": {
       "types": "./dist/quiescence-tracker.d.ts",
@@ -43,8 +43,8 @@
       "default": "./dist/disposal.js"
     },
     "./errors": {
-      "types": "./dist/errors.d.ts",
-      "default": "./dist/errors.js"
+      "types": "./dist/errors-entry.d.ts",
+      "default": "./dist/errors-entry.js"
     }
   },
   "scripts": {

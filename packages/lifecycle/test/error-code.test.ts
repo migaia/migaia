@@ -6,7 +6,7 @@ import { createLifecycleScope } from '../src/lifecycle-scope'
 import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope'
 import { createLifecycleUnit } from '../src/lifecycle-unit'
 import { createGenerationController } from '../src/generation-controller'
-import { createStringQuiescenceTracker } from '../src/quiescence-tracker'
+import { createStringLeaseRegistry } from '../src/quiescence-tracker'
 import { createProvisionalScope } from '../src/provisional-scope'
 import { createMutationQueue } from '../src/mutation-queue'
 import { createDisposeTransaction, executeReleaseDescriptor } from '../src/dispose-transaction'
@@ -135,13 +135,13 @@ describe('L-T41 lifecycle code table: every code has a precise trigger, phase ma
   })
 
   it('QUIESCENCE_SEALED: retain() after seal()', () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     tracker.seal('k')
     expect(collectCode(() => tracker.retain('k'))).toBe(LifecycleErrorCode.quiescenceSealed)
   })
 
   it('QUIESCENCE_UNSEALED_WAIT: strict whenZero() before seal()', () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     expect(collectCode(() => tracker.whenZero('k'))).toBe(LifecycleErrorCode.quiescenceUnsealedWait)
   })
 

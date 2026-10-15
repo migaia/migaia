@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { createQuiescenceTracker, createStringQuiescenceTracker } from '../src/quiescence-tracker'
+import { createQuiescenceTracker, createStringLeaseRegistry } from '../src/quiescence-tracker'
 import { LifecycleErrorCode } from '../src/error-code'
 
 describe('L-T7 QuiescenceTracker: unsealed whenZero()', () => {
   it('throws synchronously, not a rejected Promise, when the key is not sealed', () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     expect(() => tracker.whenZero('k')).toThrowError(
       expect.objectContaining({ code: LifecycleErrorCode.quiescenceUnsealedWait })
     )
   })
 
   it('does not return a promise object at all on the throwing path (no pseudo strict waiter)', () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     let thrown = false
     try {
       tracker.whenZero('k')
@@ -22,7 +22,7 @@ describe('L-T7 QuiescenceTracker: unsealed whenZero()', () => {
   })
 
   it('still throws even if the key has an active retain', () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     tracker.retain('k')
     expect(() => tracker.whenZero('k')).toThrow()
   })
@@ -31,13 +31,13 @@ describe('L-T7 QuiescenceTracker: unsealed whenZero()', () => {
 describe('L-T8 QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnce()', () => {
   it('LC-B7 does not retain an idle string key after a loose wait', async () => {
     /** Retention is observable through forget(), without relying on heap timing. */
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     await tracker.whenZeroOnce('never-retained')
     expect(tracker.forget('never-retained')).toBe(false)
   })
 
   it('strict whenZero() resolves once the sealed key reaches zero, and rejects further retain()', async () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     const release = tracker.retain('k')
     tracker.seal('k')
     expect(() => tracker.retain('k')).toThrowError(
@@ -56,13 +56,13 @@ describe('L-T8 QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnc
   })
 
   it('whenZero() resolves immediately if the sealed key is already at zero', async () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     tracker.seal('k')
     await expect(tracker.whenZero('k')).resolves.toBeUndefined()
   })
 
   it('whenZeroOnce() allows retain() to keep happening — it is not exclusive', async () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     const releaseA = tracker.retain('k')
     const wait = tracker.whenZeroOnce('k')
     // Retaining again while a whenZeroOnce() is pending must not throw (unlike sealed strict mode).
@@ -73,7 +73,7 @@ describe('L-T8 QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnc
   })
 
   it('whenZeroOnce() resolves the next time count hits zero — a new epoch after resolution is not hidden from a caller who checks count() again', async () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     const releaseA = tracker.retain('k')
     const wait = tracker.whenZeroOnce('k')
     releaseA()
@@ -95,7 +95,7 @@ describe('L-T8 QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnc
   })
 
   it('a whenZeroOnce() caller must re-check count() to avoid a false "safe to release" conclusion', async () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     const releaseA = tracker.retain('k')
     const waitPromise = tracker.whenZeroOnce('k')
     // Before the first release fires, retain again — count goes 1 -> 2 -> (releaseA) 1, never zero
@@ -115,7 +115,7 @@ describe('L-T8 QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnc
   })
 
   it('retain() returns an idempotent release', () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     const release = tracker.retain('k')
     expect(tracker.count('k')).toBe(1)
     release()
@@ -147,20 +147,20 @@ describe('QuiescenceTracker: object-keyed variant', () => {
 
 describe('seal()', () => {
   it('is idempotent', () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     tracker.seal('k')
     tracker.seal('k')
     expect(tracker.isSealed('k')).toBe(true)
   })
 
   it('can seal a key that was never retained, immediately unblocking whenZero()', async () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     tracker.seal('never-used')
     await expect(tracker.whenZero('never-used')).resolves.toBeUndefined()
   })
 
   it('forgets settled sealed string keys without reopening them', () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     tracker.seal('completed')
     expect(tracker.forget('completed')).toBe(true)
     expect(tracker.isSealed('completed')).toBe(false)
@@ -168,7 +168,7 @@ describe('seal()', () => {
   })
 
   it('does not forget an active key', () => {
-    const tracker = createStringQuiescenceTracker()
+    const tracker = createStringLeaseRegistry()
     const release = tracker.retain('active')
     tracker.seal('active')
     expect(tracker.forget('active')).toBe(false)

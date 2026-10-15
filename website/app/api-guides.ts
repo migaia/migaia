@@ -27199,6 +27199,12 @@ try {
           description: '驱动 begin({ timeoutMs }) 的时间与取消任务，默认 systemScheduler。',
           defaultValue: 'systemScheduler',
           whenToUse: '超时测试需要手动时间，或宿主拥有独立时间域时。'
+        },
+        {
+          name: 'report',
+          description:
+            '观察没有调用方接收的过期结果释放失败，以及异步 timeout 的定时器或父监听清理失败；reporter 自身的 throw/rejection 被隔离。',
+          whenToUse: '需要保留 adopt 未传 onReleaseError 或异步超时清理的诊断时。'
         }
       ]
     },
@@ -27235,6 +27241,13 @@ try {
             'Drives begin({ timeoutMs }) timing and cancellation tasks; defaults to systemScheduler.',
           defaultValue: 'systemScheduler',
           whenToUse: 'Timeout tests need manual time or the host owns a separate time domain.'
+        },
+        {
+          name: 'report',
+          description:
+            'Observes stale-result release failures with no caller error handler and timer or parent-listener cleanup failures during asynchronous timeouts. Reporter throws and rejections are contained.',
+          whenToUse:
+            'Retain diagnostics when adopt omits onReleaseError or timeout cleanup has no waiting caller.'
         }
       ]
     }
@@ -27378,50 +27391,6 @@ try {
             'Diagnostic sink for report and firstError; its own failure cannot replace the disposal outcome.',
           whenToUse:
             'Provide it with report or firstError when failures must reach logging or telemetry.'
-        }
-      ]
-    }
-  },
-  'lifecycle:index:createLifecycleUnit': {
-    zh: {
-      purpose:
-        '适合管理“当前只认最后一次加载”的生产任务。例如管理后台正在读取运行时配置，用户马上点击刷新，第二次请求已经返回最新配置，而第一次慢请求随后才返回旧配置。普通 Promise 很容易让旧结果覆盖新结果；createLifecycleUnit 会把每次 start 或 restart 视为新一轮加载，只允许最新一轮更新 value 或 error，并用 idle、loading、loaded、failed 暴露当前状态。',
-      quickStart: `type IRuntimeConfig = {\n  apiBaseUrl: string\n  revision: number\n}\n\nasync function requestRuntimeConfig(): Promise<IRuntimeConfig> {\n  const response = await fetch('/api/runtime-config', { cache: 'no-store' })\n  if (!response.ok) {\n    throw new Error(\`config request failed: \${response.status}\`)\n  }\n  return response.json() as Promise<IRuntimeConfig>\n}\n\nconst runtimeConfig = createLifecycleUnit<IRuntimeConfig>({\n  report: (error) => console.error('runtime config load failed', error)\n})\n\n// 页面首次进入：idle → loading；请求成功后变为 loaded 并写入 value。\nruntimeConfig.start(requestRuntimeConfig)\n\n// 用户点击“刷新”：立即开始新一轮。旧请求即使更晚返回，也不能覆盖新配置。\nfunction refreshRuntimeConfig(): void {\n  runtimeConfig.restart(requestRuntimeConfig)\n}\n\nconst currentConfig = runtimeConfig.value\nif (runtimeConfig.state === 'loaded' && currentConfig) {\n  console.log(currentConfig.apiBaseUrl)\n}\nif (runtimeConfig.state === 'failed') {\n  console.error(runtimeConfig.error)\n}`,
-      scenarios: [
-        '管理后台、桌面应用或 Worker 需要加载运行时配置，并把 loading、成功值和失败原因暴露给界面或诊断系统。',
-        '搜索、配置刷新或模块重载可能连续发起多轮请求，业务只允许最后一次请求成为当前结果。'
-      ],
-      avoidWhen: [
-        '任务需要保留每一轮结果；使用独立 Promise 或队列。',
-        '单元还拥有 socket、timer 等待释放资源；组合 LifecycleScope 管理资源所有权。'
-      ],
-      options: [
-        {
-          name: 'report',
-          description:
-            'start factory 同步抛错或 thenable reject 时收到带 UNIT_START_FAILED 的诊断；unit.error 仍保存原始错误。',
-          whenToUse: '失败除进入状态机外还需要统一日志或 telemetry 时。'
-        }
-      ]
-    },
-    en: {
-      purpose:
-        'Keeps only the latest asynchronous load current. When an admin refresh starts a second configuration request, a slower first response must not overwrite it. createLifecycleUnit assigns each start or restart a new generation; only the latest updates value or error. Its state exposes idle, loading, loaded or failed.',
-      quickStart: `type IRuntimeConfig = {\n  apiBaseUrl: string\n  revision: number\n}\n\nasync function requestRuntimeConfig(): Promise<IRuntimeConfig> {\n  const response = await fetch('/api/runtime-config', { cache: 'no-store' })\n  if (!response.ok) {\n    throw new Error(\`config request failed: \${response.status}\`)\n  }\n  return response.json() as Promise<IRuntimeConfig>\n}\n\nconst runtimeConfig = createLifecycleUnit<IRuntimeConfig>({\n  report: (error) => console.error('runtime config load failed', error)\n})\n\n// First page load: idle → loading; success changes it to loaded and stores value.\nruntimeConfig.start(requestRuntimeConfig)\n\n// A user refresh starts a new generation. A slower old request cannot replace the new value.\nfunction refreshRuntimeConfig(): void {\n  runtimeConfig.restart(requestRuntimeConfig)\n}\n\nconst currentConfig = runtimeConfig.value\nif (runtimeConfig.state === 'loaded' && currentConfig) {\n  console.log(currentConfig.apiBaseUrl)\n}\nif (runtimeConfig.state === 'failed') {\n  console.error(runtimeConfig.error)\n}`,
-      scenarios: [
-        'An admin page, desktop application, or Worker loads runtime configuration and exposes loading, the successful value, or the failure reason to UI or diagnostics.',
-        'Search, configuration refresh, or module reload can start overlapping requests while the product permits only the last request to become current.'
-      ],
-      avoidWhen: [
-        'Every run result must be retained; use independent Promises or a queue.',
-        'The unit also owns sockets, timers, or other disposable resources; compose a LifecycleScope for ownership.'
-      ],
-      options: [
-        {
-          name: 'report',
-          description:
-            'Receives a UNIT_START_FAILED diagnostic when the start factory throws or its thenable rejects; unit.error still retains the original error.',
-          whenToUse: 'A failed state also needs centralized logging or telemetry.'
         }
       ]
     }
@@ -27924,36 +27893,6 @@ console.log(await waiting) // false`,
       options: []
     }
   },
-  'lifecycle:quiescence:createStringQuiescenceTracker': {
-    zh: {
-      purpose:
-        '创建字符串 key 的 quiescence tracker。语义与对象版相同，但使用 Map，并在未 seal 的 key 归零后删除无状态条目，避免长期字符串 key 堆积。',
-      quickStart: `import { createStringQuiescenceTracker } from '@migaia/lifecycle'\n\nconst tracker = createStringQuiescenceTracker()\nconst sessionKey = 'session:42'\nconst release = tracker.retain(sessionKey)\ntracker.seal(sessionKey)\nrelease()\nawait tracker.whenZero(sessionKey)\nconsole.log('session closed:', sessionKey)`,
-      scenarios: [
-        'session id、channel name 或 cache key 是稳定字符串。',
-        '需要 seal 后的闭世界归零证明。'
-      ],
-      avoidWhen: [
-        'key 是对象且应随 GC 消失；使用 createQuiescenceTracker。',
-        '只需要一个全局 pending 数量；使用 createPendingTracker。'
-      ],
-      options: []
-    },
-    en: {
-      purpose:
-        'Creates a string-keyed quiescence tracker. It shares object-tracker semantics but uses a Map and removes pristine unsealed entries at zero so long-lived string keys do not accumulate.',
-      quickStart: `import { createStringQuiescenceTracker } from '@migaia/lifecycle'\n\nconst tracker = createStringQuiescenceTracker()\nconst sessionKey = 'session:42'\nconst release = tracker.retain(sessionKey)\ntracker.seal(sessionKey)\nrelease()\nawait tracker.whenZero(sessionKey)\nconsole.log('会话已关闭:', sessionKey)`,
-      scenarios: [
-        'Session IDs, channel names, or cache keys are stable strings.',
-        'A closed-world zero proof is required after sealing.'
-      ],
-      avoidWhen: [
-        'Keys are objects and should disappear with garbage collection; use createQuiescenceTracker.',
-        'Only one global pending count is needed; use createPendingTracker.'
-      ],
-      options: []
-    }
-  },
   'lifecycle:quiescence:createObjectLeaseRegistry': {
     zh: {
       purpose:
@@ -28134,66 +28073,6 @@ console.log(await waiting) // false`,
       options: []
     }
   },
-  'lifecycle:scheduler:validateSchedulerTime': {
-    zh: {
-      purpose:
-        '校验 scheduler 产生或消费的时间值必须是有限 number，并原样返回；类型错误保持 TypeError，NaN/Infinity 保持 RangeError，均带 INVALID_OPTION。',
-      quickStart: `import { validateSchedulerTime } from '@migaia/lifecycle'\n\nconst candidate = { now: () => 100 }\nconst options = { deadlineAt: 2_000 }\nconst now = validateSchedulerTime(candidate.now(), 'now()')\nconst deadlineAt = validateSchedulerTime(options.deadlineAt, 'deadlineAt')\nconsole.log({ now, deadlineAt })`,
-      scenarios: [
-        '实现自定义 scheduler 时校验 now() 输出。',
-        '公开配置接收绝对时间并需要统一错误契约。'
-      ],
-      avoidWhen: [
-        '值还必须非负；使用 validateSchedulerDelay。',
-        '需要把 base 与 delta 相加并检查溢出；使用 addSchedulerTime。'
-      ],
-      options: []
-    },
-    en: {
-      purpose:
-        'Validates that scheduler-produced or consumed time is a finite number and returns it unchanged. Wrong type remains TypeError, NaN or Infinity remains RangeError, and both carry INVALID_OPTION.',
-      quickStart: `import { validateSchedulerTime } from '@migaia/lifecycle'\n\nconst candidate = { now: () => 100 }\nconst options = { deadlineAt: 2_000 }\nconst now = validateSchedulerTime(candidate.now(), 'now()')\nconst deadlineAt = validateSchedulerTime(options.deadlineAt, 'deadlineAt')\nconsole.log({ now, deadlineAt })`,
-      scenarios: [
-        'A custom scheduler implementation must validate its now() result.',
-        'A public option accepts absolute time under the shared error contract.'
-      ],
-      avoidWhen: [
-        'The value must also be non-negative; use validateSchedulerDelay.',
-        'Base and delta must be added with overflow protection; use addSchedulerTime.'
-      ],
-      options: []
-    }
-  },
-  'lifecycle:scheduler:validateSchedulerDelay': {
-    zh: {
-      purpose:
-        '校验 delay 必须是有限非负 number，并返回校验值；负数、NaN 和 Infinity 以带 INVALID_OPTION 的 RangeError 拒绝。',
-      quickStart: `import { systemScheduler, validateSchedulerDelay } from '@migaia/lifecycle'\n\nfunction schedule(callback: () => void, delayMs: unknown) {\n  const delay = validateSchedulerDelay(delayMs, 'retryDelayMs')\n  return systemScheduler.schedule(callback, delay)\n}\nconst task = schedule(() => console.log('retry'), 250)\ntask.cancel()`,
-      scenarios: [
-        '自定义 scheduler 或 timeout option 接受延迟值。',
-        '需要与 lifecycle 内部相同的类型和范围错误。'
-      ],
-      avoidWhen: [
-        '绝对时间允许负值；使用 validateSchedulerTime。',
-        '还要计算绝对目标并防止加法溢出；再调用 addSchedulerTime。'
-      ],
-      options: []
-    },
-    en: {
-      purpose:
-        'Validates a delay as a finite non-negative number and returns it. Negative, NaN, and Infinity reject as a RangeError carrying INVALID_OPTION.',
-      quickStart: `import { systemScheduler, validateSchedulerDelay } from '@migaia/lifecycle'\n\nfunction schedule(callback: () => void, delayMs: unknown) {\n  const delay = validateSchedulerDelay(delayMs, 'retryDelayMs')\n  return systemScheduler.schedule(callback, delay)\n}\nconst task = schedule(() => console.log('retry'), 250)\ntask.cancel()`,
-      scenarios: [
-        'A custom scheduler or timeout option accepts a delay value.',
-        'The boundary needs the same type and range errors as lifecycle internals.'
-      ],
-      avoidWhen: [
-        'An absolute time may be negative; use validateSchedulerTime.',
-        'An absolute target must also be computed with overflow protection; then use addSchedulerTime.'
-      ],
-      options: []
-    }
-  },
   'lifecycle:scheduler:addSchedulerTime': {
     zh: {
       purpose:
@@ -28277,66 +28156,6 @@ console.log(await waiting) // false`,
       avoidWhen: [
         'The value has the right type but an invalid numeric range; use createLifecycleRangeError.',
         'An existing error must retain identity; use createLifecycleFailure.'
-      ],
-      options: []
-    }
-  },
-  'lifecycle:errors:createLifecycleRangeError': {
-    zh: {
-      purpose:
-        '创建保留原生 RangeError runtime type 的 lifecycle 错误，并附加 source/code、可选 cause 与 detail；适用于有限性、非负或上限约束。',
-      quickStart: `import { createLifecycleRangeError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst delayMs = -1\nif (delayMs < 0) throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, LifecycleErrorText.schedulerDelayRange, { detail: { field: 'delayMs' } })`,
-      scenarios: [
-        '数值参数类型正确，但超出 lifecycle 接受范围。',
-        '调用方需要通过 instanceof RangeError 区分类型与范围错误。'
-      ],
-      avoidWhen: [
-        '值不是 number；使用 createLifecycleTypeError。',
-        '错误不属于输入范围校验；使用更贴合语义的 factory。'
-      ],
-      options: []
-    },
-    en: {
-      purpose:
-        'Creates a lifecycle error that remains a native RangeError while attaching source, code, and optional cause or detail. Use it for finite, non-negative, or upper-bound constraints.',
-      quickStart: `import { createLifecycleRangeError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst delayMs = -1\nif (delayMs < 0) throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, LifecycleErrorText.schedulerDelayRange, { detail: { field: 'delayMs' } })`,
-      scenarios: [
-        "A numeric parameter has the correct type but lies outside lifecycle's accepted range.",
-        'Callers use instanceof RangeError to separate type and range failures.'
-      ],
-      avoidWhen: [
-        'The value is not a number; use createLifecycleTypeError.',
-        'The failure is not input-range validation; use a semantically closer factory.'
-      ],
-      options: []
-    }
-  },
-  'lifecycle:errors:tagLifecycleError': {
-    zh: {
-      purpose:
-        '在已有 Error 上附加 lifecycle source/code，同时保留对象 identity、原生子类、message、stack 与 AggregateError.errors；跨 source 冲突保持 fail-closed。',
-      quickStart: `import { LifecycleErrorCode, tagLifecycleError } from '@migaia/lifecycle'\n\nconst errors = [new Error('socket close failed'), new Error('cache flush failed')]\nconst aggregate = new AggregateError(errors, 'dispose failed')\nthrow tagLifecycleError(aggregate, LifecycleErrorCode.disposeFailed)`,
-      scenarios: [
-        '现有 AggregateError、DOMException 或其他原生错误类型必须原样保留。',
-        '同包错误跨边界需要重新分类 code，但不能替换实例。'
-      ],
-      avoidWhen: [
-        '还没有 Error 实例；使用 createLifecycleError 或原生子类 factory。',
-        '任意 unknown throw 可能是 primitive 或冻结对象；使用 createLifecycleFailure。'
-      ],
-      options: []
-    },
-    en: {
-      purpose:
-        'Attaches lifecycle source and code to an existing Error while preserving object identity, native subclass, message, stack, and AggregateError.errors. Cross-source conflicts remain fail-closed.',
-      quickStart: `import { LifecycleErrorCode, tagLifecycleError } from '@migaia/lifecycle'\n\nconst errors = [new Error('socket close 失败'), new Error('cache flush 失败')]\nconst aggregate = new AggregateError(errors, 'dispose failed')\nthrow tagLifecycleError(aggregate, LifecycleErrorCode.disposeFailed)`,
-      scenarios: [
-        'An existing AggregateError, DOMException, or other native error subtype must remain intact.',
-        'A lifecycle-owned error crosses a boundary and needs code reclassification without instance replacement.'
-      ],
-      avoidWhen: [
-        'No Error exists yet; use createLifecycleError or a native-subclass factory.',
-        'An unknown throw may be primitive or frozen; use createLifecycleFailure.'
       ],
       options: []
     }
