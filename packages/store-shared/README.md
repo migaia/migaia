@@ -185,7 +185,7 @@ try {
 - `signalDisposed`(`'SIGNAL_DISPOSED'`) —— `SharedInt32Signal` 已 `dispose()` 后继续读写；同上，新建 signal
 - `bufferTooSmall`(`'BUFFER_TOO_SMALL'`) —— 传入的 `SharedArrayBuffer` 太小，放不下要求的 cell 布局；调用方应分配更大的 buffer，这是构造期参数错误，不要重试同一 buffer
 - `indexOutOfRange`(`'INDEX_OUT_OF_RANGE'`) —— `SharedInt32Array` 下标越界；调用方检查下标是否在 `[0, length)`，这是永久性参数错误
-- `contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 在自旋上限内未 settle（cell 未稳定/锁未获取/`update` 持续失败）；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer
+- `contentionLimit`(`'CONTENTION_LIMIT'`) —— Seqlock 持续约 1 秒仍未 settle（cell 未稳定/锁未获取，期间按轮自旋并退避），或 `update` 在自旋上限内持续写入失败；通常是某个写者持锁期间崩溃留下的死锁，无法自愈，调用方应重建 buffer
 - `envUnsupported`(`'ENV_UNSUPPORTED'`) —— `Atomics.waitAsync` 在当前环境不可用；调用方改用 `sync()` 自行拉取，或换支持 `waitAsync` 的运行时，库不做静默降级
 - `invalidOption`(`'INVALID_OPTION'`) —— 构造/写入口参非法（长度非负整数、int32 范围等）；调用方修正入参，这是永久性参数错误
 
