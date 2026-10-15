@@ -2267,12 +2267,12 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     ],
     [
       '/zh/docs/store-light/async-fields-and-readiness',
-      '选择同步、异步或 Legacy Store 创建入口',
+      '选择同步或异步 Store 创建入口',
       '按 Builder 模式选择入口'
     ],
     [
       '/en/docs/store-light/async-fields-and-readiness',
-      'Choose synchronous, asynchronous, or legacy Store creation',
+      'Choose synchronous or asynchronous Store creation',
       'Choose an entry from Builder mode'
     ],
     [
