@@ -1,13 +1,3 @@
-import {
-  assimilateCapturedThen,
-  inspectThenable,
-  observeThenableRejection,
-  type IThenableInspection
-} from '@migaia/utils/function'
-
-export { assimilateCapturedThen, inspectThenable, observeThenableRejection }
-export type { IThenableInspection }
-
 /**
  * Reflective receiver-binding boundary for `@migaia/reactive`.
  *
