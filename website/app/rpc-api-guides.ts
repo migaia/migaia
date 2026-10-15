@@ -780,6 +780,34 @@ const rpcCoreGuideEntries: Readonly<Record<string, Readonly<Record<IGuideLocale,
       '不要在选定 Feature 图旁另造接收器、重放账本或 provider 队列。'
     ]
   }),
+  'rpc-core:index:defaultRpcReporter': guide({
+    purposeEn:
+      'Writes an observed background RPC failure to the host console through the same fallback used by RPC adapters. It reports the supplied value unchanged and leaves cancellation, retries and endpoint shutdown with their existing owners.',
+    purposeZh:
+      '将已经观察到的 RPC 后台失败交给宿主控制台，与 RPC 适配器未配置 report 时使用的默认出口一致。它原样报告收到的值，取消、重试和 endpoint 关闭仍由各自已有的所有者处理。',
+    quickStart: `import { defaultRpcReporter } from '@migaia/rpc-core'
+
+/** Reports a failure already observed by an application-owned background task. */
+function reportBackgroundFailure(error: unknown): void {
+  defaultRpcReporter(error)
+}`,
+    useEn: [
+      'An application-owned background task should use the same console fallback as its RPC adapters.',
+      'A custom reporter needs to delegate an already redacted failure to the default host console sink.'
+    ],
+    useZh: [
+      '应用自有后台任务需要与 RPC 适配器使用同一个默认控制台诊断出口。',
+      '自定义 reporter 已完成敏感信息脱敏，需要将失败转交默认宿主控制台。'
+    ],
+    avoidEn: [
+      'Diagnostics require durable storage, structured redaction or routing to an application telemetry service.',
+      'The caller needs to reject an operation or restart an endpoint; reporting alone performs neither action.'
+    ],
+    avoidZh: [
+      '诊断需要持久化、结构化脱敏或发送到应用自己的遥测服务，应注入专用 report。',
+      '调用方需要拒绝操作或重启 endpoint 时，报告函数不会代替这些生命周期动作。'
+    ]
+  }),
   'rpc-core:index:createEndpoint': endpointGuide({
     name: 'createEndpoint',
     importPath: '@migaia/rpc-core',

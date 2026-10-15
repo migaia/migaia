@@ -52,6 +52,12 @@ export type IApiGuide = {
   readonly scenarios: readonly string[]
 }
 
+/** One drain-budget contract shared by batch() and the file plugin's nested batch options. */
+const loggerBatchFlushTimeoutDescription = {
+  en: 'Maximum milliseconds spent draining accepted batches during flush or shutdown; defaults to 3000. On shutdown, undelivered entries are reported with detail.dropped.',
+  zh: 'flush 或 shutdown 等待已接收批次完成的最长毫秒数，默认 3000；shutdown 超时后，未投递条数通过清理错误的 detail.dropped 上报。'
+} as const
+
 /** Shared field translations whose semantics are identical across several public endpoints. */
 const optionTranslations: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, string>>>>
@@ -549,6 +555,8 @@ const optionTranslations: Readonly<
     en: 'Maximum duration of one HTTP attempt before its request is aborted and handled as a retryable network failure.',
     zh: '单次 HTTP 尝试的最长时间；超时会 abort 请求，并按可重试网络失败处理。'
   },
+  'logger:*:*:flushTimeoutMs': loggerBatchFlushTimeoutDescription,
+  'logger:*:*:batch.flushTimeoutMs': loggerBatchFlushTimeoutDescription,
   'logger:*:*:batch': {
     en: 'Optional per-HTTP override for the batch capability supplied by an earlier batch plugin. Install batch() before http().',
     zh: '对先安装的 batch 插件所提供能力进行 HTTP 局部覆盖；必须先安装 batch()，再安装 http()。'
