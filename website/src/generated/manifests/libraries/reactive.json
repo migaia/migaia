@@ -3999,7 +3999,7 @@
           "name": "ICapture",
           "kind": "type",
           "signature": "export type ICapture<R> = { readonly result: R; readonly [CAPTURE_TOKEN]: true; };",
-          "declarationLine": 4,
+          "declarationLine": 6,
           "source": "packages/reactive/dist/runtime/dependency-tracker.class.d.ts",
           "purpose": "ICapture is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICapture.",
