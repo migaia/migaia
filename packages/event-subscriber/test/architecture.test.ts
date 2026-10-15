@@ -123,7 +123,7 @@ describe('runtime-neutral boundary', () => {
     expect(channelSource).toContain(
       'const admission = shared ? undefined : registerRaw(listener, taskId)'
     )
-    expect(channelSource).toContain('createSubscriptionHandle(')
+    expect(channelSource).toContain('createRawSubscriptionOwner(')
     expect(channelSource).toContain('const nextAdmission = registerRaw(nextListener, nextTaskId)')
   })
 
