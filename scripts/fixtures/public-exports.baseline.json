@@ -85,24 +85,18 @@
         "createErrorCollector",
         "createGenerationController",
         "createLifecycleError",
-        "createLifecycleRangeError",
         "createLifecycleScope",
-        "createLifecycleUnit",
         "createMutationQueue",
         "createObjectLeaseRegistry",
         "createPendingTracker",
         "createProvisionalScope",
         "createQuiescenceTracker",
         "createStringLeaseRegistry",
-        "createStringQuiescenceTracker",
         "createSyncLifecycleScope",
         "createSyncStartedDisposalLedger",
         "createTerminalController",
         "executeReleaseDescriptor",
-        "snapshotScheduler",
-        "tagLifecycleError",
-        "validateSchedulerDelay",
-        "validateSchedulerTime"
+        "snapshotScheduler"
       ],
       "./abort": [
         "createAbortController",
@@ -112,16 +106,13 @@
         "addSchedulerTime",
         "resolveScheduler",
         "resolveSchedulerOption",
-        "snapshotScheduler",
-        "validateSchedulerDelay",
-        "validateSchedulerTime"
+        "snapshotScheduler"
       ],
       "./quiescence": [
         "createObjectLeaseRegistry",
         "createPendingTracker",
         "createQuiescenceTracker",
-        "createStringLeaseRegistry",
-        "createStringQuiescenceTracker"
+        "createStringLeaseRegistry"
       ],
       "./scope": [
         "createLifecycleScope"
@@ -140,9 +131,7 @@
         "createErrorCollector",
         "createLifecycleError",
         "createLifecycleFailure",
-        "createLifecycleRangeError",
-        "createLifecycleTypeError",
-        "tagLifecycleError"
+        "createLifecycleTypeError"
       ]
     },
     "@migaia/logger": {

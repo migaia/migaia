@@ -91,14 +91,12 @@
       "createGenerationController": "@migaia/lifecycle/generation",
       "createLifecycleError": "@migaia/lifecycle/errors",
       "createLifecycleFailure": "@migaia/lifecycle/errors",
-      "createLifecycleRangeError": "@migaia/lifecycle/errors",
       "createLifecycleScope": "@migaia/lifecycle/scope",
       "createLifecycleTypeError": "@migaia/lifecycle/errors",
       "createObjectLeaseRegistry": "@migaia/lifecycle/quiescence",
       "createPendingTracker": "@migaia/lifecycle/quiescence",
       "createQuiescenceTracker": "@migaia/lifecycle/quiescence",
       "createStringLeaseRegistry": "@migaia/lifecycle/quiescence",
-      "createStringQuiescenceTracker": "@migaia/lifecycle/quiescence",
       "createSyncStartedDisposalLedger": "@migaia/lifecycle/disposal",
       "executeReleaseDescriptor": "@migaia/lifecycle/disposal",
       "IAbortController": "@migaia/lifecycle/abort",
@@ -125,10 +123,7 @@
       "observeAbortSubscription": "@migaia/lifecycle/abort",
       "resolveScheduler": "@migaia/lifecycle/scheduler",
       "resolveSchedulerOption": "@migaia/lifecycle/scheduler",
-      "snapshotScheduler": "@migaia/lifecycle/scheduler",
-      "tagLifecycleError": "@migaia/lifecycle/errors",
-      "validateSchedulerDelay": "@migaia/lifecycle/scheduler",
-      "validateSchedulerTime": "@migaia/lifecycle/scheduler"
+      "snapshotScheduler": "@migaia/lifecycle/scheduler"
     },
     "@migaia/logger": {
       "ANSIS_PLUGIN_NAME": "@migaia/logger/plugins",

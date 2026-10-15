@@ -14700,10 +14700,10 @@
           "errors": ["No documented errors are declared for boundedWait."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for boundedWait.",
           "examples": [
-            "import {\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
             "function boundedWait(\n  task: PromiseLike<unknown>,\n  deadlineAt: number,\n  options?: { readonly scheduler?: IScheduler } // 默认 systemScheduler\n): Promise<boolean>",
             "const won = await boundedWait(task, deadlineAt) // true=task 先完成；false=截止时间先到（task 仍在跑）",
-            "import {\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController\n} from '@migaia/lifecycle'\nimport { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'"
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController\n} from '@migaia/lifecycle'\nimport { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'"
           ],
           "members": [],
           "aliasOf": "boundedWait",
@@ -14778,136 +14778,6 @@
           "usageScore": 68,
           "configuration": [],
           "fragment": "lifecycle-index--boundedWait"
-        },
-        {
-          "name": "createLifecycleUnit",
-          "kind": "function",
-          "signature": "export declare function createLifecycleUnit<T>(\n  options?: ILifecycleUnitOptions,\n): ILifecycleUnit<T>;",
-          "declarationLine": 32,
-          "source": "packages/lifecycle/dist/lifecycle-unit.d.ts",
-          "purpose": "createLifecycleUnit is part of this module's public function contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLifecycleUnit.",
-          "advanced": "No additional advanced behavior is declared for createLifecycleUnit.",
-          "parameters": ["options: ILifecycleUnitOptions (optional)"],
-          "parameterDetails": [
-            {
-              "name": "options",
-              "type": "ILifecycleUnitOptions",
-              "optional": true
-            }
-          ],
-          "returns": "ILifecycleUnit<T>",
-          "errors": ["No documented errors are declared for createLifecycleUnit."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createLifecycleUnit.",
-          "examples": [
-            "const unit = createLifecycleUnit<Config>()\nunit.start(() => fetchConfig()) // thenable → 先进 'loading'，settle 后进 'loaded'/'failed'\nunit.state // 'loading'\nunit.value // undefined（settle 前）\nunit.restart(() => fetchConfig()) // 新 generation，旧一次的迟到结果被静默丢弃"
-          ],
-          "members": [],
-          "aliasOf": "createLifecycleUnit",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "options",
-                "type": "ILifecycleUnitOptions",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": ["ILifecycleUnit<T>"],
-          "whenToUse": "Use createLifecycleUnit when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createLifecycleUnit does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "createLifecycleUnit is part of this module's public function contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import createLifecycleUnit from @migaia/lifecycle, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use createLifecycleUnit when its function contract and declared inputs match the result you need. Choose a different public symbol when createLifecycleUnit does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLifecycleUnit."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createLifecycleUnit."
-            }
-          ],
-          "declaredConfiguration": [
-            {
-              "name": "report",
-              "type": "(error: unknown) => void",
-              "optional": true,
-              "description": "Diagnostic channel for a failed `start()`, tagged `UNIT_START_FAILED` with the original failure * on `cause`. `unit.error` itself always stays the caller's raw, untagged value — this is a side * channel for callers that want a `(source, code)`-bearing signal without losing that identity."
-            }
-          ],
-          "identity": "packages/lifecycle/dist/lifecycle-unit.d.ts:createLifecycleUnit:export declare function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>;",
-          "guidance": [
-            {
-              "id": "createlifecycleunit",
-              "heading": "createLifecycleUnit",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>\n\ntype ILifecycleUnitOptions = { readonly report?: (error: unknown) => void }\n\ntype ILifecycleUnit<T> = {\n  readonly state: 'idle' | 'loading' | 'loaded' | 'failed'\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly value: T | undefined\n  readonly error: unknown\n  start(factory: () => T | PromiseLike<T>): void\n  restart(factory: () => T | PromiseLike<T>): void // start 的别名\n  close(): void\n  dispose(): void // 永远同步\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "单元装载轴的状态机，内部用一个 `GenerationController` 丢弃过期结果："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const unit = createLifecycleUnit<Config>()\nunit.start(() => fetchConfig()) // thenable → 先进 'loading'，settle 后进 'loaded'/'failed'\nunit.state // 'loading'\nunit.value // undefined（settle 前）\nunit.restart(() => fetchConfig()) // 新 generation，旧一次的迟到结果被静默丢弃"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "边界行为："
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`factory()` 只读一次其返回值的 `.then`（探测语义同 `probeThenable`）：同步非 thenable 返回直接落 `loaded`（跳过 `loading`）；`factory()` 同步抛出或 thenable reject 时进入 `failed`，`unit.error` 存原始错误（不打标签），同时额外把一份打上 `UNIT_START_FAILED` 标签的错误发给 `options.report`（若提供）。",
-                    "每次 `start()`/`restart()` 隐式开启新 generation；旧 generation 的迟到 settle 结果被静默丢弃（不写入 `state`/`value`/`error`）。",
-                    "`lifecycle` 是容器存活轴（`close()`/`dispose()` 驱动），与 `state`（装载轴）是两个独立读值。",
-                    "`dispose()` 永远同步——单元本身不持有需要等待的资源，只是终结内部 generation controller（超过一次调用幂等）。"
-                  ]
-                }
-              ]
-            }
-          ],
-          "usageScore": 66,
-          "configuration": [
-            {
-              "name": "report",
-              "type": "(error: unknown) => void",
-              "optional": true,
-              "description": "`factory()` 只读一次其返回值的 `.then`（探测语义同 `probeThenable`）：同步非 thenable 返回直接落 `loaded`（跳过 `loading`）；`factory()` 同步抛出或 thenable reject 时进入 `failed`，`unit.error` 存原始错误（不打标签），同时额外把一份打上 `UNIT_START_FAILED` 标签的错误发给 `options.report`（若提供）。",
-              "descriptionEn": "Diagnostic channel for a failed `start()`, tagged `UNIT_START_FAILED` with the original failure * on `cause`. `unit.error` itself always stays the caller's raw, untagged value — this is a side * channel for callers that want a `(source, code)`-bearing signal without losing that identity.",
-              "descriptionZh": "`factory()` 只读一次其返回值的 `.then`（探测语义同 `probeThenable`）：同步非 thenable 返回直接落 `loaded`（跳过 `loading`）；`factory()` 同步抛出或 thenable reject 时进入 `failed`，`unit.error` 存原始错误（不打标签），同时额外把一份打上 `UNIT_START_FAILED` 标签的错误发给 `options.report`（若提供）。"
-            }
-          ],
-          "fragment": "lifecycle-index--createLifecycleUnit"
         },
         {
           "name": "createMutationQueue",
@@ -15203,7 +15073,7 @@
               ]
             }
           ],
-          "usageScore": 84,
+          "usageScore": 90,
           "configuration": [
             {
               "name": "parentSignal",
@@ -15374,7 +15244,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -15404,38 +15274,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -15534,7 +15378,7 @@
               ]
             }
           ],
-          "usageScore": 96,
+          "usageScore": 102,
           "configuration": [
             {
               "name": "errorPolicy",
@@ -15628,7 +15472,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope`/`createLifecycleUnit` 内部都基于它："
+                  "text": "独立复用的容器存活轴状态机，`createLifecycleScope`/`createSyncLifecycleScope` 内部都基于它："
                 },
                 {
                   "type": "code",
@@ -15881,7 +15725,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -15911,38 +15755,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -16061,7 +15879,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDisposer.",
           "examples": [
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'",
-            "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringQuiescenceTracker(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}"
+            "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringLeaseRegistry(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}"
           ],
           "members": [],
           "aliasOf": "IDisposer",
@@ -16969,208 +16787,6 @@
           "fragment": "lifecycle-index--ILifecycleStateValue"
         },
         {
-          "name": "ILifecycleUnit",
-          "kind": "type",
-          "signature": "export type ILifecycleUnit<T> = {\n  readonly state: IUnitState;\n  /** * The container-survival axis for the unit itself (separate from `state`) — `close()`/`dispose()` * move this one. */ readonly lifecycle: ILifecycleState;\n  readonly value: T | undefined;\n  readonly error: unknown;\n  /** * Runtime-probes `factory()`'s return: a synchronous non-thenable value commits to `loaded` * immediately, without ever passing through `loading` (L-T5, D-2). A thenable commits to * `loading` and transitions on settle — but only if this call's generation is still current; a * superseded generation's late result is discarded silently (§4.2, L-T34). */ start(\n    factory: () => T | PromiseLike<T>,\n  ): void;\n  /** Alias for `start()` — same behavior, named for the \"retry after `failed`\" call site (L-T34). */ restart(\n    factory: () => T | PromiseLike<T>,\n  ): void;\n  close(): void;\n  /** Synchronous — a unit owns no user resource to await releasing, only its own bookkeeping. */ dispose(): void;\n};",
-          "declarationLine": 10,
-          "source": "packages/lifecycle/dist/lifecycle-unit.d.ts",
-          "purpose": "ILifecycleUnit is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleUnit.",
-          "advanced": "No additional advanced behavior is declared for ILifecycleUnit.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for ILifecycleUnit."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleUnit.",
-          "examples": [
-            "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
-            "function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>\n\ntype ILifecycleUnitOptions = { readonly report?: (error: unknown) => void }\n\ntype ILifecycleUnit<T> = {\n  readonly state: 'idle' | 'loading' | 'loaded' | 'failed'\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly value: T | undefined\n  readonly error: unknown\n  start(factory: () => T | PromiseLike<T>): void\n  restart(factory: () => T | PromiseLike<T>): void // start 的别名\n  close(): void\n  dispose(): void // 永远同步\n}"
-          ],
-          "members": [],
-          "aliasOf": "ILifecycleUnit",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type ILifecycleUnit<T> = { readonly state: IUnitState; /** * The container-survival axis for the unit itself (separate from `state`) — `close()`/`dispose()` * move this one. */ readonly lifecycle: ILifecycleState; readonly value: T | undefined; readonly error: unknown; /** * Runtime-probes `factory()`'s return: a synchronous non-thenable value commits to `loaded` * immediately, without ever passing through `loading` (L-T5, D-2). A thenable commits to * `loading` and transitions on settle — but only if this call's generation is still current; a * superseded generation's late result is discarded silently (§4.2, L-T34). */ start(factory: () => T | PromiseLike<T>): void; /** Alias for `start()` — same behavior, named for the \"retry after `failed`\" call site (L-T34). */ restart(factory: () => T | PromiseLike<T>): void; close(): void; /** Synchronous — a unit owns no user resource to await releasing, only its own bookkeeping. */ dispose(): void; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use ILifecycleUnit when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ILifecycleUnit does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "ILifecycleUnit is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import ILifecycleUnit from @migaia/lifecycle, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use ILifecycleUnit when its type contract and declared inputs match the result you need. Choose a different public symbol when ILifecycleUnit does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleUnit."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ILifecycleUnit."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/lifecycle-unit.d.ts:ILifecycleUnit:export type ILifecycleUnit<T> = { readonly state: IUnitState; /** * The container-survival axis for the unit itself (separate from `state`) — `close()`/`dispose()` * move this one. */ readonly lifecycle: ILifecycleState; readonly value: T | undefined; readonly error: unknown; /** * Runtime-probes `factory()`'s return: a synchronous non-thenable value commits to `loaded` * immediately, without ever passing through `loading` (L-T5, D-2). A thenable commits to * `loading` and transitions on settle — but only if this call's generation is still current; a * superseded generation's late result is discarded silently (§4.2, L-T34). */ start(factory: () => T | PromiseLike<T>): void; /** Alias for `start()` — same behavior, named for the \"retry after `failed`\" call site (L-T34). */ restart(factory: () => T | PromiseLike<T>): void; close(): void; /** Synchronous — a unit owns no user resource to await releasing, only its own bookkeeping. */ dispose(): void; };",
-          "guidance": [
-            {
-              "id": "createlifecycleunit",
-              "heading": "createLifecycleUnit",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>\n\ntype ILifecycleUnitOptions = { readonly report?: (error: unknown) => void }\n\ntype ILifecycleUnit<T> = {\n  readonly state: 'idle' | 'loading' | 'loaded' | 'failed'\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly value: T | undefined\n  readonly error: unknown\n  start(factory: () => T | PromiseLike<T>): void\n  restart(factory: () => T | PromiseLike<T>): void // start 的别名\n  close(): void\n  dispose(): void // 永远同步\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "单元装载轴的状态机，内部用一个 `GenerationController` 丢弃过期结果："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const unit = createLifecycleUnit<Config>()\nunit.start(() => fetchConfig()) // thenable → 先进 'loading'，settle 后进 'loaded'/'failed'\nunit.state // 'loading'\nunit.value // undefined（settle 前）\nunit.restart(() => fetchConfig()) // 新 generation，旧一次的迟到结果被静默丢弃"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "边界行为："
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`factory()` 只读一次其返回值的 `.then`（探测语义同 `probeThenable`）：同步非 thenable 返回直接落 `loaded`（跳过 `loading`）；`factory()` 同步抛出或 thenable reject 时进入 `failed`，`unit.error` 存原始错误（不打标签），同时额外把一份打上 `UNIT_START_FAILED` 标签的错误发给 `options.report`（若提供）。",
-                    "每次 `start()`/`restart()` 隐式开启新 generation；旧 generation 的迟到 settle 结果被静默丢弃（不写入 `state`/`value`/`error`）。",
-                    "`lifecycle` 是容器存活轴（`close()`/`dispose()` 驱动），与 `state`（装载轴）是两个独立读值。",
-                    "`dispose()` 永远同步——单元本身不持有需要等待的资源，只是终结内部 generation controller（超过一次调用幂等）。"
-                  ]
-                }
-              ]
-            }
-          ],
-          "usageScore": 28,
-          "configuration": [],
-          "fragment": "lifecycle-index--ILifecycleUnit"
-        },
-        {
-          "name": "ILifecycleUnitOptions",
-          "kind": "type",
-          "signature": "export type ILifecycleUnitOptions = {\n  /** * Diagnostic channel for a failed `start()`, tagged `UNIT_START_FAILED` with the original failure * on `cause`. `unit.error` itself always stays the caller's raw, untagged value — this is a side * channel for callers that want a `(source, code)`-bearing signal without losing that identity. */ readonly report?: (\n    error: unknown,\n  ) => void;\n};",
-          "declarationLine": 2,
-          "source": "packages/lifecycle/dist/lifecycle-unit.d.ts",
-          "purpose": "ILifecycleUnitOptions is part of this module's public type contract.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleUnitOptions.",
-          "advanced": "No additional advanced behavior is declared for ILifecycleUnitOptions.",
-          "parameters": ["This type declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this type.",
-          "errors": ["No documented errors are declared for ILifecycleUnitOptions."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleUnitOptions.",
-          "examples": [
-            "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
-            "function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>\n\ntype ILifecycleUnitOptions = { readonly report?: (error: unknown) => void }\n\ntype ILifecycleUnit<T> = {\n  readonly state: 'idle' | 'loading' | 'loaded' | 'failed'\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly value: T | undefined\n  readonly error: unknown\n  start(factory: () => T | PromiseLike<T>): void\n  restart(factory: () => T | PromiseLike<T>): void // start 的别名\n  close(): void\n  dispose(): void // 永远同步\n}"
-          ],
-          "members": [],
-          "aliasOf": "ILifecycleUnitOptions",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export type ILifecycleUnitOptions = { /** * Diagnostic channel for a failed `start()`, tagged `UNIT_START_FAILED` with the original failure * on `cause`. `unit.error` itself always stays the caller's raw, untagged value — this is a side * channel for callers that want a `(source, code)`-bearing signal without losing that identity. */ readonly report?: (error: unknown) => void; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use ILifecycleUnitOptions when its type contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ILifecycleUnitOptions does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "ILifecycleUnitOptions is part of this module's public type contract."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import ILifecycleUnitOptions from @migaia/lifecycle, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use ILifecycleUnitOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ILifecycleUnitOptions does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILifecycleUnitOptions."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ILifecycleUnitOptions."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/lifecycle-unit.d.ts:ILifecycleUnitOptions:export type ILifecycleUnitOptions = { /** * Diagnostic channel for a failed `start()`, tagged `UNIT_START_FAILED` with the original failure * on `cause`. `unit.error` itself always stays the caller's raw, untagged value — this is a side * channel for callers that want a `(source, code)`-bearing signal without losing that identity. */ readonly report?: (error: unknown) => void; };",
-          "guidance": [
-            {
-              "id": "createlifecycleunit",
-              "heading": "createLifecycleUnit",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function createLifecycleUnit<T>(options?: ILifecycleUnitOptions): ILifecycleUnit<T>\n\ntype ILifecycleUnitOptions = { readonly report?: (error: unknown) => void }\n\ntype ILifecycleUnit<T> = {\n  readonly state: 'idle' | 'loading' | 'loaded' | 'failed'\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly value: T | undefined\n  readonly error: unknown\n  start(factory: () => T | PromiseLike<T>): void\n  restart(factory: () => T | PromiseLike<T>): void // start 的别名\n  close(): void\n  dispose(): void // 永远同步\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "单元装载轴的状态机，内部用一个 `GenerationController` 丢弃过期结果："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const unit = createLifecycleUnit<Config>()\nunit.start(() => fetchConfig()) // thenable → 先进 'loading'，settle 后进 'loaded'/'failed'\nunit.state // 'loading'\nunit.value // undefined（settle 前）\nunit.restart(() => fetchConfig()) // 新 generation，旧一次的迟到结果被静默丢弃"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "边界行为："
-                },
-                {
-                  "type": "list",
-                  "items": [
-                    "`factory()` 只读一次其返回值的 `.then`（探测语义同 `probeThenable`）：同步非 thenable 返回直接落 `loaded`（跳过 `loading`）；`factory()` 同步抛出或 thenable reject 时进入 `failed`，`unit.error` 存原始错误（不打标签），同时额外把一份打上 `UNIT_START_FAILED` 标签的错误发给 `options.report`（若提供）。",
-                    "每次 `start()`/`restart()` 隐式开启新 generation；旧 generation 的迟到 settle 结果被静默丢弃（不写入 `state`/`value`/`error`）。",
-                    "`lifecycle` 是容器存活轴（`close()`/`dispose()` 驱动），与 `state`（装载轴）是两个独立读值。",
-                    "`dispose()` 永远同步——单元本身不持有需要等待的资源，只是终结内部 generation controller（超过一次调用幂等）。"
-                  ]
-                }
-              ]
-            }
-          ],
-          "usageScore": 30,
-          "configuration": [],
-          "fragment": "lifecycle-index--ILifecycleUnitOptions"
-        },
-        {
           "name": "ILifecycleUnitStateValue",
           "kind": "type",
           "signature": "export type ILifecycleUnitStateValue =\n  (typeof LifecycleUnitState)[keyof typeof LifecycleUnitState];",
@@ -18043,7 +17659,7 @@
           "errors": ["No documented errors are declared for ITerminalController."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITerminalController.",
           "examples": [
-            "import {\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
             "function createTerminalController(): ITerminalController\n\ntype ITerminalController = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  close(): void\n  forceTerminal(): void\n  whenTerminal(): Promise<void>\n}"
           ],
           "members": [],
@@ -18177,11 +17793,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LifecycleErrorCode.",
           "examples": [
             "throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')",
-            "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')",
-            "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)",
             "import { LifecycleErrorCode, type ILifecycleErrorCode } from '@migaia/lifecycle'",
             "if (error.code === LifecycleErrorCode.scopeClosed) {\n  /* ... */\n}",
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'",
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
           "members": [],
@@ -18250,54 +17864,6 @@
                 {
                   "type": "paragraph",
                   "text": "`code`、`message` 均必填（建议 `code` 取自 `LifecycleErrorCode`）。`options.errors` 非空时会冻结后挂到 `.errors`。"
-                }
-              ]
-            },
-            {
-              "id": "createlifecyclerangeerror",
-              "heading": "createLifecycleRangeError",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function createLifecycleRangeError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }\n): RangeError"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`code`、`message` 均必填。"
-                }
-              ]
-            },
-            {
-              "id": "taglifecycleerror",
-              "heading": "tagLifecycleError",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function tagLifecycleError<E extends Error>(error: E, code: string): E"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`error`、`code` 均必填。返回同一个对象（原地修改，保留原生类型如 `AggregateError`）。"
                 }
               ]
             },
@@ -18444,7 +18010,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -18474,38 +18040,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -18604,7 +18144,7 @@
               ]
             }
           ],
-          "usageScore": 88,
+          "usageScore": 64,
           "configuration": [],
           "fragment": "lifecycle-index--LifecycleErrorCode"
         },
@@ -18691,7 +18231,7 @@
           "examples": [
             "import { LifecycleErrorText, type ILifecycleErrorText } from '@migaia/lifecycle'",
             "error.message === LifecycleErrorText.disposeTransactionFailed",
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
           ],
           "members": [],
           "aliasOf": "LifecycleErrorText",
@@ -18745,7 +18285,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -18775,38 +18315,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -19104,16 +18618,6 @@
           "ownerFragment": "lifecycle-errors--createLifecycleError"
         },
         {
-          "identity": "packages/lifecycle/dist/errors.d.ts:createLifecycleRangeError:export declare function createLifecycleRangeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): RangeError;",
-          "name": "createLifecycleRangeError",
-          "signature": "export declare function createLifecycleRangeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): RangeError;",
-          "source": "packages/lifecycle/dist/errors.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./errors",
-          "ownerModule": "errors",
-          "ownerFragment": "lifecycle-errors--createLifecycleRangeError"
-        },
-        {
           "identity": "packages/lifecycle/dist/lifecycle-scope.d.ts:createLifecycleScope:export declare function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope;",
           "name": "createLifecycleScope",
           "signature": "export declare function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope;",
@@ -19162,16 +18666,6 @@
           "ownerExportPath": "./quiescence",
           "ownerModule": "quiescence",
           "ownerFragment": "lifecycle-quiescence--createStringLeaseRegistry"
-        },
-        {
-          "identity": "packages/lifecycle/dist/quiescence-tracker.d.ts:createStringQuiescenceTracker:export declare function createStringQuiescenceTracker(): IQuiescenceTracker<string>;",
-          "name": "createStringQuiescenceTracker",
-          "signature": "export declare function createStringQuiescenceTracker(): IQuiescenceTracker<string>;",
-          "source": "packages/lifecycle/dist/quiescence-tracker.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./quiescence",
-          "ownerModule": "quiescence",
-          "ownerFragment": "lifecycle-quiescence--createStringQuiescenceTracker"
         },
         {
           "identity": "packages/lifecycle/dist/sync-started-disposal-ledger.d.ts:createSyncStartedDisposalLedger:export declare function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger;",
@@ -19392,36 +18886,6 @@
           "ownerExportPath": "./scheduler",
           "ownerModule": "scheduler",
           "ownerFragment": "lifecycle-scheduler--snapshotScheduler"
-        },
-        {
-          "identity": "packages/lifecycle/dist/errors.d.ts:tagLifecycleError:export declare function tagLifecycleError<E extends Error>(error: E, code: string): E;",
-          "name": "tagLifecycleError",
-          "signature": "export declare function tagLifecycleError<E extends Error>(error: E, code: string): E;",
-          "source": "packages/lifecycle/dist/errors.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./errors",
-          "ownerModule": "errors",
-          "ownerFragment": "lifecycle-errors--tagLifecycleError"
-        },
-        {
-          "identity": "packages/lifecycle/dist/scheduler.d.ts:validateSchedulerDelay:export declare function validateSchedulerDelay(value: unknown, label?: string): number;",
-          "name": "validateSchedulerDelay",
-          "signature": "export declare function validateSchedulerDelay(value: unknown, label?: string): number;",
-          "source": "packages/lifecycle/dist/scheduler.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./scheduler",
-          "ownerModule": "scheduler",
-          "ownerFragment": "lifecycle-scheduler--validateSchedulerDelay"
-        },
-        {
-          "identity": "packages/lifecycle/dist/scheduler.d.ts:validateSchedulerTime:export declare function validateSchedulerTime(value: unknown, label: string): number;",
-          "name": "validateSchedulerTime",
-          "signature": "export declare function validateSchedulerTime(value: unknown, label: string): number;",
-          "source": "packages/lifecycle/dist/scheduler.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./scheduler",
-          "ownerModule": "scheduler",
-          "ownerFragment": "lifecycle-scheduler--validateSchedulerTime"
         }
       ]
     },
@@ -19565,7 +19029,7 @@
           "errors": ["No documented errors are declared for IAbortController."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAbortController.",
           "examples": [
-            "import {\n  snapshotScheduler,\n  validateSchedulerDelay,\n  validateSchedulerTime,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
             "function createAbortController(): IAbortController\n// type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(...); removeEventListener(...) };\n// type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void };"
           ],
           "members": [],
@@ -20069,7 +19533,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -20099,38 +19563,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -21048,7 +20486,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -21083,7 +20521,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -21113,38 +20551,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -21276,6 +20688,7 @@
             "const collector = createErrorCollector('collect', undefined)\ncollector.add('item-1', error)\nconst collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]"
           ],
           "members": [],
+          "aliasOf": "createErrorCollector",
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function createErrorCollector(policy: IErrorPolicy, report: ((error: unknown) => void) | undefined): IErrorCollector;"
@@ -21339,7 +20752,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -21374,7 +20787,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -21404,38 +20817,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -21576,6 +20963,7 @@
             "throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')"
           ],
           "members": [],
+          "aliasOf": "createLifecycleError",
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function createLifecycleError(code: string, message: string, options?: { readonly cause?: unknown; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; readonly errors?: readonly unknown[]; }): ILifecycleError;"
@@ -21644,7 +21032,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -21679,7 +21067,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -21709,38 +21097,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -21877,6 +21239,7 @@
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
           "members": [],
+          "aliasOf": "createLifecycleFailure",
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function createLifecycleFailure(code: string, message: string, error: unknown): ILifecycleError;"
@@ -21964,7 +21327,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -21994,38 +21357,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -22129,311 +21466,6 @@
           "fragment": "lifecycle-errors--createLifecycleFailure"
         },
         {
-          "name": "createLifecycleRangeError",
-          "kind": "function",
-          "signature": "export declare function createLifecycleRangeError(\n  code: string,\n  message: string,\n  options?: {\n    readonly cause?: unknown;\n    readonly detail?: Readonly<Record<string, unknown>>;\n  },\n): RangeError;",
-          "declarationLine": 48,
-          "source": "packages/lifecycle/dist/errors.d.ts",
-          "purpose": "Creates a native `RangeError` for input validation and attaches the supplied code. Preserves the native type required by `docs/contracts/error-codes.md` §2.2.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLifecycleRangeError.",
-          "advanced": "No additional advanced behavior is declared for createLifecycleRangeError.",
-          "parameters": [
-            "code: string",
-            "message: string",
-            "options: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; } (optional)"
-          ],
-          "parameterDetails": [
-            {
-              "name": "code",
-              "type": "string",
-              "optional": false
-            },
-            {
-              "name": "message",
-              "type": "string",
-              "optional": false
-            },
-            {
-              "name": "options",
-              "type": "{ readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }",
-              "optional": true
-            }
-          ],
-          "returns": "RangeError",
-          "errors": ["No documented errors are declared for createLifecycleRangeError."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createLifecycleRangeError.",
-          "examples": [
-            "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-          ],
-          "members": [],
-          "exportPath": "./errors",
-          "overloadSignatures": [
-            "export declare function createLifecycleRangeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): RangeError;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "code",
-                "type": "string",
-                "optional": false
-              },
-              {
-                "name": "message",
-                "type": "string",
-                "optional": false
-              },
-              {
-                "name": "options",
-                "type": "{ readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": ["RangeError"],
-          "whenToUse": "Use createLifecycleRangeError when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createLifecycleRangeError does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Creates a native `RangeError` for input validation and attaches the supplied code. Preserves the native type required by `docs/contracts/error-codes.md` §2.2."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import createLifecycleRangeError from @migaia/lifecycle/errors, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use createLifecycleRangeError when its function contract and declared inputs match the result you need. Choose a different public symbol when createLifecycleRangeError does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLifecycleRangeError."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createLifecycleRangeError."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/errors.d.ts:createLifecycleRangeError:export declare function createLifecycleRangeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): RangeError;",
-          "guidance": [
-            {
-              "id": "错误基础设施模块",
-              "heading": "错误基础设施模块",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
-                }
-              ]
-            },
-            {
-              "id": "createlifecyclerangeerror",
-              "heading": "createLifecycleRangeError",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function createLifecycleRangeError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }\n): RangeError"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`code`、`message` 均必填。"
-                }
-              ]
-            },
-            {
-              "id": "错误基础设施模块",
-              "heading": "错误基础设施模块",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`LIFECYCLE_SOURCE`｜3 秒上手 —— 本包所有错误的 `source` 字段固定值："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "LIFECYCLE_SOURCE // '@migaia/lifecycle'"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "字符串常量，无调用。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createLifecycleError`｜5 秒上手 —— 构造一个携带 `(source, code)` 身份的 `Error`，从不改写 `stack`："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code: string`（必填，建议取自 `LifecycleErrorCode`）、`message: string`（必填）、第三参数选项：`cause?: unknown`、`phase?: string`、`detail?: Readonly<Record<string, unknown>>`、`errors?: readonly unknown[]`（非空时冻结挂到 `.errors`）。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`containAsyncRejection`｜5 秒上手 —— 保护性地探测某个返回值是否是 thenable，是则观察其 rejection 而不让其变成未处理拒绝："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error))"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`probeThenable`｜5 秒上手 —— 只读一次 `value.then`，返回判别结果（不是布尔值，是否 thenable/是否 getter 抛错都会区分）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const probe = probeThenable(result)\nif (probe.kind === 'thenable') {\n  /* probe.thenFn 已捕获，可安全 apply 一次 */\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "单参数 `value: unknown`，无选项。三种结果：`{ kind: 'not-thenable' }`、`{ kind: 'thenable', thenFn }`、`{ kind: 'failed', error }`（读 `.then` 本身抛错）。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`assimilateCapturedThen`｜5 秒上手 —— 把 `probeThenable` 捕获到的 `thenFn` 安全地 apply 成一个真正的 `Promise`，且只调用一次："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const promise = assimilateCapturedThen<T>(probe.thenFn, thenableValue)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`thenFn`（必填，来自 `probeThenable` 的 `thenFn`）、`thenable: unknown`（必填，作为 `this` receiver 传给 `thenFn`）。无可选项。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createErrorCollector`｜10 秒上手 —— 按四种错误策略收集/上报错误，`createDisposeTransaction`/`createSyncLifecycleScope` 内部都用它："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const collector = createErrorCollector('collect', undefined)\ncollector.add('item-1', error)\nconst collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`policy: 'throw' | 'collect' | 'report' | 'firstError'`（必填）、`report: ((error: unknown) => void) | undefined`（必填，显式传 `undefined` 表示无诊断通道）。`add(source, error)` 按策略即时处理（`report` 策略立即调用 `report`）；`finalize(message)`：`collect` 返回收集到的数组，`report` 返回空数组（已在 `add` 时上报），`throw` 单错原样抛、多错聚合成携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`，`firstError` 有错误时抛首个（其余经 `report` 观测），否则返回空数组。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "if (error.code === LifecycleErrorCode.scopeClosed) {\n  /* ... */\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`LifecycleErrorText`｜3 秒上手 —— 稳定诊断消息表（本包内部错误信息的唯一声明处，公开是为了让调用方按文本断言/比对）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "error.message === LifecycleErrorText.disposeTransactionFailed"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "全部键：`provisionalCleanupFailed`、`disposeTransactionFailed`、`disposeDescriptorInvalid`、`mutationAdmissionTimedOut`、`generationCancellationFailed`、`disposalLedgerClosed`、`disposalLedgerReentrant`、`envUnsupported`、`abortSignalInvalid`、`schedulerTaskCancelGetterFailed`、`schedulerTaskInvalid`、`schedulerAccessorFailed`、`schedulerInvalid`、`schedulerNumberType`、`schedulerNumberRange`、`schedulerDelayRange`、"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`schedulerTimeOverflow`、`generationTimeoutAccessorFailed`。"
-                }
-              ]
-            }
-          ],
-          "usageScore": 58,
-          "configuration": [],
-          "fragment": "lifecycle-errors--createLifecycleRangeError"
-        },
-        {
           "name": "createLifecycleTypeError",
           "kind": "function",
           "signature": "export declare function createLifecycleTypeError(\n  code: string,\n  message: string,\n  options?: {\n    readonly cause?: unknown;\n    readonly detail?: Readonly<Record<string, unknown>>;\n  },\n): TypeError;",
@@ -22471,6 +21503,7 @@
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
           ],
           "members": [],
+          "aliasOf": "createLifecycleTypeError",
           "exportPath": "./errors",
           "overloadSignatures": [
             "export declare function createLifecycleTypeError(code: string, message: string, options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>>; }): TypeError;"
@@ -22558,7 +21591,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -22588,38 +21621,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -22737,10 +21744,11 @@
           "errors": ["No documented errors are declared for IErrorCollector."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IErrorCollector.",
           "examples": [
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}"
           ],
           "members": [],
+          "aliasOf": "IErrorCollector",
           "exportPath": "./errors",
           "overloadSignatures": [
             "export type IErrorCollector = { readonly policy: IErrorPolicy; /** Records one item's failure. For `report`, this is also where the reporter is invoked. */ add(source: string, error: unknown): void; /** * Finalizes collection. `collect`/`report`/`firstError`-with-no-error return the collected list * (empty for `report`, since those were already handed to the reporter per `add`); `throw` and * `firstError`-with-an-error throw instead of returning. */ finalize(message: string): readonly ICollectedError[]; };"
@@ -22791,7 +21799,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -22840,11 +21848,12 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleError.",
           "examples": [
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}",
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
             "function createLifecycleError(\n  code: string,\n  message: string,\n  options?: {\n    readonly cause?: unknown\n    readonly phase?: string\n    readonly detail?: Readonly<Record<string, unknown>>\n    readonly errors?: readonly unknown[]\n  }\n): ILifecycleError // Error & { source, code, phase?, detail?, cause?, errors? }",
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nfunction createLifecycleTypeError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }\n): TypeError\n\nfunction createLifecycleFailure(code: string, message: string, error: unknown): ILifecycleError"
           ],
           "members": [],
+          "aliasOf": "ILifecycleError",
           "exportPath": "./errors",
           "overloadSignatures": [
             "export type ILifecycleError = Error & { readonly source: string; readonly code: string; readonly phase?: string; readonly detail?: Readonly<Record<string, unknown>>; readonly cause?: unknown; /** * Stores a frozen, non-enumerable list of secondary failures such as cleanup errors, appended in * occurrence order. Keeps them separate from `cause` so the primary error retains its identity. */ readonly errors?: readonly unknown[]; };"
@@ -22895,7 +21904,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -23098,12 +22107,13 @@
           "errors": ["No documented errors are declared for LIFECYCLE_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LIFECYCLE_SOURCE.",
           "examples": [
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
             "const LIFECYCLE_SOURCE: '@migaia/lifecycle'",
-            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'",
+            "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'",
             "LIFECYCLE_SOURCE // '@migaia/lifecycle'"
           ],
           "members": [],
+          "aliasOf": "LIFECYCLE_SOURCE",
           "exportPath": "./errors",
           "overloadSignatures": ["export declare const LIFECYCLE_SOURCE = \"@migaia/lifecycle\";"],
           "overloadParameterDetails": [[]],
@@ -23152,7 +22162,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
                 }
               ]
             },
@@ -23178,7 +22188,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
+                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
                 },
                 {
                   "type": "paragraph",
@@ -23208,38 +22218,12 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
                   "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
                   "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
                 },
                 {
                   "type": "paragraph",
@@ -23341,297 +22325,6 @@
           "usageScore": 54,
           "configuration": [],
           "fragment": "lifecycle-errors--LIFECYCLE_SOURCE"
-        },
-        {
-          "name": "tagLifecycleError",
-          "kind": "function",
-          "signature": "export declare function tagLifecycleError<E extends Error>(error: E, code: string): E;",
-          "declarationLine": 37,
-          "source": "packages/lifecycle/dist/errors.d.ts",
-          "purpose": "Stamps `(source, code)` onto an error object we did not construct ourselves (e.g. a built-in `AggregateError`) without touching `stack`, `message`, or `errors`. Used where the error's _type_ matters to callers (`AggregateError`) so `createLifecycleError`'s plain `Error` cannot be used.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for tagLifecycleError.",
-          "advanced": "No additional advanced behavior is declared for tagLifecycleError.",
-          "parameters": ["error: E", "code: string"],
-          "parameterDetails": [
-            {
-              "name": "error",
-              "type": "E",
-              "optional": false
-            },
-            {
-              "name": "code",
-              "type": "string",
-              "optional": false
-            }
-          ],
-          "returns": "E",
-          "errors": ["No documented errors are declared for tagLifecycleError."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for tagLifecycleError.",
-          "examples": [
-            "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-          ],
-          "members": [],
-          "exportPath": "./errors",
-          "overloadSignatures": [
-            "export declare function tagLifecycleError<E extends Error>(error: E, code: string): E;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "error",
-                "type": "E",
-                "optional": false
-              },
-              {
-                "name": "code",
-                "type": "string",
-                "optional": false
-              }
-            ]
-          ],
-          "overloadReturns": ["E"],
-          "whenToUse": "Use tagLifecycleError when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when tagLifecycleError does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Stamps `(source, code)` onto an error object we did not construct ourselves (e.g. a built-in `AggregateError`) without touching `stack`, `message`, or `errors`. Used where the error's _type_ matters to callers (`AggregateError`) so `createLifecycleError`'s plain `Error` cannot be used."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import tagLifecycleError from @migaia/lifecycle/errors, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use tagLifecycleError when its function contract and declared inputs match the result you need. Choose a different public symbol when tagLifecycleError does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for tagLifecycleError."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for tagLifecycleError."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/errors.d.ts:tagLifecycleError:export declare function tagLifecycleError<E extends Error>(error: E, code: string): E;",
-          "guidance": [
-            {
-              "id": "错误基础设施模块",
-              "heading": "错误基础设施模块",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'"
-                }
-              ]
-            },
-            {
-              "id": "taglifecycleerror",
-              "heading": "tagLifecycleError",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "function tagLifecycleError<E extends Error>(error: E, code: string): E"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`error`、`code` 均必填。返回同一个对象（原地修改，保留原生类型如 `AggregateError`）。"
-                }
-              ]
-            },
-            {
-              "id": "错误基础设施模块",
-              "heading": "错误基础设施模块",
-              "blocks": [
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  createLifecycleRangeError,\n  tagLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  LifecycleErrorCode,\n  LifecycleErrorText\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`LIFECYCLE_SOURCE`｜3 秒上手 —— 本包所有错误的 `source` 字段固定值："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "LIFECYCLE_SOURCE // '@migaia/lifecycle'"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "字符串常量，无调用。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createLifecycleError`｜5 秒上手 —— 构造一个携带 `(source, code)` 身份的 `Error`，从不改写 `stack`："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleError(LifecycleErrorCode.scopeClosed, '[lifecycle] scope is closing')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code: string`（必填，建议取自 `LifecycleErrorCode`）、`message: string`（必填）、第三参数选项：`cause?: unknown`、`phase?: string`、`detail?: Readonly<Record<string, unknown>>`、`errors?: readonly unknown[]`（非空时冻结挂到 `.errors`）。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createLifecycleRangeError`｜3 秒上手 —— 同上但产出原生 `RangeError`（保留原生类型，用于入参越界场景）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "throw createLifecycleRangeError(LifecycleErrorCode.invalidOption, 'delayMs must be >= 0')"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`code`、`message`（均必填）、第三参数选项 `{ cause?: unknown; detail?: Readonly<Record<string, unknown>> }`。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createLifecycleTypeError` / `createLifecycleFailure`｜5 秒上手 —— `/errors` leaf 的边界构造器：前者创建保留原生类型的 `TypeError`；后者尽量给既有 Error 原位附码，primitive/不可扩展错误则包装并通过 `cause` 保留。"
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, 'invalid option')\n// catch (cause) { throw createLifecycleFailure(code, message, cause); }"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`tagLifecycleError`｜5 秒上手 —— 给一个已存在（非本包构造）的错误对象就地贴上 `(source, code)`，常用于给原生 `AggregateError` 打标："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "tagLifecycleError(new AggregateError(errors, 'msg'), LifecycleErrorCode.scopeDisposalFailed)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`error: E extends Error`（必填）、`code: string`（必填）。返回同一个对象（原地修改）。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`containAsyncRejection`｜5 秒上手 —— 保护性地探测某个返回值是否是 thenable，是则观察其 rejection 而不让其变成未处理拒绝："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error))"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`probeThenable`｜5 秒上手 —— 只读一次 `value.then`，返回判别结果（不是布尔值，是否 thenable/是否 getter 抛错都会区分）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const probe = probeThenable(result)\nif (probe.kind === 'thenable') {\n  /* probe.thenFn 已捕获，可安全 apply 一次 */\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "单参数 `value: unknown`，无选项。三种结果：`{ kind: 'not-thenable' }`、`{ kind: 'thenable', thenFn }`、`{ kind: 'failed', error }`（读 `.then` 本身抛错）。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`assimilateCapturedThen`｜5 秒上手 —— 把 `probeThenable` 捕获到的 `thenFn` 安全地 apply 成一个真正的 `Promise`，且只调用一次："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const promise = assimilateCapturedThen<T>(probe.thenFn, thenableValue)"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`thenFn`（必填，来自 `probeThenable` 的 `thenFn`）、`thenable: unknown`（必填，作为 `this` receiver 传给 `thenFn`）。无可选项。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`createErrorCollector`｜10 秒上手 —— 按四种错误策略收集/上报错误，`createDisposeTransaction`/`createSyncLifecycleScope` 内部都用它："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "const collector = createErrorCollector('collect', undefined)\ncollector.add('item-1', error)\nconst collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "参数：`policy: 'throw' | 'collect' | 'report' | 'firstError'`（必填）、`report: ((error: unknown) => void) | undefined`（必填，显式传 `undefined` 表示无诊断通道）。`add(source, error)` 按策略即时处理（`report` 策略立即调用 `report`）；`finalize(message)`：`collect` 返回收集到的数组，`report` 返回空数组（已在 `add` 时上报），`throw` 单错原样抛、多错聚合成携带 `SCOPE_DISPOSAL_FAILED` 码的 `AggregateError`，`firstError` 有错误时抛首个（其余经 `report` 观测），否则返回空数组。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`LifecycleErrorCode`｜10 秒上手 —— 稳定错误码表（22 个码），唯一声明处，`source` 恒为 `'@migaia/lifecycle'`："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "if (error.code === LifecycleErrorCode.scopeClosed) {\n  /* ... */\n}"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "全部取值：`delayFailed`(`DELAY_FAILED`)、`scopeClosed`(`SCOPE_CLOSED`)、`scopeTerminal`(`SCOPE_TERMINAL`)、`scopeReentrantDispose`(`SCOPE_REENTRANT_DISPOSE`)、`scopeReentrantOwn`(`SCOPE_REENTRANT_OWN`)、`scopeSyncViolation`(`SCOPE_SYNC_VIOLATION`)、`scopeDisposalFailed`(`SCOPE_DISPOSAL_FAILED`)、`unitStartFailed`(`UNIT_START_FAILED`)、`generationSuperseded`(`GENERATION_SUPERSEDED`)、"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`generationCancellationFailed`(`GENERATION_CANCELLATION_FAILED`)、`generationDisposed`(`GENERATION_DISPOSED`)、`generationTimedOut`(`GENERATION_TIMED_OUT`)、`quiescenceSealed`(`QUIESCENCE_SEALED`)、`quiescenceUnsealedWait`(`QUIESCENCE_UNSEALED_WAIT`)、`provisionalSettled`(`PROVISIONAL_SETTLED`)、`provisionalParentClosed`(`PROVISIONAL_PARENT_CLOSED`)、`queueAdmissionTimeout`(`QUEUE_ADMISSION_TIMEOUT`)、"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`queueSelfDependency`(`QUEUE_SELF_DEPENDENCY`)、`releaseForceFailed`(`RELEASE_FORCE_FAILED`)、`deadlineExceeded`(`DEADLINE_EXCEEDED`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。逐条语义见 USEGUIDE.md。"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`LifecycleErrorText`｜3 秒上手 —— 稳定诊断消息表（本包内部错误信息的唯一声明处，公开是为了让调用方按文本断言/比对）："
-                },
-                {
-                  "type": "code",
-                  "language": "ts",
-                  "code": "error.message === LifecycleErrorText.disposeTransactionFailed"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "全部键：`provisionalCleanupFailed`、`disposeTransactionFailed`、`disposeDescriptorInvalid`、`mutationAdmissionTimedOut`、`generationCancellationFailed`、`disposalLedgerClosed`、`disposalLedgerReentrant`、`envUnsupported`、`abortSignalInvalid`、`schedulerTaskCancelGetterFailed`、`schedulerTaskInvalid`、`schedulerAccessorFailed`、`schedulerInvalid`、`schedulerNumberType`、`schedulerNumberRange`、`schedulerDelayRange`、"
-                },
-                {
-                  "type": "paragraph",
-                  "text": "`schedulerTimeOverflow`、`generationTimeoutAccessorFailed`。"
-                }
-              ]
-            }
-          ],
-          "usageScore": 58,
-          "configuration": [],
-          "fragment": "lifecycle-errors--tagLifecycleError"
         }
       ],
       "aliases": []
@@ -23790,7 +22483,7 @@
               ]
             }
           ],
-          "usageScore": 100,
+          "usageScore": 106,
           "configuration": [
             {
               "name": "parentSignal",
@@ -23820,9 +22513,9 @@
               "name": "report",
               "type": "(error: unknown) => void",
               "optional": true,
-              "description": "全部选项（`ILifecycleUnitOptions`）：`report?: (error: unknown) => void` —— `start()` 的 factory 同步抛出或 thenable reject 时，除了把原始错误存进 `unit.error`（原样、不打标签），还会额外把一份打上 `UNIT_START_FAILED` 标签的错误发给 `report`。`start`/`restart` 是同一函数的两个别名；同步非 thenable 返回直接落 `loaded`（跳过 `loading`）。`close()` 同步；`dispose()` 同步（单元本身不持有需要等待的资源，只是终结 generation controller）。",
+              "description": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。",
               "descriptionEn": "Last-boundary reporter for failures that have no caller to receive them: an `adopt()` release * failure when that call passes no `onReleaseError`, and timer/parent cleanup failures raised by * an asynchronous `begin({ timeoutMs })` timeout. Its own throws and rejections are contained. * Without it those failures are dropped.",
-              "descriptionZh": "全部选项（`ILifecycleUnitOptions`）：`report?: (error: unknown) => void` —— `start()` 的 factory 同步抛出或 thenable reject 时，除了把原始错误存进 `unit.error`（原样、不打标签），还会额外把一份打上 `UNIT_START_FAILED` 标签的错误发给 `report`。`start`/`restart` 是同一函数的两个别名；同步非 thenable 返回直接落 `loaded`（跳过 `loading`）。`close()` 同步；`dispose()` 同步（单元本身不持有需要等待的资源，只是终结 generation controller）。"
+              "descriptionZh": "Generation controller 的 `report?: (error: unknown) => void` 负责没有调用方接收的失败：adopt 未传 onReleaseError 时的过期资源释放错误，以及异步 timeout 的 timer/parent-listener 清理错误。reporter 自身的 throw/rejection 会被隔离；省略时这些诊断不外发。"
             }
           ],
           "fragment": "lifecycle-generation--createGenerationController"
@@ -23842,7 +22535,7 @@
           "errors": ["No documented errors are declared for IGenerationController."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGenerationController.",
           "examples": [
-            "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
+            "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
           "members": [],
@@ -23908,7 +22601,7 @@
           "errors": ["No documented errors are declared for IGenerationControllerOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGenerationControllerOptions.",
           "examples": [
-            "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
+            "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
           "members": [],
@@ -23974,7 +22667,7 @@
           "errors": ["No documented errors are declared for IGenerationRequest."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGenerationRequest.",
           "examples": [
-            "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
+            "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
           "members": [],
@@ -24040,7 +22733,7 @@
           "errors": ["No documented errors are declared for IGenerationToken."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGenerationToken.",
           "examples": [
-            "import {\n  createLifecycleUnit,\n  type ILifecycleUnit,\n  type ILifecycleUnitOptions,\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
+            "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
             "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
           "members": [],
@@ -24112,7 +22805,7 @@
           "name": "createObjectLeaseRegistry",
           "kind": "function",
           "signature": "export declare function createObjectLeaseRegistry<\n  TKey extends object,\n>(): ILeaseRegistry<TKey>;",
-          "declarationLine": 31,
+          "declarationLine": 26,
           "source": "packages/lifecycle/dist/quiescence-tracker.d.ts",
           "purpose": "createObjectLeaseRegistry is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createObjectLeaseRegistry.",
@@ -24177,7 +22870,7 @@
           "name": "createPendingTracker",
           "kind": "function",
           "signature": "export declare function createPendingTracker(): IPendingTracker;",
-          "declarationLine": 47,
+          "declarationLine": 42,
           "source": "packages/lifecycle/dist/quiescence-tracker.d.ts",
           "purpose": "createPendingTracker is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createPendingTracker.",
@@ -24247,7 +22940,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "只暴露 `track`/`drain`/`size` 的窄接口，用于追踪并排空在途 Promise（内部基于一个字符串键 `createStringQuiescenceTracker()`）："
+                  "text": "只暴露 `track`/`drain`/`size` 的窄接口，用于追踪并排空在途 Promise（内部基于一个字符串键 `createStringLeaseRegistry()`）："
                 },
                 {
                   "type": "code",
@@ -24280,7 +22973,7 @@
           "errors": ["No documented errors are declared for createQuiescenceTracker."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createQuiescenceTracker.",
           "examples": [
-            "const tracker = createQuiescenceTracker<object>() // 或 createStringQuiescenceTracker()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT",
+            "const tracker = createQuiescenceTracker<object>() // 或 createStringLeaseRegistry()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT",
             "const leases = createObjectLeaseRegistry<object>() // 内部就是 createQuiescenceTracker()"
           ],
           "members": [],
@@ -24335,7 +23028,7 @@
           "name": "createStringLeaseRegistry",
           "kind": "function",
           "signature": "export declare function createStringLeaseRegistry(): ILeaseRegistry<string>;",
-          "declarationLine": 32,
+          "declarationLine": 27,
           "source": "packages/lifecycle/dist/quiescence-tracker.d.ts",
           "purpose": "createStringLeaseRegistry is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStringLeaseRegistry.",
@@ -24345,7 +23038,9 @@
           "returns": "ILeaseRegistry<string>",
           "errors": ["No documented errors are declared for createStringLeaseRegistry."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStringLeaseRegistry.",
-          "examples": [],
+          "examples": [
+            "const tracker = createQuiescenceTracker<object>() // 或 createStringLeaseRegistry()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT"
+          ],
           "members": [],
           "exportPath": "./quiescence",
           "overloadSignatures": [
@@ -24390,80 +23085,15 @@
           "declaredConfiguration": [],
           "identity": "packages/lifecycle/dist/quiescence-tracker.d.ts:createStringLeaseRegistry:export declare function createStringLeaseRegistry(): ILeaseRegistry<string>;",
           "guidance": [],
-          "usageScore": 52,
+          "usageScore": 96,
           "configuration": [],
           "fragment": "lifecycle-quiescence--createStringLeaseRegistry"
-        },
-        {
-          "name": "createStringQuiescenceTracker",
-          "kind": "function",
-          "signature": "export declare function createStringQuiescenceTracker(): IQuiescenceTracker<string>;",
-          "declarationLine": 24,
-          "source": "packages/lifecycle/dist/quiescence-tracker.d.ts",
-          "purpose": "String-keyed variant. `WeakMap` cannot take string keys, so pristine entries are pruned explicitly.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStringQuiescenceTracker.",
-          "advanced": "No additional advanced behavior is declared for createStringQuiescenceTracker.",
-          "parameters": ["This function declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "IQuiescenceTracker<string>",
-          "errors": ["No documented errors are declared for createStringQuiescenceTracker."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStringQuiescenceTracker.",
-          "examples": [
-            "const tracker = createQuiescenceTracker<object>() // 或 createStringQuiescenceTracker()\nconst release = tracker.retain(key)\ntracker.count(key) // 1\ntracker.seal(key) // 之后 retain(key) 抛 QUIESCENCE_SEALED\nrelease()\nawait tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEALED_WAIT"
-          ],
-          "members": [],
-          "exportPath": "./quiescence",
-          "overloadSignatures": [
-            "export declare function createStringQuiescenceTracker(): IQuiescenceTracker<string>;"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": ["IQuiescenceTracker<string>"],
-          "whenToUse": "Use createStringQuiescenceTracker when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when createStringQuiescenceTracker does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "String-keyed variant. `WeakMap` cannot take string keys, so pristine entries are pruned explicitly."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import createStringQuiescenceTracker from @migaia/lifecycle/quiescence, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use createStringQuiescenceTracker when its function contract and declared inputs match the result you need. Choose a different public symbol when createStringQuiescenceTracker does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createStringQuiescenceTracker."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for createStringQuiescenceTracker."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/quiescence-tracker.d.ts:createStringQuiescenceTracker:export declare function createStringQuiescenceTracker(): IQuiescenceTracker<string>;",
-          "guidance": [],
-          "usageScore": 66,
-          "configuration": [],
-          "fragment": "lifecycle-quiescence--createStringQuiescenceTracker"
         },
         {
           "name": "ILeaseRegistry",
           "kind": "type",
           "signature": "export type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>;",
-          "declarationLine": 30,
+          "declarationLine": 25,
           "source": "packages/lifecycle/dist/quiescence-tracker.d.ts",
           "purpose": "`LeaseRegistry` — the same engine as `QuiescenceTracker`, re-exported under the name lease call sites reach for. §4.8 requires it to pass `whenZero()`/`whenZeroOnce()`/`seal()` straight through rather than hiding them behind `count()` polling.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILeaseRegistry.",
@@ -24474,7 +23104,7 @@
           "errors": ["No documented errors are declared for ILeaseRegistry."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILeaseRegistry.",
           "examples": [
-            "import {\n  createQuiescenceTracker,\n  createStringQuiescenceTracker,\n  createObjectLeaseRegistry,\n  createStringLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'",
+            "import {\n  createQuiescenceTracker,\n  createStringLeaseRegistry,\n  createObjectLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'",
             "function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>\nfunction createStringLeaseRegistry(): ILeaseRegistry<string>\n// type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>"
           ],
           "members": [],
@@ -24527,7 +23157,7 @@
           "name": "IPendingTracker",
           "kind": "type",
           "signature": "export type IPendingTracker = {\n  /** Registers `promise` as in-flight; auto-releases on settle. Returns `promise` unchanged. */ track<\n    T,\n  >(\n    promise: Promise<T>,\n  ): Promise<T>;\n  /** * Waits until nothing is in flight, looping via `whenZeroOnce()` so work started while draining * is never missed (L-T10). */ drain(): Promise<void>;\n  readonly size: number;\n};",
-          "declarationLine": 37,
+          "declarationLine": 32,
           "source": "packages/lifecycle/dist/quiescence-tracker.d.ts",
           "purpose": "The narrow facade for in-flight operations: unlike `LeaseRegistry`, it never exposes lease semantics (retain/seal) to domain callers — only `track()`/`drain()`/`size`.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPendingTracker.",
@@ -24538,7 +23168,7 @@
           "errors": ["No documented errors are declared for IPendingTracker."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPendingTracker.",
           "examples": [
-            "import {\n  createQuiescenceTracker,\n  createStringQuiescenceTracker,\n  createObjectLeaseRegistry,\n  createStringLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'",
+            "import {\n  createQuiescenceTracker,\n  createStringLeaseRegistry,\n  createObjectLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'",
             "function createPendingTracker(): IPendingTracker\n\ntype IPendingTracker = {\n  track<T>(promise: Promise<T>): Promise<T>\n  drain(): Promise<void>\n  readonly size: number\n}"
           ],
           "members": [],
@@ -24604,8 +23234,8 @@
           "errors": ["No documented errors are declared for IQuiescenceTracker."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IQuiescenceTracker.",
           "examples": [
-            "import {\n  createQuiescenceTracker,\n  createStringQuiescenceTracker,\n  createObjectLeaseRegistry,\n  createStringLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'",
-            "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringQuiescenceTracker(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}",
+            "import {\n  createQuiescenceTracker,\n  createStringLeaseRegistry,\n  createObjectLeaseRegistry,\n  createPendingTracker,\n  type IQuiescenceTracker,\n  type ILeaseRegistry,\n  type IPendingTracker\n} from '@migaia/lifecycle'",
+            "function createQuiescenceTracker<TKey extends object>(): IQuiescenceTracker<TKey>\nfunction createStringLeaseRegistry(): IQuiescenceTracker<string>\n\ntype IQuiescenceTracker<TKey> = {\n  retain(key: TKey): IDisposer // IDisposer = () => void\n  count(key: TKey): number\n  whenZero(key: TKey): Promise<void> // 严格独占等待\n  whenZeroOnce(key: TKey): Promise<void> // 非独占等待\n  seal(key: TKey): void\n  isSealed(key: TKey): boolean\n  forget(key: TKey): boolean\n}",
             "function createObjectLeaseRegistry<TKey extends object>(): ILeaseRegistry<TKey>\nfunction createStringLeaseRegistry(): ILeaseRegistry<string>\n// type ILeaseRegistry<TKey> = IQuiescenceTracker<TKey>"
           ],
           "members": [],
@@ -24705,11 +23335,9 @@
           "returns": "number",
           "errors": ["No documented errors are declared for addSchedulerTime."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for addSchedulerTime.",
-          "examples": [
-            "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 结果溢出为 Infinity 时抛 RangeError",
-            "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 两个有限数相加；溢出 Infinity 时抛 RangeError"
-          ],
+          "examples": [],
           "members": [],
+          "aliasOf": "addSchedulerTime",
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function addSchedulerTime(base: number, delta: number, label: string): number;"
@@ -24771,7 +23399,7 @@
           "declaredConfiguration": [],
           "identity": "packages/lifecycle/dist/scheduler.d.ts:addSchedulerTime:export declare function addSchedulerTime(base: number, delta: number, label: string): number;",
           "guidance": [],
-          "usageScore": 60,
+          "usageScore": 24,
           "configuration": [],
           "fragment": "lifecycle-scheduler--addSchedulerTime"
         },
@@ -24797,6 +23425,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for resolveScheduler.",
           "examples": [],
           "members": [],
+          "aliasOf": "resolveScheduler",
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function resolveScheduler(value: unknown): IScheduler;"
@@ -24898,6 +23527,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for resolveSchedulerOption.",
           "examples": [],
           "members": [],
+          "aliasOf": "resolveSchedulerOption",
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function resolveSchedulerOption(options: { readonly scheduler?: unknown; } | null | undefined, fallback: IScheduler): IScheduler;",
@@ -25006,6 +23636,7 @@
             "const snap = snapshotScheduler(candidate) // 不是合法 scheduler 时返回 undefined，而不是抛错"
           ],
           "members": [],
+          "aliasOf": "snapshotScheduler",
           "exportPath": "./scheduler",
           "overloadSignatures": [
             "export declare function snapshotScheduler(value: unknown): IScheduler | undefined;"
@@ -25104,186 +23735,6 @@
           "usageScore": 72,
           "configuration": [],
           "fragment": "lifecycle-scheduler--snapshotScheduler"
-        },
-        {
-          "name": "validateSchedulerDelay",
-          "kind": "function",
-          "signature": "export declare function validateSchedulerDelay(value: unknown, label?: string): number;",
-          "declarationLine": 14,
-          "source": "packages/lifecycle/dist/scheduler.d.ts",
-          "purpose": "Canonical runtime check for finite, non-negative scheduler delays.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for validateSchedulerDelay.",
-          "advanced": "No additional advanced behavior is declared for validateSchedulerDelay.",
-          "parameters": ["value: unknown", "label: string (optional)"],
-          "parameterDetails": [
-            {
-              "name": "value",
-              "type": "unknown",
-              "optional": false
-            },
-            {
-              "name": "label",
-              "type": "string",
-              "optional": true
-            }
-          ],
-          "returns": "number",
-          "errors": ["No documented errors are declared for validateSchedulerDelay."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for validateSchedulerDelay.",
-          "examples": [
-            "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 结果溢出为 Infinity 时抛 RangeError",
-            "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 两个有限数相加；溢出 Infinity 时抛 RangeError"
-          ],
-          "members": [],
-          "exportPath": "./scheduler",
-          "overloadSignatures": [
-            "export declare function validateSchedulerDelay(value: unknown, label?: string): number;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "value",
-                "type": "unknown",
-                "optional": false
-              },
-              {
-                "name": "label",
-                "type": "string",
-                "optional": true
-              }
-            ]
-          ],
-          "overloadReturns": ["number"],
-          "whenToUse": "Use validateSchedulerDelay when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when validateSchedulerDelay does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Canonical runtime check for finite, non-negative scheduler delays."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import validateSchedulerDelay from @migaia/lifecycle/scheduler, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use validateSchedulerDelay when its function contract and declared inputs match the result you need. Choose a different public symbol when validateSchedulerDelay does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for validateSchedulerDelay."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for validateSchedulerDelay."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/scheduler.d.ts:validateSchedulerDelay:export declare function validateSchedulerDelay(value: unknown, label?: string): number;",
-          "guidance": [],
-          "usageScore": 68,
-          "configuration": [],
-          "fragment": "lifecycle-scheduler--validateSchedulerDelay"
-        },
-        {
-          "name": "validateSchedulerTime",
-          "kind": "function",
-          "signature": "export declare function validateSchedulerTime(value: unknown, label: string): number;",
-          "declarationLine": 12,
-          "source": "packages/lifecycle/dist/scheduler.d.ts",
-          "purpose": "Canonical runtime check for scheduler-produced and scheduler-consumed numeric values.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for validateSchedulerTime.",
-          "advanced": "No additional advanced behavior is declared for validateSchedulerTime.",
-          "parameters": ["value: unknown", "label: string"],
-          "parameterDetails": [
-            {
-              "name": "value",
-              "type": "unknown",
-              "optional": false
-            },
-            {
-              "name": "label",
-              "type": "string",
-              "optional": false
-            }
-          ],
-          "returns": "number",
-          "errors": ["No documented errors are declared for validateSchedulerTime."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for validateSchedulerTime.",
-          "examples": [
-            "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 结果溢出为 Infinity 时抛 RangeError",
-            "validateSchedulerTime(value, 'deadlineAt') // 非 number 抛 TypeError，非有限抛 RangeError\nvalidateSchedulerDelay(value) // 在上面基础上还要求 >= 0，否则抛 RangeError\naddSchedulerTime(now, delayMs, 'deadlineAt') // 两个有限数相加；溢出 Infinity 时抛 RangeError"
-          ],
-          "members": [],
-          "exportPath": "./scheduler",
-          "overloadSignatures": [
-            "export declare function validateSchedulerTime(value: unknown, label: string): number;"
-          ],
-          "overloadParameterDetails": [
-            [
-              {
-                "name": "value",
-                "type": "unknown",
-                "optional": false
-              },
-              {
-                "name": "label",
-                "type": "string",
-                "optional": false
-              }
-            ]
-          ],
-          "overloadReturns": ["number"],
-          "whenToUse": "Use validateSchedulerTime when its function contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when validateSchedulerTime does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Canonical runtime check for scheduler-produced and scheduler-consumed numeric values."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import validateSchedulerTime from @migaia/lifecycle/scheduler, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use validateSchedulerTime when its function contract and declared inputs match the result you need. Choose a different public symbol when validateSchedulerTime does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for validateSchedulerTime."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for validateSchedulerTime."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/scheduler.d.ts:validateSchedulerTime:export declare function validateSchedulerTime(value: unknown, label: string): number;",
-          "guidance": [],
-          "usageScore": 68,
-          "configuration": [],
-          "fragment": "lifecycle-scheduler--validateSchedulerTime"
         }
       ],
       "aliases": []
@@ -25442,7 +23893,7 @@
               ]
             }
           ],
-          "usageScore": 144,
+          "usageScore": 150,
           "configuration": [
             {
               "name": "errorPolicy",
@@ -25472,9 +23923,9 @@
               "name": "scheduler",
               "type": "IScheduler",
               "optional": true,
-              "description": "`@migaia/lifecycle/scheduler` — scheduler、snapshot与时间校验",
+              "description": "`@migaia/lifecycle/scheduler` — snapshot、resolve 与安全时间相加",
               "descriptionEn": "Supplies the clock domain for graceful timeouts and deadlines under R-9. Defaults to * `systemScheduler` and forwards it to `DisposeTransaction`. This keeps injected teardown and * mutation queues, such as those in `plugin-host`, in one clock domain.",
-              "descriptionZh": "`@migaia/lifecycle/scheduler` — scheduler、snapshot与时间校验"
+              "descriptionZh": "`@migaia/lifecycle/scheduler` — snapshot、resolve 与安全时间相加"
             }
           ],
           "fragment": "lifecycle-scope--createLifecycleScope"

@@ -9293,36 +9293,6 @@
     },
     {
       "from": "/en/docs/lifecycle/api",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "to": "/en/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api",
       "to": "/en/docs/lifecycle/api#lifecycle-index--createMutationQueue",
       "type": "api-symbol"
     },
@@ -9829,66 +9799,6 @@
     {
       "from": "/en/docs/lifecycle",
       "to": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleStateValue",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "to": "/en/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "to": "/en/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
       "type": "architecture-symbol"
     },
     {
@@ -10462,16 +10372,6 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/en/docs/lifecycle/api#createLifecycleRangeError",
-      "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "to": "/en/docs/lifecycle/api#createLifecycleRangeError",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/en/docs/lifecycle/api#createLifecycleScope",
       "to": "/en/docs/lifecycle/api/scope#lifecycle-scope--createLifecycleScope",
       "type": "symbol-alias"
@@ -10519,16 +10419,6 @@
     {
       "from": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringLeaseRegistry",
       "to": "/en/docs/lifecycle/api#createStringLeaseRegistry",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#createStringQuiescenceTracker",
-      "to": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "to": "/en/docs/lifecycle/api#createStringQuiescenceTracker",
       "type": "alias-symbol"
     },
     {
@@ -10752,36 +10642,6 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/en/docs/lifecycle/api#tagLifecycleError",
-      "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "to": "/en/docs/lifecycle/api#tagLifecycleError",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#validateSchedulerDelay",
-      "to": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "to": "/en/docs/lifecycle/api#validateSchedulerDelay",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api#validateSchedulerTime",
-      "to": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "to": "/en/docs/lifecycle/api#validateSchedulerTime",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/zh/docs/lifecycle/api",
       "to": "/zh/docs/lifecycle/getting-started",
       "type": "api-guide"
@@ -10863,36 +10723,6 @@
     },
     {
       "from": "/zh/docs/lifecycle/api",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "to": "/zh/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--createLifecycleUnit",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api",
       "to": "/zh/docs/lifecycle/api#lifecycle-index--createMutationQueue",
       "type": "api-symbol"
     },
@@ -11399,66 +11229,6 @@
     {
       "from": "/zh/docs/lifecycle",
       "to": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleStateValue",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "to": "/zh/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnit",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "to": "/zh/docs/lifecycle/api",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api#lifecycle-index--ILifecycleUnitOptions",
       "type": "architecture-symbol"
     },
     {
@@ -12032,16 +11802,6 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/zh/docs/lifecycle/api#createLifecycleRangeError",
-      "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "to": "/zh/docs/lifecycle/api#createLifecycleRangeError",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/zh/docs/lifecycle/api#createLifecycleScope",
       "to": "/zh/docs/lifecycle/api/scope#lifecycle-scope--createLifecycleScope",
       "type": "symbol-alias"
@@ -12089,16 +11849,6 @@
     {
       "from": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringLeaseRegistry",
       "to": "/zh/docs/lifecycle/api#createStringLeaseRegistry",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#createStringQuiescenceTracker",
-      "to": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "to": "/zh/docs/lifecycle/api#createStringQuiescenceTracker",
       "type": "alias-symbol"
     },
     {
@@ -12322,36 +12072,6 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/zh/docs/lifecycle/api#tagLifecycleError",
-      "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "to": "/zh/docs/lifecycle/api#tagLifecycleError",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#validateSchedulerDelay",
-      "to": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "to": "/zh/docs/lifecycle/api#validateSchedulerDelay",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api#validateSchedulerTime",
-      "to": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "to": "/zh/docs/lifecycle/api#validateSchedulerTime",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/en/docs/lifecycle/api/abort",
       "to": "/en/docs/lifecycle/getting-started",
       "type": "api-guide"
@@ -13413,36 +13133,6 @@
     },
     {
       "from": "/en/docs/lifecycle/api/errors",
-      "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "to": "/en/docs/lifecycle/api/errors",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors",
       "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleTypeError",
       "type": "api-symbol"
     },
@@ -13559,36 +13249,6 @@
     {
       "from": "/en/docs/lifecycle",
       "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--LIFECYCLE_SOURCE",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors",
-      "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "to": "/en/docs/lifecycle/api/errors",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
       "type": "architecture-symbol"
     },
     {
@@ -13733,36 +13393,6 @@
     },
     {
       "from": "/zh/docs/lifecycle/api/errors",
-      "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "to": "/zh/docs/lifecycle/api/errors",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleRangeError",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors",
       "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--createLifecycleTypeError",
       "type": "api-symbol"
     },
@@ -13879,36 +13509,6 @@
     {
       "from": "/zh/docs/lifecycle",
       "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--LIFECYCLE_SOURCE",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors",
-      "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "to": "/zh/docs/lifecycle/api/errors",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api/errors#lifecycle-errors--tagLifecycleError",
       "type": "architecture-symbol"
     },
     {
@@ -14393,36 +13993,6 @@
     },
     {
       "from": "/en/docs/lifecycle/api/quiescence",
-      "to": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "to": "/en/docs/lifecycle/api/quiescence",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/quiescence",
       "to": "/en/docs/lifecycle/api/quiescence#lifecycle-quiescence--ILeaseRegistry",
       "type": "api-symbol"
     },
@@ -14649,36 +14219,6 @@
     {
       "from": "/zh/docs/lifecycle",
       "to": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringLeaseRegistry",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/quiescence",
-      "to": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "to": "/zh/docs/lifecycle/api/quiescence",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api/quiescence#lifecycle-quiescence--createStringQuiescenceTracker",
       "type": "architecture-symbol"
     },
     {
@@ -14912,66 +14452,6 @@
       "type": "architecture-symbol"
     },
     {
-      "from": "/en/docs/lifecycle/api/scheduler",
-      "to": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "to": "/en/docs/lifecycle/api/scheduler",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/scheduler",
-      "to": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "to": "/en/docs/lifecycle/api/scheduler",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "to": "/en/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/en/docs/lifecycle/getting-started",
-      "to": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "to": "/en/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/en/docs/lifecycle",
-      "to": "/en/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "type": "architecture-symbol"
-    },
-    {
       "from": "/zh/docs/lifecycle/api/scheduler",
       "to": "/zh/docs/lifecycle/getting-started",
       "type": "api-guide"
@@ -15109,66 +14589,6 @@
     {
       "from": "/zh/docs/lifecycle",
       "to": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--snapshotScheduler",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler",
-      "to": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "to": "/zh/docs/lifecycle/api/scheduler",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerDelay",
-      "type": "architecture-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler",
-      "to": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "type": "api-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "to": "/zh/docs/lifecycle/api/scheduler",
-      "type": "symbol-api"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "to": "/zh/docs/lifecycle/getting-started",
-      "type": "symbol-guide"
-    },
-    {
-      "from": "/zh/docs/lifecycle/getting-started",
-      "to": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "type": "guide-symbol"
-    },
-    {
-      "from": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
-      "to": "/zh/docs/lifecycle",
-      "type": "symbol-architecture"
-    },
-    {
-      "from": "/zh/docs/lifecycle",
-      "to": "/zh/docs/lifecycle/api/scheduler#lifecycle-scheduler--validateSchedulerTime",
       "type": "architecture-symbol"
     },
     {

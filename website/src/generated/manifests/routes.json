@@ -1041,18 +1041,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/en/docs/lifecycle/api/ILifecycleUnit",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/ILifecycleUnitOptions",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/en/docs/lifecycle/api/ILifecycleUnitStateValue",
       "locale": "en",
       "domain": "docs",
@@ -1203,12 +1191,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/en/docs/lifecycle/api/createLifecycleUnit",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/en/docs/lifecycle/api/createMutationQueue",
       "locale": "en",
       "domain": "docs",
@@ -1341,19 +1323,7 @@
       "library": "lifecycle"
     },
     {
-      "path": "/en/docs/lifecycle/api/errors/createLifecycleRangeError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/en/docs/lifecycle/api/errors/createLifecycleTypeError",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/errors/tagLifecycleError",
       "locale": "en",
       "domain": "docs",
       "library": "lifecycle"
@@ -1443,12 +1413,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/en/docs/lifecycle/api/quiescence/createStringQuiescenceTracker",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/en/docs/lifecycle/api/scheduler",
       "locale": "en",
       "domain": "docs",
@@ -1474,18 +1438,6 @@
     },
     {
       "path": "/en/docs/lifecycle/api/scheduler/snapshotScheduler",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/scheduler/validateSchedulerDelay",
-      "locale": "en",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/en/docs/lifecycle/api/scheduler/validateSchedulerTime",
       "locale": "en",
       "domain": "docs",
       "library": "lifecycle"
@@ -16647,18 +16599,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/zh/docs/lifecycle/api/ILifecycleUnit",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/ILifecycleUnitOptions",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/zh/docs/lifecycle/api/ILifecycleUnitStateValue",
       "locale": "zh",
       "domain": "docs",
@@ -16809,12 +16749,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/zh/docs/lifecycle/api/createLifecycleUnit",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/zh/docs/lifecycle/api/createMutationQueue",
       "locale": "zh",
       "domain": "docs",
@@ -16947,19 +16881,7 @@
       "library": "lifecycle"
     },
     {
-      "path": "/zh/docs/lifecycle/api/errors/createLifecycleRangeError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/zh/docs/lifecycle/api/errors/createLifecycleTypeError",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/errors/tagLifecycleError",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"
@@ -17049,12 +16971,6 @@
       "library": "lifecycle"
     },
     {
-      "path": "/zh/docs/lifecycle/api/quiescence/createStringQuiescenceTracker",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
       "path": "/zh/docs/lifecycle/api/scheduler",
       "locale": "zh",
       "domain": "docs",
@@ -17080,18 +16996,6 @@
     },
     {
       "path": "/zh/docs/lifecycle/api/scheduler/snapshotScheduler",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/scheduler/validateSchedulerDelay",
-      "locale": "zh",
-      "domain": "docs",
-      "library": "lifecycle"
-    },
-    {
-      "path": "/zh/docs/lifecycle/api/scheduler/validateSchedulerTime",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"
