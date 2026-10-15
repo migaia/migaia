@@ -137,7 +137,8 @@ export function createRuntimeProviderGovernor(
     }
     if (
       callsInWindow >= options.maxCallsPerMinute ||
-      portableBytes(context.data as IRpcPortableValue) > options.maxPayloadBytes
+      portableBytes(context.data as IRpcPortableValue, options.maxPayloadBytes) >
+        options.maxPayloadBytes
     ) {
       violate()
       throw createRuntimeDiagnosticError(options.overflow)
@@ -157,7 +158,9 @@ export function createRuntimeProviderGovernor(
       if (
         callsInWindow + payloads.length > options.maxCallsPerMinute ||
         payloads.some(
-          (payload) => portableBytes(payload as IRpcPortableValue) > options.maxPayloadBytes
+          (payload) =>
+            portableBytes(payload as IRpcPortableValue, options.maxPayloadBytes) >
+            options.maxPayloadBytes
         )
       ) {
         violate()

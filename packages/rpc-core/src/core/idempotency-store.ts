@@ -67,16 +67,34 @@ type IEntry = {
   sequence: number
 }
 
-/** Count only portable result data, using decoded byte length for the bytes marker. */
-export function portableBytes(value: IRpcPortableValue | IRpcSerializedError | undefined): number {
+/**
+ * Count portable result data exactly unless the caller's trusted admission budget is exceeded. An
+ * over-budget result is only a rejection witness; replay callers omit the budget for exact bytes.
+ * Record entry snapshots preserve existing property evaluation order before recursive traversal.
+ */
+export function portableBytes(
+  value: IRpcPortableValue | IRpcSerializedError | undefined,
+  budget = Infinity
+): number {
   if (value === undefined) return 0
-  if (typeof value === 'string') return utf8ByteLength(value)
+  // Every UTF-16 code unit requires at least one UTF-8 byte, so rejection needs no full scan here.
+  if (typeof value === 'string') return value.length > budget ? value.length : utf8ByteLength(value)
   if (value === null || typeof value === 'boolean' || typeof value === 'number') return 8
+  if (Array.isArray(value)) {
+    /** Match reduce's sparse-index semantics while stopping the recursive walk after rejection. */
+    let bytes = 0
+    /** Native reduce captures the initial length before visiting any element. */
+    const length = value.length
+    for (let index = 0; index < length; index++) {
+      if (!(index in value)) continue
+      bytes += portableBytes(value[index], budget - bytes)
+      if (bytes > budget) return bytes
+    }
+    return bytes
+  }
   /** Native results charge their accessible full backing; they cannot masquerade as empty records. */
   if (isArrayBuffer(value)) return rpcBinaryBackingLength(value)
   if (isUint8Array(value)) return rpcBinaryBackingLength(rpcBinaryView(value).backing)
-  if (Array.isArray(value))
-    return value.reduce((total: number, item) => total + portableBytes(item), 0)
   if (
     '$rpc' in value &&
     value.$rpc === 'bytes' &&
@@ -86,10 +104,15 @@ export function portableBytes(value: IRpcPortableValue | IRpcSerializedError | u
     const length = value.base64url.length
     return Math.floor((length * 3) / 4)
   }
-  return Object.entries(value).reduce(
-    (total, [key, item]) => total + utf8ByteLength(key) + portableBytes(item),
-    0
-  )
+  /** Keep one canonical traversal for admission and exact replay accounting. */
+  let bytes = 0
+  for (const [key, item] of Object.entries(value)) {
+    bytes += portableBytes(key, budget - bytes)
+    if (bytes > budget) return bytes
+    bytes += portableBytes(item, budget - bytes)
+    if (bytes > budget) return bytes
+  }
+  return bytes
 }
 
 /** Charge successful payloads or the public failure detail retained for replay. */
