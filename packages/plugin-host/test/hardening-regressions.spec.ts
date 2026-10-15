@@ -106,7 +106,10 @@ describe('native Feature synchronous installation', () => {
       diagnostic: (message) => diagnostics.push(message)
     })
     const registration: Record<string, never> = {}
-    runtime.begin(registration)
+    const request = runtime.begin(registration)
+    // Generation controllers are created on first signal read; read it so supersession aborts a
+    // real controller whose abort() the spy below makes fail.
+    expect(request.signal.aborted).toBe(false)
     const abort = vi.spyOn(AbortController.prototype, 'abort').mockImplementation(() => {
       throw new Error('supersede-failed')
     })
