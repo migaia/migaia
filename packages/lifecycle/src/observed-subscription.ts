@@ -2,7 +2,7 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createLifecycleTypeError } from './errors.js'
-import { tryReadProperty } from '@migaia/utils/error'
+import { attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
 
 /** Idempotent handle for one lifecycle-owned abort registration. */
 export type IObservedAbortSubscription = {
@@ -108,21 +108,9 @@ export function observeAbortSubscription(
     )
   } catch (error) {
     unsubscribe()
-    if (
-      failures.length > 0 &&
-      error !== null &&
-      (typeof error === 'object' || typeof error === 'function')
-    ) {
-      try {
-        Object.defineProperty(error, 'errors', {
-          value: Object.freeze([...failures]),
-          enumerable: true,
-          configurable: true
-        })
-      } catch {
-        // Preserve the registration primary when its error object is not extensible.
-      }
-    }
+    // Preserve the registration primary: failures attach when it can carry them, and the aggregate
+    // fallback for a primitive or frozen primary is deliberately not thrown in its place.
+    attachSecondaryErrors(error, failures)
     throw error
   } finally {
     registrationInProgress = false

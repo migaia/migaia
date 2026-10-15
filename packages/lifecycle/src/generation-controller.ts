@@ -1,4 +1,6 @@
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
+  attachLifecycleSecondaryErrors,
   containAsyncRejection,
   createLifecycleError,
   createLifecycleFailure,
@@ -82,8 +84,12 @@ export type IGenerationController = {
   dispose(reason?: unknown): void
 }
 
-/** Appends cleanup failures while preserving each original failure object. */
-function appendCleanupErrors(target: unknown[], error: unknown): void {
+/**
+ * Pushes one cleanup failure onto a collection list, flattening a lifecycle-built AggregateError so
+ * each original failure object stays a direct entry. Builds the list only; attaching it to a
+ * primary goes through `attachLifecycleSecondaryErrors`.
+ */
+function flattenCleanupFailure(target: unknown[], error: unknown): void {
   if (error instanceof AggregateError) {
     target.push(...error.errors)
     return
@@ -91,33 +97,16 @@ function appendCleanupErrors(target: unknown[], error: unknown): void {
   target.push(error)
 }
 
-/** Appends secondary failures without replacing the primary cancellation failure or its order. */
-function appendFailureErrors(primary: unknown, cleanupErrors: readonly unknown[]): unknown {
-  if (cleanupErrors.length === 0) return primary
-  /** Previously attached secondary failures that must remain ahead of later cleanup failures. */
-  const existingErrors =
-    primary instanceof Error && Array.isArray((primary as ILifecycleError).errors)
-      ? [...((primary as ILifecycleError).errors ?? [])]
-      : []
-  /** Complete ordered secondary-failure list, excluding a duplicate primary object. */
-  const combinedErrors = [...existingErrors, ...cleanupErrors.filter((error) => error !== primary)]
-  if (combinedErrors.length === 0) return primary
-  if (primary instanceof Error) {
-    try {
-      Object.defineProperty(primary, 'errors', {
-        value: Object.freeze(combinedErrors),
-        enumerable: true,
-        configurable: true
-      })
-      return primary
-    } catch {
-      // Frozen or non-configurable errors require a wrapper; keep primary reachable through cause.
-    }
-  }
-  return createLifecycleError(
-    LifecycleErrorCode.generationCancellationFailed,
+/**
+ * Attaches cleanup failures to a cancellation primary through the package's single attach entry
+ * point; a fallback aggregate keeps the generation-cancellation code rather than the scope one.
+ */
+function attachCancellationErrors(primary: unknown, cleanupErrors: readonly unknown[]): unknown {
+  return attachLifecycleSecondaryErrors(
+    primary,
+    cleanupErrors,
     LifecycleErrorText.generationCancellationFailed,
-    { cause: primary, errors: combinedErrors }
+    LifecycleErrorCode.generationCancellationFailed
   )
 }
 
@@ -131,7 +120,7 @@ function createAdmissionFailure(
     LifecycleErrorText.generationCancellationFailed,
     primary
   )
-  return appendFailureErrors(failure, cleanupErrors) as ILifecycleError
+  return attachCancellationErrors(failure, cleanupErrors) as ILifecycleError
 }
 
 /**
@@ -180,7 +169,7 @@ export function createGenerationController(
             parentRegistration.failures[0]
           )
         if (parentRegistration.failures.length > 1) {
-          throw appendFailureErrors(
+          throw attachCancellationErrors(
             createLifecycleFailure(
               LifecycleErrorCode.generationCancellationFailed,
               LifecycleErrorText.generationCancellationFailed,
@@ -220,29 +209,22 @@ export function createGenerationController(
     registration?.retryRegistrationCleanup()
     if (registration) {
       for (const failure of registration.failures.slice(knownRegistrationFailures)) {
-        appendCleanupErrors(cleanupErrors, failure)
+        flattenCleanupFailure(cleanupErrors, failure)
       }
     }
     try {
       releaseCurrent(primary)
     } catch (error) {
-      appendCleanupErrors(cleanupErrors, error)
+      flattenCleanupFailure(cleanupErrors, error)
     }
     if (
       primary !== null &&
       (typeof primary === 'object' || typeof primary === 'function') &&
       (primary as { code?: unknown }).code === LifecycleErrorCode.invalidOption
     ) {
-      if (cleanupErrors.length > 0) {
-        try {
-          Object.defineProperty(primary, 'errors', {
-            value: Object.freeze([...cleanupErrors]),
-            enumerable: true
-          })
-        } catch {
-          // Preserve invalid-option native type and identity even when cleanup diagnostics cannot attach.
-        }
-      }
+      // Preserve invalid-option native type and identity: the aggregate fallback for a frozen
+      // primary is deliberately not thrown, so cleanup diagnostics attach only when possible.
+      attachSecondaryErrors(primary, cleanupErrors)
       throw primary
     }
     throw createAdmissionFailure(primary, cleanupErrors)
@@ -346,7 +328,7 @@ export function createGenerationController(
             }, timeoutMs)
           } catch (error) {
             scheduling = false
-            if (callbackFailed) throw appendFailureErrors(callbackFailure, [error])
+            if (callbackFailed) throw attachCancellationErrors(callbackFailure, [error])
             throw error
           }
           scheduling = false
@@ -356,9 +338,9 @@ export function createGenerationController(
               // The task was acquired even when the callback failed; cancellation is exactly once.
               scheduled.cancel()
             } catch (error) {
-              appendCleanupErrors(cancelErrors, error)
+              flattenCleanupFailure(cancelErrors, error)
             }
-            if (callbackFailed) throw appendFailureErrors(callbackFailure, cancelErrors)
+            if (callbackFailed) throw attachCancellationErrors(callbackFailure, cancelErrors)
             if (cancelErrors.length > 0) throw cancelErrors[0]
           } else {
             currentTimer = scheduled

@@ -1,5 +1,5 @@
 import type { ICollectedError, IErrorPolicy } from './types.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
+import { attachErrorIdentity, attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 import { assimilateCapturedThen, probeThenable, type IThenableProbe } from '@migaia/utils/function'
 import { LifecycleErrorCode } from './error-code.js'
 export { assimilateCapturedThen, probeThenable }
@@ -20,8 +20,8 @@ export type ILifecycleError = Error & {
   readonly detail?: Readonly<Record<string, unknown>>
   readonly cause?: unknown
   /**
-   * Stores a frozen snapshot of secondary failures such as cleanup errors. Keeps them separate from
-   * `cause` so the primary error retains its identity.
+   * Stores a frozen, non-enumerable list of secondary failures such as cleanup errors, appended in
+   * occurrence order. Keeps them separate from `cause` so the primary error retains its identity.
    */
   readonly errors?: readonly unknown[]
 }
@@ -80,13 +80,41 @@ export function createLifecycleError(
   if (options?.detail !== undefined) {
     Object.defineProperty(error, 'detail', { value: options.detail, enumerable: true })
   }
-  if (options?.errors !== undefined && options.errors.length > 0) {
-    Object.defineProperty(error, 'errors', {
-      value: Object.freeze([...options.errors]),
-      enumerable: true
-    })
-  }
+  if (options?.errors !== undefined) attachSecondaryErrors(error, options.errors)
   return error as ILifecycleError
+}
+
+/**
+ * Lifecycle's single entry point for attaching secondary failures (cleanup, rollback, cancellation)
+ * to a primary failure. Delegates to `@migaia/utils/error` `attachSecondaryErrors`, which appends
+ * to any existing `errors` list as a non-enumerable, frozen array and keeps the primary's identity.
+ * Entries identical to the primary and repeated entries are dropped first. When the primary cannot
+ * carry the list (primitive, frozen, hostile `errors` accessor), the returned `AggregateError`
+ * fallback lists the primary first, takes the primary's reason (or `fallbackMessage`) as its
+ * message and is tagged with `fallbackCode` (`SCOPE_DISPOSAL_FAILED` unless the call site owns a
+ * narrower code). Returns the value the caller must throw or reject with.
+ */
+export function attachLifecycleSecondaryErrors(
+  primary: unknown,
+  secondaryErrors: readonly unknown[],
+  fallbackMessage: string,
+  fallbackCode: string = LifecycleErrorCode.scopeDisposalFailed
+): unknown {
+  /** Secondary failures without the primary itself or repeated objects, in first-seen order. */
+  const distinct = secondaryErrors.filter(
+    (error, index) => error !== primary && secondaryErrors.indexOf(error) === index
+  )
+  /** Either the primary (attached in place) or utils' freshly built AggregateError fallback. */
+  const attached = attachSecondaryErrors(primary, distinct)
+  if (attached === primary) return primary
+  // The fallback aggregate is a fresh object owned by this call, so giving it a message is safe.
+  Object.defineProperty(attached, 'message', {
+    configurable: true,
+    enumerable: false,
+    value: safeErrorReason(primary, fallbackMessage),
+    writable: true
+  })
+  return tagLifecycleError(attached as AggregateError, fallbackCode)
 }
 
 /**
