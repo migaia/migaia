@@ -1,4 +1,4 @@
-import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
+import { attachSecondaryErrors, safeErrorReason, tryReadProperty } from '@migaia/utils/error'
 import type { IErrorPolicy } from './types.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
@@ -20,9 +20,20 @@ export function attachLifecycleSecondaryErrors(
   fallbackMessage: string,
   fallbackCode: string = LifecycleErrorCode.scopeDisposalFailed
 ): unknown {
-  /** Secondary failures without the primary itself or repeated objects, in first-seen order. */
+  /**
+   * Failures the primary already carries. Appending is idempotent per object, so a failure attached
+   * by a lower layer (for example observed-subscription cleanup) is not listed twice.
+   */
+  const existing =
+    typeof primary === 'object' && primary !== null
+      ? tryReadProperty(primary as { errors?: unknown }, 'errors')
+      : undefined
+  /** Readable existing list; a throwing or non-array `errors` contributes nothing. */
+  const carried = existing && !existing.threw && Array.isArray(existing.value) ? existing.value : []
+  /** Secondary failures without the primary, already-carried or repeated objects, first-seen order. */
   const distinct = secondaryErrors.filter(
-    (error, index) => error !== primary && secondaryErrors.indexOf(error) === index
+    (error, index) =>
+      error !== primary && !carried.includes(error) && secondaryErrors.indexOf(error) === index
   )
   /** Either the primary (attached in place) or utils' freshly built AggregateError fallback. */
   const attached = attachSecondaryErrors(primary, distinct)
