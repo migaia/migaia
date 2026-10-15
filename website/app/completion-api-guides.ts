@@ -3648,6 +3648,56 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     ],
     avoidZh: ['不要把来源信息当作权限。', 'undefined 不能证明该值没有 disposer。']
   }),
+  'reactive:extension:getDefaultRuntime': guide({
+    purposeEn:
+      'Returns the one shared convenience Runtime on explicit first use. Adapter modules can import this pure extension function without constructing a graph; later calls and the root defaultRuntime binding reuse the exact same owner.',
+    purposeZh:
+      '首次显式调用时取得唯一的共享默认Runtime。适配器导入纯extension函数不会创建图；后续调用与root的defaultRuntime绑定复用完全相同的owner。',
+    quickStart:
+      "import { getDefaultRuntime } from '@migaia/reactive/extension'\n\nconst runtime = getDefaultRuntime()\nconst count = runtime.signal(0)\nconst effect = runtime.effect(() => console.log(count.value))\ncount.value = 1\nruntime.flush()\neffect.dispose()\ncount.dispose()",
+    quickStartEn:
+      "// Importing the provider leaves the default graph unconstructed.\nimport { getDefaultRuntime } from '@migaia/reactive/extension'\n\n// Explicit first use creates the owner; repeated calls reuse it.\nconst runtime = getDefaultRuntime()\nconst count = runtime.signal(0)\nconst effect = runtime.effect(() => console.log(count.value))\ncount.value = 1\nruntime.flush()\n// Release this adapter's nodes, not the shared owner.\neffect.dispose()\ncount.dispose()",
+    quickStartZh:
+      "// 导入provider不会创建默认图。\nimport { getDefaultRuntime } from '@migaia/reactive/extension'\n\n// 显式首次使用才创建owner，后续调用复用它。\nconst runtime = getDefaultRuntime()\nconst count = runtime.signal(0)\nconst effect = runtime.effect(() => console.log(count.value))\ncount.value = 1\nruntime.flush()\n// 释放本适配器拥有的节点，保留共享owner。\neffect.dispose()\ncount.dispose()",
+    scenariosEn: [
+      'A feature adapter must remain cold until its first default-backed value is created.',
+      'Several convenience consumers intentionally share one graph.'
+    ],
+    scenariosZh: [
+      '特性适配器需要在首次创建默认owner上的值之前保持冷导入。',
+      '多个便利入口有意共用同一张图。'
+    ],
+    avoidEn: [
+      'Use createRuntime when an SSR request or independent root needs isolation.',
+      'Retain an explicitly supplied owner instead of replacing it with the default.'
+    ],
+    avoidZh: [
+      'SSR请求或独立root需要隔离时使用createRuntime。',
+      '调用方显式传入owner时保留该owner。'
+    ]
+  }),
+  'reactive:extension:ReactiveErrorPhase': guide({
+    purposeEn:
+      'The canonical diagnostic phase constants are also available from the pure extension boundary. Pass the matching phase to Runtime.reportError so adapter diagnostics use the same vocabulary without importing the eager root convenience value.',
+    purposeZh:
+      '规范诊断阶段常量也可从纯extension边界取得。向Runtime.reportError传入对应阶段，使适配器诊断共用同一词汇，同时无需导入会取得默认实例的root便利值。',
+    quickStart:
+      "import { getDefaultRuntime, ReactiveErrorPhase } from '@migaia/reactive/extension'\n\nconst runtime = getDefaultRuntime()\nconst payload = runtime.signal('{\"count\":1}')\nconst effect = runtime.effect(() => {\n  try { console.log(JSON.parse(payload.value)) } catch (error) {\n    runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })\n  }\n})\npayload.value = '{\"count\":2}'\nruntime.flush()\neffect.dispose()\npayload.dispose()",
+    quickStartEn:
+      "// Keep the original parse failure when a flushed observer reports diagnostics.\nimport { getDefaultRuntime, ReactiveErrorPhase } from '@migaia/reactive/extension'\n\nconst runtime = getDefaultRuntime()\nconst payload = runtime.signal('{\"count\":1}')\nconst effect = runtime.effect(() => {\n  try { console.log(JSON.parse(payload.value)) } catch (error) {\n    runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })\n  }\n})\npayload.value = '{\"count\":2}'\nruntime.flush()\neffect.dispose()\npayload.dispose()",
+    quickStartZh:
+      "// observer排空时报告诊断，保留原始解析错误。\nimport { getDefaultRuntime, ReactiveErrorPhase } from '@migaia/reactive/extension'\n\nconst runtime = getDefaultRuntime()\nconst payload = runtime.signal('{\"count\":1}')\nconst effect = runtime.effect(() => {\n  try { console.log(JSON.parse(payload.value)) } catch (error) {\n    runtime.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })\n  }\n})\npayload.value = '{\"count\":2}'\nruntime.flush()\neffect.dispose()\npayload.dispose()",
+    scenariosEn: [
+      'A pure adapter reports asynchronous callback failures.',
+      'Consumers correlate diagnostics by the existing phase domain.'
+    ],
+    scenariosZh: ['纯适配器报告异步回调失败。', '消费者按既有阶段域关联诊断。'],
+    avoidEn: [
+      'Do not use phase names as thrown error codes.',
+      'Choose the actual failure phase rather than relabeling unrelated work.'
+    ],
+    avoidZh: ['不要把阶段名称当作抛出的错误码。', '选择实际失败阶段，避免给无关操作改标签。']
+  }),
   'reactive:extension:createObserverBinding': guide({
     purposeEn:
       'Bridges render-and-commit hosts to one reactive observer. capture records reads without publishing edges, commit validates the snapshot, and observe owns the live Effect used after host subscription.',

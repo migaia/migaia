@@ -101,3 +101,14 @@ count.dispose();
 
 
 跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。
+
+`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export.
+
+```ts
+import { getDefaultRuntime } from '@migaia/reactive/extension'
+const runtime = getDefaultRuntime()
+const node = runtime.signal(1)
+runtime.batch(() => { node.value = 2 })
+console.log(node.value)
+node.dispose()
+```

@@ -29,3 +29,7 @@ export {
 } from '../runtime/observer-binding.js'
 export type { ICapture } from '../runtime/dependency-tracker.class.js'
 export type { IObservable, IObserver } from '../runtime/types.js'
+
+/** Pure adapter imports can defer the default and report through the canonical phase domain. */
+export { getDefaultRuntime } from '../runtime/default-runtime-provider.js'
+export { ReactiveErrorPhase } from '../runtime/trace-constants.js'

@@ -1,4 +1,4 @@
-import { currentRuntimeVersion } from '../src/entry/extension.js'
+import { getDefaultRuntime, currentRuntimeVersion } from '../src/entry/extension.js'
 import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -103,5 +103,18 @@ describe('M-T14 (§5.2): multiple Runtime instances stay isolated after createSc
     b.value = 2
     expect(b.value).toBe(2)
     b.dispose()
+  })
+})
+
+describe('ST-C6 pure default provider', () => {
+  it('returns the same authority as the root convenience binding', () => {
+    /** The provider must not create a second default graph for extension consumers. */
+    const runtime = getDefaultRuntime()
+    expect(getDefaultRuntime()).toBe(runtime)
+    expect(reactivePublicApi.defaultRuntime).toBe(runtime)
+    /** Graph ownership validates the real runtime object, not a proxy or forwarding facade. */
+    const signal = runtime.signal(1)
+    expect(signal.runtime).toBe(runtime)
+    signal.dispose()
   })
 })

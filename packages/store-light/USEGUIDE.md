@@ -484,3 +484,5 @@ Computed 只有 getter、没有 setter，属性描述符层面就不可写；ESM
 ## 构建、测试与排查
 
 仓库根目录：`pnpm --filter @migaia/store-light fmt` → `lint` → `typecheck` → `typecheck:test` → `test` → `build`。浏览器集成路径另跑 `typecheck:e2e` 与 `test:e2e`。
+
+单独导入 Store light 不创建默认 Runtime。第一次未显式传入 `options.runtime` 的 store 创建才取得 reactive 的共享默认实例；显式 runtime 的构造路径直接使用给定 owner。该实例与随后导入 reactive root 的 `defaultRuntime` 保持同一 identity。
