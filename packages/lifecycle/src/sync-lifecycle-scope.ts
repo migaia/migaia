@@ -212,7 +212,9 @@ export function createSyncLifecycleScope(
       : admitted
     currentlyReleasing = true
     const controller = createController()
-    controller.abort('scope closed')
+    controller.abort(
+      createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
+    )
     try {
       for (const admissionError of admissionErrors)
         collector.add(admissionError.source, admissionError.error)

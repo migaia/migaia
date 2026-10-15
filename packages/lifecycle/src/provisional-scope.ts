@@ -146,7 +146,12 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
     let abortFailed = false
     let abortError: unknown
     try {
-      controller.abort('provisional scope rolled back')
+      controller.abort(
+        createLifecycleError(
+          LifecycleErrorCode.provisionalSettled,
+          LifecycleErrorText.provisionalRolledBackReason
+        )
+      )
     } catch (error) {
       abortFailed = true
       abortError = error
@@ -198,7 +203,12 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
     let abortFailed = false
     let abortError: unknown
     try {
-      controller.abort('provisional scope committed')
+      controller.abort(
+        createLifecycleError(
+          LifecycleErrorCode.provisionalSettled,
+          LifecycleErrorText.provisionalCommittedReason
+        )
+      )
     } catch (error) {
       abortFailed = true
       abortError = error
