@@ -60,12 +60,6 @@ type IRegistrationOwner<T, R, V> = {
   next: IRegistrationOwner<T, R, V> | undefined
   release: IUnsubscribe
   committed: boolean
-  admissionEpoch: number
-}
-
-type IActiveLiveDispatch<T, R, V> = {
-  readonly epoch: number
-  readonly seen: Set<IRegistrationOwner<T, R, V>>
 }
 
 type IChannelCapability<T, R, V = undefined> = {
@@ -537,7 +531,6 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     admissionPolicy === EventAdmissionPolicy.unique
       ? new Map<IEventListener<T, R, V>, IRegistrationOwner<T, R, V>>()
       : undefined
-  const activeLiveDispatches = new Set<IActiveLiveDispatch<T, R, V>>()
   /** Queued values used only when the caller explicitly opts into queued reentrancy. */
   let publishing = false
   const pendingValues: T[] = []
@@ -585,12 +578,10 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     owner.next = undefined
     owner.release = release
     owner.committed = false
-    owner.admissionEpoch = membershipEpoch
     const commit = (): void => {
       if (committed || released) return
       committed = true
       owner.committed = true
-      owner.admissionEpoch = membershipEpoch
       owner.previous = last
       owner.next = undefined
       if (last) last.next = owner
@@ -811,11 +802,12 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       return Object.freeze(snapshots)
     },
     liveVisit(value, taskId, visitor) {
-      const active: IActiveLiveDispatch<T, R, V> = {
-        epoch: membershipEpoch,
-        seen: new Set()
-      }
-      activeLiveDispatches.add(active)
+      /** Membership epoch at dispatch start; any removal or clear afterwards stops admission. */
+      const epoch = membershipEpoch
+      /** Last owner already scanned; commits only append at the tail, so scans resume after it. */
+      let scanned: IRegistrationOwner<T, R, V> | undefined
+      /** True after the first pass, which admits every owner present at dispatch start. */
+      let started = false
       let projection:
         | { readonly plan: IEventProjectionPlan; readonly outcome: IEventProjectionOutcome }
         | undefined
@@ -824,18 +816,19 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
       const pending: IRegistrationOwner<T, R, V>[] = []
       const liveInvocations: Array<() => void> = []
       try {
+        /**
+         * Admits committed owners not yet scanned. The first pass admits every owner present at
+         * dispatch start; later passes admit owners committed during dispatch only while membership
+         * is unchanged, because a removal or clear unlinks nodes and ends admission.
+         */
         const append = (): void => {
-          let current = first
+          if (started && membershipEpoch !== epoch) return
+          started = true
+          let current = scanned ? scanned.next : first
           while (current) {
-            if (
-              current.committed &&
-              !active.seen.has(current) &&
-              (taskId === undefined || current.currentTaskId === taskId) &&
-              current.admissionEpoch === active.epoch
-            ) {
-              active.seen.add(current)
+            if (current.committed && (taskId === undefined || current.currentTaskId === taskId))
               pending.push(current)
-            }
+            scanned = current
             current = current.next
           }
         }
@@ -871,7 +864,6 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         visitorFailed = true
         primaryError = error
       } finally {
-        activeLiveDispatches.delete(active)
         for (const close of liveInvocations) close()
         if (projection?.outcome.diagnostic)
           reportEventProjectionFailure(
