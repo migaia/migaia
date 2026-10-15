@@ -255,7 +255,24 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       batch.registrations.set(registration.name, registration)
       registration.lifecycle = PluginHostRegistrationLifecycle.install
       try {
-        await this.#installOne(registration, batch)
+        this.#beginInstall(registration, true)
+        if (registration.plugin.setup)
+          registration.setupOutput = await runPluginSetup(registration, this.#setupPort(batch))
+        const installResult = this.#startInstall(registration, batch)
+        if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
+        const installThen = this.#readThen(installResult)
+        const installedValue = await this.#port.awaitOperation(
+          typeof installThen === 'function'
+            ? assimilateCapturedThen(installThen as (...args: unknown[]) => void, installResult)
+            : installResult,
+          registration
+        )
+        this.#port.assertOperationCurrent(registration)
+        this.#prepareInstallResult(registration, batch, installedValue)
+        await registration.provisional!.commitTo(registration.scope!)
+        registration.provisional = undefined
+        registration.installed = true
+        registration.activated = true
         this.#port.publish([registration], batch)
         closeSetupAttempt(registration)
       } catch (error) {
@@ -307,7 +324,24 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
           continue
         }
         try {
-          await this.#installOne(registration, batch)
+          this.#beginInstall(registration, true)
+          if (registration.plugin.setup)
+            registration.setupOutput = await runPluginSetup(registration, this.#setupPort(batch))
+          const installResult = this.#startInstall(registration, batch)
+          if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
+          const installThen = this.#readThen(installResult)
+          const installedValue = await this.#port.awaitOperation(
+            typeof installThen === 'function'
+              ? assimilateCapturedThen(installThen as (...args: unknown[]) => void, installResult)
+              : installResult,
+            registration
+          )
+          this.#port.assertOperationCurrent(registration)
+          this.#prepareInstallResult(registration, batch, installedValue)
+          await registration.provisional!.commitTo(registration.scope!)
+          registration.provisional = undefined
+          registration.installed = true
+          registration.activated = true
         } finally {
           closeSetupAttempt(registration)
           this.#port.setHookRegistration(undefined)
@@ -326,37 +360,6 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         rollbackErrors: Object.freeze([...rollbackErrors])
       })
     }
-  }
-
-  /**
-   * Runs one registration's asynchronous setup and install, then commits its provisional resources
-   * into the registration scope. Shared by lazy `activate()` and `installBatch()`; publication,
-   * setup-attempt closing, and failure rollback stay with each caller. `#beginInstall` and, without
-   * setup, `#startInstall` run in the caller's synchronous turn so the mutation guard observes the
-   * running hook.
-   */
-  async #installOne(
-    registration: IRegistration<TDomainCore, TValue>,
-    batch: IInstallBatchContext<TDomainCore, TValue>
-  ): Promise<void> {
-    this.#beginInstall(registration, true)
-    if (registration.plugin.setup)
-      registration.setupOutput = await runPluginSetup(registration, this.#setupPort(batch))
-    const installResult = this.#startInstall(registration, batch)
-    if (this.#hasOwnThen(installResult)) throw this.#installResultThenable(registration.name)
-    const installThen = this.#readThen(installResult)
-    const installedValue = await this.#port.awaitOperation(
-      typeof installThen === 'function'
-        ? assimilateCapturedThen(installThen as (...args: unknown[]) => void, installResult)
-        : installResult,
-      registration
-    )
-    this.#port.assertOperationCurrent(registration)
-    this.#prepareInstallResult(registration, batch, installedValue)
-    await registration.provisional!.commitTo(registration.scope!)
-    registration.provisional = undefined
-    registration.installed = true
-    registration.activated = true
   }
 
   /** Runs constructor-time installation without allowing an awaitable extension to escape. */
