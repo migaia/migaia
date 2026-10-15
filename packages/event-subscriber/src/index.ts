@@ -14,11 +14,12 @@ export { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from './error-code.
 export {
   EventAdmissionPolicy,
   EventDispatchPolicy,
+  EventRemovalPolicy,
   EventSubscriberState
 } from './state-constants.js'
 export { defineEventApiStyle, EventApiStyle } from './style.js'
 export type { IEventSubscriberErrorCode } from './error-code.js'
-export type { IEventAdmissionPolicy, IEventDispatchPolicy } from './state-constants.js'
+export type { IEventAdmissionPolicy, IEventDispatchPolicy, IEventRemovalPolicy } from './state-constants.js'
 export type { IEventChannelSubscription, IEventHubSubscription } from './types.js'
 export type { IEventApiStyle, IEventApiStyleNames } from './style.js'
 export type { IStyledEventChannel, IStyledEventHub } from './types.js'
