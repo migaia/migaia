@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/scheduler'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   defineFeature,
   definePlugin,
@@ -10,6 +11,49 @@ import {
 } from '../src/index.js'
 
 describe('lazy activation', () => {
+  it.each(['notification', 'update'] as const)(
+    'PHP-T2 preserves a cold %s signal through activation and removal',
+    async (entry) => {
+      /** Cold enablement can observe lifetime before any core or install attempt exists. */
+      const host = new PluginHost<Record<string, never>>({
+        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      })
+      /** Every observer must receive the same exact registration signal. */
+      const signals: IAbortSignal[] = []
+      await host.use(
+        definePlugin({
+          name: 'cold',
+          activation: 'lazy',
+          onDisable: (context) => {
+            signals.push(context.signal)
+          },
+          onEnable: (context) => {
+            signals.push(context.signal)
+          },
+          update: (_next, core) => {
+            signals.push(core.lifecycle.signal)
+          },
+          install: (core) => {
+            signals.push(core.lifecycle.signal)
+            return {}
+          }
+        })
+      )
+      expect(signals).toHaveLength(0)
+      if (entry === 'notification') {
+        await host.plugin.disable('cold')
+        await host.plugin.enable('cold')
+      } else await host.config.update('cold', () => ({ value: 1 }))
+      await host.activate('cold')
+      expect(signals).toHaveLength(entry === 'notification' ? 4 : 3)
+      expect(signals.every((signal) => signal === signals[0])).toBe(true)
+      expect(signals[0]!.aborted).toBe(false)
+      await host.unUse('cold')
+      expect(signals[0]!.aborted).toBe(true)
+      await host.dispose()
+    }
+  )
+
   it.each(['setup', 'install'] as const)(
     'PHA-T1 rejects synchronous %s activation reentry before sharing the pending request',
     async (phase) => {

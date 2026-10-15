@@ -1,5 +1,9 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { ILifecycleScope, IProvisionalScope } from '@migaia/lifecycle'
+import {
+  createAbortController,
+  type ILifecycleScope,
+  type IProvisionalScope
+} from '@migaia/lifecycle'
 import type { IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
 import { createPluginCore, type IPluginRuntimeIntegration } from './core.js'
@@ -55,6 +59,8 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
     batch?: IInstallBatchContext<TDomainCore, TValue>
   ): TDomainCore & IPluginHostCore<TValue> {
     if (registration.core) return registration.core
+    // Config updates can expose a cold lazy core before its first installation attempt.
+    registration.lifecycleController ??= createAbortController()
     registration.core = createPluginCore({
       registration,
       createDomainCore: () =>
