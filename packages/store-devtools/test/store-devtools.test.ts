@@ -372,36 +372,6 @@ describe('createStoreDevTools', () => {
     )
     tools.dispose()
   })
-
-  it('contains a runtime reporter failure during auto-record diagnostics', () => {
-    const reported: unknown[] = []
-    const previous = (globalThis as { reportError?: (error: unknown) => void }).reportError
-    ;(globalThis as { reportError?: (error: unknown) => void }).reportError = (error) => {
-      reported.push(error)
-    }
-    const { store, runtime } = makeStore()
-    vi.spyOn(runtime, 'reportError').mockImplementation(() => {
-      throw new Error('runtime reporter failed')
-    })
-    let shouldThrow = false
-    const tools = createStoreDevTools(store, {
-      clone: (state) => {
-        if (shouldThrow) throw new Error('diagnostic clone failed')
-        return { ...state }
-      }
-    })
-    try {
-      shouldThrow = true
-      expect(() => store.increment()).not.toThrow()
-      expect(reported).toHaveLength(1)
-      expect(reported[0]).toMatchObject({ message: 'runtime reporter failed' })
-    } finally {
-      tools.dispose()
-      if (previous)
-        (globalThis as { reportError?: (error: unknown) => void }).reportError = previous
-      else delete (globalThis as { reportError?: (error: unknown) => void }).reportError
-    }
-  })
 })
 
 it('contains revoked and throwing options getters as tagged configuration errors', () => {

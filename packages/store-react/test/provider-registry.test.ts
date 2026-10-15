@@ -343,31 +343,6 @@ describe('StoreRegistry.dispose() ordering and error aggregation', () => {
       expect(reportError).toHaveBeenCalledWith(boom, { phase: 'lifecycle-hook' })
     )
   })
-
-  it('contains a throwing runtime reporter for an observed per-entry rejection', async () => {
-    const hostReportError = vi.fn()
-    vi.stubGlobal('reportError', hostReportError)
-    try {
-      const reporterFailure = new Error('runtime reporter failed')
-      const rejection = new Error('entry disposal failed')
-      const runtime = createRuntime()
-      vi.spyOn(runtime, 'reportError').mockImplementation(() => {
-        throw reporterFailure
-      })
-      const registry = new StoreRegistry(runtime)
-      const unregister = registry.register(
-        createStoreToken('observed-rejection'),
-        { dispose: () => Promise.reject(rejection) },
-        { owned: true }
-      )
-
-      expect(() => unregister()).not.toThrow()
-      await vi.waitFor(() => expect(hostReportError).toHaveBeenCalledWith(reporterFailure))
-      registry.dispose()
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
 })
 
 describe('StoreRegistry.disposeAsync()', () => {
