@@ -239,15 +239,16 @@ describe('A5 injected task unref forwarding, rollback and lifecycle defaults', (
     expect(cancel).not.toHaveBeenCalled()
   })
 
-  it('lifecycle factories default to a snapshot of the utils systemScheduler', async () => {
-    const schedule = vi.spyOn(systemScheduler, 'schedule')
+  it('lifecycle factories default to the system scheduler admitted once at load', async () => {
+    // The default is snapshotted once at module load (LC-P2), so later patches to the utils
+    // systemScheduler object are not observed; the default must still drive real timers.
     const controller = createGenerationController()
-    controller.begin({ timeoutMs: 5 })
-    expect(schedule).toHaveBeenCalledTimes(1)
-    expect(schedule.mock.calls[0]![1]).toBe(5)
+    const { signal } = controller.begin({ timeoutMs: 5 })
+    expect(signal.aborted).toBe(false)
+    await new Promise<void>((resolve) => setTimeout(resolve, 40))
+    expect(signal.aborted).toBe(true)
     controller.dispose()
 
-    const now = vi.spyOn(systemScheduler, 'now')
     const queue = createMutationQueue()
     /** Releases the first queued task. */
     let release!: () => void
@@ -261,11 +262,9 @@ describe('A5 injected task unref forwarding, rollback and lifecycle defaults', (
           }
         })
     )
-    expect(now).not.toHaveBeenCalled()
     const second = queue.enqueue(() => {
       order.push('t2')
     })
-    expect(now).toHaveBeenCalled()
     release()
     await Promise.all([first, second])
     expect(order).toEqual(['t1', 't2'])
