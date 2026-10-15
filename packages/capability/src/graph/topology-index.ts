@@ -1,3 +1,4 @@
+import { snapshotTopologyDependencies, snapshotTopologyIndexNode } from './topology-admission.js'
 import {
   TopologyInvalidReason,
   type ICapabilityTopology,
@@ -169,63 +170,6 @@ function createReadonlyMap<K, V>(entries: readonly (readonly [K, V])[]): Readonl
     [Symbol.iterator]: (): MapIterator<[K, V]> => lookup[Symbol.iterator]()
   } as ReadonlyMap<K, V>
   return Object.freeze(facade)
-}
-
-/** Copies one dependency list once and rejects malformed or duplicate edges. */
-function snapshotDependencies(
-  dependencies: readonly ITopologyDependency[],
-  nodeId: string,
-  adapter: ITopologyIndexAdapter
-): readonly ITopologyDependency[] {
-  if (!Array.isArray(dependencies)) adapter.onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-  /** Provider IDs already admitted for this consumer. */
-  const providers = new Set<string>()
-  /** Frozen dependency facts retained by the index. */
-  const snapshots: ITopologyDependency[] = []
-  for (const candidate of dependencies as readonly unknown[]) {
-    if ((typeof candidate !== 'object' || candidate === null) && typeof candidate !== 'function')
-      adapter.onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-    const record = candidate as { readonly provider?: unknown; readonly required?: unknown }
-    let provider: unknown
-    let required: unknown
-    try {
-      provider = record.provider
-      required = record.required
-    } catch {
-      adapter.onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-    }
-    if (typeof provider !== 'string' || provider.length === 0 || typeof required !== 'boolean')
-      adapter.onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-    if (providers.has(provider)) adapter.onInvalid(TopologyInvalidReason.duplicateEdge, nodeId)
-    providers.add(provider)
-    snapshots.push(Object.freeze({ provider, required }))
-  }
-  return Object.freeze(snapshots)
-}
-
-/** Copies one public node descriptor without retaining hostile getters. */
-function snapshotIndexNode(
-  candidate: ITopologyIndexNode,
-  adapter: ITopologyIndexAdapter
-): ITopologyIndexNode {
-  if ((typeof candidate !== 'object' || candidate === null) && typeof candidate !== 'function')
-    adapter.onInvalid(TopologyInvalidReason.invalidNode)
-  const record = candidate as { readonly id?: unknown; readonly dependencies?: unknown }
-  let id: unknown
-  let dependencies: unknown
-  try {
-    id = record.id
-    dependencies = record.dependencies
-  } catch {
-    adapter.onInvalid(TopologyInvalidReason.invalidNode)
-  }
-  const nodeId = typeof id === 'string' ? id : undefined
-  if (typeof id !== 'string' || id.length === 0)
-    adapter.onInvalid(TopologyInvalidReason.invalidNode, nodeId)
-  return Object.freeze({
-    id,
-    dependencies: snapshotDependencies(dependencies as readonly ITopologyDependency[], id, adapter)
-  })
 }
 
 /** Mutable topology owner; all public values leave through frozen snapshots. */
@@ -431,10 +375,28 @@ class TopologyIndex implements ITopologyIndex {
     })
   }
 
+  /** Builds only from the static topology owner's already-admitted immutable snapshots. */
+  static fromSnapshots(
+    adapter: ITopologyIndexAdapter,
+    nodes: readonly ITopologyIndexNode[]
+  ): ITopologyIndex {
+    /** A fresh index has no transaction or external mutation authority to reconcile. */
+    const index = new TopologyIndex(adapter)
+    for (const node of nodes) index.#addSnapshot(node)
+    return index
+  }
+
   /** Adds one node atomically and activates reverse-indexed dangling edges. */
   add(candidate: ITopologyIndexNode): void {
     this.#assertWritable()
-    const node = snapshotIndexNode(candidate, this.#adapter)
+    const node = snapshotTopologyIndexNode(candidate, (reason, id) =>
+      this.#adapter.onInvalid(reason, id)
+    )
+    this.#addSnapshot(node)
+  }
+
+  /** Adds a package-admitted immutable node without repeating public getter/edge admission. */
+  #addSnapshot(node: ITopologyIndexNode): void {
     if (this.#nodes.has(node.id))
       this.#adapter.onInvalid(TopologyInvalidReason.duplicateNode, node.id)
     const danglingConsumers = this.#consumers.get(node.id)
@@ -477,7 +439,9 @@ class TopologyIndex implements ITopologyIndex {
   setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void {
     this.#assertWritable()
     const node = this.#requireNode(id)
-    const snapshots = snapshotDependencies(dependencies, id, this.#adapter)
+    const snapshots = snapshotTopologyDependencies(dependencies, id, (reason, nodeId) =>
+      this.#adapter.onInvalid(reason, nodeId)
+    )
     /** Newly introduced present providers that could close a back edge. */
     const oldProviders = new Set(node.dependencies.map((dependency) => dependency.provider))
     const mightCycle = snapshots.some((dependency) => {
@@ -792,4 +756,12 @@ class TopologyTransaction implements ITopologyTransaction {
 /** Creates an empty mutable topology index with caller-owned error construction. */
 export function createTopologyIndex(adapter: ITopologyIndexAdapter): ITopologyIndex {
   return new TopologyIndex(adapter)
+}
+
+/** Package-private trusted construction; no package subpath re-exports this factory. */
+export function createTopologyIndexFromSnapshots(
+  adapter: ITopologyIndexAdapter,
+  nodes: readonly ITopologyIndexNode[]
+): ITopologyIndex {
+  return TopologyIndex.fromSnapshots(adapter, nodes)
 }

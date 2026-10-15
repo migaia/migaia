@@ -1,3 +1,8 @@
+import {
+  admitTopologyId,
+  snapshotTopologyDependencies,
+  type ITopologySnapshotFailure
+} from './topology-admission.js'
 import type { ICapabilityGraphNodeState, ICapabilityGraphState } from './state-constants.js'
 import { CapabilityGraphNodeState, CapabilityGraphState } from './state-constants.js'
 import { CapabilityGraphErrorCode } from './error-code.js'
@@ -304,26 +309,52 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
       })
   }
 
-  /** Copies the public node contract before any topology or lifecycle side effect. */
-  const validateNode = (node: IDynamicGraphNodeDefinition<unknown>): void => {
-    if (!node || typeof node !== 'object' || typeof node.id !== 'string' || node.id.length === 0)
-      throw fail(CapabilityGraphErrorCode.invalidNode)
-    if (typeof node.kind !== 'string' || node.kind.length === 0 || typeof node.start !== 'function')
-      throw fail(CapabilityGraphErrorCode.invalidNode)
-    if (!Array.isArray(node.dependencies)) throw fail(CapabilityGraphErrorCode.invalidNode)
-    const seen = new Set<string>()
-    for (const dependency of node.dependencies) {
-      if (
-        !dependency ||
-        typeof dependency.provider !== 'string' ||
-        dependency.provider.length === 0 ||
-        typeof dependency.required !== 'boolean'
-      )
-        throw fail(CapabilityGraphErrorCode.invalidNode)
-      if (dependency.provider === node.id || seen.has(dependency.provider))
-        throw fail(CapabilityGraphErrorCode.duplicateEdge)
-      seen.add(dependency.provider)
+  /** Snapshots caller-owned node facts once before any topology or lifecycle side effect. */
+  const snapshotNode = (
+    input: IDynamicGraphNodeDefinition<unknown>
+  ): IDynamicGraphNodeDefinition<unknown> => {
+    if (!input || typeof input !== 'object') throw fail(CapabilityGraphErrorCode.invalidNode)
+    /** Graph adapts the pure admission protocol while preserving original getter failures. */
+    const invalid: ITopologySnapshotFailure = (reason, _nodeId, failure) => {
+      /** Duplicate edges keep their existing graph code; structural input uses INVALID_NODE. */
+      const code =
+        reason === TopologyInvalidReason.duplicateEdge
+          ? CapabilityGraphErrorCode.duplicateEdge
+          : CapabilityGraphErrorCode.invalidNode
+      if (failure) throw graphFailure(code, failure.cause)
+      throw fail(code)
     }
+    /** Caller fields are captured before validation so later mutation cannot rewrite graph facts. */
+    let idValue: unknown
+    /** Domain kind remains a nonempty string, independent of topology edge ownership. */
+    let kind: unknown
+    /** Original callable is captured once and invoked with its original definition receiver. */
+    let start: unknown
+    /** Shared topology admission owns membership, edge getters and duplicate checks. */
+    let dependenciesValue: unknown
+    try {
+      idValue = input.id
+      kind = input.kind
+      start = input.start
+      dependenciesValue = input.dependencies
+    } catch (cause) {
+      throw graphFailure(CapabilityGraphErrorCode.invalidNode, cause)
+    }
+    /** Stable identity used for lookup, callbacks and diagnostics throughout this registration. */
+    const id = admitTopologyId(idValue, invalid)
+    if (typeof kind !== 'string' || kind.length === 0 || typeof start !== 'function')
+      throw fail(CapabilityGraphErrorCode.invalidNode)
+    /** Immutable edges are shared by the lifecycle definition and the canonical index owner. */
+    const dependencies = snapshotTopologyDependencies(dependenciesValue, id, invalid)
+    if (dependencies.some((edge) => edge.provider === id))
+      throw fail(CapabilityGraphErrorCode.duplicateEdge)
+    return Object.freeze({
+      id: id as IGraphNodeId,
+      kind,
+      dependencies: dependencies as IDynamicGraphNodeDefinition<unknown>['dependencies'],
+      // This receiver boundary preserves method-style starts without rereading input.start.
+      start: (context) => Reflect.apply(start, input, [context])
+    })
   }
 
   /** Resolves one canonical index order into lifecycle entries. */
@@ -541,9 +572,10 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
     get generation() {
       return graphGeneration
     },
-    register(node, binding) {
+    register(input, binding) {
       return mutate(async () => {
-        validateNode(node)
+        /** Snapshot at queue admission, preserving the existing mutation scheduling boundary. */
+        const node = snapshotNode(input)
         if (definitions.has(node.id)) throw fail(CapabilityGraphErrorCode.duplicateNode)
         const entry: IStoredNode<TBinding> = {
           definition: node,
@@ -653,9 +685,10 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
       if (!definitions.has(id)) throw fail(CapabilityGraphErrorCode.unknownNode)
       return topologyIndex.dependents(id)
     },
-    replace(node, binding, options) {
+    replace(input, binding, options) {
       return mutate(async () => {
-        validateNode(node)
+        /** Replacement commits the same immutable node contract as first registration. */
+        const node = snapshotNode(input)
         const previous = definitions.get(node.id)
         if (!previous) throw fail(CapabilityGraphErrorCode.unknownNode)
         const oldDependencies = previous.definition.dependencies
