@@ -33,6 +33,12 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
   debugName?: string
   #value!: T
   #dirty = true
+  /**
+   * Whether the next dirty pull must run `fn` instead of trusting the recorded dependency versions.
+   * True before the first successful evaluation, after a dependency was disconnected, and after a
+   * failed evaluation, so an error is retried on every read until an evaluation succeeds.
+   */
+  #mustRecompute = true
   #computing = false // 循环自依赖保护：a→b→a 会在此触发可读错误而非栈溢出
   #disposed = false
   #fn: () => T
@@ -93,6 +99,8 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     this.#suspend()
   }
   onDependencyDisconnected(): void {
+    // The disconnected dependency is gone from `depVersions`; only `fn` can tell what replaces it.
+    this.#mustRecompute = true
     this.markDirty()
   }
   get value(): T {
@@ -167,13 +175,40 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
         this.#version = nextVersion
       }
       this.#previewCapture = undefined
+      this.#mustRecompute = false
       this.#dirty = false
       this.#scheduleSuspension()
       return
     }
     this.#previewCapture = undefined
+    // "Maybe dirty" is confirmed first: pull the dependencies and compare versions. An upstream
+    // value that `equals` kept unchanged then stops here and does not rerun `fn`.
+    if (!this.#mustRecompute && this.#revalidate()) {
+      this.#dirty = false
+      this.#scheduleSuspension()
+      return
+    }
+    this.#mustRecompute = true
     this.#recompute()
   } // Settles lazy node versions.
+  /**
+   * Checks the recorded dependency versions under the same cycle guard as `#recompute`. A cycle
+   * recorded through a caught circular error would otherwise recurse through dependency pulls.
+   */
+  #revalidate(): boolean {
+    if (this.#computing) {
+      throw createReactiveError(
+        ReactiveErrorCode.circularDependency,
+        ReactiveErrorText.circularComputedDependency
+      )
+    }
+    this.#computing = true
+    try {
+      return internalsOf(this.runtime).tracker.revalidate(this)
+    } finally {
+      this.#computing = false
+    }
+  }
   #recompute(): void {
     if (this.#computing) {
       // 求值过程中又读到了自己：环。给出可理解的响应式错误，而不是让引擎栈溢出。
@@ -215,6 +250,7 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
     } finally {
       this.#computing = false
     }
+    this.#mustRecompute = false
     this.#dirty = false // 仅在完全成功后才落定 dirty
     trace?.end()
     this.#scheduleSuspension()
@@ -234,7 +270,8 @@ export class Computed<T> implements IObservable, IObserver, IDisposable {
   #suspend(): void {
     if (this.#keepAlive || this.#disposed || this.subs.size > 0) return
     this.#suspensionGeneration++
-    internalsOf(this.runtime).tracker.clearDependencies(this)
+    // Keep the version snapshot so the next read can reuse the cache when no dependency changed.
+    internalsOf(this.runtime).tracker.suspendDependencies(this)
     this.#dirty = true
   }
 }

@@ -75,7 +75,8 @@ export const LoggerErrorCode = {
   /**
    * Logger plugin final uninstall cleanup attempted every registered action but one or more actions
    * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or
-   * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets.
+   * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A
+   * batcher whose final drain left entries undelivered reports this code with `detail.dropped`.
    */
   pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED',
 
@@ -110,8 +111,10 @@ export const LoggerErrorCode = {
   extendsCycle: 'EXTENDS_CYCLE',
 
   /**
-   * A bounded batch/direct-HTTP owner has no admission slot for another full batch. The producer
-   * must stop or retry after quiescence; entries are never silently dropped or spilled.
+   * A bounded batch/direct-HTTP owner had no admission slot for another full batch, so it dropped
+   * the oldest queued batch (or the incoming one when every pending batch is in flight). Reported
+   * through the logger failure path, not thrown to the producer; `detail.dropped` is the dropped
+   * entry count. Callers should raise `maxPendingBatches` or relieve the slow batch callback.
    */
   batchOverflow: 'BATCH_OVERFLOW',
   /**
