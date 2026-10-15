@@ -29,7 +29,9 @@ export const CapabilityGraphErrorText = {
   /** Stable option-admission message consumed by factory validation. */
   invalidOption: 'capability graph option admission failed',
   /** Stable dependency-block message consumed by reject-policy mutations. */
-  nodeHasDependents: 'capability graph node has required dependents'
+  nodeHasDependents: 'capability graph node has required dependents',
+  /** Stable admission-timeout message consumed by dynamic-graph mutation scheduling. */
+  mutationAdmissionTimeout: 'capability graph mutation admission timed out'
 } as const
 
 export type ICapabilityGraphErrorText =
