@@ -5,7 +5,7 @@ import { createLifecycleUnit } from '../src/lifecycle-unit'
 import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope'
 import { createGenerationController } from '../src/generation-controller'
 import { systemScheduler, createManualScheduler } from '@migaia/utils/scheduler'
-import { assimilateCapturedThen, probeThenable } from '../src/errors'
+import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
 import type { ILifecycleOwner } from '../src/types'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))

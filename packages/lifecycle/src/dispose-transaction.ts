@@ -1,4 +1,4 @@
-import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
+import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { defaultLifecycleScheduler } from './default-scheduler.js'
 import { assertErrorPolicyReporter, attachLifecycleSecondaryErrors } from './error-boundary.js'
 import { safeReport } from './report-boundary.js'
@@ -21,7 +21,7 @@ import {
   observeAbortSubscription,
   type IObservedAbortSubscription
 } from './observed-subscription.js'
-import { DisposeTransactionKind, ThenableProbeKind } from './state-constants.js'
+import { DisposeTransactionKind } from './state-constants.js'
 
 type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
 
@@ -41,13 +41,13 @@ const assimilateThenable = (
 ):
   | { readonly kind: typeof ThenableProbeKind.notThenable }
   | { readonly kind: typeof ThenableProbeKind.failed; readonly error: unknown }
-  | { readonly kind: typeof ThenableProbeKind.promise; readonly promise: Promise<void> } => {
+  | { readonly kind: typeof ThenableProbeKind.thenable; readonly promise: Promise<void> } => {
   const probe = probeThenable(value)
   if (probe.kind === ThenableProbeKind.notThenable) return { kind: ThenableProbeKind.notThenable }
   if (probe.kind === ThenableProbeKind.failed)
     return { kind: ThenableProbeKind.failed, error: probe.error }
   return {
-    kind: ThenableProbeKind.promise,
+    kind: ThenableProbeKind.thenable,
     promise: assimilateCapturedThen<void>(probe.thenFn, value)
   }
 }

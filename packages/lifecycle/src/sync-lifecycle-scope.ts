@@ -1,4 +1,4 @@
-import { probeThenable } from '@migaia/utils/function'
+import { probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { assertErrorPolicyReporter } from './error-boundary.js'
 import type {
   ICollectedError,
@@ -14,7 +14,7 @@ import { LifecycleErrorText } from './error-text.js'
 import { createOwnedEntryList } from './owned-entries.js'
 import { createTerminalController } from './terminal-controller.js'
 import { captureAbortControllerFactory } from './abort-factory.js'
-import { LifecycleState, ThenableProbeKind } from './state-constants.js'
+import { LifecycleState } from './state-constants.js'
 import { admitDescriptor } from './dispose-transaction.js'
 
 const disposeKey = (Symbol as typeof Symbol & { dispose?: symbol }).dispose

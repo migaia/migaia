@@ -45,8 +45,8 @@ pnpm add @migaia/lifecycle
 - [事务性所有权](#事务性所有权模块)：`createProvisionalScope`
 - [变更队列](#变更队列模块)：`createMutationQueue`
 - [调度器、中止与有界等待](#调度器中止与有界等待模块)：`snapshotScheduler`、`validateSchedulerDelay`、`validateSchedulerTime`、`createAbortController`、`boundedWait`、`createTerminalController`
-- [错误基础设施](#错误基础设施模块)：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`probeThenable`、`assimilateCapturedThen`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`
-- [状态常量](#状态常量模块)：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`ThenableProbeKind`、`DisposeTransactionKind`
+- [错误基础设施](#错误基础设施模块)：`LIFECYCLE_SOURCE`、`createLifecycleError`、`createLifecycleRangeError`、`tagLifecycleError`、`containAsyncRejection`、`createErrorCollector`、`LifecycleErrorCode`、`LifecycleErrorText`
+- [状态常量](#状态常量模块)：`LifecycleState`、`LifecycleUnitState`、`LifecycleErrorPolicy`、`DisposeTransactionKind`
 - [按需导入与 tree-shaking](#按需导入与-tree-shaking)
 - [高阶组合示例](#高阶组合示例)
 - [构建门禁](#构建门禁)
@@ -407,7 +407,7 @@ import { createPendingTracker } from '@migaia/lifecycle/quiescence'
 import { createLifecycleScope } from '@migaia/lifecycle/scope'
 import { createGenerationController } from '@migaia/lifecycle/generation'
 import { createSyncStartedDisposalLedger } from '@migaia/lifecycle/disposal'
-import { probeThenable } from '@migaia/lifecycle/errors'
+import { probeThenable } from '@migaia/utils/function'
 ```
 
 `/abort` 还公开 canonical hostile-signal-safe `observeAbortSubscription` 及其 `I`-prefixed handle/sink types；Resource 等消费者应静态从该 leaf 委托 signal registration，不复制 registration ledger。可用 subpath：`/abort`、`/scheduler`、`/quiescence`、`/scope`、`/generation`、`/disposal`、`/errors`。Root 和 subpath 都 re-export 同一 preserve-modules 实现，同名 runtime export 保持 `===`；包不开放 `dist/*` wildcard。`sideEffects: false` 表示未导入 leaf 可被 bundler 删除；Node/Bun 直接 ESM import 本身不执行 tree-shaking，体积验收应看 bundler retained modules，而不是只看 gzip 总字节。
@@ -425,12 +425,11 @@ import {
   createLifecycleRangeError,
   tagLifecycleError,
   containAsyncRejection,
-  probeThenable,
-  assimilateCapturedThen,
   createErrorCollector,
   LifecycleErrorCode,
   LifecycleErrorText
 } from '@migaia/lifecycle'
+import { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'
 ```
 
 **`LIFECYCLE_SOURCE`｜3 秒上手** —— 本包所有错误的 `source` 字段固定值：
@@ -481,6 +480,8 @@ containAsyncRejection(maybeAsyncCallbackResult, (error) => report(error))
 ```
 
 参数：`value: unknown`（必填）、`onRejected: (error: unknown) => void`（必填）。非 thenable 时直接返回，不调用 `onRejected`。
+
+以下 thenable 工具从 `@migaia/utils/function` 导入，属于 utils API。
 
 **`probeThenable`｜5 秒上手** —— 只读一次 `value.then`，返回判别结果（不是布尔值，是否 thenable/是否 getter 抛错都会区分）：
 
@@ -540,9 +541,9 @@ import {
   LifecycleState,
   LifecycleUnitState,
   LifecycleErrorPolicy,
-  ThenableProbeKind,
   DisposeTransactionKind
 } from '@migaia/lifecycle'
+import { ThenableProbeKind } from '@migaia/utils/function'
 ```
 
 均为纯常量对象（`as const`），无调用参数，用于替代裸字符串字面量做比较/`switch`。
@@ -553,7 +554,7 @@ import {
 
 **`LifecycleErrorPolicy`｜3 秒上手** —— 释放错误策略：`{ throw: 'throw', collect: 'collect', report: 'report', firstError: 'firstError' }`；`firstError` 不是通用默认值，只为兼容 `web-rpc` discovery-registry 的迁移语义存在。
 
-**`ThenableProbeKind`｜3 秒上手** —— `probeThenable`/内部归化逻辑的判别结果：`{ notThenable: 'not-thenable', thenable: 'thenable', failed: 'failed', promise: 'promise' }`。
+`ThenableProbeKind` 由 `@migaia/utils/function` 提供，取值为 `notThenable`、`thenable`、`failed`；lifecycle 不再提供平行常量或 `promise` 变体。
 
 **`DisposeTransactionKind`｜3 秒上手** —— `createDisposeTransaction` 的模式：`{ order: 'order', plan: 'plan' }`。
 

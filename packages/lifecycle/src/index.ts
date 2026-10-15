@@ -18,9 +18,7 @@ export {
   type ILifecycleStateValue,
   type ILifecycleUnitStateValue,
   type ILifecycleErrorPolicy,
-  ThenableProbeKind,
   DisposeTransactionKind,
-  type IThenableProbeKind,
   type IDisposeTransactionKind
 } from './state-constants.js'
 
@@ -43,11 +41,8 @@ export {
   createLifecycleRangeError,
   tagLifecycleError,
   containAsyncRejection,
-  probeThenable,
-  assimilateCapturedThen,
   createErrorCollector,
   type ILifecycleError,
-  type IThenableProbe,
   type IErrorCollector
 } from './errors.js'
 
