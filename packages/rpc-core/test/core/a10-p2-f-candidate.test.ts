@@ -73,13 +73,15 @@ describe('P2-F private qualification and canonical ownership', () => {
     assert.equal(inherited.signal.reason, parentReason)
   })
 
-  it('[A16] public generation stays eager with the original native reason identity', () => {
-    /** Public lifecycle behavior is the negative control for RPC-only laziness. */
+  it('[A16] public generation allocates lazily and keeps the original native reason identity', () => {
+    /** Lifecycle generations, like RPC scopes, construct their controller on first signal read. */
     const allocations = countControllers()
-    /** This public owner must continue allocating during begin. */
+    /** Canonical lifecycle owner under test. */
     const controller = createGenerationController()
     /** Token and native signal are both returned by the canonical owner. */
     const request = controller.begin()
+    assert.equal(allocations(), 0)
+    assert.equal(request.signal.aborted, false)
     assert.equal(allocations(), 1)
     /** Cancelling preserves the exact original native error instance. */
     const reason = new RangeError('public generation fixture')
