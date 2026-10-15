@@ -119,8 +119,16 @@ async function raceGraceful(
   const assimilated = assimilateThenable(result)
   if (assimilated.kind === ThenableProbeKind.failed) return { ok: false, error: assimilated.error }
   if (assimilated.kind === 'not-thenable') {
+    // A synchronous graceful that returned has already released the resource, so it counts as
+    // success even past its budget; running `force` now would release the same resource twice.
+    // The overrun stays observable as a diagnostic only.
     if (effectiveDeadline !== undefined && scheduler.now() >= effectiveDeadline) {
-      return { ok: false, timedOut: true }
+      context.report(
+        createLifecycleError(
+          LifecycleErrorCode.deadlineExceeded,
+          LifecycleErrorText.syncGracefulOverBudget
+        )
+      )
     }
     return { ok: true }
   }

@@ -113,7 +113,7 @@ const failures = scope.dispose() // 同步返回，不可能有异步资源
 scope.own(handle, {
   syncSafe: false,
   order: 10, // 大的先释放；只在 order 模式事务里生效
-  graceful: (ctx) => flush(), // 优雅释放；超时只放弃等待，仍会跑 force
+  graceful: (ctx) => flush(), // 优雅释放；异步超时只放弃等待，仍会跑 force；同步返回即算成功
   gracefulTimeoutMs: 200,
   force: (ctx) => handle.close(), // 必填，必须无条件完成
   gcFallback: true // 显式释放时自动 unregister 的 FinalizationRegistry 兜底

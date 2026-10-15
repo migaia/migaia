@@ -8,6 +8,12 @@ export const LifecycleErrorText = {
   scopeReentrantDispose: '[lifecycle] cannot join the same scope disposal from its disposer',
   /** Stable message for a descriptor that cannot be admitted into a release transaction. */
   disposeDescriptorInvalid: '[lifecycle] release descriptor admission failed',
+  /**
+   * Diagnostic reported through `context.report` when a synchronous `graceful` returned after its
+   * budget. The release still counts as successful and `force` does not run; consumed by
+   * dispose-transaction's graceful race.
+   */
+  syncGracefulOverBudget: '[lifecycle] synchronous graceful completed after its deadline',
   /** Fallback message for a queue timeout wrapper around a non-Error primary. */
   mutationAdmissionTimedOut: '[lifecycle] mutation admission timed out',
   /** Stable diagnostic for failed generation cancellation or complete timer/parent cleanup. */

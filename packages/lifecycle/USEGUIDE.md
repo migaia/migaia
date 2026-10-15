@@ -102,7 +102,7 @@ type IReleaseDescriptor = {
 
 - `syncSafe?: boolean` —— 声明该 descriptor 可被 `SyncLifecycleScope` 接受，不改变 `LifecycleScope` 本身的静态类型（同/异步由构造的具体类型决定，不由 descriptor 推断）。
 - `order?: number` —— 释放排序键，缺省按 `0`；只在 `DisposeTransaction` 的 `order` 模式下生效，数值大者先释放（往「释放顺序的下方」沉降，与分配顺序相反）。
-- `graceful?` —— 优雅释放；超时**只放弃等待**（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。
+- `graceful?` —— 优雅释放；超时**只放弃等待**（不取消它），随即降级到 `force`；`graceful` 本身抛错（非超时）不会阻止 `force` 继续跑。同步返回的 `graceful` 视为已完成释放：即使超过预算也不再跑 `force`，只通过 `context.report` 上报一条 `DEADLINE_EXCEEDED` 诊断。
 - `gracefulTimeoutMs?: number` —— 优雅阶段自己的预算，会被事务共享的绝对 `deadlineAt` 进一步封顶（取两者较小值）。
 - `force: (context) => void | PromiseLike<void>`（**必填**）—— 必须无条件完成，不得依赖任何前置条件。
 - `gcFallback?: boolean` —— 置为 `true` 时向内部 `FinalizationRegistry` 注册一个不强引用 `resource`/闭包 target 的兜底；显式释放（`dispose()`/`release()`）会自动 unregister 它。
@@ -1059,7 +1059,7 @@ if (error.code === LifecycleErrorCode.scopeClosed) {
 | `queueAdmissionTimeout`        | `QUEUE_ADMISSION_TIMEOUT`        | mutation 在队列中等待超过配置的 `queueAdmissionTimeoutMs`                                                             |
 | `queueSelfDependency`          | `QUEUE_SELF_DEPENDENCY`          | 同一 `owner` 在自己尚未完成时又向同一队列提交新任务且被等待，会死锁                                                   |
 | `releaseForceFailed`           | `RELEASE_FORCE_FAILED`           | descriptor 的 `force` 抛出/reject（契约要求 `force` 必须无条件成功）                                                  |
-| `deadlineExceeded`             | `DEADLINE_EXCEEDED`              | 共享绝对 deadline 已过去，但仍有资源被要求进入新的 graceful 阶段（诊断码，正常降级路径不抛这个码）                    |
+| `deadlineExceeded`             | `DEADLINE_EXCEEDED`              | 共享绝对 deadline 已过去，但仍有资源被要求进入新的 graceful 阶段；或同步 `graceful` 超过预算才返回（仍算成功，不跑 `force`）。两者都只经 `report` 上报，正常降级路径不用这个码 |
 | `envUnsupported`               | `ENV_UNSUPPORTED`                | lifecycle 需要的宿主 `AbortController` 能力缺失；调度器宿主能力缺失由 utils `ENV_UNSUPPORTED` 报告                    |
 | `invalidOption`                | `INVALID_OPTION`                 | scheduler 收到非法时间/延迟参数，或 descriptor 字段类型非法                                                           |
 
