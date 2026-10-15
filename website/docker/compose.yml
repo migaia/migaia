@@ -1,0 +1,20 @@
+# VPS deployment of the documentation image. The image is private on GHCR:
+#   docker login ghcr.io -u <github-user>   # token needs read:packages
+#   docker compose pull && docker compose up -d
+# Pin MIGAIA_WEBSITE_TAG to a sha-<commit> tag for a fixed release; it defaults to main.
+# The reverse proxy forwards /migaia and /migaia/* unchanged (no prefix strip) to 127.0.0.1:${MIGAIA_WEBSITE_PORT}.
+services:
+  website:
+    image: ghcr.io/migaia/migaia-website:${MIGAIA_WEBSITE_TAG:-main}
+    container_name: migaia-website
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${MIGAIA_WEBSITE_PORT:-8080}:8080'
+    read_only: true
+    # Caddy's startup storage cleanup writes here; the root filesystem stays read-only.
+    tmpfs:
+      - /home/nonroot/.local
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

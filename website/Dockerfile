@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1.7
+# Static documentation image served under /migaia. Build context: website/.
+# Every stage is Debian-based; the runtime holds only Caddy and the prerendered files.
+
+ARG BUN_VERSION=1.4.2
+ARG CADDY_VERSION=2.10.2
+
+# Build: bun is the only JavaScript runtime. `--bun` keeps the Node-shebang CLIs on bun.
+# The committed src/generated manifests are the input, so no workspace package is built here.
+FROM oven/bun:${BUN_VERSION}-debian AS build
+WORKDIR /website
+COPY package.json bun.lock bunfig.toml ./
+RUN bun install --frozen-lockfile
+COPY . .
+ENV WEBSITE_BASE=/migaia/
+RUN bun --bun react-router build && bun --bun pagefind --site build/client
+
+# Caddy: official static release binary, checked against the release checksum list.
+FROM debian:trixie-slim AS caddy
+ARG CADDY_VERSION
+ARG TARGETARCH
+WORKDIR /tmp/caddy
+ADD https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_${TARGETARCH}.tar.gz ./
+ADD https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_checksums.txt ./
+RUN grep " caddy_${CADDY_VERSION}_linux_${TARGETARCH}.tar.gz\$" caddy_${CADDY_VERSION}_checksums.txt | sha512sum -c - \
+  && tar -xzf caddy_${CADDY_VERSION}_linux_${TARGETARCH}.tar.gz caddy
+
+# Runtime: distroless Debian, no shell, non-root.
+FROM gcr.io/distroless/static-debian13:nonroot
+COPY --from=caddy /tmp/caddy/caddy /usr/bin/caddy
+COPY docker/Caddyfile /etc/caddy/Caddyfile
+# React Router writes basename pages to build/client/migaia/, but assets and the Pagefind
+# bundle stay at build/client/; their URLs are /migaia/assets and /migaia/pagefind.
+COPY --from=build /website/build/client/migaia /srv/migaia
+COPY --from=build /website/build/client/assets /srv/migaia/assets
+COPY --from=build /website/build/client/pagefind /srv/migaia/pagefind
+EXPOSE 8080
+ENTRYPOINT ["/usr/bin/caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
