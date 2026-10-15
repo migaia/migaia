@@ -1,6 +1,10 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { EventSubscriberErrorCode } from './error-code.js'
-import { MAX_NATIVE_RECURSION_DEPTH } from '@migaia/utils/function'
+import {
+  MAX_NATIVE_RECURSION_DEPTH,
+  inspectThenable,
+  observeThenableRejection
+} from '@migaia/utils/function'
 import { admitAbortSignal } from '@migaia/utils/promise'
 import { tryReadProperty } from '@migaia/utils/error'
 import {
@@ -15,6 +19,7 @@ import type {
   IEventChannelLike,
   IEventChannelOptions,
   IEventContext,
+  IEventDispatchControl,
   IEventDispatchSnapshot,
   IEventInvocation,
   IEventInvocationVisitor,
@@ -60,6 +65,8 @@ type IRegistrationOwner<T, R, V> = {
   next: IRegistrationOwner<T, R, V> | undefined
   release: IUnsubscribe
   committed: boolean
+  /** Live abort/task control created once per registration and shared by every dispatch snapshot. */
+  control: IEventDispatchControl
 }
 
 type IChannelCapability<T, R, V = undefined> = {
@@ -190,35 +197,45 @@ export const createEventContext = <T, R, V = undefined>(
   return context
 }
 
-/** Builds a snapshot whose task label is frozen while abort state remains live. */
+/**
+ * Builds the live control for one registration owner. It closes over the owner only, so one
+ * instance serves every dispatch snapshot of that registration.
+ */
+const createOwnerControl = <T, R, V>(owner: IRegistrationOwner<T, R, V>): IEventDispatchControl =>
+  Object.freeze({
+    get active() {
+      return owner.active
+    },
+    get aborted() {
+      return owner.aborted
+    },
+    get abortReason() {
+      return owner.abortReason
+    },
+    abort(reason?: unknown) {
+      if (!owner.active) return
+      owner.aborted = true
+      owner.abortReason = reason
+      owner.release()
+    },
+    setTaskId(taskId: string | undefined) {
+      if (!owner.active) return
+      owner.currentTaskId = validateTaskId(taskId, true)
+    }
+  })
+
+/**
+ * Builds a package-internal snapshot whose task label is fixed at dispatch time while abort state
+ * stays live through the shared owner control. Snapshots never reach user code, so they are not
+ * frozen.
+ */
 const snapshotOwner = <T, R, V>(
   owner: IRegistrationOwner<T, R, V>
-): IEventDispatchSnapshot<T, R, V> =>
-  Object.freeze({
-    listener: owner.listener,
-    taskId: owner.currentTaskId,
-    control: Object.freeze({
-      get active() {
-        return owner.active
-      },
-      get aborted() {
-        return owner.aborted
-      },
-      get abortReason() {
-        return owner.abortReason
-      },
-      abort(reason?: unknown) {
-        if (!owner.active) return
-        owner.aborted = true
-        owner.abortReason = reason
-        owner.release()
-      },
-      setTaskId(taskId: string | undefined) {
-        if (!owner.active) return
-        owner.currentTaskId = validateTaskId(taskId, true)
-      }
-    })
-  })
+): IEventDispatchSnapshot<T, R, V> => ({
+  listener: owner.listener,
+  taskId: owner.currentTaskId,
+  control: owner.control
+})
 
 /** Invokes one snapshot entry and returns its raw listener result. */
 export const invokeDispatchSnapshot = <T, R, V = undefined>(
@@ -351,27 +368,21 @@ export const reportLateFailure = <
       reportTerminal(options, diagnostic, error)
       return
     }
-    observePromiseLike(
-      reportResult,
-      () => undefined,
-      (error) => reportTerminal(options, diagnostic, error)
-    )
+    observeRejection(reportResult, (error) => reportTerminal(options, diagnostic, error))
     return
   }
   reportTerminal(options, diagnostic, undefined)
 }
 
 /**
- * Observes any promise-like value through native Promise assimilation. Native assimilation
- * preserves the original thenable receiver and turns a hostile `then` getter into an asynchronously
- * observed rejection instead of a synchronous publish failure.
+ * Observes a listener or reporter result for rejection. The `then` property is read once: a
+ * thenable is assimilated with its original receiver, a throwing `then` getter is reported one
+ * microtask later as an asynchronous rejection, and any other value schedules no work.
  */
-export const observePromiseLike = (
-  value: unknown,
-  onFulfilled: () => void,
-  onRejected: (error: unknown) => void
-): void => {
-  Promise.resolve(value).then(onFulfilled, onRejected)
+const observeRejection = (value: unknown, onRejected: (error: unknown) => void): void => {
+  const inspection = inspectThenable(value)
+  if ('error' in inspection) void Promise.reject(inspection.error).then(undefined, onRejected)
+  else observeThenableRejection(value, inspection, onRejected)
 }
 
 /** Final fallback chain. Runtime access is isolated here so core channel code has no host branch. */
@@ -578,6 +589,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     owner.next = undefined
     owner.release = release
     owner.committed = false
+    owner.control = createOwnerControl(owner)
     const commit = (): void => {
       if (committed || released) return
       committed = true
@@ -622,7 +634,8 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
         ? { plan: projectionPlan, outcome: capability.project(value) }
         : undefined
       for (const snapshot of snapshots) {
-        if (!remaining) return
+        // Budget exhaustion stops delivery but still reaches the projection report below.
+        if (!remaining) break
         --remaining
         if (nativeDepth >= MAX_NATIVE_RECURSION_DEPTH) spillCapture = []
         let result: R | PromiseLike<R>
@@ -639,11 +652,16 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
               while (pendingValues.length && remaining) dispatchValue(pendingValues.pop()!)
           }
         }
-        const context = createEventContext(value, snapshot, projection)
-        observePromiseLike(
-          result,
-          () => undefined,
-          (error) => reportLateFailure<T, undefined, V>(normalizedOptions, context, error)
+        // Primitive results cannot be thenables: skip the probe so sync listeners allocate nothing.
+        if (result === null || (typeof result !== 'object' && typeof result !== 'function'))
+          continue
+        // The failure context is built only when a rejection is actually reported.
+        observeRejection(result, (error) =>
+          reportLateFailure<T, undefined, V>(
+            normalizedOptions,
+            createEventContext(value, snapshot, projection),
+            error
+          )
         )
       }
       if (projection?.outcome.diagnostic)
