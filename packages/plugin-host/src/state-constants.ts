@@ -12,7 +12,10 @@ export const PluginHostRegistrationLifecycle = {
   dispose: 'dispose'
 } as const
 
-/** Internal physical-cleanup policy: normal steps degrade; managed cleanup awaits each release. */
+/**
+ * Internal physical-cleanup policy: bounded steps degrade; explicit unbounded cleanup awaits each
+ * release.
+ */
 export const PluginHostCleanupMode = {
   bounded: 'bounded',
   unbounded: 'unbounded'

@@ -44,7 +44,7 @@ Tray 一次安装多个插件时，先让 PluginHost 完成插件的 `setup`，�
 
 提交成功后，每个插件都会得到一张只能由当前 Host 签发和识别的“安装凭证”，正式类型名是 **exact receipt**。Tray 卸载或替换插件时拿这张凭证指向那一次具体安装，因此旧插件迟到的清理动作不会误删同名的新插件。**opaque data-order slot** 则是 Host 内部保存的排序位置：Tray 只能原样交还，不能读取或伪造；同一个插件定义重启或替换时沿用位置，定义删除或整个会话结束时才永久作废。宿主 stage 与插件槽位按首次分配的先后执行；禁用、恢复和替换不重排，替换发布后的新运行只执行新一代 stage。
 
-托管卸载分两步。第一步先让新请求看不到待卸载插件，这叫“逻辑撤销”；排空期间发起的新 pipeline 运行不含该插件 stage，仍可正常完成。第二步等待已经拿到旧插件的请求和正在执行的 pipeline 全部结束，再真正调用插件与资源的 `dispose()`，这叫“物理完成”。如果等待时间达到调用方设置的上限，接口会先返回 `cleanupComplete: false`；这不代表资源已经释放，调用方仍须等待返回的 `physicalCompletion` Promise。超时只允许调用方先拿回控制权，不会跳过或打乱清理顺序。 managed cleanup 的物理链不设强制截止时间，`execution.pipelineDrainTimeoutMs` 仅限制本次观察等待（`false` 为无限等待）；普通 `unUse()`/`dispose()` 仍按 `disposeStepTimeoutMs` 对每项清理作有界退化。
+托管卸载分两步。第一步先让新请求看不到待卸载插件，这叫“逻辑撤销”；排空期间发起的新 pipeline 运行不含该插件 stage，仍可正常完成。第二步等待已经拿到旧插件的请求和正在执行的 pipeline 全部结束，再真正调用插件与资源的 `dispose()`，这叫“物理完成”。如果等待时间达到调用方设置的上限，接口会先返回 `cleanupComplete: false`；这不代表资源已经释放，调用方仍须等待返回的 `physicalCompletion` Promise。`execution.pipelineDrainTimeoutMs` 必填、无默认值：数值为 managed cleanup 各项共享的排空预算，耗尽后继续后续清理；显式 `false` 才逐项等待真实完成，且不受普通步骤预算截断。`beforeCleanup` fence 始终先完成。数值预算不会取消仍执行的 lease 或 disposer，它们及迟到错误继续由 `physicalCompletion` 观察。普通 `unUse()`/`dispose()` 使用 `disposeStepTimeoutMs`（默认 5000ms）。
 
 ---
 
@@ -125,7 +125,7 @@ import { PluginHost, type IPluginHostOptions } from '@migaia/plugin-host'
 - `scheduler?: IScheduler`（来自 `@migaia/utils/scheduler`）—— 时间源，默认内部 `systemScheduler`；传入的对象必须提供 `now()`/`schedule()`，否则抛 `TypeError`。
 - `queueAdmissionTimeoutMs?: number | false` —— mutation 在 FIFO 队列中等待被拒绝的阈值。**默认 `undefined`：只诊断、不拒绝**（即默认情况下排队再久也不会触发 `MUTATION_QUEUE_TIMEOUT`）；传 `false` 关闭一切队列等待相关的计时器和诊断；传具体数值后，等待超过该阈值会被移出队列并以 `MUTATION_QUEUE_TIMEOUT` reject。
 - `queueAdmissionDiagnosticMs?: number | false` —— 未配置 `queueAdmissionTimeoutMs`（拒绝阈值）时使用的诊断阈值，默认 `1000`；传 `false` 关闭该诊断计时器。
-- `disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 表示永久等待、不触发 `DISPOSE_STEP_TIMEOUT`。
+- `disposeStepTimeoutMs?: number | false` —— 单个 disposer 步骤（pipeline disposer / 插件 dispose 钩子 / resource disposer）的最长等待时间，默认 `5000`；传 `false` 关闭普通步骤预算；managed removal 的有限 `pipelineDrainTimeoutMs` 仍会限制其步骤等待。
 
 超时类选项传入非 `false` 的非有限非负数（负数、`NaN`、`Infinity`、非 `number`）一律抛 `TypeError`（`INVALID_OPTION`）。
 

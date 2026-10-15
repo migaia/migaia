@@ -191,8 +191,7 @@ export class PluginHost<
   #resumeRuntime: PluginHostResumeRuntime<TDomainCore, TValue>
   #coreRuntime: PluginHostCoreRuntime<TDomainCore, TValue>
   #pipelineDrainTimeoutMs: number | false
-  /** Records disposer steps detached by a bounded timeout until the current host disposal settles. */
-  #cleanupAbandoned = false
+  /** Optional queue admission deadline; undefined keeps diagnostic-only waiting. */
   #queueAdmissionTimeoutMs: number | false | undefined
   /**
    * Every piece of shared mutable state, in one holder.
@@ -353,9 +352,13 @@ export class PluginHost<
       scheduler: this.#scheduler,
       pending: this.#pending,
       disposeStepTimeoutMs,
-      markAbandoned: () => {
-        this.#cleanupAbandoned = true
-      },
+      reportLateError: (error) =>
+        reportDiagnostic(
+          this.#diagnostic,
+          ERROR_TEXT.HOST_DISPOSING,
+          PluginHostErrorCode.cleanupIncomplete,
+          error
+        ),
       wrapDisposalError: (error, phase) => {
         const detail = error instanceof Error ? error.message : String(error)
         return registerPluginHostDisposalNode(
@@ -669,10 +672,6 @@ export class PluginHost<
         for (const slot of this.#state.stageSlots.values()) slot.retired = true
         this.#state.stageSlots.clear()
       },
-      resetCleanupAbandoned: () => {
-        this.#cleanupAbandoned = false
-      },
-      isCleanupAbandoned: () => this.#cleanupAbandoned,
       commitRevision: () => {
         this.#state.commit()
       },
@@ -699,8 +698,13 @@ export class PluginHost<
       commitRevision: () => {
         this.#state.commit()
       },
-      disposeRegistration: (registration, preserveErrorIdentity, mode) =>
-        this.#removalRuntime.disposeRegistration(registration, preserveErrorIdentity, mode),
+      disposeRegistration: (registration, preserveErrorIdentity, mode, deadlineAt) =>
+        this.#removalRuntime.disposeRegistration(
+          registration,
+          preserveErrorIdentity,
+          mode,
+          deadlineAt
+        ),
       revokeRegistration: (registration) => this.#removalRuntime.revokeRegistration(registration),
       createView: () => this.#createView(),
       markRemoved: (name) => {
@@ -1251,9 +1255,11 @@ export class PluginHost<
             }
             if (step.action !== DependencyAction.release) continue
             const beforeRelease = this.#removalRuntime.runBeforeRelease(registration)
-            if (beforeRelease) cleanupErrors.push(...(await beforeRelease))
+            if (beforeRelease) cleanupErrors.push(...(await beforeRelease).cleanupErrors)
             await this.#drainRegistrationLeases(registration)
-            cleanupErrors.push(...(await this.#removalRuntime.disposeRegistration(registration)))
+            cleanupErrors.push(
+              ...(await this.#removalRuntime.disposeRegistration(registration)).cleanupErrors
+            )
             this.#enablementRuntime.forget(step.id)
             this.#state.removedNames.add(step.id)
             applied.push(step.id)

@@ -1,6 +1,8 @@
 import { reportDiagnostic } from './diagnostic-report.js'
 import {
   boundedWait,
+  mergeCleanupResults,
+  type ICleanupResult,
   type IAbortController,
   type IPendingTracker,
   type IQuiescenceTracker,
@@ -21,11 +23,9 @@ type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly pipelineDrainTimeoutMs: number | false
   readonly enqueueTerminal: <T>(task: () => Promise<T>) => Promise<T>
   readonly registrationsInReverse: () => readonly TRegistration[]
-  readonly runBeforeRelease: (registration: TRegistration) => Promise<unknown[]> | undefined
-  readonly disposeRegistration: (registration: TRegistration) => Promise<unknown[]>
+  readonly runBeforeRelease: (registration: TRegistration) => Promise<ICleanupResult> | undefined
+  readonly disposeRegistration: (registration: TRegistration) => Promise<ICleanupResult>
   readonly clearPipelineState: () => void
-  readonly resetCleanupAbandoned: () => void
-  readonly isCleanupAbandoned: () => boolean
   readonly commitRevision: () => void
   readonly diagnostic: IPluginHostDiagnostic
 }>
@@ -45,7 +45,6 @@ export class PluginHostDisposalRuntime<TRegistration> {
   dispose(): Promise<IPluginHostDisposalResult> {
     if (this.#promise) return this.#promise
     this.#port.terminal.close()
-    this.#port.resetCleanupAbandoned()
     this.#port.pipelineLeases.seal(this.#port.pipelineKey)
     try {
       this.#port.executionController.abort(
@@ -62,6 +61,8 @@ export class PluginHostDisposalRuntime<TRegistration> {
     }
     this.#promise = this.#port.enqueueTerminal(async () => {
       const errors: unknown[] = []
+      /** Only continuations belong to physical completion; current errors are already returned. */
+      const physical: Promise<ICleanupResult>[] = []
       const drained =
         this.#port.pipelineDrainTimeoutMs === false
           ? await this.#port.pipelineLeases.whenZero(this.#port.pipelineKey).then(() => true)
@@ -79,8 +80,14 @@ export class PluginHostDisposalRuntime<TRegistration> {
         )
       for (const registration of this.#port.registrationsInReverse()) {
         const beforeRelease = this.#port.runBeforeRelease(registration)
-        if (beforeRelease) errors.push(...(await beforeRelease))
-        errors.push(...(await this.#port.disposeRegistration(registration)))
+        if (beforeRelease) {
+          const result = await beforeRelease
+          errors.push(...result.cleanupErrors)
+          if (result.physicalCompletion) physical.push(result.physicalCompletion)
+        }
+        const result = await this.#port.disposeRegistration(registration)
+        errors.push(...result.cleanupErrors)
+        if (result.physicalCompletion) physical.push(result.physicalCompletion)
       }
       this.#port.clearPipelineState()
       this.#port.terminal.forceTerminal()
@@ -93,16 +100,16 @@ export class PluginHostDisposalRuntime<TRegistration> {
           error
         )
       }
-      const cleanupComplete =
-        drained && this.#port.pending.size === 0 && !this.#port.isCleanupAbandoned()
+      const cleanupComplete = drained && this.#port.pending.size === 0 && physical.length === 0
       const physicalCompletion = cleanupComplete
         ? undefined
-        : Promise.all([
-            this.#port.pending.drain(),
-            this.#port.pipelineLeases.whenZero(this.#port.pipelineKey)
+        : mergeCleanupResults([
+            ...physical,
+            Promise.all([
+              this.#port.pending.drain(),
+              this.#port.pipelineLeases.whenZero(this.#port.pipelineKey)
+            ]).then(() => ({ cleanupErrors: [] }))
           ])
-            .then(() => Object.freeze({ cleanupErrors: Object.freeze([]) }))
-            .catch((error: unknown) => Object.freeze({ cleanupErrors: Object.freeze([error]) }))
       return Object.freeze({
         logicalTerminal: true,
         cleanupComplete,

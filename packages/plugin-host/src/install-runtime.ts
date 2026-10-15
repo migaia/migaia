@@ -1,3 +1,4 @@
+import type { ICleanupResult } from '@migaia/lifecycle'
 import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
@@ -76,11 +77,11 @@ type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly disposeRegistration: (
     registration: IRegistration<TDomainCore, TValue>,
     preserveErrorIdentity: boolean
-  ) => Promise<unknown[]>
+  ) => Promise<ICleanupResult>
   /** Cleans a failed lazy attempt while retaining its cold registration for explicit retry. */
   readonly resetRegistration: (
     registration: IRegistration<TDomainCore, TValue>
-  ) => Promise<unknown[]>
+  ) => Promise<ICleanupResult>
   readonly closeRegistrationSync: (
     registration: IRegistration<TDomainCore, TValue>,
     rollbackErrors: unknown[]
@@ -285,7 +286,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       } catch (error) {
         closeSetupAttempt(registration)
         /** The removal owner handles both provisional leftovers and any committed scope prefix. */
-        const rollbackErrors = await this.#port.resetRegistration(registration)
+        const { cleanupErrors: rollbackErrors } = await this.#port.resetRegistration(registration)
         this.#reportRollbackFailure(registration.name, rollbackErrors)
         /**
          * Preserve the original primary; immutable failures retain it in the existing wrapper
@@ -363,7 +364,9 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     } catch (error) {
       const rollbackErrors: unknown[] = []
       for (const registration of [...installed].reverse())
-        rollbackErrors.push(...(await this.#port.disposeRegistration(registration, true)))
+        rollbackErrors.push(
+          ...(await this.#port.disposeRegistration(registration, true)).cleanupErrors
+        )
       this.#reportRollbackFailure(failedName, rollbackErrors)
       throw this.#installFailure(failedName, error, {
         failedName,
@@ -496,7 +499,10 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     // until reset clears it; the next attempt gets a fresh owner and a fresh batch-bound core.
     registration.scope ??= createLifecycleScope({
       errorPolicy: 'collect',
-      scheduler: this.#port.scheduler
+      scheduler: this.#port.scheduler,
+      get deadlineAt() {
+        return registration.cleanupDeadlineAt
+      }
     })
     registration.featureExposeValid = true
     this.#port.beginOperation(registration)
@@ -782,7 +788,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     let rollback: Promise<readonly unknown[]> = Promise.resolve([])
     for (const registration of [...installed].reverse())
       rollback = rollback.then((previousErrors) =>
-        this.#port.disposeRegistration(registration, true).then((errors) => {
+        this.#port.disposeRegistration(registration, true).then(({ cleanupErrors: errors }) => {
           this.#reportRollbackFailure(failedName, errors)
           return [...previousErrors, ...errors]
         })

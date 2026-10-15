@@ -207,9 +207,13 @@ await host.unUse('provider') // `late` 保留为 blocked definition，不再留�
 ```
 
 同名 `replace()` 与 provider 恢复会复用该 definition 的 Host ordering slot；真正
-`unUse()` 删除 definition 后 slot 永久退休，之后同名 `use()` 获得新的单调 slot。逻辑 bounded
-结果可能先返回 `cleanupComplete: false`，但 `physicalCompletion` 严格等待 Graph binding lease、
-pipeline lease、插件 disposer 与资源 disposer，未完成前不会启动后项。不能使用
+`unUse()` 删除 definition 后 slot 永久退休，之后同名 `use()` 获得新的单调 slot。
+
+逻辑 bounded
+结果可能先返回 `cleanupComplete: false`。Graph binding fence 始终先完成；PluginHost 使用必填的
+`execution.pipelineDrainTimeoutMs`：数值预算耗尽后推进后续清理，显式 `false` 才逐项等待真实完成。
+未结束工作与迟到错误由 `physicalCompletion` 继续观察。共同结果 `ICleanupResult` 与
+`mergeCleanupResults([result])` 来自 `@migaia/lifecycle`；后者合并当前及所有后续增量错误。不能使用
 `await using` 的编译目标可用 `try/finally { await host.dispose() }`。
 
 ### Loader、Adapter 与 Runtime 子路径
