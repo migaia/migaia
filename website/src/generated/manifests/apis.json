@@ -72718,7 +72718,7 @@
           "signature": "export declare const defaultRpcReporter: (error: unknown) => void;",
           "declarationLine": 7,
           "source": "packages/rpc-core/dist/core/default-reporter.d.ts",
-          "purpose": "Default sink for background RPC failures when a caller passes no `report` option. Every rpc-* module falls back to it, and it writes to `console.error`. Its single exported identity lets a caller recognize the default reporter (for example to report an expected notice once) without comparing against `console.error` itself.",
+          "purpose": "Default sink for background RPC failures when a caller passes no `report` option. Every rpc-* module falls back to it, and it writes to `console.error`. Notice coalescing follows caller configuration, not this function identity; an explicit reporter receives the same events as its wrapper.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defaultRpcReporter.",
           "advanced": "No additional advanced behavior is declared for defaultRpcReporter.",
           "parameters": ["This const declaration has no parameters."],
@@ -72741,7 +72741,7 @@
             {
               "id": "introduction",
               "title": "介绍",
-              "content": "Default sink for background RPC failures when a caller passes no `report` option. Every rpc-* module falls back to it, and it writes to `console.error`. Its single exported identity lets a caller recognize the default reporter (for example to report an expected notice once) without comparing against `console.error` itself."
+              "content": "Default sink for background RPC failures when a caller passes no `report` option. Every rpc-* module falls back to it, and it writes to `console.error`. Notice coalescing follows caller configuration, not this function identity; an explicit reporter receives the same events as its wrapper."
             },
             {
               "id": "getting-started",
