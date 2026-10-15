@@ -26,4 +26,16 @@ requires a health check. A thread is not a fault-isolation or CPU-limit boundary
 process profile when either guarantee is required. See [USEGUIDE.md](./USEGUIDE.md) for the
 thread launcher contract and example.
 
-Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit. The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor.
+`health.intervalMs` must be finite and greater than zero, so recurring health checks cannot run at a zero interval.
+
+`startupTimeoutMs` may be zero for an immediate one-shot startup deadline.
+
+`restart` selects a supported mode and bounded exponential backoff; unknown modes fail option admission.
+
+`terminalPolicy` selects stay or cooldown; unknown modes fail option admission.
+
+`isolation` accepts required or best-effort; unknown modes fail option admission.
+
+`stop` defines drain, exit and reap phases. Their one-shot budgets may be zero for an immediate deadline.
+
+An unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit. The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor.

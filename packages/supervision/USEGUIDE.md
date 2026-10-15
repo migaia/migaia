@@ -16,12 +16,16 @@ const supervisor = createCoroutineSupervisor<IEchoPort>({
       const port = { call: async (value: unknown) => value }
       expose(port)
       heartbeat()
-      await new Promise<void>((resolve) => signal.addEventListener('abort', resolve, { once: true }))
+      await new Promise<void>((resolve) =>
+        signal.addEventListener('abort', resolve, { once: true })
+      )
       // Close resources owned by this task before returning.
     }
   },
   ready: (unit) => unit.exposed.then(() => undefined),
-  report: (error) => { console.error(error) }
+  report: (error) => {
+    console.error(error)
+  }
 })
 
 const ready = await supervisor.start()
@@ -52,7 +56,12 @@ platform spawn API.
 
 ```ts
 import { createUnitBudget } from '@migaia/supervision'
-import { createProcessSupervisor, StdinMode, StdoutMode, StderrMode } from '@migaia/supervision/process'
+import {
+  createProcessSupervisor,
+  StdinMode,
+  StdoutMode,
+  StderrMode
+} from '@migaia/supervision/process'
 import type { IProcessLauncher } from '@migaia/supervision/process'
 
 declare const launcher: IProcessLauncher
@@ -67,7 +76,9 @@ const supervisor = createProcessSupervisor({
     env: { inherit: [], set: {} },
     stdio: { stdin: StdinMode.ignore, stdout: StdoutMode.drain, stderr: StderrMode.drain }
   },
-  report: (error) => { console.error(error) }
+  report: (error) => {
+    console.error(error)
+  }
 })
 
 const outcome = await supervisor.start()
@@ -122,7 +133,9 @@ const supervisor = createThreadSupervisor({
   launcher,
   budget,
   spec: { entry: './compute-thread.js', limits: { heapBytes: 32 * 1024 * 1024 } },
-  report: (error) => { console.error(error) }
+  report: (error) => {
+    console.error(error)
+  }
 })
 
 const outcome = await supervisor.start()
@@ -147,4 +160,16 @@ guarantees. Platform adapters and their runtime-specific proof belong to their o
 this profile does not assert that Bun, Deno, browser, or Electron thread termination has been
 verified by its in-memory tests.
 
-Health `intervalMs` must be finite and greater than zero. One-shot startup and stop budgets may still be zero for an immediate deadline. Unknown restart, terminal-policy or isolation modes fail option admission; an unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit. The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor.
+`health.intervalMs` must be finite and greater than zero, so recurring health checks cannot run at a zero interval.
+
+`startupTimeoutMs` may be zero for an immediate one-shot startup deadline.
+
+`restart` selects a supported mode and bounded exponential backoff; unknown modes fail option admission.
+
+`terminalPolicy` selects stay or cooldown; unknown modes fail option admission.
+
+`isolation` accepts required or best-effort; unknown modes fail option admission.
+
+`stop` defines drain, exit and reap phases. Their one-shot budgets may be zero for an immediate deadline.
+
+An unknown replacement strategy throws coded `INVALID_OPTION` before enqueuing or retiring the serving unit. The prewarm pool snapshots its injected scheduler through the same lifecycle admission as the supervisor.
