@@ -228,6 +228,7 @@
         "defaultRuntime"
       ],
       "./extension": [
+        "ReactiveErrorPhase",
         "assertOwnedBy",
         "assertReactiveOwnedBy",
         "claimOwnership",
@@ -236,6 +237,7 @@
         "createSourceBinding",
         "createTrackedObserver",
         "currentRuntimeVersion",
+        "getDefaultRuntime",
         "internalRuntimeOf",
         "invalidateObservable",
         "isAnyRuntimeTracking",

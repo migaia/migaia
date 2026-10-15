@@ -193,6 +193,15 @@
               {
                 "type": "paragraph",
                 "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => { node.value = 2 })\nconsole.log(node.value)\nnode.dispose()"
               }
             ]
           }
@@ -792,6 +801,15 @@
               {
                 "type": "paragraph",
                 "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => { node.value = 2 })\nconsole.log(node.value)\nnode.dispose()"
               }
             ]
           }
@@ -1241,6 +1259,15 @@
                 {
                   "type": "paragraph",
                   "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => { node.value = 2 })\nconsole.log(node.value)\nnode.dispose()"
                 }
               ]
             }
@@ -1378,11 +1405,20 @@
                 {
                   "type": "paragraph",
                   "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => { node.value = 2 })\nconsole.log(node.value)\nnode.dispose()"
                 }
               ]
             }
           ],
-          "usageScore": 40,
+          "usageScore": 46,
           "configuration": [],
           "fragment": "reactive-index--defaultRuntime"
         },
@@ -2953,73 +2989,6 @@
           "fragment": "reactive-index--ReactiveErrorCode"
         },
         {
-          "name": "ReactiveErrorPhase",
-          "kind": "const",
-          "signature": "export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
-          "declarationLine": 17,
-          "source": "packages/reactive/dist/runtime/trace-constants.d.ts",
-          "purpose": "Diagnostic phases used when the reactive runtime reports failures from host callbacks.",
-          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ReactiveErrorPhase.",
-          "advanced": "No additional advanced behavior is declared for ReactiveErrorPhase.",
-          "parameters": ["This const declaration has no parameters."],
-          "parameterDetails": [],
-          "returns": "No explicit return annotation is declared for this const.",
-          "errors": ["No documented errors are declared for ReactiveErrorPhase."],
-          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ReactiveErrorPhase.",
-          "examples": [
-            "import {\n  createRuntime, defaultRuntime, assertSingleRuntimeCopy,\n  ReactiveErrorCode, REACTIVE_SOURCE, ReactiveErrorPhase, ReactiveTracePhase,\n  ReactiveTraceType, ReactiveTraceReason, ReactiveDependencyKind,\n  type IReactiveSignal, type IReactiveComputed, type IReactiveEffect,\n  type IComputedConfig, type IReactiveNodeOptions, type IDisposable, type IDisposer,\n  type IRuntime, type IRuntimeOptions, type ISchedulerStrategy, type IFlushResult,\n  type IRuntimeTraceEvent, type IRuntimeErrorContext, type IReactiveErrorCode,\n  type IReactiveError\n} from '@migaia/reactive';",
-            "import {\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
-          ],
-          "members": [],
-          "aliasOf": "ReactiveErrorPhase",
-          "exportPath": ".",
-          "overloadSignatures": [
-            "export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };"
-          ],
-          "overloadParameterDetails": [[]],
-          "overloadReturns": [],
-          "whenToUse": "Use ReactiveErrorPhase when its const contract and declared inputs match the result you need.",
-          "notUse": "Choose a different public symbol when ReactiveErrorPhase does not match the required inputs or return contract.",
-          "sections": [
-            {
-              "id": "introduction",
-              "title": "介绍",
-              "content": "Diagnostic phases used when the reactive runtime reports failures from host callbacks."
-            },
-            {
-              "id": "getting-started",
-              "title": "上手",
-              "content": "Import ReactiveErrorPhase from @migaia/reactive, then follow a maintained task example for your use case."
-            },
-            {
-              "id": "when-to-use",
-              "title": "适用场景",
-              "content": "Use ReactiveErrorPhase when its const contract and declared inputs match the result you need. Choose a different public symbol when ReactiveErrorPhase does not match the required inputs or return contract."
-            },
-            {
-              "id": "quick-implementation",
-              "title": "快速实现",
-              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
-            },
-            {
-              "id": "core-usage",
-              "title": "核心用法",
-              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ReactiveErrorPhase."
-            },
-            {
-              "id": "advanced-usage",
-              "title": "高阶用法",
-              "content": "No additional advanced behavior is declared for ReactiveErrorPhase."
-            }
-          ],
-          "declaredConfiguration": [],
-          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveErrorPhase:export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
-          "guidance": [],
-          "usageScore": 24,
-          "configuration": [],
-          "fragment": "reactive-index--ReactiveErrorPhase"
-        },
-        {
           "name": "ReactiveTracePhase",
           "kind": "const",
           "signature": "export declare const ReactiveTracePhase: { readonly start: \"start\"; readonly end: \"end\"; readonly error: \"error\"; readonly connect: \"connect\"; readonly disconnect: \"disconnect\"; };",
@@ -3220,7 +3189,18 @@
           "fragment": "reactive-index--ReactiveTraceType"
         }
       ],
-      "aliases": []
+      "aliases": [
+        {
+          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveErrorPhase:export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
+          "name": "ReactiveErrorPhase",
+          "signature": "export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
+          "source": "packages/reactive/dist/runtime/trace-constants.d.ts",
+          "exportPath": ".",
+          "ownerExportPath": "./extension",
+          "ownerModule": "extension",
+          "ownerFragment": "reactive-extension--ReactiveErrorPhase"
+        }
+      ]
     },
     {
       "id": "reactive:extension",
@@ -3994,6 +3974,102 @@
           "usageScore": 14,
           "configuration": [],
           "fragment": "reactive-extension--currentRuntimeVersion"
+        },
+        {
+          "name": "getDefaultRuntime",
+          "kind": "function",
+          "signature": "export declare function getDefaultRuntime(): IRuntime;",
+          "declarationLine": 6,
+          "source": "packages/reactive/dist/runtime/default-runtime-provider.d.ts",
+          "purpose": "Returns the canonical default, constructing it only on explicit first use and preserving identity.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for getDefaultRuntime.",
+          "advanced": "No additional advanced behavior is declared for getDefaultRuntime.",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "IRuntime",
+          "errors": ["No documented errors are declared for getDefaultRuntime."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for getDefaultRuntime.",
+          "examples": [
+            "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => { node.value = 2 })\nconsole.log(node.value)\nnode.dispose()"
+          ],
+          "members": [],
+          "aliasOf": "getDefaultRuntime",
+          "exportPath": "./extension",
+          "overloadSignatures": ["export declare function getDefaultRuntime(): IRuntime;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": ["IRuntime"],
+          "whenToUse": "Use getDefaultRuntime when its function contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when getDefaultRuntime does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Returns the canonical default, constructing it only on explicit first use and preserving identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import getDefaultRuntime from @migaia/reactive/extension, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use getDefaultRuntime when its function contract and declared inputs match the result you need. Choose a different public symbol when getDefaultRuntime does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for getDefaultRuntime."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for getDefaultRuntime."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/reactive/dist/runtime/default-runtime-provider.d.ts:getDefaultRuntime:export declare function getDefaultRuntime(): IRuntime;",
+          "guidance": [
+            {
+              "id": "8-生命周期-错误与边界",
+              "heading": "8. 生命周期、错误与边界",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。 3. `runtime.effect(.)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "没有订阅者的 `Computed` 会被自动挂起（断开依赖、下次读取重新计算），需要\"即使暂时没人订阅也保持热态\"时传 `{ keepAlive: true }`。 6. `dispose()` 之后的节点读取会立刻抛错，不会静默返回旧值——这是有意设计，避免\"看起来能用但永不更新\"的幽灵状态。 7. `defaultRuntime` 是进程级单例，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 USEGUIDE.md。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => { node.value = 2 })\nconsole.log(node.value)\nnode.dispose()"
+                }
+              ]
+            }
+          ],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "reactive-extension--getDefaultRuntime"
         },
         {
           "name": "ICapture",
@@ -5252,6 +5328,105 @@
           "usageScore": 14,
           "configuration": [],
           "fragment": "reactive-extension--ownerOf"
+        },
+        {
+          "name": "ReactiveErrorPhase",
+          "kind": "const",
+          "signature": "export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
+          "declarationLine": 17,
+          "source": "packages/reactive/dist/runtime/trace-constants.d.ts",
+          "purpose": "Diagnostic phases used when the reactive runtime reports failures from host callbacks.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ReactiveErrorPhase.",
+          "advanced": "No additional advanced behavior is declared for ReactiveErrorPhase.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for ReactiveErrorPhase."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ReactiveErrorPhase.",
+          "examples": [
+            "import {\n  createRuntime, defaultRuntime, assertSingleRuntimeCopy,\n  ReactiveErrorCode, REACTIVE_SOURCE, ReactiveErrorPhase, ReactiveTracePhase,\n  ReactiveTraceType, ReactiveTraceReason, ReactiveDependencyKind,\n  type IReactiveSignal, type IReactiveComputed, type IReactiveEffect,\n  type IComputedConfig, type IReactiveNodeOptions, type IDisposable, type IDisposer,\n  type IRuntime, type IRuntimeOptions, type ISchedulerStrategy, type IFlushResult,\n  type IRuntimeTraceEvent, type IRuntimeErrorContext, type IReactiveErrorCode,\n  type IReactiveError\n} from '@migaia/reactive';",
+            "import {\n  ReactiveErrorPhase,\n  ReactiveTracePhase,\n  ReactiveTraceType,\n  type IRuntimeTraceEvent\n} from '@migaia/reactive';"
+          ],
+          "members": [],
+          "aliasOf": "ReactiveErrorPhase",
+          "exportPath": "./extension",
+          "overloadSignatures": [
+            "export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ReactiveErrorPhase when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ReactiveErrorPhase does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Diagnostic phases used when the reactive runtime reports failures from host callbacks."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ReactiveErrorPhase from @migaia/reactive/extension, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ReactiveErrorPhase when its const contract and declared inputs match the result you need. Choose a different public symbol when ReactiveErrorPhase does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ReactiveErrorPhase."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ReactiveErrorPhase."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/reactive/dist/runtime/trace-constants.d.ts:ReactiveErrorPhase:export declare const ReactiveErrorPhase: { readonly asyncFlush: \"async-flush\"; /** Reports a hostile action-error cause getter during batch flush failure reconciliation. */ readonly causeRead: \"cause-read\"; readonly dependencyDisconnect: \"dependency-disconnect\"; readonly lifecycleHook: \"lifecycle-hook\"; readonly ssrResource: \"ssr-resource\"; readonly subscriptionListener: \"subscription-listener\"; readonly traceListener: \"trace-listener\"; };",
+          "guidance": [
+            {
+              "id": "8-生命周期-错误与边界",
+              "heading": "8. 生命周期、错误与边界",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "1. 不要跨 `Runtime` 混用节点——一个 `Runtime` 创建的 `Signal` 被另一个 `Runtime` 的 `Computed`/`Effect` 读取会直接抛错。 2. 统一经 Runtime 工厂创建节点：`runtime.signal(value, options?)`、`runtime.computed(fn, config?)`、`runtime.effect(fn, options?)`，均支持 `dispose()`/`disposed`。 3. `runtime.effect(.)` 创建时会同步立即执行一次，不是等到依赖变化才第一次运行。 4. `Signal.value = 相同值`（`Object.is` 判定）不会触发任何通知，也不会推进版本号。 5."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "没有订阅者的 `Computed` 会被自动挂起（断开依赖、下次读取重新计算），需要\"即使暂时没人订阅也保持热态\"时传 `{ keepAlive: true }`。 6. `dispose()` 之后的节点读取会立刻抛错，不会静默返回旧值——这是有意设计，避免\"看起来能用但永不更新\"的幽灵状态。 7. `defaultRuntime` 是进程级单例，请求隔离（SSR）、单测互不污染、Worker 独立场景都应该显式 `createRuntime()`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "更完整的 API 参考、生命周期细节、错误处理与调度语义、扩展 API 说明见 USEGUIDE.md。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "跨副本诊断使用 `@migaia/reactive.runtime-copies` 和 `@migaia/reactive.ownership-copy` 全局 Symbol key。迁移时请统一升级同一进程中的 reactive 副本：旧 `@morning-watch/store` 命名空间与新版本互相不可见，混用时不会互相计数或识别归属品牌。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`@migaia/reactive/extension` provides `getDefaultRuntime()` for adapters that must stay cold on import. It constructs the shared default on first call and returns the exact same object as the root `defaultRuntime` binding. Importing the root convenience binding keeps its existing eager behavior. `ReactiveErrorPhase` is also available from the pure extension entry, with the same canonical object as the root export."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { getDefaultRuntime } from '@migaia/reactive/extension'\nconst runtime = getDefaultRuntime()\nconst node = runtime.signal(1)\nruntime.batch(() => { node.value = 2 })\nconsole.log(node.value)\nnode.dispose()"
+                }
+              ]
+            }
+          ],
+          "usageScore": 30,
+          "configuration": [],
+          "fragment": "reactive-extension--ReactiveErrorPhase"
         }
       ],
       "aliases": []
