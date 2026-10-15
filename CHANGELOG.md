@@ -41,6 +41,13 @@
 
 ### Behavior
 
+- Static capability graphs invoke independent starts in each topology level
+  before awaiting that level. Previously each node completed serially. A failed
+  level fully settles before rollback; its first failure in topology order stays
+  primary and later failures remain reachable through `errors`. Release order
+  stays reverse topology order. Declare a dependency edge when completion order
+  matters; same-level completion order is no longer serial.
+
 - Dynamic capability graph registration and replacement snapshot node identity,
   kind, start and dependencies once when their queued mutation is admitted.
   Later caller mutation no longer rewrites graph facts. Captured starts retain

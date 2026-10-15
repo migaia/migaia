@@ -72,7 +72,7 @@ import {
 } from '@migaia/capability/graph'
 ```
 
-它只管理静态 required provider-consumer DAG：首次 `ready()` 冻结注册表，检测 unknown provider/重复 edge/cycle，按稳定拓扑顺序启动；启动失败会回滚已启动节点，`dispose()` 按逆拓扑释放。节点的 `start()` 可以通过 `context.get(provider)` 读取 direct ready provider，并用 `context.own(resource, descriptor)` 登记 auxiliary resource；primary `value + release` 只由 Graph 所有一次。
+它只管理静态 required provider-consumer DAG：首次 `ready()` 冻结注册表，检测 unknown provider/重复 edge/cycle，按 level/ordinal 调用启动，同层并行等待，整层成功才启动下一层；本层全部 settle 后以规范顺序第一个失败为 primary，并保留其余失败于 errors 链，回滚本层及此前已启动节点，`dispose()` 按逆拓扑释放。节点的 `start()` 可以通过 `context.get(provider)` 读取 direct ready provider，并用 `context.own(resource, descriptor)` 登记 auxiliary resource；primary `value + release` 只由 Graph 所有一次。
 
 无状态拓扑入口 `@migaia/capability/graph/topology` 的公开节点 `ordinal` 是一次性注册位置：对于 `nodeCount` 个节点，必须唯一且连续覆盖 `[0, nodeCount)`。不满足时通过调用方提供的 `onInvalid` 报告 `invalid-node` 或 `duplicate-ordinal`，不会静默排序或重写输入。
 

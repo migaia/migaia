@@ -1,4 +1,5 @@
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createGenerationController,
@@ -266,7 +267,8 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
     }
   }
 
-  const assertKnownAndAcyclic = (): IAdmittedNode[] => {
+  /** Derives ephemeral startup layers from the canonical topology's level and ordinal facts. */
+  const assertKnownAndAcyclic = (): readonly (readonly IAdmittedNode[])[] => {
     const topology = buildCapabilityTopology(
       nodeOrder,
       (nodeId, provider) => {
@@ -284,7 +286,13 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
       }
     )
     const admittedById = new Map<string, IAdmittedNode>(nodeOrder.map((node) => [node.id, node]))
-    return topology.ordered.map((node) => admittedById.get(node.id)!)
+    /** Only this startup snapshot owns buckets; topology remains the edge and level authority. */
+    const layers: IAdmittedNode[][] = []
+    for (const node of topology.ordered) {
+      const level = topology.level.get(node.id)!
+      ;(layers[level] ??= []).push(admittedById.get(node.id)!)
+    }
+    return layers
   }
 
   const releaseLateResult = (
@@ -485,25 +493,40 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
     }
   }
 
+  /** Starts each level together, then settles its failures before rollback or the next level. */
   const startGraph = async (): Promise<void> => {
     graphState = CapabilityGraphState.starting
-    let ordered: IAdmittedNode[]
     try {
-      ordered = assertKnownAndAcyclic()
+      const layers = assertKnownAndAcyclic()
       const request = generations.begin()
       currentGraphToken = request.token
       currentGraphSignal = request.signal
-      for (const [index, node] of ordered.entries()) {
+      /** Physical release order follows the full topology, independent of async completion. */
+      let releaseOrder = 0
+      for (const layer of layers) {
         if (graphState !== CapabilityGraphState.starting)
           throw fail(CapabilityGraphErrorCode.admissionClosed)
-        const blocked = node.dependencies.some(
-          (edge) => nodesById.get(edge.provider)?.state !== CapabilityGraphNodeState.ready
-        )
-        if (blocked) {
-          node.state = CapabilityGraphNodeState.blocked
-          throw fail(CapabilityGraphErrorCode.providerUnavailable, { nodeId: node.id })
+        for (const node of layer) {
+          const blocked = node.dependencies.some(
+            (edge) => nodesById.get(edge.provider)?.state !== CapabilityGraphNodeState.ready
+          )
+          if (blocked) {
+            node.state = CapabilityGraphNodeState.blocked
+            throw fail(CapabilityGraphErrorCode.providerUnavailable, { nodeId: node.id })
+          }
         }
-        await startNode(node, index + 1)
+        /** AllSettled keeps each in-flight start observed and includes successful peers in rollback. */
+        const results = await Promise.allSettled(
+          layer.map((node) => startNode(node, ++releaseOrder))
+        )
+        /** Rejections retain ordinal order even when later nodes reject first. */
+        const failures: unknown[] = []
+        for (const result of results) if (result.status === 'rejected') failures.push(result.reason)
+        if (failures.length > 0)
+          throw graphFailure(
+            CapabilityGraphErrorCode.startFailed,
+            attachSecondaryErrors(failures[0], failures.slice(1))
+          )
       }
       if (graphState !== CapabilityGraphState.starting)
         throw fail(CapabilityGraphErrorCode.admissionClosed)

@@ -23487,11 +23487,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'capability:graph:createCapabilityGraph': {
     en: {
       purpose:
-        'Creates a closed static required-edge graph. Register the complete node inventory before the first ready(), then let the Graph own deterministic startup, rollback, direct-provider reads, and reverse-topology release.',
+        'Creates a static required-edge graph. Register before ready(); starts are invoked by ordinal and awaited concurrently within each level. The next level waits for all successes. A failed level settles before rollback; its first failure in topology order stays primary with other failures in errors. Release remains reverse topology order. Declare edges for completion ordering.',
       quickStart: `import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst reportCleanupFailure = (error: unknown) => console.error('graph cleanup failed:', error)\nconst loadConfig = () => ({ baseUrl: '/api' })\nconst createService = (config: { baseUrl: string }) => ({\n  baseUrl: config.baseUrl,\n  close: async () => undefined\n})\nconst config = 'config' as IGraphNodeId\nconst service = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph({ onError: reportCleanupFailure })\n\ngraph.register({\n  id: config, kind: 'value', dependencies: [],\n  start: () => ({ value: loadConfig(), release: () => undefined })\n})\ngraph.register({\n  id: service, kind: 'service',\n  dependencies: [{ provider: config, required: true }],\n  start: ({ get }) => {\n    const value = createService(get(config))\n    return { value, release: () => value.close() }\n  }\n})\n\ntry {\n  await graph.ready()\n  console.log(graph.get(service, config))\n} finally {\n  await graph.dispose()\n}`,
       scenarios: [
         'The full service and resource dependency graph is known before startup.',
-        'Startup must be stable by registration order within each topology level.',
+        'Start invocation must follow registration order, with independent work concurrent within each topology level.',
         'A failed node must roll back already-started nodes and all provisional resources.'
       ],
       avoidWhen: [
@@ -23514,11 +23514,11 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose:
-        '创建封闭的静态 required-edge Graph。首次 ready() 前登记完整节点清单，由 Graph 拥有确定性启动、失败回滚、direct provider 读取与逆拓扑释放。',
+        '创建静态 required-edge Graph。首次 ready() 前登记节点；同层按 ordinal 调用 start、并行等待，整层成功才进入下一层。失败层全部 settle 后以拓扑顺序第一个失败为 primary，其他失败保留在 errors 链；释放保持逆拓扑顺序。需要完成顺序时声明依赖边。',
       quickStart: `import { createCapabilityGraph, type IGraphNodeId } from '@migaia/capability/graph'\n\nconst reportCleanupFailure = (error: unknown) => console.error('graph cleanup failed:', error)\nconst loadConfig = () => ({ baseUrl: '/api' })\nconst createService = (config: { baseUrl: string }) => ({\n  baseUrl: config.baseUrl,\n  close: async () => undefined\n})\nconst config = 'config' as IGraphNodeId\nconst service = 'service' as IGraphNodeId\nconst graph = createCapabilityGraph({ onError: reportCleanupFailure })\n\ngraph.register({\n  id: config, kind: 'value', dependencies: [],\n  start: () => ({ value: loadConfig(), release: () => undefined })\n})\ngraph.register({\n  id: service, kind: 'service',\n  dependencies: [{ provider: config, required: true }],\n  start: ({ get }) => {\n    const value = createService(get(config))\n    return { value, release: () => value.close() }\n  }\n})\n\ntry {\n  await graph.ready()\n  console.log(graph.get(service, config))\n} finally {\n  await graph.dispose()\n}`,
       scenarios: [
         '完整服务与资源依赖图在启动前已知。',
-        '同一 topology level 内必须按注册顺序稳定启动。',
+        '同层按注册顺序调用 start，并行等待相互独立的工作。',
         '某节点启动失败时必须回滚已启动节点与全部 provisional resource。'
       ],
       avoidWhen: [
