@@ -87,8 +87,9 @@ function createTrackerCore<TKey>(store: IKeyStore<TKey, IKeyState>): IQuiescence
       })
     },
     whenZeroOnce(key) {
-      const state = getOrCreate(key)
-      if (state.count === 0) return Promise.resolve()
+      /** An idle loose wait carries no state, unlike seal(), whose admission fence must persist. */
+      const state = store.get(key)
+      if (!state || state.count === 0) return Promise.resolve()
       return new Promise<void>((resolve) => {
         state.looseWaiters.push(resolve)
       })
