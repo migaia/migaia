@@ -456,10 +456,11 @@ function createStoreCore<S extends Record<string, unknown>>(
         const contextKey = Symbol(key)
         Object.defineProperty(store, contextKey, { configurable: true, value: fn })
         contextMembers.add(contextKey)
+        /** Stable diagnostic identity belongs to the action definition, not each invocation. */
+        const actionName = `${debugName}.${key}`
         let warnedAsync = false
         store[key] = (...args: unknown[]) => {
           assertNotDisposed()
-          const actionName = `${debugName}.${key}`
           const result = runtime.runTracedAction(actionName, () =>
             runMutation(() =>
               runtime.untracked(() =>
