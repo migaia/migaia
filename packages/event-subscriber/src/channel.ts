@@ -34,6 +34,7 @@ import { isRecord } from './internal/record.js'
 import {
   EventAdmissionPolicy,
   EventDispatchPolicy,
+  EventRemovalPolicy,
   EventSubscriberState
 } from './state-constants.js'
 import {
@@ -462,7 +463,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     terminalReport = options.terminalReport
     dispatchPolicy = options.dispatchPolicy ?? EventDispatchPolicy.recursive
     admissionPolicy = options.admissionPolicy
-    removalPolicy = options.removalPolicy ?? 'handle'
+    removalPolicy = options.removalPolicy ?? EventRemovalPolicy.handle
     publishBudget = options.publishBudget ?? 100_000
     const suppliedThrowOnAborted = options.throwOnAborted
     throwOnAborted = suppliedThrowOnAborted === undefined ? false : suppliedThrowOnAborted
@@ -506,7 +507,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     (admissionPolicy !== undefined &&
       admissionPolicy !== EventAdmissionPolicy.multiple &&
       admissionPolicy !== EventAdmissionPolicy.unique) ||
-    (removalPolicy !== 'handle' && removalPolicy !== 'listener-all')
+    (removalPolicy !== EventRemovalPolicy.handle && removalPolicy !== EventRemovalPolicy.listenerAll)
   ) {
     throw createEventTypeError(
       EventSubscriberErrorCode.invalidOptions,
@@ -569,7 +570,7 @@ export function createCanonicalChannel<T, R = void, V = undefined>(
     const release = (): void => {
       if (released) return
       released = true
-      if (removalPolicy === 'listener-all' && committed && !uniqueOwners) {
+      if (removalPolicy === EventRemovalPolicy.listenerAll && committed && !uniqueOwners) {
         const matching: IRegistrationOwner<T, R, V>[] = []
         let current = first
         while (current) {

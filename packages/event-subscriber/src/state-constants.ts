@@ -25,3 +25,11 @@ export type IEventSubscriberResultStatus = (typeof EventSubscriberState)[keyof P
   typeof EventSubscriberState,
   'fulfilled' | 'rejected'
 >]
+
+/** Controls whether a channel handle releases one registration or every equal listener identity. */
+export const EventRemovalPolicy = {
+  handle: 'handle',
+  listenerAll: 'listener-all'
+} as const
+
+export type IEventRemovalPolicy = (typeof EventRemovalPolicy)[keyof typeof EventRemovalPolicy]

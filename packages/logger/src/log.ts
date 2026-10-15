@@ -1,6 +1,7 @@
 import { defineHost } from '@migaia/plugin-host'
 import {
   createEventChannel,
+  EventRemovalPolicy,
   invokeEachLive,
   withSnapshotEntries,
   type ICanonicalEventChannel
@@ -317,7 +318,8 @@ class LoggerCore {
   }
 
   hook(name: string, fn: ILogHookFn): () => void {
-    const channel = this.#hooks.get(name) ?? createEventChannel({ removalPolicy: 'listener-all' })
+    const channel =
+      this.#hooks.get(name) ?? createEventChannel({ removalPolicy: EventRemovalPolicy.listenerAll })
     this.#hooks.set(name, channel)
     /** Stable listener for `fn`; a fresh wrapper per call would defeat `listener-all` removal. */
     let listener = this.#hookListeners.get(fn)
