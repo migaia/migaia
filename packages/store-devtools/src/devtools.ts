@@ -44,23 +44,12 @@ export type IStoreHistoryEntry = {
   state: Record<string, unknown>
 }
 
-/** Reports diagnostic snapshot failures without allowing a hostile runtime sink to affect writes. */
+/** Routes snapshot failures to the Runtime reporter, which already contains reporter failures. */
 function reportDevtoolsFailure(
   runtime: IReactiveStore<Record<string, unknown>>['$runtime'],
   error: unknown
 ): void {
-  try {
-    runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener })
-    return
-  } catch (reporterError) {
-    const host = (globalThis as { reportError?: (value: unknown) => void }).reportError
-    try {
-      if (host) host(reporterError)
-      else console.error(reporterError)
-    } catch {
-      // Diagnostic sinks are best effort and must not break the business mutation.
-    }
-  }
+  runtime.reportError(error, { phase: ReactiveErrorPhase.traceListener })
 }
 
 export type IActionTrace = {
