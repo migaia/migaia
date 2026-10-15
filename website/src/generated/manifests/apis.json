@@ -72252,7 +72252,7 @@
           "name": "createRpcIdempotencyStore",
           "kind": "function",
           "signature": "export declare function createRpcIdempotencyStore(options?: {\n  readonly retentionMs?: number;\n  readonly maxEntries?: number;\n  readonly maxEntriesPerScope?: number;\n  readonly maxBytes?: number;\n  readonly maxOutcomeBytes?: number;\n}): IRpcIdempotencyStore;",
-          "declarationLine": 46,
+          "declarationLine": 50,
           "source": "packages/rpc-core/dist/core/idempotency-store.d.ts",
           "purpose": "Provide bounded, settlement-relative deduplication without owning endpoint timers.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRpcIdempotencyStore.",
