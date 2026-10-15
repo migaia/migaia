@@ -15,6 +15,14 @@
 
 ### Behavior
 
+- Lifecycle adds `abortableDelay`, returning `true` for elapsed time and `false`
+  for abort delivery. HTTP backoff and Resource retries share its timer/listener
+  ownership; HTTP keeps cancellation successful and Resource keeps its AbortError.
+  A registration or scheduling throw remains primary even if an injected host
+  invoked its callback before returning. Wait failures carry `DELAY_FAILED`.
+- `boundedWait` gains optional `reportCleanup`. Without it, cleanup failures
+  still reject. Logger drain uses this existing deadline primitive and reports
+  cleanup failures without replacing the task/deadline winner.
 - Synchronous lifecycle disposal uses the same descriptor admission and ordering
   as asynchronous disposal. A descriptor changed to an invalid force or order
   after registration reports `INVALID_OPTION` while other valid resources still

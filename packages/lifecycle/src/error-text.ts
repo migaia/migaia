@@ -1,5 +1,9 @@
 /** Stable lifecycle diagnostics shared by scheduler and cancellation boundaries. */
 export const LifecycleErrorText = {
+  /** Fallback for a delay admission or cleanup failure that cannot retain native Error identity. */
+  delayFailed: '[lifecycle] abortable delay failed',
+  /** Rejects a malformed optional wait-cleanup channel before any resource admission. */
+  waitCleanupReporterInvalid: '[lifecycle] wait cleanup reporter must be a function',
   /** Fallback message for a provisional registration/cleanup wrapper around a non-Error throw. */
   provisionalCleanupFailed: '[lifecycle] provisional cleanup failed',
   /** Stable finalization message for transaction-level failures. */

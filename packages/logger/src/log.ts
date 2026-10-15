@@ -703,31 +703,15 @@ class LoggerCore {
     while (this.#pending.size > 0 && rounds++ < 100) {
       const remainingMs = deadlineAt - this.#scheduler.now()
       if (remainingMs <= 0) return
-      const settled = Symbol('drain-settled')
-      let timer: { cancel(): void } | undefined
-      try {
-        const winner = await Promise.race([
-          Promise.all(this.#pending).then(() => settled),
-          new Promise<undefined>((resolve) => {
-            // R-9：deadline 定时器走注入的 scheduler，不用宿主 setTimeout（时间域与 `deadlineAt` 一致）。
-            timer = this.#scheduler.schedule(() => resolve(undefined), remainingMs)
-          })
-        ])
-        if (winner !== settled) return // deadline hit while something in #pending is still stuck
-      } finally {
-        // Same timer-leak hazard as boundedWait() (LG-R5-2): without this, every round that resolves
-        // via #pending settling first — the common, happy-path case — leaves its deadline timer
-        // dangling until it fires on its own up to `remainingMs` later.
-        if (timer !== undefined) {
-          try {
-            timer.cancel()
-          } catch (error) {
-            // A cleanup failure must not replace a settled drain or leave flush pending. Keep it
-            // observable through the logger failure policy while preserving flush settlement.
-            this.#reportFailure('flush', error)
-          }
-        }
-      }
+      // Absolute task/deadline races retain boundedWait's established winner semantics.
+      // HTTP/resource duration waits use abortableDelay; no extra AbortController is needed here.
+      if (
+        !(await boundedWait(Promise.all(this.#pending), deadlineAt, {
+          scheduler: this.#scheduler,
+          reportCleanup: (error) => this.#reportFailure('flush', error)
+        }))
+      )
+        return
     }
   }
 

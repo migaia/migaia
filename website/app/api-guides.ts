@@ -27470,6 +27470,50 @@ try {
       ]
     }
   },
+  'lifecycle:index:abortableDelay': {
+    zh: {
+      purpose:
+        '用注入的 scheduler 等待一段有限、非负的相对时长。到期返回 true，abort 事件先到返回 false，由调用方决定取消是否应变成领域错误；可选 reportCleanup 观察清理失败，不改变已经完成的结果。',
+      quickStart: `import { abortableDelay, createAbortController } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
+
+const scheduler = createManualScheduler()
+const controller = createAbortController()
+const waiting = abortableDelay(scheduler, 250, controller.signal)
+controller.abort()
+console.log(await waiting) // false`,
+      scenarios: [
+        'HTTP 退避或资源重试需要一个随请求取消、并确定释放 timer 与监听器的等待。',
+        '多个领域复用同一计时所有者，同时保留各自的取消与清理错误策略。'
+      ],
+      avoidWhen: [
+        '需要让一个已有任务与绝对截止时间竞争，应使用 boundedWait。',
+        '需要重复调度 health 检查或预算授予，调用方仍应保留已有的周期 owner。'
+      ],
+      options: []
+    },
+    en: {
+      purpose:
+        'Waits for a finite non-negative duration through the injected scheduler. It returns true on expiry or false when an abort event wins, leaving domain cancellation to the caller. An optional reportCleanup channel observes cleanup failures without replacing successful completion.',
+      quickStart: `import { abortableDelay, createAbortController } from '@migaia/lifecycle'
+import { createManualScheduler } from '@migaia/utils/scheduler'
+
+const scheduler = createManualScheduler()
+const controller = createAbortController()
+const waiting = abortableDelay(scheduler, 250, controller.signal)
+controller.abort()
+console.log(await waiting) // false`,
+      scenarios: [
+        'HTTP backoff or resource retries need cancellation with deterministic timer and listener release.',
+        'Several domains share one timer owner while retaining their own cancellation and cleanup policies.'
+      ],
+      avoidWhen: [
+        'An existing task must race an absolute deadline; use boundedWait instead.',
+        'Health polling or budget admission needs a recurring scheduling owner rather than one relative delay.'
+      ],
+      options: []
+    }
+  },
   'lifecycle:index:boundedWait': {
     zh: {
       purpose:

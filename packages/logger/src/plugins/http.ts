@@ -1,3 +1,4 @@
+import { abortableDelay } from '@migaia/lifecycle'
 import type { IEmptyPluginExt, ILogEntry, ILoggerPluginCore, ILoggerPlugin } from '../typing.js'
 import {
   createBatcherForCore,
@@ -534,90 +535,22 @@ class HttpPlugin implements ILoggerPlugin<
     throw ensureLoggerDeliveryError(lastErr)
   }
 
+  /** Uses lifecycle-owned wait handles while preserving HTTP's primary/cleanup classification. */
   #wait(delayMs: number): Promise<void> {
+    /** Disposal cancellation ends the retry delay without manufacturing a transport failure. */
     const signal = this.#controller?.signal
-    if (signal?.aborted) return Promise.resolve()
-    return new Promise((resolve, reject) => {
-      /** Task returned by scheduler, retained until the schedule return boundary settles. */
-      let timer: IScheduledTask | undefined
-      /** Whether the scheduler callback or abort path requested settlement. */
-      let callbackFired = false
-      /** Whether schedule() returned or failed, allowing cleanup to observe the task. */
-      let scheduleSettled = false
-      let settled = false
-      /** Owns listener cleanup before registration can partially commit and throw. */
-      const listenerCleanupRequired = signal !== undefined
-      /** Prevents removeEventListener failure from causing a second removal attempt. */
-      let listenerRemoved = false
-      /** Delays abort settlement until registration throw can remain the primary error. */
-      let listenerRegistrationComplete = false
-      /** Records callback delivery that happened before addEventListener threw. */
-      let abortObserved = false
-      /** Preserves the first wait failure; cancellation/removal failures remain secondary. */
-      let primaryError: unknown
-      /** Prevents a synchronous callback and final cleanup from cancelling twice. */
-      let cancelAttempted = false
-      let onAbort: () => void
-      const finish = (primary?: unknown, hasPrimary = false): void => {
-        if (settled || !scheduleSettled || (!callbackFired && !hasPrimary && !primaryError)) return
-        const cleanupErrors: unknown[] = []
-        const scheduled = timer
-        timer = undefined
-        if (scheduled && !cancelAttempted) {
-          cancelAttempted = true
-          try {
-            scheduled.cancel()
-          } catch (error) {
-            cleanupErrors.push(error)
-          }
-        }
-        if (listenerCleanupRequired && !listenerRemoved) {
-          listenerRemoved = true
-          try {
-            signal?.removeEventListener('abort', onAbort)
-          } catch (error) {
-            cleanupErrors.push(error)
-          }
-        }
-        settled = true
-        if (hasPrimary || primaryError !== undefined || cleanupErrors.length > 0) {
-          const failure = ensureHttpFailure(
-            hasPrimary || primaryError !== undefined,
-            primary ?? primaryError,
-            cleanupErrors
-          )
-          reject(hasPrimary || primaryError !== undefined ? markHttpWaitPrimary(failure) : failure)
-          return
-        }
-        resolve()
+    /** HTTP exposes cleanup failures through its existing delivery aggregate. */
+    const cleanupErrors: unknown[] = []
+    return abortableDelay(this.#scheduler, delayMs, signal, (error) =>
+      cleanupErrors.push(error)
+    ).then(
+      () => {
+        if (cleanupErrors.length > 0) throw ensureHttpFailure(false, undefined, cleanupErrors)
+      },
+      (error: unknown) => {
+        throw markHttpWaitPrimary(ensureHttpFailure(true, error, cleanupErrors))
       }
-      onAbort = () => {
-        abortObserved = true
-        callbackFired = true
-        if (listenerRegistrationComplete) finish()
-      }
-      try {
-        signal?.addEventListener('abort', onAbort, { once: true })
-        listenerRegistrationComplete = true
-        if (settled || signal?.aborted || abortObserved) {
-          callbackFired = true
-          scheduleSettled = true
-          finish()
-          return
-        }
-        timer = this.#scheduler.schedule(() => {
-          callbackFired = true
-          finish()
-        }, delayMs)
-        scheduleSettled = true
-      } catch (error) {
-        primaryError = error
-        listenerRegistrationComplete = true
-        scheduleSettled = true
-        finish(error, true)
-      }
-      finish()
-    })
+    )
   }
 
   /** Keeps exponential retry delays finite for arbitrarily large valid retry counts. */
