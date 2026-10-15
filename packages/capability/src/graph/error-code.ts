@@ -32,7 +32,13 @@ export const CapabilityGraphErrorCode = {
   /** Factory options or their accessors fail admission. */
   invalidOption: 'GRAPH_INVALID_OPTION',
   /** A reject-policy mutation targets a node that still has required dependents. */
-  nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS'
+  nodeHasDependents: 'GRAPH_NODE_HAS_DEPENDENTS',
+  /**
+   * A dynamic-graph mutation waited behind an older mutation longer than `mutationAdmissionMs` and
+   * was rejected without running. The lifecycle queue timeout stays on `cause`. Check for a stuck
+   * predecessor (start that never settles, leaked binding lease) or raise the budget.
+   */
+  mutationAdmissionTimeout: 'GRAPH_MUTATION_ADMISSION_TIMEOUT'
 } as const
 
 export type ICapabilityGraphErrorCode =

@@ -22,7 +22,7 @@ import type {
   IGraphNodeId,
   IGraphNodeInstance
 } from './index.js'
-import { createQuiescenceTracker } from '@migaia/lifecycle'
+import { createMutationQueue, createQuiescenceTracker } from '@migaia/lifecycle'
 
 /** Deterministic traversal counters for one dynamic mutation. */
 export type IGraphTraversalMetrics = Readonly<{
@@ -178,7 +178,6 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   options: IDynamicCapabilityGraphOptions<TBinding> = {}
 ): IDynamicCapabilityGraph<TBinding> {
   const definitions = new Map<string, IStoredNode<TBinding>>()
-  let serial = Promise.resolve()
   let graphState: ICapabilityGraphState = CapabilityGraphState.open
   let graphGeneration = 0
   let disposePromise: Promise<void> | undefined
@@ -259,23 +258,36 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   )
     throw fail(CapabilityGraphErrorCode.invalidOption)
 
-  /** Serializes graph mutations while allowing a rejected predecessor to recover the queue. */
+  /**
+   * Canonical FIFO owner for graph mutations. It arms the admission budget at enqueue time, so a
+   * mutation queued behind a stuck predecessor is rejected even if that predecessor never settles.
+   */
+  const mutationQueue = createMutationQueue({
+    queueAdmissionTimeoutMs: options.mutationAdmissionMs ?? false
+  })
+
+  /**
+   * Serializes one graph mutation. A rejected predecessor does not block later mutations. A
+   * mutation that never ran because its admission budget expired rejects with
+   * `GRAPH_MUTATION_ADMISSION_TIMEOUT`, keeping the lifecycle timeout on `cause`.
+   */
   const schedule = <T>(task: () => Promise<T>): Promise<T> => {
+    /** Enqueue time used for the per-mutation queue metric. */
     const enqueuedAt = Date.now()
-    const run = async (): Promise<T> => {
-      const budget = options.mutationAdmissionMs
-      if (budget !== undefined && Date.now() - enqueuedAt > budget)
-        throw fail(CapabilityGraphErrorCode.invalidOption)
-      const queueTimeMs = Math.max(0, Date.now() - enqueuedAt)
-      beginMetrics(queueTimeMs)
-      return task()
-    }
-    const next = serial.then(run, run)
-    serial = next.then(
-      () => undefined,
-      () => undefined
-    )
-    return next
+    /** True once the queue admitted this mutation; separates task failures from admission timeouts. */
+    let admitted = false
+    return mutationQueue
+      .enqueue(async () => {
+        admitted = true
+        // Keep the mutation body asynchronous relative to the caller, as the former Promise chain did.
+        await undefined
+        beginMetrics(Math.max(0, Date.now() - enqueuedAt))
+        return task()
+      })
+      .catch((error: unknown) => {
+        if (admitted) throw error
+        throw graphFailure(CapabilityGraphErrorCode.mutationAdmissionTimeout, error)
+      })
   }
 
   /** Copies the public node contract before any topology or lifecycle side effect. */

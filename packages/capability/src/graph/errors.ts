@@ -97,7 +97,9 @@ export function graphMessageFor(code: ICapabilityGraphErrorCode): string {
     [CapabilityGraphErrorCode.unknownNode]: CapabilityGraphErrorText.unknownNode,
     [CapabilityGraphErrorCode.reentrantOperation]: CapabilityGraphErrorText.reentrantOperation,
     [CapabilityGraphErrorCode.invalidOption]: CapabilityGraphErrorText.invalidOption,
-    [CapabilityGraphErrorCode.nodeHasDependents]: CapabilityGraphErrorText.nodeHasDependents
+    [CapabilityGraphErrorCode.nodeHasDependents]: CapabilityGraphErrorText.nodeHasDependents,
+    [CapabilityGraphErrorCode.mutationAdmissionTimeout]:
+      CapabilityGraphErrorText.mutationAdmissionTimeout
   }
   return messages[code]
 }
