@@ -165,7 +165,6 @@ export {
   type IGraphDependents,
   type ITopologyIndex,
   type ITopologyIndexAdapter,
-  type ITopologyIndexMetrics,
   type ITopologyIndexNode,
   type ITopologyIndexReader,
   type ITopologyIndexWriter,

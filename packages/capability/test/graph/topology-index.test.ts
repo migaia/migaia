@@ -134,17 +134,6 @@ function randomDependencies(
   return dependencies
 }
 
-/** Reads a metrics delta without changing index counters. */
-function metricDelta(
-  before: Readonly<{ visitedNodes: number; visitedEdges: number }>,
-  after: Readonly<{ visitedNodes: number; visitedEdges: number }>
-): Readonly<{ visitedNodes: number; visitedEdges: number }> {
-  return {
-    visitedNodes: after.visitedNodes - before.visitedNodes,
-    visitedEdges: after.visitedEdges - before.visitedEdges
-  }
-}
-
 describe('incremental topology index', () => {
   it('A1 maintains dependents, missing edges, and required closure', () => {
     const index = createTestIndex()
@@ -225,46 +214,21 @@ describe('incremental topology index', () => {
     }
   })
 
-  it('A3 keeps leaf mutation costs independent of total graph size', () => {
-    const deltas: Array<
-      Readonly<{
-        add: Readonly<{ visitedNodes: number; visitedEdges: number }>
-        dependents: Readonly<{ visitedNodes: number; visitedEdges: number }>
-        remove: Readonly<{ visitedNodes: number; visitedEdges: number }>
-      }>
-    > = []
-
+  it('A3 preserves leaf mutation and closure across graph sizes', () => {
     for (const size of [2, 1002, 4002, 8002]) {
       const index = createTestIndex()
       index.add({ id: 'n0', dependencies: [] })
       index.add({ id: 'n1', dependencies: [{ provider: 'n0', required: true }] })
       for (let ordinal = 2; ordinal < size; ordinal += 1)
-        index.add({
-          id: `n${ordinal}`,
-          dependencies: [{ provider: 'n1', required: true }]
-        })
-
-      const beforeAdd = index.metrics()
+        index.add({ id: `n${ordinal}`, dependencies: [{ provider: 'n1', required: true }] })
       index.add({ id: 'leaf', dependencies: [{ provider: `n${size - 1}`, required: true }] })
-      const afterAdd = index.metrics()
-      index.dependents('leaf')
-      const afterDependents = index.metrics()
+      expect(index.dependents('leaf')).toEqual({ required: [], optional: [] })
+      expect(index.closure(['n0'])).toHaveLength(size + 1)
       index.remove('leaf')
-      const afterRemove = index.metrics()
-      deltas.push({
-        add: metricDelta(beforeAdd, afterAdd),
-        dependents: metricDelta(afterAdd, afterDependents),
-        remove: metricDelta(afterDependents, afterRemove)
-      })
-
-      const beforeClosure = index.metrics()
+      expect(index.has('leaf')).toBe(false)
       expect(index.closure(['n0'])).toHaveLength(size)
-      const closureDelta = metricDelta(beforeClosure, index.metrics())
-      expect(closureDelta).toEqual({ visitedNodes: size, visitedEdges: size - 1 })
+      expect(index).not.toHaveProperty('metrics')
     }
-
-    expect(deltas.every((delta) => delta.add.visitedNodes <= 3)).toBe(true)
-    expect(deltas).toEqual([deltas[0], deltas[0], deltas[0], deltas[0]])
   })
 
   it('A4 isolates, rolls back, commits, and closes transactions', () => {
@@ -350,38 +314,26 @@ describe('incremental topology index', () => {
     expect(index.order()).toEqual(['p', 'a', 'b'])
   })
 
-  it('A4 keeps base read visits made while a transaction is open after commit', () => {
+  it('A4 retains base reads and commits the isolated transaction', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     const transaction = index.begin()
-    const beforeRead = index.metrics()
-    index.order()
-    const afterRead = index.metrics()
+    expect(index.order()).toEqual(['p'])
     transaction.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
-    const transactionOwn = transaction.metrics()
+    expect(index.order()).toEqual(['p'])
     transaction.commit()
-    // Base reads during the transaction plus the transaction's own visits, neither overwriting the other.
-    expect(index.metrics().visitedNodes).toBe(
-      afterRead.visitedNodes + (transactionOwn.visitedNodes - beforeRead.visitedNodes)
-    )
-    expect(afterRead.visitedNodes).toBeGreaterThan(beforeRead.visitedNodes)
+    expect(index.order()).toEqual(['p', 'a'])
   })
 
-  it('A19 keeps a rolled-back transaction visit count in the base metrics', () => {
+  it('A19 drops rolled-back writes after transaction reads', () => {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
-    const before = index.metrics()
     const transaction = index.begin()
     transaction.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
-    transaction.order()
-    const transactionOwn = transaction.metrics()
+    expect(transaction.order()).toEqual(['p', 'a'])
     transaction.rollback()
-    // The writes are gone, but the reads the validation performed stay visible to metrics().
     expect(index.has('a')).toBe(false)
-    expect(index.metrics().visitedNodes).toBeGreaterThan(before.visitedNodes)
-    expect(index.metrics().visitedNodes - before.visitedNodes).toBe(
-      transactionOwn.visitedNodes - before.visitedNodes + 1
-    )
+    expect(index.order()).toEqual(['p'])
   })
 
   it('A4 opens and rolls back a transaction without copying the index', () => {

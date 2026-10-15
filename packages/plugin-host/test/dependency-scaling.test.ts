@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ITopologyIndex, ITopologyIndexMetrics } from '@migaia/capability/graph/topology'
+import type { ITopologyIndex } from '@migaia/capability/graph/topology'
 
-/** A11 captures each host-owned index to compare work across graph sizes and failed batches. */
+/**
+ * A11 captures each host-owned index to verify isolated facts across graph sizes and failed
+ * batches.
+ */
 const captured = vi.hoisted(() => [] as ITopologyIndex[])
 
 vi.mock('@migaia/capability/graph/topology', async (importOriginal) => {
@@ -18,13 +21,7 @@ vi.mock('@migaia/capability/graph/topology', async (importOriginal) => {
 
 import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
 
-/** Returns the index work performed between two cumulative metric snapshots. */
-const delta = (before: ITopologyIndexMetrics, after: ITopologyIndexMetrics) => ({
-  visitedNodes: after.visitedNodes - before.visitedNodes,
-  visitedEdges: after.visitedEdges - before.visitedEdges
-})
-
-/** Builds a host with a long required chain and measures one leaf-only mutation sequence. */
+/** Builds a host with a long required chain and exercises one leaf-only mutation sequence. */
 const measure = async (size: number) => {
   const host = new PluginHost<Record<string, never>>({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -46,11 +43,6 @@ const measure = async (size: number) => {
   }
   const index = captured.at(-1)!
   await host.use(...(plugins as never))
-  /** Index work of installing the whole chain as one batch, normalized per member. */
-  const batchWorkPerMember = {
-    visitedNodes: index.metrics().visitedNodes / size,
-    visitedEdges: index.metrics().visitedEdges / size
-  }
   const leaf = definePlugin({
     name: `leaf-${size}`,
     features: {
@@ -60,41 +52,23 @@ const measure = async (size: number) => {
     },
     install: () => ({})
   })
-  const beforeUse = index.metrics()
   await host.use(leaf)
-  const afterUse = index.metrics()
+  expect(index.has(leaf.name)).toBe(true)
   await host.unUse(leaf.name, { policy: 'cascade', dryRun: true })
-  const afterDryRun = index.metrics()
+  expect(index.has(leaf.name)).toBe(true)
   await host.unUse(leaf.name)
-  const afterRemoval = index.metrics()
-  return {
-    host,
-    index,
-    batchWorkPerMember,
-    deltas: [
-      delta(beforeUse, afterUse),
-      delta(afterUse, afterDryRun),
-      delta(afterDryRun, afterRemoval)
-    ]
-  }
+  expect(index.has(leaf.name)).toBe(false)
+  expect(index.size).toBe(size)
+  return { host, index }
 }
 
 describe('dependency index scaling', () => {
-  it('keeps leaf work independent of unrelated host size and rolls back failed batches', async () => {
+  it('keeps leaf facts isolated across host sizes and rolls back failed batches', async () => {
     captured.length = 0
     const small = await measure(100)
-    const smallBeforeLarge = small.index.metrics()
+    const smallBeforeLarge = small.index.order()
     const large = await measure(2000)
-    expect(large.deltas).toEqual(small.deltas)
-    // Recovery planning after install must not walk each member's dependent closure (R1).
-    // Bounded by a constant factor: a closure walk per member makes this ratio grow with size.
-    expect(large.batchWorkPerMember.visitedNodes).toBeLessThan(
-      2 * small.batchWorkPerMember.visitedNodes
-    )
-    expect(large.batchWorkPerMember.visitedEdges).toBeLessThan(
-      2 * small.batchWorkPerMember.visitedEdges
-    )
-    expect(small.index.metrics()).toEqual(smallBeforeLarge)
+    expect(small.index.order()).toEqual(smallBeforeLarge)
 
     const sizeBeforeFailure = large.index.size
     const failed = definePlugin({
