@@ -2387,6 +2387,89 @@ div:has(> .explained-code:not([data-output])) + div > [data-output='true'] {
 a.journey-item:hover,
 a.capability-item:hover,
 a.callout:hover {
+/*
+ * Card edge light: a broad, faint accent glow that wanders slowly inside each card and shows only
+ * on its 1px border ring. The glow drifts and breathes instead of tracing the border, and every
+ * card runs on a different phase so the grid never pulses in sync. Reduced motion freezes it.
+ */
+@property --edge-x {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 20%;
+}
+
+@property --edge-y {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+.journey-item::before,
+.library-item::before {
+  animation:
+    card-edge-drift 19s ease-in-out infinite alternate,
+    card-edge-breathe 13s ease-in-out infinite alternate;
+  background: radial-gradient(
+    70% 60% at var(--edge-x) var(--edge-y),
+    color-mix(in oklab, var(--accent-default) 85%, transparent),
+    transparent 75%
+  );
+  border-radius: inherit;
+  content: '';
+  inset: -1px;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  opacity: 0.5;
+  padding: 1px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.journey-item:nth-child(3n + 2)::before,
+.library-item:nth-child(3n + 2)::before {
+  animation-delay: -7s, -4s;
+  animation-duration: 23s, 11s;
+}
+
+.journey-item:nth-child(3n)::before,
+.library-item:nth-child(3n)::before {
+  animation-delay: -13s, -9s;
+  animation-duration: 17s, 15s;
+}
+
+@keyframes card-edge-drift {
+  0% {
+    --edge-x: 15%;
+    --edge-y: 0%;
+  }
+
+  35% {
+    --edge-x: 90%;
+    --edge-y: 30%;
+  }
+
+  70% {
+    --edge-x: 70%;
+    --edge-y: 100%;
+  }
+
+  100% {
+    --edge-x: 10%;
+    --edge-y: 75%;
+  }
+}
+
+@keyframes card-edge-breathe {
+  0% {
+    opacity: 0.35;
+  }
+
+  100% {
+    opacity: 0.85;
+  }
+}
+
   border-color: var(--border-strong);
   box-shadow: var(--shadow-raised);
   transform: translateY(-2px);
@@ -2470,6 +2553,7 @@ a.journey-item:hover b {
 
 .library-item {
   border: 1px solid var(--border-default);
+  position: relative;
   border-radius: var(--radius-md);
   display: grid;
   gap: var(--space-1);
