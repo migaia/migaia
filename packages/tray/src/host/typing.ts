@@ -5,6 +5,9 @@ import type {
   IFeature,
   IFeatureReference,
   IPluginConstraint,
+  IPluginConstraintTuple,
+  IHostHandle,
+  IPluginHostCoreFor,
   IPluginHostConfigFor,
   IPluginHostDisposalResult,
   IPluginHostInstalledPlugins,
@@ -15,21 +18,64 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import type { IEventContext } from '@migaia/event-subscriber'
 import type { ICleanupResult } from '@migaia/lifecycle'
 
+/** Both canonical PluginHost entries expose the same managed composition capability. */
+export type ITrayHostSource = PluginHost<any, any, any> | IHostHandle<any, any, any>
+
+/** Plugin hooks receive the declared domain core and lifecycle core, rather than the Host handle. */
+export type ITrayPluginCore<THost extends ITrayHostSource> = IPluginHostCoreFor<THost>
+
+/** Type-only provenance keeps concrete Host capabilities out of recursive facade inference. */
+declare const trayHostTypes: unique symbol
+
+/** Minimal type carrier shared by consumers of an exact or dynamic managed Host. */
+export type ITrayHostTypeInfo = Readonly<{
+  readonly [trayHostTypes]: Readonly<{
+    readonly host: ITrayHostSource
+    readonly definitions: readonly IPluginConstraint<any>[]
+    readonly ready: readonly IPluginConstraint<any>[]
+  }>
+}>
+
+/** Concrete source Host retained by one managed facade. */
+export type ITrayHostSourceOf<THost extends ITrayHostTypeInfo> = THost[typeof trayHostTypes]['host']
+
+/** Admitted definitions retained by one managed facade, including blocked definitions. */
+export type ITrayHostDefinitions<THost extends ITrayHostTypeInfo> =
+  THost[typeof trayHostTypes]['definitions']
+
+/** Only ready managed plugins may provide exact Runtime callback extensions. */
+export type ITrayHostReadyPlugins<THost extends ITrayHostTypeInfo> =
+  THost[typeof trayHostTypes]['ready']
+
 /** Constructor-installed plugins remain part of every exact and dynamic Tray view. */
-export type IHostBaselinePlugins<THost extends PluginHost<any, any, any>> =
-  IPluginHostInstalledPlugins<THost> extends readonly IPluginConstraint<any>[]
+export type IHostBaselinePlugins<THost extends ITrayHostSource> =
+  THost extends PluginHost<any, any, any>
     ? IPluginHostInstalledPlugins<THost>
-    : readonly []
+    : THost extends { readonly __installedPlugins?: infer TInstalled }
+      ? Extract<TInstalled, readonly IPluginConstraint<any>[]>
+      : readonly []
 
 /** Avoids the PluginHost empty-merge sentinel from poisoning dynamic unknown-key fallbacks. */
-type IHostBaselineExtensions<THost extends PluginHost<any, any, any>> =
+type IHostBaselineExtensions<THost extends ITrayHostSource> =
   IHostBaselinePlugins<THost> extends readonly []
     ? object
     : Extract<IMergePluginExts<IHostBaselinePlugins<THost>>, object>
 
 /** Plugin descriptor accepted by the managed Tray Host. */
-export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> =
-  IPluginConstraint<THost>
+export type ITrayPluginConstraint<THost extends ITrayHostSource> = IPluginConstraint<
+  ITrayPluginCore<THost>
+>
+
+/** Reuses PluginHost admission, including defined-plugin core provenance and adapter constraints. */
+export type ITrayPluginAdmission<
+  THost extends ITrayHostSource,
+  TPlugins extends readonly IPluginConstraint<any>[],
+  TReady extends readonly IPluginConstraint<any>[] = readonly []
+> = IPluginConstraintTuple<
+  ITrayPluginCore<THost>,
+  TPlugins,
+  readonly [...IHostBaselinePlugins<THost>, ...TReady]
+>
 
 /** Extracts literal plugin names for the bounded ready-closure solver. */
 type ITrayDefinitionNames<TDefinitions extends readonly unknown[]> = [
@@ -101,8 +147,8 @@ type IRemoveTrayDefinition<
   : readonly []
 
 /** Resolves a literal mutation result, falling back to a baseline-preserving dynamic view. */
-type ITrayMutationView<
-  THost extends PluginHost<any, any, any>,
+export type ITrayMutationView<
+  THost extends ITrayHostSource,
   TDefinitions extends readonly ITrayPluginConstraint<THost>[],
   TReady extends readonly ITrayPluginConstraint<THost>[],
   TPlugin extends ITrayPluginConstraint<THost>
@@ -252,6 +298,24 @@ export type ITrayPluginMutationResult<TPreviousView, TSuccessView, TCommittedFai
       Readonly<{ readonly ok: false; readonly committed: false; readonly error: Error }>)
   | (ITrayPluginMutationObservation<TCommittedFailureView> &
       Readonly<{ readonly ok: false; readonly committed: true; readonly error: Error }>)
+
+/** Shared mutation projection keeps Loader and direct Host installation on one capability contract. */
+export type ITrayHostMutationResult<
+  THost extends ITrayHostSource,
+  TDefinitions extends readonly ITrayPluginConstraint<THost>[],
+  TReady extends readonly ITrayPluginConstraint<THost>[],
+  TPlugin extends ITrayPluginConstraint<THost>,
+  TMutation extends 'use' | 'replace'
+> = ITrayPluginMutationResult<
+  ITrayHost<THost, TDefinitions, TReady>,
+  TMutation extends 'replace'
+    ? ITrayMutationView<THost, TDefinitions, TReady, TPlugin>
+    : ITrayResolvedHost<THost, readonly [...TDefinitions, TPlugin]>,
+  TMutation extends 'replace'
+    ? ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>
+    : ITrayHostDynamic<THost>
+>
+
 export type ITrayPluginRemovalObservation<TView> = ICleanupResult &
   Readonly<{
     readonly name: string
@@ -281,13 +345,19 @@ export type ITrayPluginRemovalResult<TPreviousView, TCommittedView> =
 
 /** Public managed Host surface. */
 export type ITrayHost<
-  THost extends PluginHost<any, any, any>,
+  THost extends ITrayHostSource,
   TDefinitions extends readonly ITrayPluginConstraint<THost>[],
   TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<
     IResolveReadyTrayPlugins<TDefinitions>,
     readonly ITrayPluginConstraint<THost>[]
   >
 > = Readonly<{
+  /** No runtime property is emitted; each facade keeps its source and plugin tuples in declarations. */
+  readonly [trayHostTypes]: Readonly<{
+    readonly host: THost
+    readonly definitions: TDefinitions
+    readonly ready: TReady
+  }>
   readonly plugins: readonly string[]
   readonly readyPlugins: readonly string[]
   readonly state: ITrayHostState
@@ -302,15 +372,9 @@ export type ITrayHost<
     type: TKey,
     listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>
   ): IUnsubscribe
-  use<TPlugin extends ITrayPluginConstraint<THost>>(
-    plugin: TPlugin
-  ): Promise<
-    ITrayPluginMutationResult<
-      ITrayHost<THost, TDefinitions, TReady>,
-      ITrayResolvedHost<THost, readonly [...TDefinitions, TPlugin]>,
-      ITrayHostDynamic<THost>
-    >
-  >
+  use<const TPlugin extends ITrayPluginConstraint<THost>>(
+    plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]
+  ): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>
   unUse<const TName extends string>(
     name: TName
   ): Promise<
@@ -326,22 +390,16 @@ export type ITrayHost<
           ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>
         >
   >
-  replace<TPlugin extends ITrayPluginConstraint<THost>>(
-    plugin: TPlugin
-  ): Promise<
-    ITrayPluginMutationResult<
-      ITrayHost<THost, TDefinitions, TReady>,
-      ITrayMutationView<THost, TDefinitions, TReady, TPlugin>,
-      ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>
-    >
-  >
+  replace<const TPlugin extends ITrayPluginConstraint<THost>>(
+    plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]
+  ): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>
   dispose(): Promise<ITrayHostDisposalResult>
   [asyncDisposeKey](): Promise<void>
 }>
 
 /** Conservative dynamic view returned after widened or committed-failure mutations. */
 export type ITrayHostDynamic<
-  THost extends PluginHost<any, any, any>,
+  THost extends ITrayHostSource,
   TManagedBaseline extends object = object
 > = Omit<
   ITrayHost<
@@ -359,13 +417,13 @@ export type ITrayHostDynamic<
 
 /** Host creation options. */
 export type ICreateHostOptions<
-  THost extends PluginHost<any, any, any>,
+  THost extends ITrayHostSource,
   TPlugins extends readonly ITrayPluginConstraint<THost>[]
 > = Readonly<{
   /** Constructs the one PluginHost instance owned by the resulting Tray host. */
   readonly create: () => THost
   /** Initial plugin definitions admitted and installed in tuple order. */
-  readonly plugins: TPlugins
+  readonly plugins: TPlugins & ITrayPluginAdmission<NoInfer<THost>, TPlugins>
   /** Maximum wait for a serialized graph mutation to enter execution. */
   readonly mutationAdmissionMs: number
   /** Maximum bounded-shutdown wait for physical plugin quiescence. */
@@ -380,7 +438,7 @@ export type ICreateHostOptions<
 }>
 
 export type ITrayResolvedHost<
-  THost extends PluginHost<any, any, any>,
+  THost extends ITrayHostSource,
   TDefinitions extends readonly ITrayPluginConstraint<THost>[]
 > =
   ICanResolveReadyDefinitions<TDefinitions> extends true

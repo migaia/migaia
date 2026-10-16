@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import {
   createAbortController,
   type ILifecycleScope,
@@ -30,7 +30,7 @@ type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{
    */
   readonly createDomainCore: (request: IHostCoreConstructionRequest) => TDomainCore
   readonly assertRegistrationValid: (registration: IRegistration<TDomainCore, TValue>) => void
-  readonly executionSignal: IAbortSignal
+  readonly executionSignal: INativeAbortSignal
   readonly registerStage: (
     stage: Function,
     registration: IRegistration<TDomainCore, TValue>,

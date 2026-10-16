@@ -9,7 +9,6 @@ import { CapabilityGraphNodeState, type IGraphNodeId } from '@migaia/capability/
 import { createEventHub } from '@migaia/event-subscriber'
 import type { IEventContext } from '@migaia/event-subscriber'
 import {
-  PluginHost,
   readPluginDependencies,
   asyncDisposeKey,
   type IPluginConstraint,
@@ -25,6 +24,7 @@ import {
   TrayHostState,
   type ICreateHostOptions,
   type ITrayHost,
+  type ITrayHostSource,
   type ITrayHostDisposalResult,
   type ITrayHostEventMap,
   type ITrayHostState,
@@ -50,7 +50,7 @@ import {
 } from '@migaia/plugin-host/composition'
 
 // 宿主不再结构上包含托管协议：协议经 `openComposition` 取得，宿主类型只描述宿主自己。
-type IAnyHost = PluginHost<any, any, any>
+type IAnyHost = ITrayHostSource
 type IAnySnapshot = IPluginHostCompositionSnapshot
 type IPluginBinding = ITrayPluginConstraint<IAnyHost>
 type IGraphId = IGraphNodeId
@@ -84,7 +84,7 @@ let anchorSequence = 0
 
 /** Creates one Tray-owned managed Host and resolves only after its graph is active. */
 export async function createHost<
-  THost extends PluginHost<any, any, any>,
+  THost extends ITrayHostSource,
   const TPlugins extends readonly ITrayPluginConstraint<THost>[]
 >(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>> {
   const captured = snapshotOptions(options)
@@ -384,7 +384,7 @@ export async function createHost<
 
 /** Snapshots creation options before constructing any lifecycle state. */
 function snapshotOptions<
-  THost extends PluginHost<any, any, any>,
+  THost extends ITrayHostSource,
   TPlugins extends readonly ITrayPluginConstraint<THost>[]
 >(options: ICreateHostOptions<THost, TPlugins>): ICreateHostOptions<THost, TPlugins> {
   if (options === null || typeof options !== 'object')
@@ -408,7 +408,7 @@ function snapshotOptions<
     throw createTrayError(TrayErrorCode.invalidEntry)
   return Object.freeze({
     create,
-    plugins: Object.freeze([...plugins]) as TPlugins,
+    plugins: Object.freeze([...plugins]) as ICreateHostOptions<THost, TPlugins>['plugins'],
     mutationAdmissionMs,
     quiescenceMs,
     shutdown,

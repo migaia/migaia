@@ -6,8 +6,8 @@ import type { IAdapter, IAdapterContext } from './typing.js'
 /** Snapshots adapter invocation once and assimilates foreign thenables safely. */
 export function defineAdapter<
   TArtifact,
-  THost extends import('@migaia/plugin-host').PluginHost<any, any, any>,
-  TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>
+  THost extends import('../host/typing.js').ITrayHostSource,
+  const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>
 >(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin> {
   if (!adapter || typeof adapter !== 'object' || typeof adapter.adapt !== 'function')
     throw createTrayError(TrayErrorCode.adapterContractInvalid)

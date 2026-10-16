@@ -1,5 +1,5 @@
 import type { PluginHostState } from './host-state.js'
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import {
   boundedWait,
   createSyncStartedDisposalLedger,
@@ -20,7 +20,7 @@ type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonl
   /** Host-owned synchronous hook boundary, independent of the asynchronous cleanup wait. */
   readonly invokeHook: <T>(invoke: () => T) => T
   readonly pipelineLeases: IQuiescenceTracker<object>
-  readonly executionSignal: IAbortSignal
+  readonly executionSignal: INativeAbortSignal
   readonly cleanupRuntime: PluginHostCleanupRuntime
   readonly scheduler: IScheduler
   readonly disposeStepTimeoutMs: number | false

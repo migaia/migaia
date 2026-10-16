@@ -1,5 +1,5 @@
 import type { PluginHostOperationRuntime } from './operation-runtime.js'
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { IAbortController } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRegistration } from './registry.js'
@@ -10,7 +10,7 @@ export type IPluginSetupPort = Readonly<{
   /** Marks only the synchronous setup invocation, leaving async continuations unmarked. */
   readonly invokeHook: <T>(invoke: () => T) => T
   readonly createCore: (registration: IRegistration<any, any>) => IPluginHostCore<any>
-  readonly executionSignal: IAbortSignal
+  readonly executionSignal: INativeAbortSignal
   readonly scheduler: IScheduler
   readonly setSetupPending: (registration: IRegistration<any, any> | undefined) => void
   readonly diagnostic: IPluginHostDiagnostic

@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import ERROR_TEXT, {
   attachPluginHostIdentity,
   formatPluginHostDiagnostic,
@@ -102,6 +102,7 @@ import {
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IRegistration } from './registry.js'
 import type {
+  pluginHostCoreTypes,
   IPluginConstraint,
   IPluginConstraintTuple,
   IPluginHostCore,
@@ -170,6 +171,11 @@ export class PluginHost<
   TValue = never,
   TInstalled extends readonly IPluginConstraint<any>[] = readonly []
 > {
+  /** Type-only core axes let composition owners retain the exact plugin-facing capabilities. */
+  declare readonly [pluginHostCoreTypes]: Readonly<{
+    readonly core: TDomainCore
+    readonly value: TValue
+  }>
   /** Immutable process-local identity used by Host errors and diagnostics. */
   readonly identity: IPluginHostIdentity
   /** Type-only baseline tuple marker; no runtime property is emitted. */
@@ -226,7 +232,8 @@ export class PluginHost<
   readonly #pipelineExecution: IPluginHostPipelineExecutionPort<TValue>
   #diagnostic: IPluginHostDiagnostic
   /** Real lifecycle signal shared by active pipeline stages and disposal cancellation. */
-  #liveSignal: IAbortSignal = this.#executionController.signal as unknown as IAbortSignal
+  #liveSignal: INativeAbortSignal = this.#executionController
+    .signal as unknown as INativeAbortSignal
   /** Tracks synchronous pipeline execution so a stage cannot extend its own traversal. */
   #pipelineDepth = 0
   #configRuntime: PluginHostConfigRuntime<TDomainCore, TValue, TInstalled>

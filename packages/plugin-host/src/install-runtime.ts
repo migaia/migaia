@@ -3,7 +3,7 @@ import type { PluginHostOperationRuntime } from './operation-runtime.js'
 
 import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import {
   createAbortController,
   createLifecycleScope,
@@ -58,7 +58,7 @@ type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonl
   /** Host-owned synchronous invocation boundary; preserves the hook's exact returned value. */
   readonly invokeHook: <T>(invoke: () => T) => T
   readonly scheduler: IScheduler
-  readonly executionSignal: IAbortSignal
+  readonly executionSignal: INativeAbortSignal
   readonly setSetupPending: (registration: IRegistration<TDomainCore, TValue> | undefined) => void
   /** Shared host state owning dependency facts and committed registration status. */
   readonly state: PluginHostState<TDomainCore, TValue>
@@ -90,7 +90,7 @@ type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonl
 const reportLateSettlement = (
   pending: Promise<unknown>,
   primary: unknown,
-  signal: IAbortSignal,
+  signal: INativeAbortSignal,
   name: string,
   diagnostic: IPluginHostDiagnostic
 ): void => {
