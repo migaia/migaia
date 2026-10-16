@@ -568,6 +568,38 @@ export const runPackages = async (names, runtime, onPoolDrained = undefined) => 
 }
 
 /**
+ * Apply the explicit toolchain admission policy, then run conformance when every peer tool exists.
+ *
+ * @param {ICiRuntime} runtime Child environment.
+ * @returns {Promise<IGateResult>} Conformance result, or a blocking/warning skip row naming the
+ *   missing tools.
+ */
+const runConformanceAdmitted = async (runtime) => {
+  /** Missing toolchains retain the original explicit blocking/warning skip policy. */
+  const missing = []
+  for (const tool of conformanceTools)
+    if (
+      (await runCommand('/bin/sh', [
+        '-c',
+        'command -v "$1" >/dev/null 2>&1',
+        'ci-tool-check',
+        tool
+      ])) !== 0
+    )
+      missing.push(tool)
+  if (!missing.length) return runConformance(runtime)
+  return {
+    name: text.missingTools(missing),
+    code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
+    state:
+      process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
+        ? GateState.skipWarning
+        : GateState.skipBlocking,
+    seconds: 0
+  }
+}
+
+/**
  * Run the conformance suite as concurrent whole-file lanes behind one required summary row. Each
  * lane runs the package's original `test:conformance` script (serial files, one worker) with a
  * private TMPDIR and RPC_H_EVIDENCE, so native peer builds and evidence files never collide. Both
@@ -681,8 +713,12 @@ export const runCi = async (
     )
   /** Root rows execute early but keep their original summary position after the groups. */
   const rootResults = []
-  /** Conformance runs inside the root callback but keeps its post-custody summary position. */
+  /** Tail rows run inside the root callback but keep their original post-custody positions. */
   const conformanceResults = []
+  /** Suite-parity row, executed alongside conformance. */
+  const parityResults = []
+  /** Website rows in their original fmt, lint, typecheck, test order. */
+  const websiteResults = []
   /** All readers begin only after the one topological workspace build has finished. */
   const packages = await runPackages([...releasePackages, ...storePackages], runtime, async () => {
     for (const name of [GateName.registry, GateName.consumers])
@@ -705,32 +741,43 @@ export const runCi = async (
     )
     for (const name of rootTestGates)
       rootResults.push(await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env }))
-    if (!scope.rpc) return
-    /** Missing toolchains retain the original explicit blocking/warning skip policy. */
-    const missing = []
-    for (const tool of conformanceTools)
-      if (
-        (await runCommand('/bin/sh', [
-          '-c',
-          'command -v "$1" >/dev/null 2>&1',
-          'ci-tool-check',
-          tool
-        ])) !== 0
-      )
-        missing.push(tool)
-    conformanceResults.push(
-      missing.length
-        ? {
-            name: text.missingTools(missing),
-            code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
-            state:
-              process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
-                ? GateState.skipWarning
-                : GateState.skipBlocking,
-            seconds: 0
-          }
-        : await runConformance(runtime)
-    )
+    /** Conformance, suite-parity and the website chain share no inputs, so they overlap. */
+    await Promise.all([
+      scope.rpc &&
+        runConformanceAdmitted(runtime).then((result) => conformanceResults.push(result)),
+      scope.rpc &&
+        runGate(
+          GateName.parity,
+          'required',
+          'pnpm',
+          ['--filter', './packages/rpc-integration', 'run', 'test:suite-parity'],
+          { env: runtime.env }
+        ).then((result) => parityResults.push(result)),
+      scope.website &&
+        (async () => {
+          for (const gate of ['fmt', 'lint', 'typecheck'])
+            websiteResults.push(
+              await runGate(
+                `website/${gate}`,
+                'required',
+                'make',
+                ['--no-print-directory', 'ci-website-check', `GATE=${gate}`],
+                { env: runtime.env }
+              )
+            )
+          websiteResults.push(
+            await runGate(
+              'website/test',
+              'warning',
+              'make',
+              ['--no-print-directory', 'ci-website-test'],
+              {
+                env: runtime.env
+              }
+            )
+          )
+        })()
+    ])
   })
   if (releasePackages.length) results.push(groupSummary(GateName.ship, releasePackages, packages))
   if (storePackages.length) results.push(groupSummary(GateName.store, storePackages, packages))
@@ -741,41 +788,7 @@ export const runCi = async (
       env: runtime.env
     })
   )
-  if (scope.rpc) {
-    results.push(...conformanceResults)
-    results.push(
-      await runGate(
-        GateName.parity,
-        'required',
-        'pnpm',
-        ['--filter', './packages/rpc-integration', 'run', 'test:suite-parity'],
-        { env: runtime.env }
-      )
-    )
-  }
-  if (scope.website) {
-    for (const gate of ['fmt', 'lint', 'typecheck'])
-      results.push(
-        await runGate(
-          `website/${gate}`,
-          'required',
-          'make',
-          ['--no-print-directory', 'ci-website-check', `GATE=${gate}`],
-          { env: runtime.env }
-        )
-      )
-    results.push(
-      await runGate(
-        'website/test',
-        'warning',
-        'make',
-        ['--no-print-directory', 'ci-website-test'],
-        {
-          env: runtime.env
-        }
-      )
-    )
-  }
+  results.push(...conformanceResults, ...parityResults, ...websiteResults)
   return printSummary(results)
 }
 
