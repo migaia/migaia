@@ -194,16 +194,16 @@ const optionTranslations: Readonly<
     zh: '启动后的可选就绪握手；遵守取消信号，并在启动截止时间前完成。'
   },
   'supervision:*:*:startupTimeoutMs': {
-    en: 'Maximum launch and readiness time in scheduler milliseconds; defaults to 10000.',
-    zh: '启动与就绪握手的调度器毫秒预算，默认 10000；超时后回收未完成单元。'
+    en: 'Maximum launch/readiness wait after budget grant, default 10000 ms; finite nonnegative values include a zero one-shot deadline.',
+    zh: '获得预算后的启动与就绪等待，默认10000毫秒；接受有限非负数，0为一次立即到期的预算。'
   },
   'supervision:*:*:restart': {
     en: 'Restart mode and bounded exponential backoff after profile-classified retryable exit.',
     zh: 'profile 将退出判为可重试后采用的重启模式与有界指数退避配置。'
   },
   'supervision:*:*:restart.mode': {
-    en: 'Selects never, on-failure or always restart after exit; defaults to on-failure.',
-    zh: '退出后的重启策略，可选 never、on-failure 或 always；默认 on-failure。'
+    en: 'Accepts never, on-failure or always, defaulting to on-failure; unknown values fail construction with INVALID_OPTION.',
+    zh: '只接受 never、on-failure、always，默认 on-failure；未知值在构造时以 INVALID_OPTION 失败。'
   },
   'supervision:*:*:restart.initialDelayMs': {
     en: 'First automatic restart delay in scheduler milliseconds; defaults to 250.',
@@ -258,68 +258,68 @@ const optionTranslations: Readonly<
     zh: '先于本地 lease 获得的可选父级预算；释放时归还两个已占名额。'
   },
   'supervision:*:*:terminalPolicy': {
-    en: 'Chooses permanent terminal state or an explicit cooldown before allowing another generation.',
-    zh: '选择永久 terminal 状态，或经过明确 cooldown 后允许新的 generation。'
+    en: 'Selects stay or cooldown after automatic retries stop; manual restart remains available until disposal.',
+    zh: '自动重试停止后选择 stay 或 cooldown；尚未销毁时仍可手动 restart。'
   },
   'supervision:*:*:terminalPolicy.mode': {
-    en: 'Keeps the supervisor terminal with stay, or schedules reopening with cooldown.',
-    zh: 'stay 保持 terminal；cooldown 在指定等待时间后允许重新开始。'
+    en: 'Accepts stay or cooldown; unknown values fail construction with TypeError and INVALID_OPTION.',
+    zh: '只接受 stay 或 cooldown；未知值在构造时抛带 INVALID_OPTION 的 TypeError。'
   },
   'supervision:*:*:terminalPolicy.afterMs': {
-    en: 'Cooldown duration in scheduler milliseconds before terminal admission can reopen.',
-    zh: 'terminal 后重新开放准入前的 cooldown 毫秒数，仅 cooldown 模式使用。'
+    en: 'Finite nonnegative cooldown milliseconds; zero schedules one immediately due retry.',
+    zh: 'cooldown 等待的有限非负毫秒数；0登记一次立即到期的重试。'
   },
   'supervision:*:*:stop': {
-    en: 'Ordered shutdown policy for draining application work, requesting exit and finally reaping the unit.',
-    zh: '依次排空应用工作、请求退出及最终回收单元的关闭策略配置。'
+    en: 'Waits for application work, requests graceful exit, then waits after force; each one-shot budget may be zero.',
+    zh: '依次等待应用收尾、请求正常退出并在强制停止后确认退出；每阶段单次等待预算均可为0。'
   },
   'supervision:*:*:stop.beforeTerminate': {
-    en: 'Optional cancellable drain callback invoked before profile-specific termination.',
-    zh: '类型专属终止前调用的可选可取消排空回调；在该阶段停止接收工作。'
+    en: 'Cancellable application cleanup before profile termination; stop accepting new work in this callback.',
+    zh: '在停止实例前运行可取消的应用收尾回调，并停止接收新工作。'
   },
   'supervision:*:*:stop.drainTimeoutMs': {
-    en: 'Maximum application drain time before termination proceeds; defaults to 5000 milliseconds.',
-    zh: '终止继续执行前的应用排空毫秒预算，默认 5000，超时后继续回收。'
+    en: 'Finite nonnegative cleanup wait before termination, default 5000 ms; zero stops waiting immediately.',
+    zh: '终止前等待应用收尾的有限非负毫秒数，默认5000；0立即停止本次等待。'
   },
   'supervision:*:*:stop.exitTimeoutMs': {
-    en: 'Maximum wait for graceful actual exit before hard termination; defaults to 5000 milliseconds.',
-    zh: '强制终止前等待实际优雅退出的毫秒预算，默认 5000。'
+    en: 'Finite nonnegative wait for graceful exit before force, default 5000 ms; zero proceeds immediately.',
+    zh: '强制停止前等待正常退出的有限非负毫秒数，默认5000；0立即继续强制停止。'
   },
   'supervision:*:*:stop.reapTimeoutMs': {
-    en: 'Maximum wait for actual exit after hard termination; defaults to 5000 milliseconds.',
-    zh: '强制终止后等待实际退出的毫秒预算，默认 5000；未退出不能提前释放 lease。'
+    en: 'Finite nonnegative actual-exit wait after force, default 5000 ms; expiry does not return capacity before actual exit.',
+    zh: '强制停止后确认真实退出的有限非负毫秒数，默认5000；到期不代表可以提前归还名额。'
   },
   'supervision:*:*:health': {
-    en: 'Periodic cancellable health checks for a ready unit; repeated failure invalidates that generation.',
-    zh: 'ready 单元的定期可取消健康检查；连续失败会作废该 generation。'
+    en: 'Periodic cancellable checks on a ready unit; repeated failure retires the unit under restart policy.',
+    zh: '对已准备实例做周期性可取消检查，连续失败后按重启策略处理该实例。'
   },
   'supervision:*:*:health.check': {
-    en: 'Checks the current unit and rejects on unhealthy state; honor the provided cancellation signal.',
-    zh: '检查当前单元，不健康时拒绝；检查函数必须遵守提供的取消信号。'
+    en: 'Check the current unit; Promise failure marks an unhealthy check. Honor the supplied cancellation signal.',
+    zh: '检查当前实例；Promise以错误结束表示检查失败，并响应传入的取消信号。'
   },
   'supervision:*:*:health.intervalMs': {
-    en: 'Scheduler interval between health checks; defaults to 5000 milliseconds.',
-    zh: '健康检查之间的调度器时间间隔，默认 5000 毫秒，避免并行叠加检查。'
+    en: 'Finite positive interval between health checks, default 5000 ms; zero fails construction with INVALID_OPTION.',
+    zh: '健康检查间的有限正毫秒数，默认5000；0在创建时以 INVALID_OPTION 失败。'
   },
   'supervision:*:*:health.timeoutMs': {
-    en: 'Maximum duration of one health check; defaults to 2000 milliseconds.',
-    zh: '单次健康检查的最长调度器执行时间，默认 2000 毫秒。'
+    en: 'Finite nonnegative limit for each health check, default 2000 ms; zero is an immediate deadline.',
+    zh: '每次健康检查的有限非负毫秒预算，默认2000；0表示立即到期。'
   },
   'supervision:*:*:health.failureThreshold': {
     en: 'Consecutive failed checks required to declare the ready generation unhealthy; defaults to 3.',
     zh: '宣告 ready generation 不健康所需的连续失败次数，默认 3。'
   },
   'supervision:*:*:isolation': {
-    en: 'Requires declared launcher capabilities or explicitly accepts cooperative isolation; defaults to required.',
-    zh: '要求启动器具备声明的隔离能力，或明确接受 cooperative 隔离；默认 required。'
+    en: 'Accepts required or best-effort, defaulting to required. Weaker capability acceptance does not improve actual host isolation.',
+    zh: '只接受 required 或 best-effort，默认 required；接受较弱能力不会增强宿主的实际隔离程度。'
   },
   'supervision:*:*:requires': {
     en: 'Additional launcher capabilities checked together with the profile requirements before launch.',
     zh: '启动前与 profile 需求一同检查的附加启动器能力列表，不能由适配器忽略。'
   },
   'supervision:*:*:scheduler': {
-    en: 'Owns monotonic deadlines, restart delays and health timers; omission uses systemScheduler.',
-    zh: '统一拥有单调截止时间、重启延迟和健康计时器；省略时使用 systemScheduler。'
+    en: 'Owns deadlines, backoff and health timers; lifecycle captures now, schedule and optional defer with their receivers.',
+    zh: '负责截止时间、重试和健康计时器；lifecycle保存 now、schedule和可选 defer方法及其接收者。'
   },
   'supervision:*:*:heartbeat': {
     en: 'Coroutine heartbeat watchdog; it observes cooperative task progress rather than native process health.',
@@ -330,12 +330,12 @@ const optionTranslations: Readonly<
     zh: '上次协程心跳距当前调度器时间的最大毫秒数；超过时本次检查失败。'
   },
   'supervision:*:*:heartbeat.intervalMs': {
-    en: 'Scheduler interval between coroutine heartbeat-age checks.',
-    zh: '协程心跳年龄检查的调度器间隔，与 timeoutMs 共同确定检测延迟。'
+    en: 'Finite positive heartbeat check interval, defaulting to heartbeat.timeoutMs; mapped to health.intervalMs.',
+    zh: '心跳检查的有限正毫秒间隔，默认等于 heartbeat.timeoutMs；它转为 health.intervalMs。'
   },
   'supervision:*:*:heartbeat.failureThreshold': {
-    en: 'Consecutive stale heartbeat observations required before invalidating the coroutine.',
-    zh: '作废协程前所需的连续心跳过期观察次数；一次恢复可中断失败累计。'
+    en: 'Consecutive stale checks before the coroutine is retired; a successful check resets failures.',
+    zh: '处理协程前允许的连续心跳过期检查次数；一次成功检查会清零失败累计。'
   },
   'supervision:*:*:usage': {
     en: 'Optional native usage sampling policy for process resource-limit enforcement.',
@@ -462,8 +462,8 @@ const optionTranslations: Readonly<
     zh: '等待插件 hook 结果的最长时间。超时拒绝等待，并禁止迟到结果提交。它不会强制停止 hook。false 表示不设截止时间。'
   },
   'plugin-host:*:*:execution.pipelineDrainTimeoutMs': {
-    en: 'Maximum wait for running pipeline work during cleanup. false waits until all work finishes.',
-    zh: '清理时等待正在运行的 pipeline 完成的最长时间。false 会等待全部完成。'
+    en: 'Bounds active pipeline waits on ordinary shutdown; managed composition batch removal also uses it as a cleanup deadline. Individual dispose steps retain disposeStepTimeoutMs. false removes the relevant limit.',
+    zh: '普通关闭时限制现有流水线等待；组合层受管理的批量卸载也用它作为清理截止时间。单步清理仍使用 disposeStepTimeoutMs，false 取消对应时限。'
   },
   'plugin-host:*:*:pipeline': {
     en: 'Selects how data-processing stages run. Omit it for the default sync mode.',
@@ -628,8 +628,8 @@ const optionTranslations: Readonly<
     zh: '等待插件 hook 结果的最长时间。超时拒绝等待，并禁止迟到结果提交。它不会强制停止 hook。false 表示不设截止时间。'
   },
   'plugin-host:index:PluginHost:execution.pipelineDrainTimeoutMs': {
-    en: 'Maximum wait for running pipeline work during cleanup. false waits until all work finishes.',
-    zh: '清理时等待正在运行的 pipeline 完成的最长时间。false 会等待全部完成。'
+    en: 'Bounds active pipeline waits on ordinary shutdown; managed composition batch removal also uses it as a cleanup deadline. Individual dispose steps retain disposeStepTimeoutMs. false removes the relevant limit.',
+    zh: '普通关闭时限制现有流水线等待；组合层受管理的批量卸载也用它作为清理截止时间。单步清理仍使用 disposeStepTimeoutMs，false 取消对应时限。'
   },
   'plugin-host:index:PluginHost:pipeline': {
     en: 'Selects how data-processing stages run. Omit it for the default sync mode.',
@@ -2135,7 +2135,8 @@ const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
       description: 'Runs once after the Resource reaches its disposed terminal state.',
       defaultValue: 'undefined',
       type: '() => void',
-      whenToUse: 'Remove the Resource from an external registry after cleanup finishes.',
+      whenToUse:
+        'Remove the Resource after logical closure; await whenTerminal for started physical cleanup.',
       example: '{ onTerminal: () => registry.delete(key) }'
     }
   ],
@@ -2197,7 +2198,7 @@ const storeLightResourceOptions: Readonly<Record<IGuideLocale, readonly IApiOpti
       description: 'Resource 到达 disposed 终态后执行一次。',
       defaultValue: 'undefined',
       type: '() => void',
-      whenToUse: 'cleanup 完成后从外部 registry 移除 Resource。',
+      whenToUse: '资源停止使用后从外部登记表移除；已启动的实际清理通过 whenTerminal 等待。',
       example: '{ onTerminal: () => registry.delete(key) }'
     }
   ]
@@ -2520,7 +2521,7 @@ const storeMiddlewareHostOptions: Readonly<Record<IGuideLocale, readonly IApiOpt
     {
       name: 'execution.pipelineDrainTimeoutMs',
       description:
-        'Maximum wait for active pipeline leases to drain before logical removal continues; false waits until zero.',
+        'A number bounds managed cleanup steps and active pipeline leases; false alone waits without a limit. Inspect physicalCompletion or mergeCleanupResults for late errors.',
       defaultValue: 'required',
       optional: false,
       type: 'number | false',
@@ -2633,7 +2634,7 @@ const storeMiddlewareHostOptions: Readonly<Record<IGuideLocale, readonly IApiOpt
     {
       name: 'execution.pipelineDrainTimeoutMs',
       description:
-        'logical removal 继续前等待 active pipeline lease 归零的最长时间；false 会一直等待。',
+        '数值限制受管理清理步骤和活动管道租用的等待；false 才无限等待。稍后错误通过 physicalCompletion 或 mergeCleanupResults 观察。',
       defaultValue: '必填',
       optional: false,
       type: 'number | false',
@@ -2817,6 +2818,24 @@ const storePersistUnitOptions: Readonly<Record<IGuideLocale, readonly IApiOption
       type: 'number',
       whenToUse: 'Coalesce high-frequency writes within an accepted durability window.',
       example: '250'
+    },
+    {
+      name: 'options.maxWaitMs',
+      description:
+        'Maximum debounce window after the first post-hydration change; finite 0..2147483647. Omit for quiet-only debounce;0queues next task, not storage completion.',
+      defaultValue: 'undefined',
+      type: 'number',
+      whenToUse: 'Bound enqueueing during continuous edits.',
+      example: '1000'
+    },
+    {
+      name: 'options.scheduler',
+      description:
+        'Captured monotonic clock and cancellable tasks for debounce and max-wait timers.',
+      defaultValue: 'systemScheduler',
+      type: 'IScheduler',
+      whenToUse: 'Use one host clock and timer cancellation capability.',
+      example: 'systemScheduler'
     }
   ],
   zh: [
@@ -2903,6 +2922,23 @@ const storePersistUnitOptions: Readonly<Record<IGuideLocale, readonly IApiOption
       type: 'number',
       whenToUse: '在可接受 durability window 内合并高频 write。',
       example: '250'
+    },
+    {
+      name: 'options.maxWaitMs',
+      description:
+        '成功恢复后首次修改起的最长防抖窗口，接受0..2147483647有限毫秒；省略只等安静间隔，0在下一个任务入队，不限制存储完成时间。',
+      defaultValue: 'undefined',
+      type: 'number',
+      whenToUse: '持续编辑时给请求入队设置最长等待。',
+      example: '1000'
+    },
+    {
+      name: 'options.scheduler',
+      description: '捕获单调时钟与可取消任务，统一安排防抖和最长等待计时。',
+      defaultValue: 'systemScheduler',
+      type: 'IScheduler',
+      whenToUse: '把计时和取消交给同一个宿主调度器。',
+      example: 'systemScheduler'
     }
   ]
 }
@@ -12640,6 +12676,24 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
           type: 'number',
           whenToUse: 'Trade accepted durability latency for fewer writes.',
           example: '250'
+        },
+        {
+          name: 'options.maxWaitMs',
+          description:
+            'Maximum debounce window after the first post-hydration change; finite 0..2147483647. Omit for quiet-only debounce;0queues next task, not storage completion.',
+          defaultValue: 'undefined',
+          type: 'number',
+          whenToUse: 'Bound enqueueing during continuous edits.',
+          example: '1000'
+        },
+        {
+          name: 'options.scheduler',
+          description:
+            'Captured monotonic clock and cancellable tasks for debounce and max-wait timers.',
+          defaultValue: 'systemScheduler',
+          type: 'IScheduler',
+          whenToUse: 'Use one host clock and timer cancellation capability.',
+          example: 'systemScheduler'
         }
       ]
     },
@@ -12725,6 +12779,23 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
           type: 'number',
           whenToUse: '用可接受 durability latency 换取更少 write。',
           example: '250'
+        },
+        {
+          name: 'options.maxWaitMs',
+          description:
+            '成功恢复后首次修改起的最长防抖窗口，接受0..2147483647有限毫秒；省略只等安静间隔，0在下一个任务入队，不限制存储完成时间。',
+          defaultValue: 'undefined',
+          type: 'number',
+          whenToUse: '持续编辑时给请求入队设置最长等待。',
+          example: '1000'
+        },
+        {
+          name: 'options.scheduler',
+          description: '捕获单调时钟与可取消任务，统一安排防抖和最长等待计时。',
+          defaultValue: 'systemScheduler',
+          type: 'IScheduler',
+          whenToUse: '把计时和取消交给同一个宿主调度器。',
+          example: 'systemScheduler'
         }
       ]
     }
@@ -12875,6 +12946,24 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
           example: '100'
         },
         {
+          name: 'options.maxWaitMs',
+          description:
+            'Maximum debounce window after the first post-hydration change; finite 0..2147483647. Omit for quiet-only debounce;0queues next task, not storage completion.',
+          defaultValue: 'undefined',
+          type: 'number',
+          whenToUse: 'Bound enqueueing during continuous edits.',
+          example: '1000'
+        },
+        {
+          name: 'options.scheduler',
+          description:
+            'Captured monotonic clock and cancellable tasks for debounce and max-wait timers.',
+          defaultValue: 'systemScheduler',
+          type: 'IScheduler',
+          whenToUse: 'Use one host clock and timer cancellation capability.',
+          example: 'systemScheduler'
+        },
+        {
           name: 'options.partialize',
           description: 'Synchronous projection selecting the persisted portion of the atom value.',
           defaultValue: '(value) => value',
@@ -12976,6 +13065,23 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
           type: 'number',
           whenToUse: '限制每个 member 的 write frequency。',
           example: '100'
+        },
+        {
+          name: 'options.maxWaitMs',
+          description:
+            '成功恢复后首次修改起的最长防抖窗口，接受0..2147483647有限毫秒；省略只等安静间隔，0在下一个任务入队，不限制存储完成时间。',
+          defaultValue: 'undefined',
+          type: 'number',
+          whenToUse: '持续编辑时给请求入队设置最长等待。',
+          example: '1000'
+        },
+        {
+          name: 'options.scheduler',
+          description: '捕获单调时钟与可取消任务，统一安排防抖和最长等待计时。',
+          defaultValue: 'systemScheduler',
+          type: 'IScheduler',
+          whenToUse: '把计时和取消交给同一个宿主调度器。',
+          example: 'systemScheduler'
         },
         {
           name: 'options.partialize',
@@ -15388,40 +15494,6 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       options: storeMiddlewareHostOptions.zh
     }
   },
-  'store-middleware:index:StoreMiddlewareHost': {
-    en: {
-      purpose:
-        'Class-form Store Middleware Host with explicit construction and instanceof identity. runAction emits start/end/error around one synchronous Runtime batch, recordError contains reentrancy, and repeated dispose calls share one Promise.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { MutationPolicy, StoreMiddlewareHost } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nlet state = { submitted: false }\nconst execution = { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }\nconst getState = () => state\nconst applyState = (next: typeof state) => { state = next }\nconst mutationPolicy = new MutationPolicy('actions-only')\nconst submit = () => applyState({ submitted: true })\nconst host = new StoreMiddlewareHost({ execution, runtime, getState, applyState, mutationPolicy })\ntry {\n  host.runAction('checkout:submit', submit)\n  console.log('submitted:', getState().submitted)\n} finally {\n  await host.dispose()\n}`,
-      scenarios: [
-        'A framework adapter constructs and retains the Host class directly.',
-        'Action failures must emit diagnostics and then rethrow the original business error.',
-        'Binding disposers must run LIFO before plugin cleanup.'
-      ],
-      avoidWhen: [
-        'The factory is clearer.',
-        'Middleware processing may cross an await boundary.',
-        'Disposal completion can be ignored.'
-      ],
-      options: storeMiddlewareHostOptions.en
-    },
-    zh: {
-      purpose:
-        '具有显式 construction 与 instanceof identity 的 class-form Store Middleware Host。runAction 在一次同步 Runtime batch 周围发出 start/end/error，recordError 隔离 reentrancy，重复 dispose 共享同一 Promise。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { MutationPolicy, StoreMiddlewareHost } from '@migaia/store-middleware'\n\nconst runtime = createRuntime()\nlet state = { submitted: false }\nconst execution = { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 }\nconst getState = () => state\nconst applyState = (next: typeof state) => { state = next }\nconst mutationPolicy = new MutationPolicy('actions-only')\nconst submit = () => applyState({ submitted: true })\nconst host = new StoreMiddlewareHost({ execution, runtime, getState, applyState, mutationPolicy })\ntry {\n  host.runAction('checkout:submit', submit)\n  console.log('已提交:', getState().submitted)\n} finally {\n  await host.dispose()\n}`,
-      scenarios: [
-        'framework adapter 直接构造并保留 Host class。',
-        'action failure 必须发出 diagnostic，再重新抛原始 business error。',
-        'binding disposer 必须先于 plugin cleanup 按 LIFO 执行。'
-      ],
-      avoidWhen: [
-        'factory 更清晰。',
-        'middleware processing 可能跨 await boundary。',
-        '准备忽略 disposal completion。'
-      ],
-      options: storeMiddlewareHostOptions.zh
-    }
-  },
   'store-middleware:index:bindStoreMiddleware': {
     en: {
       purpose:
@@ -16407,7 +16479,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates an explicit string-keyed reactive object without Proxying user data. get tracks one key, has and keys track structure, snapshot tracks the full revision, and peek stays allocation-free and untracked.',
-      quickStart: `import { createRuntime, observableObject } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst renderName = (name: unknown) => console.log('name:', name)\nconst profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nstop.dispose()\nprofile.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableObject } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst renderName = (name: unknown) => console.log('Name:', name)\nconst profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nruntime.flush()\nstop.dispose()\nprofile.dispose()`,
       scenarios: [
         'Independent object properties need fine-grained invalidation.',
         'Consumers need explicit tracked and untracked read APIs.',
@@ -16423,7 +16495,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建不 Proxy user data 的显式 string-keyed reactive object。get 追踪单 key，has/keys 追踪 structure，snapshot 追踪完整 revision，peek 保持无分配且不追踪。',
-      quickStart: `import { createRuntime, observableObject } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst renderName = (name: unknown) => console.log('name:', name)\nconst profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nstop.dispose()\nprofile.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableObject } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst renderName = (name: unknown) => console.log('姓名:', name)\nconst profile = observableObject({ name: 'Ada', online: false }, { debugName: 'profile' }, runtime)\nconst stop = runtime.effect(() => renderName(profile.get('name')))\nprofile.set('name', 'Grace')\nprofile.replace({ name: 'Lin', online: true })\nruntime.flush()\nstop.dispose()\nprofile.dispose()`,
       scenarios: [
         '独立 object property 需要细粒度 invalidation。',
         'consumer 需要显式 tracked 与 untracked read API。',
@@ -16441,7 +16513,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Class-form Observable Object for callers that need explicit constructor order or instanceof checks. It owns lazy key cells and must be disposed by the same lifecycle that owns its Runtime usage.',
-      quickStart: `import { ObservableObject, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst state = new ObservableObject({ count: 0 }, runtime, { debugName: 'counter' })\nstate.update('count', (count) => count + 1)\nconst view = state.snapshot()\nconsole.log(view)\nstate.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { ObservableObject } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst state = new ObservableObject({ count: 0 }, runtime, { debugName: 'counter' })\nstate.update('count', (count) => count + 1)\nconst view = state.snapshot()\nconsole.log('Count:', view.count)\nstate.dispose()`,
       scenarios: [
         'A framework adapter constructs collection classes directly.',
         'Runtime is clearer as the second constructor argument.',
@@ -16457,7 +16529,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '面向需要显式 constructor 顺序或 instanceof 检查的 class-form Observable Object。它拥有惰性 key cell，必须由拥有其 Runtime usage 的同一 lifecycle dispose。',
-      quickStart: `import { ObservableObject, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst state = new ObservableObject({ count: 0 }, runtime, { debugName: 'counter' })\nstate.update('count', (count) => count + 1)\nconst view = state.snapshot()\nconsole.log(view)\nstate.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { ObservableObject } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst state = new ObservableObject({ count: 0 }, runtime, { debugName: 'counter' })\nstate.update('count', (count) => count + 1)\nconst view = state.snapshot()\nconsole.log('计数:', view.count)\nstate.dispose()`,
       scenarios: [
         'framework adapter 直接构造 collection class。',
         '把 Runtime 作为第二个 constructor 参数更清晰。',
@@ -16475,7 +16547,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates an ordered reactive collection with lazy per-index dependencies plus separate length, structure, and snapshot revision tracking. Bulk replace and splice notify only materialized index cells.',
-      quickStart: `import { createRuntime, observableArray } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nconsole.log('Names in rows:', frozen.map((row) => row.name))\nrows.dispose()`,
       scenarios: [
         'A large list has only a small number of observed indices.',
         'Length and whole-list iteration must react independently from unrelated indexed reads.',
@@ -16491,7 +16563,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建有序 reactive collection：惰性 per-index dependency，并分离 length、structure 与 snapshot revision tracking。bulk replace/splice 只通知已 materialize 的 index cell。',
-      quickStart: `import { createRuntime, observableArray } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nrows.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst initialRows = [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }]\nconst newRow = { id: 3, name: 'Grace' }\nconst rows = observableArray(initialRows, { debugName: 'rows' }, runtime)\nconst first = rows.at(0)\nrows.splice(1, 0, newRow)\nconst frozen = rows.snapshot()\nconsole.log('列表姓名:', frozen.map((row) => row.name))\nrows.dispose()`,
       scenarios: [
         '大型 list 只有少量 observed index。',
         'length 与 whole-list iteration 必须和无关 indexed read 独立响应。',
@@ -16509,7 +16581,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Class-form indexed list with explicit Runtime ownership. Negative at() reads track structure, set requires an existing non-negative integer index, and splice preserves native omitted-argument semantics.',
-      quickStart: `import { ObservableArray, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst task = { id: 'task-1', title: 'Review' }\nconst nextTask = { id: 'task-1', title: 'Ship' }\nconst tasks = [task]\nconst queue = new ObservableArray(tasks, runtime, { debugName: 'queue' })\nqueue.push(task)\nconst last = queue.at(-1)\nqueue.set(0, nextTask)\nconsole.log(last)\nqueue.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst task = { id: 'task-1', title: 'Review' }\nconst nextTask = { id: 'task-1', title: 'Ship' }\nconst tasks = [task]\nconst queue = new ObservableArray(tasks, runtime, { debugName: 'queue' })\nqueue.push(task)\nconst last = queue.at(-1)\nqueue.set(0, nextTask)\nconsole.log('Last queued task:', last?.title)\nqueue.dispose()`,
       scenarios: [
         'An adapter requires direct class construction.',
         'Index-level tracking is materially smaller than whole-array invalidation.',
@@ -16525,7 +16597,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '具有显式 Runtime ownership 的 class-form indexed list。负数 at() read 追踪 structure，set 要求已有的非负整数 index，splice 保留 native omitted-argument semantics。',
-      quickStart: `import { ObservableArray, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst task = { id: 'task-1', title: 'Review' }\nconst nextTask = { id: 'task-1', title: 'Ship' }\nconst tasks = [task]\nconst queue = new ObservableArray(tasks, runtime, { debugName: 'queue' })\nqueue.push(task)\nconst last = queue.at(-1)\nqueue.set(0, nextTask)\nconsole.log(last)\nqueue.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst task = { id: 'task-1', title: 'Review' }\nconst nextTask = { id: 'task-1', title: 'Ship' }\nconst tasks = [task]\nconst queue = new ObservableArray(tasks, runtime, { debugName: 'queue' })\nqueue.push(task)\nconst last = queue.at(-1)\nqueue.set(0, nextTask)\nconsole.log('队尾任务:', last?.title)\nqueue.dispose()`,
       scenarios: [
         'adapter 需要直接 class construction。',
         'index-level tracking 比 whole-array invalidation 显著更小。',
@@ -16543,7 +16615,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates a reactive Map with per-key value and membership dependencies, a structural key dependency, and an iteration dependency. Untracked peek never materializes a cell.',
-      quickStart: `import { createRuntime, observableMap } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = { id: 'ada', name: 'Ada' }\nconst initialUsers = [[user.id, user]] as const\nconst selectedId = user.id\nconst users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nconsole.log(selected, entries)\nusers.prune()\nusers.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst user = { id: 'ada', name: 'Ada' }\nconst initialUsers = [[user.id, user]] as const\nconst selectedId = user.id\nconst users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nconsole.log('Selected user:', selected?.name)\nusers.dispose()`,
       scenarios: [
         'Arbitrary key identity needs fine-grained get and has tracking.',
         'Key-set readers should ignore value-only changes.',
@@ -16559,7 +16631,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建 reactive Map：per-key value/membership dependency、structural key dependency 与 iteration dependency 相互分离；untracked peek 不 materialize cell。',
-      quickStart: `import { createRuntime, observableMap } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst user = { id: 'ada', name: 'Ada' }\nconst initialUsers = [[user.id, user]] as const\nconst selectedId = user.id\nconst users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nconsole.log(selected, entries)\nusers.prune()\nusers.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst user = { id: 'ada', name: 'Ada' }\nconst initialUsers = [[user.id, user]] as const\nconst selectedId = user.id\nconst users = observableMap(initialUsers, { debugName: 'users' }, runtime)\nusers.set(user.id, user)\nconst selected = users.get(selectedId)\nconst entries = users.entries()\nconsole.log('已选用户:', selected?.name)\nusers.dispose()`,
       scenarios: [
         '任意 key identity 需要细粒度 get 与 has tracking。',
         'key-set reader 应忽略只改变 value 的 mutation。',
@@ -16577,7 +16649,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Class-form Observable Map for explicit construction and ownership. replace swaps the entire content atomically, clear publishes one structural and one iteration revision, and dispose is idempotent.',
-      quickStart: `import { ObservableMap, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst entries = [['theme', 'dark']] as const\nconst nextEntries = [['theme', 'light'], ['locale', 'zh-CN']] as const\nconst cache = new ObservableMap(entries, runtime, { debugName: 'cache' })\ncache.replace(nextEntries)\nconst keys = cache.keys()\nconsole.log(keys)\ncache.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst entries = [['theme', 'dark']] as const\nconst nextEntries = [['theme', 'light'], ['locale', 'zh-CN']] as const\nconst cache = new ObservableMap<string, string>(entries, runtime, { debugName: 'cache' })\ncache.replace(nextEntries)\nconst keys = cache.keys()\nconsole.log('Cache keys:', keys)\ncache.dispose()`,
       scenarios: [
         'A framework owns the class instance directly.',
         'Bulk replacement must be one bounded reactive transaction.',
@@ -16593,7 +16665,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '用于显式 construction 与 ownership 的 class-form Observable Map。replace 原子交换全部内容，clear 只发布一次 structure 与一次 iteration revision，dispose 幂等。',
-      quickStart: `import { ObservableMap, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst entries = [['theme', 'dark']] as const\nconst nextEntries = [['theme', 'light'], ['locale', 'zh-CN']] as const\nconst cache = new ObservableMap(entries, runtime, { debugName: 'cache' })\ncache.replace(nextEntries)\nconst keys = cache.keys()\nconsole.log(keys)\ncache.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst entries = [['theme', 'dark']] as const\nconst nextEntries = [['theme', 'light'], ['locale', 'zh-CN']] as const\nconst cache = new ObservableMap<string, string>(entries, runtime, { debugName: 'cache' })\ncache.replace(nextEntries)\nconst keys = cache.keys()\nconsole.log('缓存字段:', keys)\ncache.dispose()`,
       scenarios: [
         'framework 直接拥有 class instance。',
         'bulk replacement 必须是一次 bounded reactive transaction。',
@@ -16611,7 +16683,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates a reactive membership set with lazy per-value has dependencies and one structural dependency for size, iteration, and snapshots. Duplicate add and missing delete are no-op writes.',
-      quickStart: `import { createRuntime, observableSet } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst enableEditor = () => console.log('editor enabled')\nconst permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nif (permissions.has('write')) enableEditor()\npermissions.delete('read')\nconsole.log(permissions.snapshot())\npermissions.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableSet } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nconsole.log('Editor access:', permissions.has('write'))\npermissions.delete('read')\nconsole.log('Current permissions:', permissions.valuesArray())\npermissions.dispose()`,
       scenarios: [
         'Membership checks should react only when their queried value changes.',
         'Size and enumeration need structural tracking.',
@@ -16627,7 +16699,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建 reactive membership set：惰性 per-value has dependency，并由一个 structural dependency 服务 size、iteration 与 snapshot。duplicate add 和 missing delete 都是 no-op write。',
-      quickStart: `import { createRuntime, observableSet } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst enableEditor = () => console.log('editor enabled')\nconst permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nif (permissions.has('write')) enableEditor()\npermissions.delete('read')\nconsole.log(permissions.snapshot())\npermissions.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { observableSet } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst permissions = observableSet(['read'], { debugName: 'permissions' }, runtime)\npermissions.add('write')\nconsole.log('可编辑:', permissions.has('write'))\npermissions.delete('read')\nconsole.log('当前权限:', permissions.valuesArray())\npermissions.dispose()`,
       scenarios: [
         'membership check 只在其查询 value 改变时响应。',
         'size 与 enumeration 需要 structural tracking。',
@@ -16645,7 +16717,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Class-form Observable Set with explicit Runtime ownership and idempotent disposal. replace updates only materialized membership cells before publishing at most one structural revision.',
-      quickStart: `import { ObservableSet, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst ids = ['user-1', 'user-2']\nconst nextIds = ['user-2', 'user-3']\nconst active = new ObservableSet(ids, runtime, { debugName: 'activeIds' })\nactive.replace(nextIds)\nconst snapshot = active.snapshot()\nconsole.log(snapshot)\nactive.prune()\nactive.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { ObservableSet } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst ids = ['user-1', 'user-2']\nconst nextIds = ['user-2', 'user-3']\nconst active = new ObservableSet(ids, runtime, { debugName: 'activeIds' })\nactive.replace(nextIds)\nconst snapshot = active.snapshot()\nconsole.log('Active users:', [...snapshot])\nactive.dispose()`,
       scenarios: [
         'Direct class construction fits an adapter boundary.',
         'A large membership domain has few observed values.',
@@ -16661,7 +16733,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '具有显式 Runtime ownership 与幂等 disposal 的 class-form Observable Set。replace 先更新已 materialize membership cell，再至多发布一次 structural revision。',
-      quickStart: `import { ObservableSet, createRuntime } from '@migaia/reactive'\n\nconst runtime = createRuntime()\nconst ids = ['user-1', 'user-2']\nconst nextIds = ['user-2', 'user-3']\nconst active = new ObservableSet(ids, runtime, { debugName: 'activeIds' })\nactive.replace(nextIds)\nconst snapshot = active.snapshot()\nconsole.log(snapshot)\nactive.prune()\nactive.dispose()`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { ObservableSet } from '@migaia/store-indexed'\n\nconst runtime = createRuntime()\nconst ids = ['user-1', 'user-2']\nconst nextIds = ['user-2', 'user-3']\nconst active = new ObservableSet(ids, runtime, { debugName: 'activeIds' })\nactive.replace(nextIds)\nconst snapshot = active.snapshot()\nconsole.log('活跃用户:', [...snapshot])\nactive.dispose()`,
       scenarios: [
         '直接 class construction 适合 adapter boundary。',
         '大型 membership domain 只有少量 observed value。',
@@ -17601,7 +17673,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Splits one writable array definition into stable per-key writable item definitions plus a derived ordered items list. insert/remove update the source; prune only trims the split token cache.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, splitDef } from '@migaia/store-keyed'\n\ntype Todo = { id: string; done: boolean }\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todosDef = atomDef<readonly Todo[]>([{ id: 'todo-42', done: false }], 'todos')\nconst todos = splitDef(todosDef, (todo) => todo.id)\nconst itemDef = todos.of('todo-42')\nstore.set(itemDef, (todo) => ({ ...todo, done: true }))\nconsole.log('todo item:', store.get(itemDef))\ntodos.prune(store)`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, splitDef } from '@migaia/store-keyed'\n\ntype ITodo = { id: string; done: boolean }\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todosDef = atomDef<readonly ITodo[]>([{ id: 'todo-42', done: false }], 'todos')\nconst todos = splitDef(todosDef, (todo) => todo.id)\nconst itemDef = todos.of('todo-42')\nstore.set(itemDef, (todo) => ({ ...todo, done: true }))\nconsole.log('todo item:', store.get(itemDef))\nstore.dispose()`,
       scenarios: [
         'List items need stable definition identity across reorder.',
         'Each keyed item needs independent read/write subscriptions.',
@@ -17635,7 +17707,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '把一个 writable array definition 拆成稳定 per-key writable item definition 与 derived ordered items list。insert/remove 更新 source；prune 只裁剪 split token cache。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, splitDef } from '@migaia/store-keyed'\n\ntype Todo = { id: string; done: boolean }\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todosDef = atomDef<readonly Todo[]>([{ id: 'todo-42', done: false }], 'todos')\nconst todos = splitDef(todosDef, (todo) => todo.id)\nconst itemDef = todos.of('todo-42')\nstore.set(itemDef, (todo) => ({ ...todo, done: true }))\nconsole.log('待办条目:', store.get(itemDef))\ntodos.prune(store)`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { atomDef, createAtomStore, splitDef } from '@migaia/store-keyed'\n\ntype ITodo = { id: string; done: boolean }\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\nconst todosDef = atomDef<readonly ITodo[]>([{ id: 'todo-42', done: false }], 'todos')\nconst todos = splitDef(todosDef, (todo) => todo.id)\nconst itemDef = todos.of('todo-42')\nstore.set(itemDef, (todo) => ({ ...todo, done: true }))\nconsole.log('待办条目:', store.get(itemDef))\nstore.dispose()`,
       scenarios: [
         'list item 在 reorder 后仍需要稳定 definition identity。',
         '每个 keyed item 需要独立 read/write subscription。',
@@ -18732,7 +18804,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Owns a stable key-to-item token cache shared by split kernels. of performs get-or-create; prune separates liveness, eviction eligibility, and per-item cleanup; clear only drops cache references.',
-      quickStart: `import { KeyedSplitCache } from '@migaia/store-keyed'\n\ntype ItemDef = { id: string; dispose: () => void }\nconst createItemDef = (id: string): ItemDef => ({ id, dispose: () => console.log('disposed:', id) })\nconst cache = new KeyedSplitCache<string, ItemDef>()\nconst liveKeys = new Set(['todo-1'])\nconst item = cache.of('todo-1', () => createItemDef('todo-1'))\nconsole.log('cached item:', item.id)\ncache.prune((id) => liveKeys.has(id), () => true, (entry) => entry.dispose())`,
+      quickStart: `import { KeyedSplitCache } from '@migaia/store-keyed'\n\ntype ICachedItem = { id: string }\nconst cache = new KeyedSplitCache<string, ICachedItem>()\nconst item = cache.of('todo-1', () => ({ id: 'todo-1' }))\nconsole.log('Cached item:', item.id)\ncache.clear()`,
       scenarios: [
         'A custom keyed split needs stable item identity.',
         'Eviction must skip observed items and optionally dispose evicted instances.',
@@ -18784,7 +18856,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '拥有 split kernel 共用的稳定 key-to-item token cache。of 执行 get-or-create；prune 分离 liveness、eviction eligibility 与 per-item cleanup；clear 只丢 cache reference。',
-      quickStart: `import { KeyedSplitCache } from '@migaia/store-keyed'\n\ntype ItemDef = { id: string; dispose: () => void }\nconst createItemDef = (id: string): ItemDef => ({ id, dispose: () => console.log('disposed:', id) })\nconst cache = new KeyedSplitCache<string, ItemDef>()\nconst liveKeys = new Set(['todo-1'])\nconst item = cache.of('todo-1', () => createItemDef('todo-1'))\nconsole.log('缓存条目:', item.id)\ncache.prune((id) => liveKeys.has(id), () => true, (entry) => entry.dispose())`,
+      quickStart: `import { KeyedSplitCache } from '@migaia/store-keyed'\n\ntype ICachedItem = { id: string }\nconst cache = new KeyedSplitCache<string, ICachedItem>()\nconst item = cache.of('todo-1', () => ({ id: 'todo-1' }))\nconsole.log('缓存条目:', item.id)\ncache.clear()`,
       scenarios: [
         '自定义 keyed split 需要稳定 item identity。',
         'eviction 必须跳过 observed item，并可选择 dispose 被淘汰 instance。',
@@ -19302,7 +19374,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ],
       avoidWhen: [
         'All fields are synchronous; createStore keeps the boundary synchronous.',
-        'A half-ready compatibility object is required during migration.',
+        'The caller expects a half-ready return; this factory exposes only ready Stores.',
         'Async application data loading is being confused with FieldBuilder construction; use StoreResource for data.'
       ],
       options: storeLightCreationOptions.en
@@ -19318,7 +19390,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
       ],
       avoidWhen: [
         '全部 field 都同步；createStore 可保持同步 boundary。',
-        '迁移期间确实需要 half-ready compatibility object。',
+        '调用方期待立即拿到未完成初始化的 Store；此入口只返回已就绪 Store。',
         '把应用数据异步加载误当 FieldBuilder 构造；数据应使用 StoreResource。'
       ],
       options: storeLightCreationOptions.zh
@@ -21418,12 +21490,12 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
   'store-worker:serialize:workerParser': {
     en: {
       purpose:
-        'Creates the main-thread Serialize parser that offloads encode and decode to one Worker. Encode streams use explicit credits for bounded backpressure; byte transfer is opt-in and destructive, while copy remains the safe default.',
+        'Offloads encode/decode with bounded stream credits. Copy is default; transfer hands over input. Credit waits and stream stop preserve native AbortError tagged REQUEST_ABORTED; other failures retain their owners.',
       quickStart: `import { workerParser } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst value = { id: 'demo' }\nconst context = { signal: new AbortController().signal }\nconst sink = { write: async (chunk: unknown) => console.log(chunk) }\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}`,
       scenarios: [
         'Encoding produces bytes consumed by persistence or transport without rebuilding a large object graph on the main thread.',
         'Streaming encode output needs bounded producer credits and consumer-driven cancellation.',
-        'An exclusively owned full Uint8Array can move zero-copy to the Worker.'
+        'A native transfer can detach the input buffer; portable encoding can still copy data.'
       ],
       avoidWhen: [
         'A large object graph must first be structured-cloned into the Worker; that clone still blocks the caller thread.',
@@ -21434,12 +21506,12 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     },
     zh: {
       purpose:
-        '创建把 encode 与 decode 卸载到一个 Worker 的主线程 Serialize parser。encode stream 使用显式 credit 实现有界 backpressure；byte transfer 是破坏性 opt-in，copy 仍是安全默认值。',
+        '把编码和解码放到 Worker，以消费额度限制流。默认 copy，transfer 会交出输入。发送额度等待与主动停止流保留带 REQUEST_ABORTED 的原生 AbortError，其他失败保留实际来源。',
       quickStart: `import { workerParser } from '@migaia/store-worker'\nimport { Worker } from 'node:worker_threads'\n\nconst worker = new Worker(new URL('./serialize.worker.ts', import.meta.url), { type: 'module' })\nconst parser = workerParser({ worker, type: 'msgpack-worker', ownership: 'copy' })\nconst value = { id: 'demo' }\nconst context = { signal: new AbortController().signal }\nconst sink = { write: async (chunk: unknown) => console.log(chunk) }\n\ntry {\n  const chunks = await parser.encode(value, context)\n  for await (const chunk of chunks) await sink.write(chunk)\n} finally {\n  await parser.dispose?.()\n  worker.terminate()\n}`,
       scenarios: [
         'encode 生成的 bytes 直接进入 persistence 或 transport，不需要在主线程重建大型 object graph。',
         'streaming encode output 需要有界 producer credit 与 consumer-driven cancellation。',
-        '独占且覆盖完整 buffer 的 Uint8Array 可以零拷贝移交 Worker。'
+        '原生 transfer 可让输入缓冲区转交后分离；可移植编码仍可能复制数据。'
       ],
       avoidWhen: [
         '大型 object graph 必须先 structured-clone 进 Worker；该 clone 仍会阻塞调用线程。',
@@ -22320,7 +22392,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates the recommended realm-local reactive view over one shared signed int32. Local reads participate in Reactive tracking while explicit sync or watch imports remote writes from the same ABI buffer.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst stopEffect = runtime.effect(() => console.log(counter.value))\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  stopEffect.dispose()\n  counter.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\nconst stock = sharedInt32(createRuntime(), 7)\ntry {\n  stock.value -= 2\n  console.log('Remaining stock:', stock.value)\n} finally {\n  stock.dispose()\n}`,
       scenarios: [
         'A counter, flag, cursor, or state code must be shared across workers or realms.',
         'Realm-local Effects should track reads and rerun when remote writes are synchronized.',
@@ -22336,7 +22408,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建单个共享有符号 int32 的推荐 realm-local 响应式 view。本地读取参与 Reactive 追踪，显式 sync 或 watch 把同一 ABI buffer 的远端写入拉入当前 Runtime。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst counter = sharedInt32(runtime, 0)\nconst stop = counter.watch()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst stopEffect = runtime.effect(() => console.log(counter.value))\n\ntry {\n  counter.value += 1\n  worker.postMessage({ buffer: counter.buffer })\n} finally {\n  stop()\n  stopEffect.dispose()\n  counter.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32 } from '@migaia/store-shared'\nconst stock = sharedInt32(createRuntime(), 7)\ntry {\n  stock.value -= 2\n  console.log('剩余库存:', stock.value)\n} finally {\n  stock.dispose()\n}`,
       scenarios: [
         'counter、flag、cursor 或状态码需要跨 worker/realm 共享。',
         'realm-local Effect 应追踪读取，并在远端写入同步后重跑。',
@@ -22354,7 +22426,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Constructs the class form of a shared int32 reactive view. Prefer sharedInt32 for ordinary creation; use the class when subclass-free constructor identity or explicit new is required by a composition boundary.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Signal } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst workerRuntime = createRuntime()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst owner = new SharedInt32Signal(runtime, 7)\nworker.postMessage({ buffer: owner.buffer })\n\nconst peer = new SharedInt32Signal(workerRuntime, 0, owner.buffer)\ntry {\n  peer.sync()\n  console.log(peer.value)\n} finally {\n  peer.dispose()\n  owner.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Signal } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst workerRuntime = createRuntime()\nconst owner = new SharedInt32Signal(runtime, 7)\n\nconst peer = new SharedInt32Signal(workerRuntime, 0, owner.buffer)\ntry {\n  peer.sync()\n  console.log('Attached stock:', peer.value)\n} finally {\n  peer.dispose()\n  owner.dispose()\n}`,
       scenarios: [
         'A framework requires an explicit constructable class rather than a factory.',
         'Two realms need independent Reactive ownership over one ABI-compatible buffer.',
@@ -22370,7 +22442,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '构造共享 int32 响应式 view 的 class 形式。普通创建优先 sharedInt32；只有组合边界要求显式 new 或 constructable class identity 时直接使用类。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Signal } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst workerRuntime = createRuntime()\nconst worker = { postMessage: (message: unknown) => console.log('sent:', message) }\nconst owner = new SharedInt32Signal(runtime, 7)\nworker.postMessage({ buffer: owner.buffer })\n\nconst peer = new SharedInt32Signal(workerRuntime, 0, owner.buffer)\ntry {\n  peer.sync()\n  console.log(peer.value)\n} finally {\n  peer.dispose()\n  owner.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Signal } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst workerRuntime = createRuntime()\nconst owner = new SharedInt32Signal(runtime, 7)\n\nconst peer = new SharedInt32Signal(workerRuntime, 0, owner.buffer)\ntry {\n  peer.sync()\n  console.log('接入后库存:', peer.value)\n} finally {\n  peer.dispose()\n  owner.dispose()\n}`,
       scenarios: [
         '框架要求显式 constructable class，而不是 factory。',
         '两个 realm 需要在同一 ABI-compatible buffer 上拥有独立 Reactive ownership。',
@@ -22388,7 +22460,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Creates the recommended fixed-length shared int32 array. Untracked reads stay O(1), tracked reads lazily materialize one Reactive cell per observed index, and array sync batches remote changes into one Runtime update.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst worker = new Worker('worker.js')\nconst positions = sharedInt32Array(runtime, 1_000, { initialValues: [0, 0] })\nconst stop = positions.watch()\n\ntry {\n  positions.set(0, 10)\n  positions.update(1, (current) => current + 1)\n  worker.postMessage({ buffer: positions.buffer, length: positions.length })\n  console.log(positions.snapshot())\n} finally {\n  stop()\n  positions.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\nconst positions = sharedInt32Array(createRuntime(), 2, { initialValues: [0, 0] })\ntry {\n  positions.set(0, 10)\n  positions.update(1, (current) => current + 1)\n  console.log('Current positions:', [...positions.snapshot()])\n} finally {\n  positions.dispose()\n}`,
       scenarios: [
         'A fixed index domain of counters, positions, or status slots is shared across workers.',
         'Only indexes actually read by Effects should allocate reactive cells.',
@@ -22404,7 +22476,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '创建推荐的定长共享 int32 数组。非追踪读取保持 O(1)，追踪读取只为实际观察下标惰性物化 Reactive cell，整体 sync 把远端变化合并为一次 Runtime batch。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst worker = new Worker('worker.js')\nconst positions = sharedInt32Array(runtime, 1_000, { initialValues: [0, 0] })\nconst stop = positions.watch()\n\ntry {\n  positions.set(0, 10)\n  positions.update(1, (current) => current + 1)\n  worker.postMessage({ buffer: positions.buffer, length: positions.length })\n  console.log(positions.snapshot())\n} finally {\n  stop()\n  positions.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { sharedInt32Array } from '@migaia/store-shared'\nconst positions = sharedInt32Array(createRuntime(), 2, { initialValues: [0, 0] })\ntry {\n  positions.set(0, 10)\n  positions.update(1, (current) => current + 1)\n  console.log('当前位置:', [...positions.snapshot()])\n} finally {\n  positions.dispose()\n}`,
       scenarios: [
         '固定下标域的 counter、position 或 status slot 需要跨 worker 共享。',
         '只有 Effect 实际读取的下标才应分配响应式 cell。',
@@ -22422,7 +22494,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     en: {
       purpose:
         'Constructs the class form of the fixed shared int32 array. It exposes high-level get, set, update, sync, watch, snapshot, automatic cell reclamation, and disposal plus low-level cell primitives for an explicit composition owner.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n} finally {\n  array.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  array.update(0, (current) => current + 1)\n  console.log('Updated stock:', [...array.snapshot()])\n} finally {\n  array.dispose()\n}`,
       scenarios: [
         'A framework requires direct class construction and lifecycle identity.',
         'High-frequency rotating index access reclaims cells after their final observer leaves.',
@@ -22438,7 +22510,7 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '构造定长共享 int32 数组的 class 形式。它同时暴露高层 get、set、update、sync、watch、snapshot、自动 cell 回收、dispose，以及供明确组合 owner 使用的底层 cell 原语。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  const next = array.update(0, (current) => current + 1)\n  const changed = array.sync()\n  console.log(next, changed, array.snapshot())\n} finally {\n  array.dispose()\n}`,
+      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { SharedInt32Array } from '@migaia/store-shared'\n\nconst runtime = createRuntime()\nconst array = new SharedInt32Array(runtime, 2, { initialValues: [1, 2] })\ntry {\n  array.update(0, (current) => current + 1)\n  console.log('更新后库存:', [...array.snapshot()])\n} finally {\n  array.dispose()\n}`,
       scenarios: [
         '框架要求直接 class 构造与生命周期 identity。',
         '高频轮换访问下标，最后一个 observer 退订后自动回收 cell。',
@@ -27384,14 +27456,13 @@ try {
     zh: {
       purpose:
         '用注入的 scheduler 等待一段有限、非负的相对时长。到期返回 true，abort 事件先到返回 false，由调用方决定取消是否应变成领域错误；可选 reportCleanup 观察清理失败，不改变已经完成的结果。',
-      quickStart: `import { abortableDelay, createAbortController } from '@migaia/lifecycle'
+      quickStart: `import { abortableDelay } from '@migaia/lifecycle'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 
 const scheduler = createManualScheduler()
-const controller = createAbortController()
-const waiting = abortableDelay(scheduler, 250, controller.signal)
-controller.abort()
-console.log(await waiting) // false`,
+const nextAttempt = abortableDelay(scheduler, 20, undefined)
+scheduler.advance(20)
+if (await nextAttempt) console.log('可以重试:', 'draft-1')`,
       scenarios: [
         'HTTP 退避或资源重试需要一个随请求取消、并确定释放 timer 与监听器的等待。',
         '多个领域复用同一计时所有者，同时保留各自的取消与清理错误策略。'
@@ -27405,14 +27476,13 @@ console.log(await waiting) // false`,
     en: {
       purpose:
         'Waits for a finite non-negative duration through the injected scheduler. It returns true on expiry or false when an abort event wins, leaving domain cancellation to the caller. An optional reportCleanup channel observes cleanup failures without replacing successful completion.',
-      quickStart: `import { abortableDelay, createAbortController } from '@migaia/lifecycle'
+      quickStart: `import { abortableDelay } from '@migaia/lifecycle'
 import { createManualScheduler } from '@migaia/utils/scheduler'
 
 const scheduler = createManualScheduler()
-const controller = createAbortController()
-const waiting = abortableDelay(scheduler, 250, controller.signal)
-controller.abort()
-console.log(await waiting) // false`,
+const nextAttempt = abortableDelay(scheduler, 20, undefined)
+scheduler.advance(20)
+if (await nextAttempt) console.log('Ready to retry:', 'draft-1')`,
       scenarios: [
         'HTTP backoff or resource retries need cancellation with deterministic timer and listener release.',
         'Several domains share one timer owner while retaining their own cancellation and cleanup policies.'
@@ -27627,63 +27697,34 @@ console.log(await waiting) // false`,
   'lifecycle:quiescence:createQuiescenceTracker': {
     zh: {
       purpose:
-        '按对象 key 管理引用计数、封存与归零等待。retain() 返回幂等 release；seal() 禁止新增租约；whenZero() 只允许在 seal 后等待，确保闭世界归零。',
+        '按对象 key 管理引用计数、封存与归零等待。retain() 返回重复调用只减一次的 release；seal() 禁止新增租约；whenZero() 只允许在 seal 后等待，确保闭世界归零。',
       quickStart: `import { createQuiescenceTracker } from '@migaia/lifecycle'\n\nconst session = { id: 'session-42' }\nconst tracker = createQuiescenceTracker<object>()\nconst release = tracker.retain(session)\ntracker.seal(session)\nrelease()\nawait tracker.whenZero(session)\nconsole.log('session is quiescent:', session.id)`,
       scenarios: [
         '共享 session、channel 或 cache entry 需要知道是否仍被对象 owner 占用。',
         '关闭前需要先封存新增租约，再证明当前租约全部释放。'
       ],
       avoidWhen: [
-        'key 是稳定字符串；使用 createStringQuiescenceTracker。',
+        'key 是稳定字符串；使用 createStringLeaseRegistry。',
         '只追踪全局 Promise 数量；使用 createPendingTracker。'
       ],
       options: []
     },
     en: {
       purpose:
-        'Tracks retain count, sealing, and zero wait per object key. retain() returns an idempotent release, seal() rejects new leases, and whenZero() is legal only after seal so the zero proof is closed-world.',
+        'Tracks retain count, sealing, and zero wait per object key. retain() returns a release function that decrements once, seal() rejects new leases, and whenZero() is legal only after seal so the zero proof is closed-world.',
       quickStart: `import { createQuiescenceTracker } from '@migaia/lifecycle'\n\nconst session = { id: 'session-42' }\nconst tracker = createQuiescenceTracker<object>()\nconst release = tracker.retain(session)\ntracker.seal(session)\nrelease()\nawait tracker.whenZero(session)\nconsole.log('session is quiescent:', session.id)`,
       scenarios: [
         'A shared session, channel, or cache entry must know whether object owners still hold it.',
         'Shutdown must seal new leases before proving every current lease released.'
       ],
       avoidWhen: [
-        'Keys are stable strings; use createStringQuiescenceTracker.',
+        'Keys are stable strings; use createStringLeaseRegistry.',
         'Only one global Promise count matters; use createPendingTracker.'
       ],
       options: []
     }
   },
-  'lifecycle:scheduler:createManualScheduler': {
-    zh: {
-      purpose:
-        '创建不依赖真实等待的确定性虚拟时钟。schedule() 登记任务，advance(ms) 推进时间并一次性执行所有到期任务，包括到期 callback 新增的同截止任务。',
-      quickStart: `import { createManualScheduler } from '@migaia/lifecycle'\n\nconst scheduler = createManualScheduler()\nlet fired = false\nscheduler.schedule(() => { fired = true }, 100)\nscheduler.advance(99)\nconsole.log(fired) // false\nscheduler.advance(1)\nconsole.log(fired) // true`,
-      scenarios: [
-        'timeout、deadline、重试或队列 SLA 单测不能依赖真实时间。',
-        '需要精确验证同一时刻任务的稳定执行和取消。'
-      ],
-      avoidWhen: [
-        '生产宿主需要真实单调时间；使用 systemScheduler。',
-        '代码直接调用 Date.now 或 setTimeout；先把 scheduler 注入真正的时间 owner。'
-      ],
-      options: []
-    },
-    en: {
-      purpose:
-        'Creates a deterministic virtual clock with no real waiting. schedule() registers work and advance(ms) flushes every due task, including same-deadline work scheduled by a due callback.',
-      quickStart: `import { createManualScheduler } from '@migaia/lifecycle'\n\nconst scheduler = createManualScheduler()\nlet fired = false\nscheduler.schedule(() => { fired = true }, 100)\nscheduler.advance(99)\nconsole.log(fired) // false\nscheduler.advance(1)\nconsole.log(fired) // true`,
-      scenarios: [
-        'Timeout, deadline, retry, or queue-SLA tests cannot depend on wall-clock time.',
-        'Tests need exact verification of stable same-time execution and cancellation.'
-      ],
-      avoidWhen: [
-        'A production host needs real monotonic time; use systemScheduler.',
-        'Code still calls Date.now or setTimeout directly; inject the scheduler into the actual time owner first.'
-      ],
-      options: []
-    }
-  },
+
   'lifecycle:abort:createAbortController': {
     zh: {
       purpose:
@@ -27717,8 +27758,19 @@ console.log(await waiting) // false`,
   'lifecycle:abort:observeAbortSubscription': {
     zh: {
       purpose:
-        '以受控边界登记一个 AbortSignal listener，并返回显式 cleanup。它捕获读取 signal、安装、回调与移除阶段的失败，交给调用方提供的 failure sink，而不是让生命周期基础设施静默吞错。',
-      quickStart: `import { observeAbortSubscription } from '@migaia/lifecycle'\n\nconst controller = new AbortController()\nconst signal = controller.signal\nconst logger = { error: (failure: unknown) => console.error('abort cleanup failed:', failure) }\nconst cancelOperation = (reason: unknown) => console.log('cancel request:', reason)\nconst observed = observeAbortSubscription(signal, () => cancelOperation(signal.reason), { report: (failure) => logger.error(failure) })\ncontroller.abort('navigation replaced')\nobserved.cleanup()`,
+        '以受控边界登记一个 AbortSignal listener，并返回 cleanup。它捕获读取 signal、安装、回调与移除阶段的失败，交给调用方提供的 failure sink，而不是让生命周期基础设施静默吞错。',
+      quickStart: `import { createAbortController, observeAbortSubscription } from '@migaia/lifecycle/abort'
+
+const controller = createAbortController()
+const notices: string[] = []
+const observed = observeAbortSubscription(
+  controller.signal,
+  (reason) => notices.push(String(reason)),
+  (error) => console.error('Listener cleanup:', error)
+)
+controller.abort('page closed')
+observed.unsubscribe()
+console.log('已取消任务:', notices.join(', '))`,
       scenarios: [
         '生命周期原语内部需要观察结构化 AbortSignal，同时隔离 hostile getter 或 listener API。',
         '取消回调和清理失败必须进入明确诊断通道。'
@@ -27732,7 +27784,18 @@ console.log(await waiting) // false`,
     en: {
       purpose:
         'Registers an AbortSignal listener behind a controlled boundary and returns explicit cleanup. Failures while reading the signal, installing, invoking, or removing are sent to the caller-owned failure sink rather than silently swallowed by lifecycle infrastructure.',
-      quickStart: `import { observeAbortSubscription } from '@migaia/lifecycle'\n\nconst controller = new AbortController()\nconst signal = controller.signal\nconst logger = { error: (failure: unknown) => console.error('abort cleanup failed:', failure) }\nconst cancelOperation = (reason: unknown) => console.log('cancel request:', reason)\nconst observed = observeAbortSubscription(signal, () => cancelOperation(signal.reason), { report: (failure) => logger.error(failure) })\ncontroller.abort('navigation replaced')\nobserved.cleanup()`,
+      quickStart: `import { createAbortController, observeAbortSubscription } from '@migaia/lifecycle/abort'
+
+const controller = createAbortController()
+const notices: string[] = []
+const observed = observeAbortSubscription(
+  controller.signal,
+  (reason) => notices.push(String(reason)),
+  (error) => console.error('Listener cleanup:', error)
+)
+controller.abort('page closed')
+observed.unsubscribe()
+console.log('Canceled task:', notices.join(', '))`,
       scenarios: [
         'A lifecycle primitive must observe a structural AbortSignal while containing hostile getters or listener APIs.',
         'Cancellation callback and cleanup failures need an explicit diagnostic path.'
@@ -27748,16 +27811,22 @@ console.log(await waiting) // false`,
     zh: {
       purpose:
         '把多个清理结果及其 physicalCompletion 合并为一个冻结结果。当前错误先于迟到增量，每个分支的失败都保留原身份；外部 realm 的 Promise 与 thenable 不会被跳过。',
-      quickStart: `import { mergeCleanupResults } from '@migaia/lifecycle/disposal'
+      quickStart: `import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
 
-const flushFailure = new Error('cache flush failed')
-const closeFailure = new Error('socket close failed')
-const result = await mergeCleanupResults([{
-  cleanupErrors: [flushFailure],
-  physicalCompletion: Promise.resolve({ cleanupErrors: [closeFailure] })
-}, Promise.resolve({ cleanupErrors: [] })])
-console.log(result.cleanupErrors) // [flushFailure, closeFailure]，原始身份不变
-`,
+const cleanup = createSyncStartedDisposalLedger()
+const started: string[] = []
+cleanup.start('cache', () => {
+  started.push('cache')
+  return Promise.resolve()
+})
+cleanup.start('listener', () => {
+  started.push('listener')
+})
+const result = cleanup.seal()
+console.log('已启动清理:', started.join(', '))
+const { cleanupErrors } = await mergeCleanupResults([result])
+console.log('清理失败:', cleanupErrors.length)
+console.log('关闭状态:', cleanup.lifecycle)`,
       scenarios: [
         '宿主已逻辑关闭，但多个资源还会异步产生迟到清理结果。',
         '组合多个包的 cleanup result，统一观察每个分支及其物理完成链。'
@@ -27771,16 +27840,22 @@ console.log(result.cleanupErrors) // [flushFailure, closeFailure]，原始身份
     en: {
       purpose:
         'Merges cleanup snapshots and their incremental physicalCompletion results into one frozen result. It preserves branch order and original error identities, including rejected, foreign-realm and PromiseLike inputs.',
-      quickStart: `import { mergeCleanupResults } from '@migaia/lifecycle/disposal'
+      quickStart: `import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
 
-const flushFailure = new Error('cache flush failed')
-const closeFailure = new Error('socket close failed')
-const result = await mergeCleanupResults([{
-  cleanupErrors: [flushFailure],
-  physicalCompletion: Promise.resolve({ cleanupErrors: [closeFailure] })
-}, Promise.resolve({ cleanupErrors: [] })])
-console.log(result.cleanupErrors) // [flushFailure, closeFailure], with original identities
-`,
+const cleanup = createSyncStartedDisposalLedger()
+const started: string[] = []
+cleanup.start('cache', () => {
+  started.push('cache')
+  return Promise.resolve()
+})
+cleanup.start('listener', () => {
+  started.push('listener')
+})
+const result = cleanup.seal()
+console.log('Cleanup started:', started.join(', '))
+const { cleanupErrors } = await mergeCleanupResults([result])
+console.log('Cleanup failures:', cleanupErrors.length)
+console.log('Close state:', cleanup.lifecycle)`,
       scenarios: [
         'A host has logically closed while several resources still have later cleanup results.',
         'A composition owner needs one observation of multiple packages and physical continuations.'
@@ -27796,21 +27871,51 @@ console.log(result.cleanupErrors) // [flushFailure, closeFailure], with original
     zh: {
       purpose:
         '为“同步启动、异步完成”的 dispose API 建立唯一账本。start() 在当前调用栈执行 callback，seal() 关闭接纳并返回当前错误快照与稳定 physicalCompletion（仅含之后新增错误）；全部 thenable settle 后才进入 terminal。',
-      quickStart: `import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle'\n\nconst socket = { close: async () => console.log('socket closed') }\nconst cache = { flush: async () => console.log('cache flushed') }\nconst handleSyncErrors = (errors: readonly unknown[]) => console.error('sync disposal errors:', errors)\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.cleanupErrors)\nconst { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])\nconsole.log('async disposal errors:', allErrors)`,
+      quickStart: `import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
+
+const cleanup = createSyncStartedDisposalLedger()
+const started: string[] = []
+cleanup.start('cache', () => {
+  started.push('cache')
+  return Promise.resolve()
+})
+cleanup.start('listener', () => {
+  started.push('listener')
+})
+const result = cleanup.seal()
+console.log('已启动清理:', started.join(', '))
+const { cleanupErrors } = await mergeCleanupResults([result])
+console.log('清理失败:', cleanupErrors.length)
+console.log('关闭状态:', cleanup.lifecycle)`,
       scenarios: [
         '公开 dispose() 必须同步返回，但它启动的异步清理仍需要可等待 completion。',
         '领域适配器自行决定顺序与错误投影，只需要 lifecycle 管 pending 和原始错误观察。'
       ],
       avoidWhen: [
         'dispose 本身可以返回 Promise；使用 LifecycleScope 或 DisposeTransaction。',
-        '需要超时或取消永不 settle 的 thenable；ledger 不制造这些语义。'
+        '需要超时或取消永不 settle 的 thenable；ledger 不制造这些行为。'
       ],
       options: []
     },
     en: {
       purpose:
         'Provides one ledger for disposal that starts synchronously and completes asynchronously. start() invokes callbacks in the current stack, seal() closes admission and returns the current error snapshot plus stable physicalCompletion containing only later errors, and terminal waits for every thenable settlement.',
-      quickStart: `import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle'\n\nconst socket = { close: async () => console.log('socket closed') }\nconst cache = { flush: async () => console.log('cache flushed') }\nconst handleSyncErrors = (errors: readonly unknown[]) => console.error('sync disposal errors:', errors)\nconst ledger = createSyncStartedDisposalLedger()\nledger.start('socket', () => socket.close())\nledger.start('cache', () => cache.flush())\nconst outcome = ledger.seal()\nhandleSyncErrors(outcome.cleanupErrors)\nconst { cleanupErrors: allErrors } = await mergeCleanupResults([outcome])\nconsole.log('async disposal errors:', allErrors)`,
+      quickStart: `import { createSyncStartedDisposalLedger, mergeCleanupResults } from '@migaia/lifecycle/disposal'
+
+const cleanup = createSyncStartedDisposalLedger()
+const started: string[] = []
+cleanup.start('cache', () => {
+  started.push('cache')
+  return Promise.resolve()
+})
+cleanup.start('listener', () => {
+  started.push('listener')
+})
+const result = cleanup.seal()
+console.log('Cleanup started:', started.join(', '))
+const { cleanupErrors } = await mergeCleanupResults([result])
+console.log('Cleanup failures:', cleanupErrors.length)
+console.log('Close state:', cleanup.lifecycle)`,
       scenarios: [
         'A public dispose() must return synchronously while asynchronous cleanup still needs awaitable completion.',
         'A domain adapter owns ordering and error projection but needs lifecycle-owned pending and raw error observation.'
@@ -28065,25 +28170,38 @@ console.log(result.cleanupErrors) // [flushFailure, closeFailure], with original
   'lifecycle:scheduler:addSchedulerTime': {
     zh: {
       purpose:
-        '把已校验的 base 与 delta 相加，并在有限操作数产生 Infinity 时以 RangeError 拒绝，防止 deadline 溢出后静默变成永不超时。',
-      quickStart: `import { addSchedulerTime, systemScheduler, validateSchedulerDelay } from '@migaia/lifecycle'\n\nconst timeoutMs = 2_000\nconst delay = validateSchedulerDelay(timeoutMs, 'timeoutMs')\nconst deadlineAt = addSchedulerTime(systemScheduler.now(), delay, 'deadlineAt')\nconsole.log('deadline:', deadlineAt)`,
+        '把已校验的 base 与 delta 相加，并在有限操作数产生 Infinity 时以 RangeError 失败，防止 deadline 溢出后静默变成永不超时。',
+      quickStart: `import { addSchedulerTime } from '@migaia/lifecycle/scheduler'
+import { createManualScheduler } from '@migaia/utils/scheduler'
+
+const scheduler = createManualScheduler()
+const deadlineAt = addSchedulerTime(scheduler.now(), 2_000, 'deadlineAt')
+console.log('保存截止时间:', deadlineAt)`,
       scenarios: [
         '由 scheduler.now() 和相对 timeout 构造绝对 deadline。',
         '极大数输入不能静默关闭超时保护。'
       ],
-      avoidWhen: ['操作数尚未验证；先调用时间/延迟 validator。', '只需要做普通业务数值加法。'],
+      avoidWhen: [
+        '参数不是已经检查的有限数字；在应用接收输入时检查类型和范围。',
+        '只需要做普通业务数值加法。'
+      ],
       options: []
     },
     en: {
       purpose:
         'Adds validated base and delta and rejects with RangeError if finite operands produce Infinity, preventing deadline overflow from silently becoming no timeout.',
-      quickStart: `import { addSchedulerTime, systemScheduler, validateSchedulerDelay } from '@migaia/lifecycle'\n\nconst timeoutMs = 2_000\nconst delay = validateSchedulerDelay(timeoutMs, 'timeoutMs')\nconst deadlineAt = addSchedulerTime(systemScheduler.now(), delay, 'deadlineAt')\nconsole.log('deadline:', deadlineAt)`,
+      quickStart: `import { addSchedulerTime } from '@migaia/lifecycle/scheduler'
+import { createManualScheduler } from '@migaia/utils/scheduler'
+
+const scheduler = createManualScheduler()
+const deadlineAt = addSchedulerTime(scheduler.now(), 2_000, 'deadlineAt')
+console.log('Save deadline:', deadlineAt)`,
       scenarios: [
         'An absolute deadline is derived from scheduler.now() plus a relative timeout.',
         'Extremely large input must not silently disable timeout protection.'
       ],
       avoidWhen: [
-        'Operands are not validated yet; run the time and delay validators first.',
+        'Operands are not finite numbers checked at the application input; validate their type and range there.',
         'Only ordinary domain-number addition is needed.'
       ],
       options: []
@@ -28093,28 +28211,44 @@ console.log(result.cleanupErrors) // [flushFailure, closeFailure], with original
     zh: {
       purpose:
         '创建带 @migaia/lifecycle source、稳定 code、原生 stack 和可选 cause/phase/detail/errors 的 Error。它不覆盖 stack，errors 会冻结为快照。',
-      quickStart: `import { createLifecycleError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst originalError = new Error('scope was already closed')\nthrow createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosed, { phase: 'own', cause: originalError })`,
+      quickStart: `import { LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'
+import { createLifecycleError } from '@migaia/lifecycle/errors'
+
+const failure = createLifecycleError(
+  LifecycleErrorCode.invalidOption,
+  LifecycleErrorText.schedulerNumberType
+)
+console.log('错误类型:', failure.name)
+console.log('错误代码:', failure.code)`,
       scenarios: [
         'lifecycle 自身需要创建没有更具体原生子类要求的边界错误。',
         '原始失败、阶段和诊断详情必须沿公开错误链可达。'
       ],
       avoidWhen: [
-        '输入错误必须保持 TypeError 或 RangeError；使用对应 factory。',
-        '已有 Error 实例需要保持 identity；使用 tagLifecycleError 或 createLifecycleFailure。'
+        '需要原生 TypeError 时使用公开的 createLifecycleTypeError。',
+        '已有错误需要保留原对象或原始原因；使用 createLifecycleFailure。'
       ],
       options: []
     },
     en: {
       purpose:
         'Creates an Error carrying @migaia/lifecycle source, stable code, native stack, and optional cause, phase, detail, or frozen errors snapshot. It never overwrites stack.',
-      quickStart: `import { createLifecycleError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst originalError = new Error('scope 已经关闭')\nthrow createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosed, { phase: 'own', cause: originalError })`,
+      quickStart: `import { LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'
+import { createLifecycleError } from '@migaia/lifecycle/errors'
+
+const failure = createLifecycleError(
+  LifecycleErrorCode.invalidOption,
+  LifecycleErrorText.schedulerNumberType
+)
+console.log('Error kind:', failure.name)
+console.log('Error code:', failure.code)`,
       scenarios: [
         'Lifecycle itself needs a boundary error with no more specific native subclass requirement.',
         'Original failure, phase, and diagnostic detail must remain reachable through the public error chain.'
       ],
       avoidWhen: [
-        'Input failure must remain TypeError or RangeError; use the matching factory.',
-        'An existing Error instance must retain identity; use tagLifecycleError or createLifecycleFailure.'
+        'Use the public createLifecycleTypeError when a native TypeError is needed.',
+        'An existing error should retain its object or original cause; use createLifecycleFailure.'
       ],
       options: []
     }
@@ -28123,28 +28257,42 @@ console.log(result.cleanupErrors) // [flushFailure, closeFailure], with original
     zh: {
       purpose:
         '创建保留原生 TypeError runtime type 的 lifecycle 错误，并附加 source/code、可选 cause 与 detail；适用于输入形状或可调用性错误。',
-      quickStart: `import { createLifecycleTypeError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst getterError = new TypeError('scheduler getter returned a non-scheduler')\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, LifecycleErrorText.schedulerAccessorFailed, { cause: getterError, detail: { field: 'scheduler' } })`,
+      quickStart: `import { LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'
+import { createLifecycleTypeError } from '@migaia/lifecycle/errors'
+
+const failure = createLifecycleTypeError(
+  LifecycleErrorCode.invalidOption,
+  LifecycleErrorText.schedulerNumberType
+)
+console.log('错误类型:', failure.name)`,
       scenarios: [
         '公开参数类型或对象形状不合法。',
         '调用方依赖 instanceof TypeError，同时还需要稳定 source/code。'
       ],
       avoidWhen: [
-        '数值类型正确但范围非法；使用 createLifecycleRangeError。',
-        '已有错误需要保持 identity；使用 createLifecycleFailure。'
+        '数值范围检查由接收输入的应用处理；本包不公开范围错误构造函数。',
+        '已有错误需要保持 original error object；使用 createLifecycleFailure。'
       ],
       options: []
     },
     en: {
       purpose:
         'Creates a lifecycle error that remains a native TypeError while attaching source, code, and optional cause or detail. Use it for invalid input shape or callability.',
-      quickStart: `import { createLifecycleTypeError, LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'\n\nconst getterError = new TypeError('scheduler getter 返回了非法对象')\nthrow createLifecycleTypeError(LifecycleErrorCode.invalidOption, LifecycleErrorText.schedulerAccessorFailed, { cause: getterError, detail: { field: 'scheduler' } })`,
+      quickStart: `import { LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'
+import { createLifecycleTypeError } from '@migaia/lifecycle/errors'
+
+const failure = createLifecycleTypeError(
+  LifecycleErrorCode.invalidOption,
+  LifecycleErrorText.schedulerNumberType
+)
+console.log('Error kind:', failure.name)`,
       scenarios: [
         'A public parameter type or object shape is invalid.',
         'Callers depend on instanceof TypeError while also requiring stable source and code.'
       ],
       avoidWhen: [
-        'The value has the right type but an invalid numeric range; use createLifecycleRangeError.',
-        'An existing error must retain identity; use createLifecycleFailure.'
+        'The application receiving a value owns range checks; this package exposes no range-error factory.',
+        'An existing error must retain original error object; use createLifecycleFailure.'
       ],
       options: []
     }
@@ -28152,29 +28300,49 @@ console.log(result.cleanupErrors) // [flushFailure, closeFailure], with original
   'lifecycle:errors:createLifecycleFailure': {
     zh: {
       purpose:
-        '把任意 unknown throw 转为 lifecycle 边界失败。可扩展 Error 会原位打标以保持 identity；primitive、冻结或不可打标值会被包装，并通过 cause 保留原值。',
-      quickStart: `try {\n  await releaseResource()\n} catch (error) {\n  throw createLifecycleFailure(\n    LifecycleErrorCode.disposeFailed,\n    LifecycleErrorText.disposeFailed,\n    error\n  )\n}`,
+        '把任意 unknown throw 转为 lifecycle 边界失败。可扩展 Error 会原位打标以保持 original error object；primitive、冻结或不可打标值会被包装，并通过 cause 保留原值。',
+      quickStart: `import { LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'
+import { createLifecycleFailure } from '@migaia/lifecycle/errors'
+
+const original = new TypeError('expected a scheduler')
+const failure = createLifecycleFailure(
+  LifecycleErrorCode.invalidOption,
+  LifecycleErrorText.schedulerNumberType,
+  original
+)
+console.log('错误类型:', failure.name)
+console.log('原始错误:', failure === original ? 'same object' : 'wrapped')`,
       scenarios: [
         '调用用户 disposer、listener 或宿主能力后捕获到 unknown。',
-        '必须同时保证原错误可达与 lifecycle source/code 契约。'
+        '必须同时保证原错误可达与 lifecycle source/code 约定。'
       ],
       avoidWhen: [
-        '正在校验调用方输入且需要明确 TypeError/RangeError；使用对应 factory。',
-        '确定拥有一个可扩展 Error 且只需打标；直接 tagLifecycleError。'
+        '正在检查输入类型且需要新 TypeError；使用 createLifecycleTypeError。',
+        '需要创建新错误而不是处理已有错误；使用 createLifecycleError。'
       ],
       options: []
     },
     en: {
       purpose:
-        'Converts any unknown throw into a lifecycle-boundary failure. Extensible Errors are tagged in place to retain identity; primitive, frozen, or untaggable values are wrapped with the original retained through cause.',
-      quickStart: `try {\n  await releaseResource()\n} catch (error) {\n  throw createLifecycleFailure(\n    LifecycleErrorCode.disposeFailed,\n    LifecycleErrorText.disposeFailed,\n    error\n  )\n}`,
+        'Converts any unknown throw into a lifecycle-boundary failure. Extensible Errors are tagged in place to retain original error object; primitive, frozen, or untaggable values are wrapped with the original retained through cause.',
+      quickStart: `import { LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'
+import { createLifecycleFailure } from '@migaia/lifecycle/errors'
+
+const original = new TypeError('expected a scheduler')
+const failure = createLifecycleFailure(
+  LifecycleErrorCode.invalidOption,
+  LifecycleErrorText.schedulerNumberType,
+  original
+)
+console.log('Error kind:', failure.name)
+console.log('Original error:', failure === original ? 'same object' : 'wrapped')`,
       scenarios: [
         'Calling a user disposer, listener, or host capability produces an unknown throw.',
         'Both original-error reachability and lifecycle source/code contract must be guaranteed.'
       ],
       avoidWhen: [
-        'Caller input is being validated and needs an explicit TypeError or RangeError; use the matching factory.',
-        'A known extensible Error only needs tagging; call tagLifecycleError directly.'
+        'Input type validation needs a new TypeError; use createLifecycleTypeError.',
+        'A new error is needed instead of handling an existing one; use createLifecycleError.'
       ],
       options: []
     }

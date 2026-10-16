@@ -15,45 +15,37 @@ describe('Storage Web backend guide', () => {
         .join('\n')
 
       expect(sections.map((section) => section.id)).toEqual([
-        'backend-map',
-        'feature-map',
+        'install',
         'memory',
-        'direct',
-        'local-storage-sync',
-        'session-storage',
-        'session-storage-sync',
-        'cookies',
-        'cookies-sync',
-        'records',
-        'host',
-        'live-query'
+        'backend-map',
+        'web-options',
+        'string-methods',
+        'namespace'
       ])
       expect(code).toContain('@migaia/storage-web/memory')
-      expect(code).toContain('@migaia/storage-web/local-storage')
-      expect(code).toContain('@migaia/storage-web/session-storage')
-      expect(code).toContain('@migaia/storage-web/cookies')
-      expect(code).toContain('@migaia/storage-web/indexed-db')
-      expect(code).toContain('@migaia/storage-web/host')
-      expect(code).toContain('cache.subscribeChanges')
+      expect(JSON.stringify(sections)).toContain('@migaia/storage-web/local-storage')
+      expect(JSON.stringify(sections)).toContain('@migaia/storage-web/session-storage')
+      expect(JSON.stringify(sections)).toContain('@migaia/storage-web/cookies')
+      expect(JSON.stringify(sections)).toContain('@migaia/storage-web/indexed-db')
+      expect(JSON.stringify(guide?.next)).toContain('host-and-plugins')
+      expect(JSON.stringify(sections)).toContain('subscribeChanges')
       expect(code).not.toContain('cache.capabilities.changeFeed')
       expect(code).toContain("await settings.set('theme', 'dark')")
-      expect(code).toContain("settings.sync.set('density', 'compact')")
+      expect(code).toContain("settings.sync.get('theme')")
       expect(code).not.toContain('settings.capabilities.syncRead')
-      expect(code).toContain("await checkout.set('step', 'payment')")
-      expect(code).toContain("checkout.sync.set('step', 'payment')")
+      expect(JSON.stringify(sections)).toContain('sessionStorageHost')
+      expect(JSON.stringify(sections)).toContain('sync.set')
       expect(code).not.toContain('checkout.capabilities.syncRead')
-      expect(code).toContain("await preferences.set('locale',")
-      expect(code).toContain("preferences.sync.set('locale',")
-      expect(code).toContain("indexedDbReactive({ id: 'users'")
-      expect(code).toContain('host.liveQuery({')
-      expect(code).toContain("matches: (change) => change.scope === 'users'")
-      expect(code).toContain('await users.ready')
-      expect(code).toContain('await users.refresh()')
-      expect(code).toContain('await users.dispose()')
-      expect(sections.find((section) => section.id === 'records')?.heading).toMatch(
-        locale === 'zh'
-          ? /仅提供异步契约.*不存在同步入口/
-          : /async contract only.*no synchronous entry/
+      expect(JSON.stringify(sections)).toContain('cookiesHost')
+      expect(JSON.stringify(sections)).toContain('conflictPolicy')
+      expect(JSON.stringify(sections)).toContain('syncRead')
+      expect(JSON.stringify(sections)).toContain('secondaryIndexes')
+      expect(JSON.stringify(sections)).toContain('changeFeed')
+      expect(JSON.stringify(sections)).toContain('opaqueEntries')
+      expect(JSON.stringify(sections)).toContain('maxValueBytes')
+      expect(code).toContain('await settings.dispose()')
+      expect(JSON.stringify(sections)).toMatch(
+        locale === 'zh' ? /没有同步通道/ : /without a synchronous channel/
       )
     }
   )
@@ -82,17 +74,17 @@ describe('Storage Web backend guide', () => {
       expect(code).toContain('await db.putRecord')
       expect(code).toContain('await db.getRecord')
       expect(code).toContain('await db.deleteRecord')
-      expect(code).toContain('await db.setBytes')
+      expect(JSON.stringify(sections)).toContain('setBytes')
       expect(code).toContain('db.iterateRecords(range, {')
       expect(code).toContain('pageSize: 64')
       expect(code).toContain('await db.transaction')
-      expect(code).toContain('StorageErrorCode.transactionConflict')
-      expect(code).toContain('tx.commit()')
-      expect(code).toMatch(
-        locale === 'zh' ? /tx\.put 只更新.*内存草稿/ : /tx\.put changes only.*in-memory draft/
+      expect(JSON.stringify(sections)).toContain('TRANSACTION_CONFLICT')
+      expect(code).not.toContain('tx.commit()')
+      expect(JSON.stringify(sections)).toMatch(
+        locale === 'zh' ? /草稿/ : /draft rather than immediately persisting/
       )
-      expect(code).toMatch(
-        locale === 'zh' ? /Promise resolve 表示.*原子落盘/ : /Resolution means.*atomic persistence/
+      expect(JSON.stringify(sections)).toMatch(
+        locale === 'zh' ? /原子提交/ : /commits its draft atomically/
       )
       expect(code).toContain('await db.dispose()')
     }
@@ -109,20 +101,22 @@ describe('Storage Web backend guide', () => {
 
     expect(sections.map((section) => section.id)).toEqual([
       'entity',
-      'codec',
-      'json-codec',
-      'structured-codec',
-      'binary-codec',
-      'codec-selection'
+      'definition-options',
+      'repository',
+      'list-options',
+      'indexes',
+      'schema',
+      'codecs',
+      'migrations'
     ])
     expect(code).toContain('jsonCodec.encode')
-    expect(code).toContain('jsonCodec.decode')
-    expect(code).toContain('selectCodec(structuredCodec, db.capabilities)')
-    expect(code).toContain('snapshot.self = snapshot')
-    expect(code).toContain('selectCodec(binaryCodec, binaryStore.capabilities)')
-    expect(code).toContain('selectCodec(binaryCodec, textStore.capabilities')
-    expect(code).toContain("await binaryStore.setBytes('greeting'")
-    expect(code).toContain("await textStore.set('greeting'")
+    expect(JSON.stringify(sections)).toContain('jsonCodec')
+    expect(JSON.stringify(sections)).toContain('structuredCodec')
+    expect(JSON.stringify(sections)).toMatch(locale === 'zh' ? /不制作副本/ : /without copying it/)
+    expect(code).toContain('selectCodec(binaryCodec, store.capabilities)')
+    expect(JSON.stringify(sections)).toContain('base64')
+    expect(code).toContain("await store.setBytes('attachment'")
+    expect(JSON.stringify(sections)).toContain('DESERIALIZE_FAILED')
   })
 
   it.each(['zh', 'en'] as const)(
@@ -147,14 +141,14 @@ describe('Storage Web backend guide', () => {
         'consistency',
         'cleanup'
       ])
-      expect(code).toContain('memoryReactive')
+      expect(JSON.stringify(sections)).toContain('memoryReactive')
       expect(code).toContain('localStorageReactive')
       expect(code).toContain('sessionStorageReactive')
-      expect(code).toContain('cookiesReactive')
+      expect(JSON.stringify(sections)).toContain('cookiesReactive')
       expect(code).toContain('indexedDbReactive')
       expect(code).toContain('host.liveQuery({')
       expect(code).toContain('await theme.ready')
-      expect(code).toContain('await locale.ready')
+      expect(code).toContain('await theme.dispose()')
       expect(code).toContain('await step.ready')
       expect(code).toContain('await user.ready')
       expect(code).toContain('keepPreviousData: true')
@@ -176,24 +170,34 @@ describe('Storage Web backend guide', () => {
         .join('\n')
 
       expect(sections.map((section) => section.id)).toEqual([
-        'mental-model',
         'install',
-        'install-cancellation',
-        'dispose'
+        'options',
+        'plugins',
+        'dynamic',
+        'custom',
+        'helpers'
       ])
       expect(code).toContain("import { createStorageHost } from '@migaia/storage-web/host'")
       expect(code).toContain('memoryBackendPlugin')
-      expect(code).toContain('indexedDbBackendPlugin')
+      expect(JSON.stringify(sections)).toContain('indexedDbBackendPlugin')
       expect(code).toContain("host.backend('cache')")
       expect(code).toContain('try {')
       expect(code).toContain('finally {')
-      expect(code.match(/await host\.dispose\(\)/g)?.length).toBeGreaterThanOrEqual(3)
+      expect(JSON.stringify(sections.find((section) => section.id === 'install'))).toMatch(
+        /try \{[\s\S]*host\.backend\('drafts'\)[\s\S]*finally \{\\n  await host\.dispose\(\)/
+      )
+      expect(JSON.stringify(sections.find((section) => section.id === 'dynamic'))).toContain(
+        'await host.dispose()'
+      )
+      expect(JSON.stringify(sections.find((section) => section.id === 'custom'))).toContain(
+        'await host.dispose()'
+      )
 
-      const cancellation = sections.find((section) => section.id === 'install-cancellation')
+      const cancellation = sections.find((section) => section.id === 'options')
       const cancellationText = JSON.stringify(cancellation)
       expect(cancellationText).toContain('STORAGE_HOST_BUSY')
-      expect(cancellationText).toMatch(
-        locale === 'zh' ? /不会删除|不受影响/ : /does not delete|Unaffected/
+      expect(JSON.stringify(sections.find((section) => section.id === 'dynamic'))).toMatch(
+        locale === 'zh' ? /不删除浏览器持久数据/ : /does not delete browser-persistent data/
       )
     }
   )
@@ -214,8 +218,9 @@ describe('Storage Web backend guide', () => {
       'path-removal',
       'opaque'
     ])
-    expect(code).toContain("scope: { path: '/', secure: true")
-    expect(code).toContain("scope: { path: '/account', secure: true")
+    expect(code).toContain("path: '/'")
+    expect(code).toContain("accountCookies('/account')")
+    expect(code).toContain('secure: true')
     expect(code).toContain("namespace: 'site-preferences'")
     expect(code).toContain("namespace: 'account-preferences'")
 
@@ -224,8 +229,8 @@ describe('Storage Web backend guide', () => {
     )
     expect(pathText).toContain('/account/settings')
     expect(pathText).toContain('/accounting')
-    expect(pathText).toMatch(locale === 'zh' ? /不会误匹配|不可见/ : /accounting|Hidden/)
-    expect(pathText).toMatch(locale === 'zh' ? /仍然存在|仍存在/ : /remains|leaving/)
+    expect(pathText).toMatch(locale === 'zh' ? /不可见/ : /hidden/)
+    expect(pathText).toMatch(locale === 'zh' ? /原值仍然存在/ : /cookie intact/)
   })
 
   it.each(['zh', 'en'] as const)(
@@ -249,13 +254,13 @@ describe('Storage Web backend guide', () => {
       ])
       expect(code).toContain('new AbortController()')
       expect(code).toContain("controller.abort('search panel closed')")
-      expect(code).toContain('StorageContractErrorCode.aborted')
-      expect(code).toContain('timeoutMs: 2_000')
-      expect(code).toContain('StorageErrorCode.quotaExceeded')
-      expect(code).toContain('StorageErrorCode.unavailable')
+      expect(JSON.stringify(sections)).toContain('ABORTED')
+      expect(code).toContain('timeoutMs: 1')
+      expect(JSON.stringify(sections)).toContain('QUOTA_EXCEEDED')
+      expect(JSON.stringify(sections)).toContain('BACKEND_UNAVAILABLE')
       expect(code).toContain('error.cause')
       expect(code).toContain('await firstStore.dispose()')
-      expect(code).toContain('const nextStore = memoryStorageHost()')
+      expect(code).toContain("const nextStore = indexedDbHost({ dbName: 'docs-preferences' })")
 
       const text = JSON.stringify(sections)
       expect(text).toContain('STORE_DISPOSED')

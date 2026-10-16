@@ -606,7 +606,7 @@ test('SITE-T-RESOURCE-OVERVIEW keeps concrete learning content without the gener
 })
 
 test('SITE-T-RESOURCE-START explains request generations, observation, and terminal cleanup', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /构造函数默认 autoStart: true.*?立即创建第一代请求/s)
@@ -621,7 +621,7 @@ test('SITE-T-RESOURCE-START explains request generations, observation, and termi
 })
 
 test('SITE-T-RESOURCE-REACTIVE shows the complete invalidation and render chain', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /const id = userId\.value/)
@@ -637,7 +637,7 @@ test('SITE-T-RESOURCE-REACTIVE shows the complete invalidation and render chain'
 })
 
 test('SITE-T-RESOURCE-DECISION keeps use cases and direct-await tradeoffs above the example', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/resource/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /当异步结果依赖 Signal\/Computed/)
@@ -812,7 +812,7 @@ test('SITE-T-STORE-WORKER-API-ENTRYPOINTS render compute, streaming, and ownersh
   assert.match(readWorker('index', 'WorkerAdapter'), /--option-request-options-transfer"/)
   assert.match(readWorker('index', 'createWorkerHandler'), /不能成为 unhandled Worker error/)
   assert.match(readWorker('index', 'workerComputed'), /supersede 旧 generation/)
-  assert.match(readWorker('serialize', 'workerParser'), /有界 backpressure/)
+  assert.match(readWorker('serialize', 'workerParser'), /消费额度限制流/)
   assert.match(readWorker('serialize', 'workerParser'), /--option-ownership"/)
   assert.match(readWorker('serialize', 'workerPlugin'), /只增加 registry shape/)
   assert.match(readWorker('serialize', 'createSerializeWorkerHandler'), /双 credit producer window/)
@@ -843,7 +843,10 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
     ),
     false
   )
-  const architecture = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/index.html'), 'utf8')
+  const architecture = readFileSync(
+    join(buildRoot, 'zh/docs/event-subscriber/readme/index.html'),
+    'utf8'
+  )
   const api = readFileSync(join(buildRoot, 'zh/docs/event-subscriber/api/index.html'), 'utf8')
   const symbol = apiManifest.apis
     .find((candidate) => candidate.library === 'event-subscriber' && candidate.module === 'index')
@@ -932,7 +935,7 @@ test('SITE-T-DOC-FLOW renders maintained guidance without architecture trampolin
 })
 
 test('SITE-T-CROSS-LIBRARY makes maintained cross-library references explainable and navigable', () => {
-  const capability = readFileSync(join(buildRoot, 'zh/docs/capability/index.html'), 'utf8')
+  const capability = readFileSync(join(buildRoot, 'zh/docs/capability/readme/index.html'), 'utf8')
   assert.match(capability, /class="library-reference"[^>]*href="\/zh\/docs\/plugin-host"/)
   assert.match(renderedText(capability), /安装和卸载插件.*配置共享能力与处理步骤.*安装失败时回滚/s)
   assert.match(capability, /class="library-reference"[^>]*href="\/zh\/docs\/storage-web"/)
@@ -968,7 +971,7 @@ test('SITE-T-CODE-EXPLANATIONS keeps example guidance plain and label-free', () 
 
 test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neighboring APIs', () => {
   const capabilityArchitecture = readFileSync(
-    join(buildRoot, 'zh/docs/capability/index.html'),
+    join(buildRoot, 'zh/docs/capability/readme/index.html'),
     'utf8'
   )
 
@@ -979,7 +982,7 @@ test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neigh
   assert.match(capabilityArchitecture, /data-slot="separator"/)
 
   const storeLightArchitecture = readFileSync(
-    join(buildRoot, artifactPath('/zh/docs/store-light')),
+    join(buildRoot, artifactPath('/zh/docs/store-light/readme')),
     'utf8'
   )
   assert.match(
@@ -991,7 +994,7 @@ test('SITE-T-CONTRACT-LAYOUT separates signatures, fields, validation, and neigh
 })
 
 test('SITE-T-CAPABILITY-LIFECYCLE shows when to enable, consume, disable, and dispose', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/capability')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/capability/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /type INotificationCenter = ICapabilityHandle/)
@@ -1007,7 +1010,7 @@ test('SITE-T-CAPABILITY-LIFECYCLE shows when to enable, consume, disable, and di
 })
 
 test('SITE-T-PLUGIN-HOST-TRAY explains composition terms in reader language', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /这一节只给 Tray.*? 的 Host 适配器维护者看/)
@@ -1021,7 +1024,7 @@ test('SITE-T-PLUGIN-HOST-TRAY explains composition terms in reader language', ()
 })
 
 test('SITE-T-PLUGIN-HOST-DEFINE uses definePlugin and consumes the committed view', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /import \{ definePlugin, PluginHost \} from '@migaia\/plugin-host'/)
@@ -1036,7 +1039,7 @@ test('SITE-T-PLUGIN-HOST-DEFINE uses definePlugin and consumes the committed vie
 })
 
 test('SITE-T-PLUGIN-HOST-GENERATOR-CONTINUE explains the control signal and transition', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/plugin-host/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /GENERATOR_CONTINUE 是框架导出的唯一 Symbol 控制信号，不是.*?业务数据/)
@@ -1208,7 +1211,10 @@ test('SITE-T-ARCHITECTURE-INDEX groups every library by family on the docs home'
 
 test('SITE-T-LIBRARY-DESCRIPTIONS uses concrete responsibilities instead of slogans', () => {
   const docsIndex = readFileSync(join(buildRoot, artifactPath('/zh/docs')), 'utf8')
-  const utilsArchitecture = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const utilsArchitecture = readFileSync(
+    join(buildRoot, artifactPath('/zh/docs/utils/readme')),
+    'utf8'
+  )
   /** English library descriptions appear on the docs home library index. */
   const loggerEnglish = readFileSync(join(buildRoot, artifactPath('/en/docs')), 'utf8')
 
@@ -1227,20 +1233,16 @@ test('SITE-T-LIBRARY-DESCRIPTIONS uses concrete responsibilities instead of slog
   }
 })
 
-test('SITE-T-ARCHITECTURE-LEDES explain capability, pain, and design on every package home', () => {
+test('SITE-T-ARCHITECTURE-LEDES explain capability, pain, and design on every README page', () => {
   const packageHomes = routeManifest.entries.filter(
-    (entry) => entry.locale === 'zh' && /^\/zh\/docs\/[^/]+$/.test(entry.path)
+    (entry) => entry.locale === 'zh' && /^\/zh\/docs\/[^/]+\/readme$/.test(entry.path)
   )
 
   assert.ok(packageHomes.length > 20)
   for (const entry of packageHomes) {
     const html = readFileSync(join(buildRoot, artifactPath(entry.path)), 'utf8')
-    /** Journey homes show the positioning paragraph; other homes use it as their lede. */
-    const lede = renderedText(
-      html.match(/<p class="package-position">([\s\S]*?)<\/p>/)?.[1] ??
-        html.match(/<p class="lede">([\s\S]*?)<\/p>/)?.[1] ??
-        ''
-    )
+    /** The README page uses the maintained positioning paragraph as its lede. */
+    const lede = renderedText(html.match(/<p class="lede">([\s\S]*?)<\/p>/)?.[1] ?? '')
     assert.ok(lede.length >= 70, `package positioning is too thin: ${entry.path}`)
     assert.doesNotMatch(lede, /归属与边界模型|源码契约|使用入口/)
     assert.match(
@@ -1250,12 +1252,12 @@ test('SITE-T-ARCHITECTURE-LEDES explain capability, pain, and design on every pa
     )
   }
 
-  const lifecycle = readFileSync(join(buildRoot, artifactPath('/zh/docs/lifecycle')), 'utf8')
+  const lifecycle = readFileSync(join(buildRoot, artifactPath('/zh/docs/lifecycle/readme')), 'utf8')
   assert.match(lifecycle, /一组资源必须随同一 owner 关闭/)
   assert.match(lifecycle, /scope、generation、terminal controller 与 dispose transaction/)
   assert.match(lifecycle, /不负责事件分发、业务排队或依赖图/)
 
-  const tray = readFileSync(join(buildRoot, artifactPath('/zh/docs/tray')), 'utf8')
+  const tray = readFileSync(join(buildRoot, artifactPath('/zh/docs/tray/readme')), 'utf8')
   /** Tray supports both fixed startup entries and managed runtime Host instances. */
   const trayText = renderedText(tray)
   assert.match(trayText, /createTrayGraph.*ready\(\).*dispose\(\).*按依赖逆序释放/s)
@@ -1277,7 +1279,7 @@ test('SITE-T-ARCHITECTURE-API-NAV shares one library sidebar between guides and 
 })
 
 test('SITE-T-CODE-EXPLANATION-PROSE renders authored code without synthesized walkthrough prose', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /<figure class="code-frame">/)
   assert.doesNotMatch(html, /class="code-walkthrough(?:-notes)?"/)
@@ -1510,7 +1512,10 @@ test('SITE-T-CAPABILITY-HOST-EXAMPLE explains its complete production lifecycle'
 })
 
 test('SITE-T-EVENT-STYLE explains the exact subscription, delivery, and removal behavior', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/event-subscriber')), 'utf8')
+  const html = readFileSync(
+    join(buildRoot, artifactPath('/zh/docs/event-subscriber/readme')),
+    'utf8'
+  )
   const text = renderedText(html)
 
   assert.match(text, /on\(\) 登记监听器，并返回只属于这次订阅的取消句柄 stop/)
@@ -1521,7 +1526,10 @@ test('SITE-T-EVENT-STYLE explains the exact subscription, delivery, and removal 
 })
 
 test('SITE-T-EVENT-SUBSCRIBER uses its subpath and states the style boundary precisely', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/event-subscriber')), 'utf8')
+  const html = readFileSync(
+    join(buildRoot, artifactPath('/zh/docs/event-subscriber/readme')),
+    'utf8'
+  )
   const text = renderedText(html)
 
   assert.match(text, /from '@migaia\/event-subscriber\/subscriber'/)
@@ -1532,7 +1540,10 @@ test('SITE-T-EVENT-SUBSCRIBER uses its subpath and states the style boundary pre
 })
 
 test('SITE-T-EVENT-SUBSCRIBER-NAME explains why the legacy class event name was removed', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/event-subscriber')), 'utf8')
+  const html = readFileSync(
+    join(buildRoot, artifactPath('/zh/docs/event-subscriber/readme')),
+    'utf8'
+  )
   const text = renderedText(html)
 
   assert.match(text, /const channel = createEventChannel<number>\(\)/)
@@ -1545,7 +1556,10 @@ test('SITE-T-EVENT-SUBSCRIBER-NAME explains why the legacy class event name was 
 })
 
 test('SITE-T-EVENT-TASK defines the channel, registration, payload, and settled result', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/event-subscriber')), 'utf8')
+  const html = readFileSync(
+    join(buildRoot, artifactPath('/zh/docs/event-subscriber/readme')),
+    'utf8'
+  )
   const text = renderedText(html)
 
   assert.match(text, /const tasks = createEventChannel<IEmailJob, IEmailReceipt>\(\)/)
@@ -1614,7 +1628,7 @@ test('SITE-T-CLASS-EXAMPLE-COVERAGE gives every class detail page a maintained e
 })
 
 test('SITE-T-UTILS-DEFERRED recommends the native Promise.withResolvers API first', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /优先使用原生 API/)
   assert.match(html, /Promise\.withResolvers/)
@@ -1622,7 +1636,7 @@ test('SITE-T-UTILS-DEFERRED recommends the native Promise.withResolvers API firs
 })
 
 test('SITE-T-UTILS-TO-PROMISE explains execution timing and identity tradeoffs', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /当前调用栈立即执行/)
   assert.match(html, /下一次 microtask/)
@@ -1631,7 +1645,7 @@ test('SITE-T-UTILS-TO-PROMISE explains execution timing and identity tradeoffs',
 })
 
 test('SITE-T-UTILS-MANUAL-SCHEDULER marks repository-only test infrastructure', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /本仓测试专用/)
   assert.match(html, /不面向外部业务代码/)
@@ -1639,7 +1653,7 @@ test('SITE-T-UTILS-MANUAL-SCHEDULER marks repository-only test infrastructure', 
 })
 
 test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date.now', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /systemScheduler.*performance\.now\(\).*单调不递减/s)
@@ -1651,7 +1665,7 @@ test('SITE-T-UTILS-SYSTEM-SCHEDULER distinguishes the injectable clock from Date
 })
 
 test('SITE-T-UTILS-ERROR-CODES renders every code as a described list item', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(html, /<li><code>invalidArgument<\/code>/)
@@ -1662,7 +1676,7 @@ test('SITE-T-UTILS-ERROR-CODES renders every code as a described list item', () 
 })
 
 test('SITE-T-UTILS-BYTE-CONTEXT explains ArrayBuffer storage and Uint8Array views', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /ArrayBuffer.*原始连续内存.*不能按下标读写/s)
@@ -1673,7 +1687,7 @@ test('SITE-T-UTILS-BYTE-CONTEXT explains ArrayBuffer storage and Uint8Array view
 })
 
 test('SITE-T-UTILS-PROBE-PROPERTY shows its input object and all result branches', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /const user = \{.*name: 'Ada'.*get profile\(\): never/s)
@@ -1687,7 +1701,7 @@ test('SITE-T-UTILS-PROBE-PROPERTY shows its input object and all result branches
 })
 
 test('SITE-T-UTILS-IMMUTABLE-SNAPSHOT explains structured clone mechanics and limits', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /globalThis\.structuredClone\(\).*不经过 JSON 字符串/s)
@@ -1699,7 +1713,7 @@ test('SITE-T-UTILS-IMMUTABLE-SNAPSHOT explains structured clone mechanics and li
 })
 
 test('SITE-T-UTILS-DIAGNOSTIC-SNAPSHOT contrasts strict and best-effort cloning', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /原生 structuredClone\(value\).*全有或全无/s)
@@ -1711,7 +1725,7 @@ test('SITE-T-UTILS-DIAGNOSTIC-SNAPSHOT contrasts strict and best-effort cloning'
 })
 
 test('SITE-T-UTILS-IDENTITY-SNAPSHOT documents its only meaningful policy use', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /identitySnapshot.*单独调用它没有运行时收益/s)
@@ -1722,7 +1736,7 @@ test('SITE-T-UTILS-IDENTITY-SNAPSHOT documents its only meaningful policy use', 
 })
 
 test('SITE-T-UTILS-SET explains immutable updates and structural sharing precisely', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /每次 set 都返回新根对象/s)
@@ -1733,7 +1747,7 @@ test('SITE-T-UTILS-SET explains immutable updates and structural sharing precise
 })
 
 test('SITE-T-UTILS-OWN-CONFIG demonstrates admission, isolation, and managed successors', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /ownConfig.*接收外部配置的边界.*独立、可验证所有权/s)
@@ -1745,7 +1759,7 @@ test('SITE-T-UTILS-OWN-CONFIG demonstrates admission, isolation, and managed suc
 })
 
 test('SITE-T-UTILS-COMBINE-CONFIG shows both inputs, merged output, and an explicit diff', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /const defaults = ownConfig\(\{\s*retries: 1/)
@@ -1758,7 +1772,7 @@ test('SITE-T-UTILS-COMBINE-CONFIG shows both inputs, merged output, and an expli
 })
 
 test('SITE-T-UTILS-ONCE explains module scope, singleton limits, and Proxy responsibility', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /export const getRuntime = once/)
@@ -1772,7 +1786,7 @@ test('SITE-T-UTILS-ONCE explains module scope, singleton limits, and Proxy respo
 })
 
 test('SITE-T-UTILS-ONCE-ASYNC explains concrete use cases and shared-failure boundaries', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
 
   assert.match(html, /export const loadAppConfig = onceAsync/)
   assert.match(html, /加载不会刷新的启动配置/)
@@ -1785,7 +1799,7 @@ test('SITE-T-UTILS-ONCE-ASYNC explains concrete use cases and shared-failure bou
 })
 
 test('SITE-T-UTILS-READONLY-CONFIG explains read-only behavior in plain language', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/utils/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /readonlyConfig.*给已有配置套上只读保护/s)
@@ -1887,553 +1901,1011 @@ test('SITE-T-TYPE-CODE keeps every module type declaration visible with its code
 
 test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', () => {
   const expectations = [
-    ['/zh/docs/store-react', 'Store React 学习路径', '先按状态来源选择 Hook'],
-    ['/en/docs/store-react', 'Store React learning paths', 'Choose a Hook from the state source'],
-    [
-      '/zh/docs/store-react/getting-started',
-      '五分钟建立作用域 Store 与精确 Selector',
-      '在挂载前注册，在组件中按 Token 读取'
-    ],
+    ['/zh/docs/store-react', '把 Store 状态带进 React', '状态仍由原来的包持有'],
+    ['/en/docs/store-react', 'Bring Store state into React', 'State stays with its owning package'],
+    ['/zh/docs/store-react/getting-started', '渲染一个计数按钮', 'Provider 与 Registry 的创建参数'],
     [
       '/en/docs/store-react/getting-started',
-      'Build a scoped Store with a precise Selector in five minutes',
-      'Register before mount and read by Token inside components'
+      'Render a counter button',
+      'Provider and Registry creation parameters'
     ],
     [
       '/zh/docs/store-react/provider-ownership-and-readiness',
-      '明确 StoreProvider 所有权与 Ready Barrier',
-      '按输入决定默认 dispose 行为'
+      '关闭订单页面并释放所属 Store',
+      '安排启动等待与后续渲染'
     ],
     [
       '/en/docs/store-react/provider-ownership-and-readiness',
-      'Define StoreProvider ownership and Ready Barriers',
-      'Derive default disposal from supplied ownership'
+      'Release the owned Store when closing an order page',
+      'Arrange startup readiness and later rendering'
+    ],
+    [
+      '/zh/docs/store-react/selectors-and-concurrent-tracking',
+      '选择组件真正需要的值',
+      '让读取保持稳定'
+    ],
+    [
+      '/en/docs/store-react/selectors-and-concurrent-tracking',
+      'Select the values a component needs',
+      'Keep reads stable'
+    ],
+    [
+      '/zh/docs/store-react/atoms-and-definitions',
+      '读取 Provider 内的 Atom 定义',
+      '定义和写入由 store-keyed 管理'
+    ],
+    [
+      '/en/docs/store-react/atoms-and-definitions',
+      'Read Atom definitions inside a Provider',
+      'Definitions and writes belong to store-keyed'
     ],
     [
       '/zh/docs/store-react/resources-and-suspense',
-      '正确选择 Resource、StoreResource 与 Suspense Hook',
-      '从资源来源选择 Hook'
+      '在用户资料加载时显示占位内容',
+      '管理实例并区分服务端与客户端'
     ],
     [
       '/en/docs/store-react/resources-and-suspense',
-      'Choose Resource, StoreResource, and Suspense Hooks correctly',
-      'Choose a Hook from the resource source'
+      'Show a fallback while a profile loads',
+      'Manage instances and distinguish server/client behavior'
     ],
-    ['/zh/docs/store-worker', 'Store Worker 学习路径', '先判断工作是否值得跨线程'],
+    [
+      '/zh/docs/store-react/registry-and-dependency-injection',
+      '按 token 注入订单 Store',
+      '区分单项清理与范围关闭'
+    ],
+    [
+      '/en/docs/store-react/registry-and-dependency-injection',
+      'Inject an order Store by token',
+      'Distinguish entry cleanup from scope closure'
+    ],
+    [
+      '/zh/docs/store-react/features-and-config',
+      '为收据组件启用所需功能',
+      '给等待缓存选择稳定范围'
+    ],
+    [
+      '/en/docs/store-react/features-and-config',
+      'Enable the feature required by a receipt component',
+      'Choose a stable scope for readiness caching'
+    ],
+    [
+      '/zh/docs/store-react/ssr-strict-mode-and-shutdown',
+      '隔离服务器请求并收取关闭结果',
+      '按九个公开错误码定位调用'
+    ],
+    [
+      '/en/docs/store-react/ssr-strict-mode-and-shutdown',
+      'Isolate server requests and collect cleanup results',
+      'Locate calls using the nine public error codes'
+    ],
+    ['/zh/docs/store-worker', '把计算交给 Worker 并取回结果', '底层工具'],
     [
       '/en/docs/store-worker',
-      'Store Worker learning paths',
-      'First decide whether work deserves a thread boundary'
+      'Run computations in a Worker and receive results',
+      'Low-level tools'
     ],
     [
       '/zh/docs/store-worker/getting-started',
-      '五分钟建立可取消的 Worker 计算链',
-      'Worker 侧建立处理器'
+      '在真实 Worker 中计算购物总价',
+      '构造与首个请求的参数'
     ],
     [
       '/en/docs/store-worker/getting-started',
-      'Build a cancellable Worker computation path in five minutes',
-      'Create the Worker-side handler'
+      'Calculate a shopping total in a real Worker',
+      'Constructor and first-request parameters'
+    ],
+    [
+      '/zh/docs/store-worker/choose-an-offload-path',
+      '选择一次计算或序列化任务',
+      '继续配置结果和字节'
+    ],
+    [
+      '/en/docs/store-worker/choose-an-offload-path',
+      'Choose computation or serialization',
+      'Configure results and bytes next'
+    ],
+    [
+      '/zh/docs/store-worker/adapter-requests-and-cancellation',
+      '取消请求并停止连接',
+      '关闭与释放的返回值'
+    ],
+    [
+      '/en/docs/store-worker/adapter-requests-and-cancellation',
+      'Cancel requests and stop a connection',
+      'Results of closing and disposal'
+    ],
+    [
+      '/zh/docs/store-worker/worker-handlers-and-lifecycle',
+      '接收 Worker 消息并完成关闭',
+      '消息函数附带的方法与属性'
+    ],
+    [
+      '/en/docs/store-worker/worker-handlers-and-lifecycle',
+      'Receive Worker messages and complete shutdown',
+      'Methods and properties attached to the message function'
+    ],
+    [
+      '/zh/docs/store-worker/resource-computed-and-cache',
+      'Worker 计算与缓存',
+      '选择缓存与重试行为'
+    ],
+    [
+      '/en/docs/store-worker/resource-computed-and-cache',
+      'Worker computations and cache',
+      'Choose cache and retry behavior'
+    ],
+    [
+      '/zh/docs/store-worker/serialization-worker-pipeline',
+      '序列化 Worker 流程',
+      '区分标签工具与流传送'
+    ],
+    [
+      '/en/docs/store-worker/serialization-worker-pipeline',
+      'Serialization worker pipeline',
+      'Separate chunk tagging from streaming'
     ],
     [
       '/zh/docs/store-worker/byte-copy-and-transfer-ownership',
-      '在 copy 安全性与 transfer 零拷贝之间选择',
-      '转移前确认输入是独占整块视图'
+      '字节复制与交出后的使用',
+      '交出不再使用的一份完整字节'
     ],
     [
       '/en/docs/store-worker/byte-copy-and-transfer-ownership',
-      'Choose between copy safety and zero-copy transfer',
-      'Transfer only an exclusively owned full-buffer view'
+      'Byte copies and transfer ownership',
+      'Hand off a complete byte buffer'
     ],
-    ['/zh/docs/store-wasm', 'Store WASM 学习路径', '按数据形状选择最窄字段'],
+    ['/zh/docs/store-worker/errors-timeouts-and-cleanup', '错误、超时与清理', '保留错误的真实来源'],
     [
-      '/en/docs/store-wasm',
-      'Store WASM learning paths',
-      'Choose the narrowest field for the data shape'
+      '/en/docs/store-worker/errors-timeouts-and-cleanup',
+      'Errors, timeouts, and cleanup',
+      'Preserve the actual error source'
     ],
     [
-      '/zh/docs/store-wasm/getting-started',
-      '五分钟建立并释放 WASM 字段 Store',
-      '显式完成 Readiness 后创建 Store'
+      '/zh/docs/store-worker/performance-and-shutdown-order',
+      '工作选择与关闭顺序',
+      '从工作内容决定是否卸载'
     ],
+    [
+      '/en/docs/store-worker/performance-and-shutdown-order',
+      'Workload choices and shutdown order',
+      'Choose offloading from the work itself'
+    ],
+    ['/zh/docs/store-wasm', '把数值状态保存在 WASM 内存中', '底层工具'],
+    ['/en/docs/store-wasm', 'Store numeric state in WASM memory', 'Low-level tools'],
+    ['/zh/docs/store-wasm/getting-started', '创建并释放温度字段', '继续选择字段'],
     [
       '/en/docs/store-wasm/getting-started',
-      'Build and release a WASM-field Store in five minutes',
-      'Complete Readiness before creating Store'
+      'Create and release a temperature field',
+      'Choose the next field'
+    ],
+    [
+      '/zh/docs/store-wasm/initialization-and-provider-readiness',
+      '先加载模块，再同步创建字段',
+      '在 React 子树显示前等待'
+    ],
+    [
+      '/en/docs/store-wasm/initialization-and-provider-readiness',
+      'Load the module before creating fields',
+      'Wait before rendering a React subtree'
+    ],
+    [
+      '/zh/docs/store-wasm/choose-a-field-layout',
+      '按数值、文字和集合选择字段',
+      '容量是输入限制，不是分配保证'
+    ],
+    [
+      '/en/docs/store-wasm/choose-a-field-layout',
+      'Choose fields for numbers, text, and collections',
+      'Capacity limits do not guarantee allocation'
+    ],
+    [
+      '/zh/docs/store-wasm/number-boolean-and-string-fields',
+      '读写数字、开关和定长文字',
+      '相同值和失败写入怎样处理'
+    ],
+    [
+      '/en/docs/store-wasm/number-boolean-and-string-fields',
+      'Read and write numbers, toggles, and bounded text',
+      'Equal values and failed writes'
     ],
     [
       '/zh/docs/store-wasm/array-granularity-and-bulk-writes',
-      '按订阅密度选择 Array Granularity',
-      '从读取模式选择分桶'
+      '数组粒度与批量写入',
+      '批量写入前先检查输入'
     ],
     [
       '/en/docs/store-wasm/array-granularity-and-bulk-writes',
-      'Choose Array Granularity from subscription density',
-      'Choose buckets from the read pattern'
+      'Array granularity and bulk writes',
+      'Validate inputs before bulk writes'
     ],
-    ['/zh/docs/store-shared', 'Store Shared 学习路径', '先判断是否真的需要共享内存'],
+    [
+      '/zh/docs/store-wasm/record-layout-and-field-tracking',
+      '记录布局与逐字段追踪',
+      '固定记录的字段限制'
+    ],
+    [
+      '/en/docs/store-wasm/record-layout-and-field-tracking',
+      'Record layout and field tracking',
+      'Limits of fixed records'
+    ],
+    [
+      '/zh/docs/store-wasm/memory-safety-views-and-capacity',
+      '内存视图与容量',
+      '按业务限制固定容量'
+    ],
+    [
+      '/en/docs/store-wasm/memory-safety-views-and-capacity',
+      'Memory views and capacity',
+      'Choose fixed capacities from product needs'
+    ],
+    ['/zh/docs/store-wasm/errors-rollback-and-disposal', '错误、回滚与释放', '错误与字段模式工具'],
+    [
+      '/en/docs/store-wasm/errors-rollback-and-disposal',
+      'Errors, rollback, and disposal',
+      'Error and field-mode tools'
+    ],
+    [
+      '/zh/docs/store-wasm/performance-and-when-not-to-use',
+      '何时保留普通 Store 字段',
+      '根据布局需要选择'
+    ],
+    [
+      '/en/docs/store-wasm/performance-and-when-not-to-use',
+      'When ordinary store fields remain useful',
+      'Choose from layout needs'
+    ],
+    ['/zh/docs/store-shared', '在线程之间共享整数状态', '共享的是内存，不是 Runtime 对象'],
     [
       '/en/docs/store-shared',
-      'Store Shared learning paths',
-      'First decide whether shared memory is necessary'
+      'Share integer state between threads',
+      'Share memory rather than Runtime objects'
     ],
-    [
-      '/zh/docs/store-shared/getting-started',
-      '五分钟在主线程与 Worker 共享响应式数组',
-      '主线程创建并交接 Buffer'
-    ],
+    ['/zh/docs/store-shared/getting-started', '创建一个响应式库存视图', '观察者和共享内存分别管理'],
     [
       '/en/docs/store-shared/getting-started',
-      'Share a reactive array between main thread and Worker in five minutes',
-      'Create and hand off the Buffer on main'
+      'Create a reactive stock view',
+      'Manage observers separately from shared memory'
+    ],
+    [
+      '/zh/docs/store-shared/environment-and-buffer-handoff',
+      '把共享库存传给 Worker',
+      '每个线程持有自己的对象'
+    ],
+    [
+      '/en/docs/store-shared/environment-and-buffer-handoff',
+      'Pass shared stock to a Worker',
+      'Each thread owns its local object'
+    ],
+    [
+      '/zh/docs/store-shared/shared-signal-and-sync',
+      '把远端写入带进本地视图',
+      '争用处理来自底层读写'
+    ],
+    [
+      '/en/docs/store-shared/shared-signal-and-sync',
+      'Bring remote writes into a local view',
+      'Contention handling belongs to the underlying reads and writes'
+    ],
+    [
+      '/zh/docs/store-shared/shared-array-and-reactive-cells',
+      '只追踪订单需要的共享数组下标',
+      '读写与复制数组数据'
+    ],
+    [
+      '/en/docs/store-shared/shared-array-and-reactive-cells',
+      'Track the shared array index needed by an order',
+      'Read, write, and copy array data'
     ],
     [
       '/zh/docs/store-shared/seqlock-and-contention',
-      '理解 Seqlock 一致读写与不可恢复竞争',
-      '读写协议避免新值配旧版本'
+      '读取一次已经完成的共享写入',
+      '持续争用时会怎样'
     ],
     [
       '/en/docs/store-shared/seqlock-and-contention',
-      'Understand Seqlock consistency and unrecoverable contention',
-      'The protocol prevents new value with an old version'
-    ],
-    ['/zh/docs/store-devtools', 'Store Devtools 学习路径', '先按要回答的问题选择入口'],
-    [
-      '/en/docs/store-devtools',
-      'Store Devtools learning paths',
-      'Choose an entry from the question'
+      'Read one completed shared write',
+      'What happens during sustained contention'
     ],
     [
-      '/zh/docs/store-devtools/getting-started',
-      '五分钟记录状态、定位 Action 并安全释放',
-      '围绕一个 Store 建立有界诊断会话'
+      '/zh/docs/store-shared/dirty-pages-and-sparse-sync',
+      '同步其他运行时修改的数组',
+      '了解底层同步方法的作用'
     ],
+    [
+      '/en/docs/store-shared/dirty-pages-and-sparse-sync',
+      'Synchronize array writes from another Runtime',
+      'Understand the low-level synchronization methods'
+    ],
+    [
+      '/zh/docs/store-shared/watch-waitasync-and-fallback',
+      '用真实 Worker 唤醒共享状态观察者',
+      '在已有循环中选择手动同步'
+    ],
+    [
+      '/en/docs/store-shared/watch-waitasync-and-fallback',
+      'Wake shared-state observers from a real Worker',
+      'Choose manual synchronization in an existing loop'
+    ],
+    [
+      '/zh/docs/store-shared/atomic-update-and-low-level-primitives',
+      '预订一件库存并了解底层方法',
+      '共享 Signal 的观察节点成员'
+    ],
+    [
+      '/en/docs/store-shared/atomic-update-and-low-level-primitives',
+      'Reserve one item and understand low-level methods',
+      'Observable members of a shared Signal'
+    ],
+    [
+      '/zh/docs/store-shared/ownership-pruning-and-disposal',
+      '关闭本地视图并保留共享数据',
+      '分别结束视图、包装对象与 Worker'
+    ],
+    [
+      '/en/docs/store-shared/ownership-pruning-and-disposal',
+      'Close a local view while retaining shared data',
+      'Finish views, wrappers, and Workers separately'
+    ],
+    [
+      '/zh/docs/store-shared/security-capacity-and-recovery',
+      '按可信快照重新创建共享库存',
+      '识别七个公开错误码与原始宿主错误'
+    ],
+    [
+      '/en/docs/store-shared/security-capacity-and-recovery',
+      'Recreate shared stock from a trusted snapshot',
+      'Identify seven public codes and original host errors'
+    ],
+    ['/zh/docs/store-devtools', '查看 Store 怎样变化', '底层工具'],
+    ['/en/docs/store-devtools', 'See how a Store changes', 'Low-level tools'],
+    ['/zh/docs/store-devtools/getting-started', '记录修改并恢复购物车数量', 'tools 的全部成员'],
     [
       '/en/docs/store-devtools/getting-started',
-      'Record state, inspect Actions, and release safely in five minutes',
-      'Build one bounded diagnostic session around a Store'
+      'Record an edit and restore a cart quantity',
+      'Every member of tools'
+    ],
+    [
+      '/zh/docs/store-devtools/session-and-history',
+      '设置历史容量并标记调试时刻',
+      '检查条目是否还在历史中'
+    ],
+    [
+      '/en/docs/store-devtools/session-and-history',
+      'Bound history and label debugging checkpoints',
+      'Check whether an entry remains available'
+    ],
+    [
+      '/zh/docs/store-devtools/actions-and-runtime-trace',
+      '查看动作摘要与 Runtime 事件',
+      '区分历史与整条 Runtime 流'
+    ],
+    [
+      '/en/docs/store-devtools/actions-and-runtime-trace',
+      'Inspect action summaries and Runtime events',
+      'Distinguish history from the Runtime stream'
     ],
     [
       '/zh/docs/store-devtools/time-travel-and-side-effects',
-      '把 jumpTo 当作状态复水，不是事务回滚',
-      '明确能恢复与不能恢复的内容'
+      '恢复字段时，观察者还会执行',
+      '回放期间记录哪些内容'
     ],
     [
       '/en/docs/store-devtools/time-travel-and-side-effects',
-      'Treat jumpTo as state hydration, not transaction rollback',
-      'Know what can and cannot be restored'
+      'Observers still run when restoring fields',
+      'Recording during replay'
     ],
-    ['/zh/docs/store-ssr', 'Store SSR 学习路径', '沿一次请求的生命周期阅读'],
-    ['/en/docs/store-ssr', 'Store SSR learning paths', 'Follow one request lifecycle'],
     [
-      '/zh/docs/store-ssr/getting-started',
-      '五分钟完成服务端脱水与浏览器复水',
-      '服务端：创建、渲染、注入、关闭'
+      '/zh/docs/store-devtools/dependency-and-observer-trees',
+      '依赖树与观察者树',
+      '读取结果与展开深度'
     ],
+    [
+      '/en/docs/store-devtools/dependency-and-observer-trees',
+      'Dependency and observer trees',
+      'Returned data and traversal depth'
+    ],
+    [
+      '/zh/docs/store-devtools/clone-redaction-and-failure-containment',
+      '克隆、脱敏与失败处理',
+      '编辑无效 JSON 时诊断失败不打断草稿'
+    ],
+    [
+      '/en/docs/store-devtools/clone-redaction-and-failure-containment',
+      'Cloning, redaction, and failure handling',
+      'Keep a draft usable when diagnostic JSON parsing fails'
+    ],
+    [
+      '/zh/docs/store-devtools/command-bridge-boundary',
+      '命令常量与本地映射',
+      '常量提供拼写，应用决定动作'
+    ],
+    [
+      '/en/docs/store-devtools/command-bridge-boundary',
+      'Command constants and local mapping',
+      'Constants name commands; the application chooses actions'
+    ],
+    ['/zh/docs/store-devtools/performance-and-disposal', '诊断成本与释放', '关闭会话与处理失败'],
+    [
+      '/en/docs/store-devtools/performance-and-disposal',
+      'Diagnostic cost and disposal',
+      'Dispose the session and handle failures'
+    ],
+    ['/zh/docs/store-ssr', '为每次请求收集页面状态', '创建状态与传输状态'],
+    [
+      '/en/docs/store-ssr',
+      'Collect page state for each request',
+      'Create state and transport state'
+    ],
+    ['/zh/docs/store-ssr/getting-started', '生成第一次请求的状态文本', '返回的作用域可做什么'],
     [
       '/en/docs/store-ssr/getting-started',
-      'Complete server dehydration and browser hydration in five minutes',
-      'Server: create, render, embed, and close'
+      'Produce state text for the first request',
+      'What the returned scope provides'
+    ],
+    [
+      '/zh/docs/store-ssr/request-isolation-and-runtime',
+      '让每次请求使用自己的状态',
+      '把创建和清理放在同一请求 owner 中'
+    ],
+    [
+      '/en/docs/store-ssr/request-isolation-and-runtime',
+      'Give each request its own state',
+      'Keep creation and cleanup with the request owner'
+    ],
+    [
+      '/zh/docs/store-ssr/register-and-own-state',
+      '登记状态并确定清理责任',
+      '先收到快照，再登记对象'
+    ],
+    [
+      '/en/docs/store-ssr/register-and-own-state',
+      'Register state and assign cleanup ownership',
+      'Receive state before registering an object'
+    ],
+    [
+      '/zh/docs/store-ssr/hydrate-and-dehydrate',
+      '把订单快照还原到新的请求范围',
+      '选择稳定传输快照'
+    ],
+    [
+      '/en/docs/store-ssr/hydrate-and-dehydrate',
+      'Restore an order snapshot into a new request scope',
+      'Choose a stable transfer snapshot'
     ],
     [
       '/zh/docs/store-ssr/await-resources-and-timeouts',
-      '用总预算收敛异步 Resource',
-      'timeoutMs 是整个等待过程的预算'
+      '等待读取完成后生成首屏数据',
+      '等待后打包资源与 Store'
     ],
     [
       '/en/docs/store-ssr/await-resources-and-timeouts',
-      'Converge async Resources under one total budget',
-      'timeoutMs budgets the complete wait'
+      'Wait for loading before generating initial page data',
+      'Package resources and Stores after waiting'
+    ],
+    ['/zh/docs/store-ssr/embed-and-read-state', '把结账状态写入页面并读回', '文档对象和数据标签'],
+    [
+      '/en/docs/store-ssr/embed-and-read-state',
+      'Write checkout state into HTML and read it back',
+      'Document fields and data elements'
+    ],
+    [
+      '/zh/docs/store-ssr/custom-codecs-and-abort',
+      '通过编解码器生成状态脚本',
+      '从真实文档入口读取编码状态'
+    ],
+    [
+      '/en/docs/store-ssr/custom-codecs-and-abort',
+      'Generate a state script through a codec registry',
+      'Read encoded state from a document host'
     ],
     [
       '/zh/docs/store-ssr/validation-security-and-trusted-path',
-      '建立载荷边界，再决定是否使用 Trusted 快速路径',
-      'assertSSRState 的拒绝边界'
+      '检查状态，再选择受信路径',
+      '受信类型不能代替数据检查'
     ],
     [
       '/en/docs/store-ssr/validation-security-and-trusted-path',
-      'Establish payload boundaries before choosing the trusted fast path',
-      'assertSSRState rejection boundaries'
-    ],
-    ['/zh/docs/store-persist', 'Store Persist 学习路径', '先按内存状态模型选择入口'],
-    [
-      '/en/docs/store-persist',
-      'Store Persist learning paths',
-      'Choose the entry from the in-memory state model'
+      'Validate state before choosing the trusted path',
+      'A trusted type is not input authentication'
     ],
     [
-      '/zh/docs/store-persist/getting-started',
-      '五分钟恢复、修改并落盘用户设置',
-      '把 readiness 和物理写入放进调用流程'
+      '/zh/docs/store-ssr/shutdown-errors-and-streaming',
+      '流输出完成后关闭请求范围',
+      '区分十二个公开错误码'
     ],
+    [
+      '/en/docs/store-ssr/shutdown-errors-and-streaming',
+      'Close the request scope after stream output completes',
+      'Distinguish the twelve public error codes'
+    ],
+    ['/zh/docs/store-persist', '自动保存用户设置与集合', '底层工具'],
+    ['/en/docs/store-persist', 'Automatically save settings and collections', 'Low-level tools'],
+    ['/zh/docs/store-persist/getting-started', '保存并读回主题设置', '接入应用中的存储'],
     [
       '/en/docs/store-persist/getting-started',
-      'Restore, modify, and persist user settings in five minutes',
-      'Place readiness and physical writing in the caller flow'
+      'Save and read back a theme',
+      'Connect application storage'
+    ],
+    ['/zh/docs/store-persist/choose-an-adapter', '按状态对象选择保存入口', '选项差别与错误'],
+    [
+      '/en/docs/store-persist/choose-an-adapter',
+      'Choose the entry for your state object',
+      'Option differences and errors'
     ],
     [
-      '/zh/docs/store-persist/hydration-and-startup-races',
-      '处理 Hydration 与启动期本地写入竞态',
-      'Plain object 使用启动快照三向合并'
+      '/zh/docs/store-persist/partialize-merge-and-migrations',
+      '筛选保存字段并升级旧格式',
+      '选择合并方式'
     ],
     [
-      '/en/docs/store-persist/hydration-and-startup-races',
-      'Handle Hydration races with local startup writes',
-      'Plain objects use a three-way startup snapshot merge'
+      '/en/docs/store-persist/partialize-merge-and-migrations',
+      'Select saved fields and upgrade old formats',
+      'Choose how to combine saved and current state'
     ],
     [
       '/zh/docs/store-persist/codecs-and-storage-capabilities',
-      '让 Codec 输出与 Backend 能力精确匹配',
-      '按 codec.output 选择存储通道'
+      '选择文本或字节保存格式',
+      '单次存取工具的参数与结果'
     ],
     [
       '/en/docs/store-persist/codecs-and-storage-capabilities',
-      'Match Codec output to Backend capability exactly',
-      'Select a storage channel from codec.output'
+      'Choose text or byte storage',
+      'Parameters and results for one-off storage helpers'
     ],
-    ['/zh/docs/store-middleware', 'Store Middleware 学习路径', '先判断是否需要 Host'],
+    [
+      '/zh/docs/store-persist/hydration-and-startup-races',
+      '恢复与启动竞态',
+      '区分“尝试结束”和“读取成功”'
+    ],
+    [
+      '/en/docs/store-persist/hydration-and-startup-races',
+      'Hydration and startup races',
+      'Separate attempt completion from success'
+    ],
+    [
+      '/zh/docs/store-persist/write-queue-debounce-and-flush',
+      '有序写入、防抖与保存',
+      '关闭时仍有待保存的编辑'
+    ],
+    [
+      '/en/docs/store-persist/write-queue-debounce-and-flush',
+      'Write queues, debounce, and flush',
+      'Close with an edit still awaiting its timer'
+    ],
+    [
+      '/zh/docs/store-persist/keyed-families-and-clear',
+      '按键保存与批量删除',
+      '退出用户草稿编辑后删除存档'
+    ],
+    [
+      '/en/docs/store-persist/keyed-families-and-clear',
+      'Keyed persistence and clearing',
+      'Remove archives after leaving the draft editor'
+    ],
+    ['/zh/docs/store-persist/retry-errors-and-shutdown', '重试、错误与关闭', '排错与适配器工具'],
+    [
+      '/en/docs/store-persist/retry-errors-and-shutdown',
+      'Retry, errors, and shutdown',
+      'Troubleshooting and adapter tools'
+    ],
+    ['/zh/docs/store-middleware', '观察 Store 的操作与状态更新', '各包负责的部分'],
     [
       '/en/docs/store-middleware',
-      'Store Middleware learning paths',
-      'Decide whether a Host is necessary'
+      'Observe Store operations and state updates',
+      'Package responsibilities'
     ],
-    [
-      '/zh/docs/store-middleware/getting-started',
-      '五分钟启用 Actions-only 与日志插件',
-      '共享策略实例并显式关闭 Host'
-    ],
+    ['/zh/docs/store-middleware/getting-started', '给计数 Store 接入日志', '绑定返回什么'],
     [
       '/en/docs/store-middleware/getting-started',
-      'Enable actions-only writes and a logging plugin in five minutes',
-      'Share the policy instance and close the Host explicitly'
+      'Add logging to a counter Store',
+      'What the binding returns'
+    ],
+    [
+      '/zh/docs/store-middleware/binding-and-shared-policy',
+      '绑定已有 Store 与共享写入策略',
+      '返回句柄与插件管理'
+    ],
+    [
+      '/en/docs/store-middleware/binding-and-shared-policy',
+      'Bind a Store and share its mutation policy',
+      'Returned handle and plugin management'
+    ],
+    ['/zh/docs/store-middleware/events-and-plugins', '按事件编写审计插件', '同步管道的处理顺序'],
+    [
+      '/en/docs/store-middleware/events-and-plugins',
+      'Write an audit plugin for events',
+      'Synchronous pipeline order'
+    ],
+    [
+      '/zh/docs/store-middleware/actions-and-mutation-boundaries',
+      '在同一操作范围内更新订单',
+      '理解业务函数与事件的完成时间'
+    ],
+    [
+      '/en/docs/store-middleware/actions-and-mutation-boundaries',
+      'Update an order inside one action scope',
+      'Distinguish business execution from event timing'
     ],
     [
       '/zh/docs/store-middleware/snapshot-clone-policies',
-      '为状态快照选择明确的 Clone Policy',
-      '按消费场景选择，而不是统一使用“宽容克隆”'
+      '保存订单记录时选择复制方式',
+      '了解诊断复制的实际限制'
     ],
     [
       '/en/docs/store-middleware/snapshot-clone-policies',
-      'Choose an explicit Clone Policy for state snapshots',
-      'Choose by consumer instead of applying one tolerant clone everywhere'
+      'Choose a copy policy when recording an order',
+      'Understand diagnostic fallback limits'
     ],
     [
       '/zh/docs/store-middleware/devtools-and-state-commands',
-      '安全接入 Redux DevTools 状态命令',
-      '只有提供 applyState 才能接受状态命令'
+      '通过本地检查器恢复计数状态',
+      '安装、应用状态与卸载'
     ],
     [
       '/en/docs/store-middleware/devtools-and-state-commands',
-      'Integrate Redux DevTools state commands safely',
-      'Accept state commands only when applyState exists'
+      'Restore counter state from a local inspector',
+      'Install, apply state, and remove'
     ],
-    ['/zh/docs/store-indexed', 'Store Indexed 学习路径', '先从访问模式选择集合'],
+    [
+      '/zh/docs/store-middleware/pipeline-errors-and-reentrancy',
+      '让事件继续传递并区分错误出口',
+      '检查七个公开错误码'
+    ],
+    [
+      '/en/docs/store-middleware/pipeline-errors-and-reentrancy',
+      'Continue event delivery and distinguish failure paths',
+      'Inspect the seven public error codes'
+    ],
+    [
+      '/zh/docs/store-middleware/shutdown-and-ownership',
+      '先关闭观察绑定，再处理 Store',
+      '检查逻辑关闭与实际清理'
+    ],
+    [
+      '/en/docs/store-middleware/shutdown-and-ownership',
+      'Close observation bindings before disposing the Store',
+      'Inspect logical closure and physical cleanup'
+    ],
+    ['/zh/docs/store-indexed', '按字段和条目观察集合', '按集合形状与读取方式继续'],
     [
       '/en/docs/store-indexed',
-      'Store Indexed learning paths',
-      'Choose a collection from the access pattern'
+      'Observe collection fields and entries',
+      'Continue by collection shape and read behavior'
     ],
-    [
-      '/zh/docs/store-indexed/getting-started',
-      '五分钟订阅一个大集合中的单个 key',
-      '在同一个 Runtime 中创建集合和 Effect'
-    ],
+    ['/zh/docs/store-indexed/getting-started', '观察任务列表的第一项', '写入检查、调试名称与释放'],
     [
       '/en/docs/store-indexed/getting-started',
-      'Subscribe to one key in a large collection in five minutes',
-      'Create the collection and Effect in one Runtime'
+      'Observe the first task in a list',
+      'Mutation checks, debug naming, and cleanup'
     ],
-    [
-      '/zh/docs/store-indexed/choose-a-collection',
-      '选择 Object、Array、Map 或 Set',
-      '类与工厂函数的参数顺序不同'
-    ],
+    ['/zh/docs/store-indexed/choose-a-collection', '按数据形状选择集合', '四种集合共用的成员'],
     [
       '/en/docs/store-indexed/choose-a-collection',
-      'Choose Object, Array, Map, or Set',
-      'Classes and factory functions use different argument order'
+      'Choose a collection for the data shape',
+      'Members shared by all four collections'
+    ],
+    [
+      '/zh/docs/store-indexed/tracking-and-cell-lifecycle',
+      '让价格视图只读取所需条目',
+      '让集合与观察者使用同一个 Runtime'
+    ],
+    [
+      '/en/docs/store-indexed/tracking-and-cell-lifecycle',
+      'Let a price view read its selected entry',
+      'Use one Runtime for the collection and its observer'
     ],
     [
       '/zh/docs/store-indexed/array-index-semantics',
-      '正确使用 ObservableArray 的纯索引语义',
-      '不要把移动后的索引当稳定实体'
+      '删除首行后继续观察第一个位置',
+      '位置变化不等于跟随同一商品'
     ],
     [
       '/en/docs/store-indexed/array-index-semantics',
-      'Use ObservableArray pure index semantics correctly',
-      'Do not treat a shifted index as stable entity identity'
+      'Observe the first position after removing a row',
+      'Position tracking does not follow a product'
+    ],
+    [
+      '/zh/docs/store-indexed/bulk-replacement-and-pruning',
+      '用新库存整体替换当前内容',
+      '理解 prune 实际整理什么'
+    ],
+    [
+      '/en/docs/store-indexed/bulk-replacement-and-pruning',
+      'Replace current contents with refreshed inventory',
+      'Understand what prune actually retires'
     ],
     [
       '/zh/docs/store-indexed/mutation-guards-and-runtime',
-      '接入 Mutation Guard，并隔离 Runtime',
-      '跨 Runtime 追踪必须失败'
+      '在操作范围内修改订单',
+      '让集合与观察使用同一运行时'
     ],
     [
       '/en/docs/store-indexed/mutation-guards-and-runtime',
-      'Integrate a Mutation Guard and isolate Runtime',
-      'Cross-Runtime tracking must fail'
+      'Modify an order inside an action',
+      'Use one runtime for a collection and its observers'
     ],
-    ['/zh/docs/store-keyed', 'Store Keyed 学习路径', '先判断是否真的需要键控定义'],
+    [
+      '/zh/docs/store-indexed/disposal-and-errors',
+      '关闭选择列表并保留错误来源',
+      '检查五个公开码与外部错误'
+    ],
+    [
+      '/en/docs/store-indexed/disposal-and-errors',
+      'Close a selection list and preserve error sources',
+      'Check five public codes and external errors'
+    ],
+    ['/zh/docs/store-keyed', '在多个会话中复用状态定义', '从独立状态到列表与清理'],
     [
       '/en/docs/store-keyed',
-      'Store Keyed learning paths',
-      'Decide whether keyed definitions are necessary'
+      'Reuse state definitions across sessions',
+      'Continue from scoped values to lists and cleanup'
     ],
-    [
-      '/zh/docs/store-keyed/getting-started',
-      '五分钟建立两个互不串状态的作用域',
-      '模块顶层定义，作用域边界实例化'
-    ],
+    ['/zh/docs/store-keyed/getting-started', '订阅购物车小计', '继续查找 AtomStore 成员'],
     [
       '/en/docs/store-keyed/getting-started',
-      'Build two state-isolated scopes in five minutes',
-      'Define at module scope and instantiate at the scope boundary'
+      'Subscribe to a cart subtotal',
+      'Find the remaining AtomStore members'
     ],
     [
       '/zh/docs/store-keyed/definitions-and-scopes',
-      '选择 Definition，并明确实例作用域',
-      '按初值与写入契约选择构造器'
+      '定义复用与独立会话状态',
+      '供适配器使用的实例 atom 协议'
     ],
     [
       '/en/docs/store-keyed/definitions-and-scopes',
-      'Choose a Definition and name its instance scope',
-      'Choose a constructor by initialization and write contract'
+      'Reuse definitions with independent session state',
+      'The instance atom protocol for adapters'
+    ],
+    [
+      '/zh/docs/store-keyed/derived-and-writable-state',
+      '把结算操作放进可写派生',
+      '调度更新与处理失败'
+    ],
+    [
+      '/en/docs/store-keyed/derived-and-writable-state',
+      'Put checkout logic in a writable derivation',
+      'Schedule updates and handle failures'
     ],
     [
       '/zh/docs/store-keyed/optics-and-split-lists',
-      '用 Optics 聚焦对象并按稳定 key 拆分列表',
-      '长期列表必须同时管理源项与 token 缓存'
+      '按商品键编辑列表中的数量',
+      '需要自定义投影时复用底层工具'
     ],
     [
       '/en/docs/store-keyed/optics-and-split-lists',
-      'Focus objects with Optics and split lists by stable key',
-      'A long-lived list owns source items and token cache separately'
+      'Edit a line quantity by its product key',
+      'Reuse low-level tools for custom projections'
     ],
     [
       '/zh/docs/store-keyed/families-and-cache-identity',
-      '按业务 key 建立 Family，并控制缓存 identity',
-      '让 key 选择 Definition，而不是共享实例'
+      '按会话编号选择草稿定义',
+      '管理定义缓存与已有状态'
     ],
     [
       '/en/docs/store-keyed/families-and-cache-identity',
-      'Build a family by business key and control cache identity',
-      'Let the key choose a Definition, not a shared instance'
+      'Choose a draft definition by conversation ID',
+      'Manage cached definitions and existing state'
     ],
     [
       '/zh/docs/store-keyed/preview-and-overrides',
-      '在并发预览和测试替换中保持契约',
-      '只有纯工厂才能在 speculative preview 中执行'
+      '预览表单与临时替换价格',
+      '临时使用活动价格，再恢复普通价格'
     ],
     [
       '/en/docs/store-keyed/preview-and-overrides',
-      'Preserve contracts during concurrent preview and test replacement',
-      'Only a pure factory may run during speculative preview'
+      'Preview a form and temporarily replace pricing',
+      'Use campaign pricing and restore regular pricing'
     ],
     [
       '/zh/docs/store-keyed/release-and-disposal',
-      '释放单个 Definition 或终止整个 AtomStore',
-      '按所有权层级选择清理动作'
+      '关闭会话后回收状态和缓存',
+      '按公开错误码检查原因'
     ],
     [
       '/en/docs/store-keyed/release-and-disposal',
-      'Release one Definition or terminate the whole AtomStore',
-      'Choose cleanup at the owning layer'
+      'Release state and cached definitions after a conversation closes',
+      'Inspect failures using public codes'
     ],
-    ['/zh/docs/store-light', 'Store Light 学习路径', '先判断数据是否适合对象 Store'],
+    ['/zh/docs/store-light', '让表单和页面对象自动更新', '扩展与诊断工具'],
     [
       '/en/docs/store-light',
-      'Store Light learning paths',
-      'Decide whether the data fits an object Store'
+      'Keep forms and page objects reactive',
+      'Extension and diagnostic tools'
     ],
     [
       '/zh/docs/store-light/getting-started',
-      '五分钟创建、订阅并释放对象 Store',
-      '直接描述业务对象'
+      '安装并创建一个设置对象',
+      '创建后可以读什么、调用什么'
     ],
     [
       '/en/docs/store-light/getting-started',
-      'Create, subscribe to, and dispose an object Store in five minutes',
-      'Describe the business object directly'
+      'Install and create a settings object',
+      'Properties and methods after creation'
     ],
-    [
-      '/zh/docs/store-light/object-store-model',
-      '理解字段、Computed、Action 与 raw',
-      '每一种输入形状只有一个含义'
-    ],
+    ['/zh/docs/store-light/object-store-model', '字段、计算值、方法和订阅', '一起修改配送地址'],
     [
       '/en/docs/store-light/object-store-model',
-      'Understand fields, Computed values, Actions, and raw',
-      'Every input shape has one meaning'
-    ],
-    [
-      '/zh/docs/store-light/async-fields-and-readiness',
-      '选择同步或异步 Store 创建入口',
-      '按 Builder 模式选择入口'
-    ],
-    [
-      '/en/docs/store-light/async-fields-and-readiness',
-      'Choose synchronous or asynchronous Store creation',
-      'Choose an entry from Builder mode'
-    ],
-    [
-      '/zh/docs/store-light/snapshots-and-hydration',
-      '区分完整快照、持久化数据与宽松 Hydration',
-      '不要用一个快照承担所有用途'
-    ],
-    [
-      '/en/docs/store-light/snapshots-and-hydration',
-      'Separate complete snapshots, persisted data, and tolerant hydration',
-      'Do not make one snapshot serve every purpose'
+      'Fields, computed values, methods, and subscriptions',
+      'Update a shipping address together'
     ],
     [
       '/zh/docs/store-light/field-builders-and-mutation',
-      '扩展 FieldBuilder，并保持 Runtime 与写入边界',
-      '声明同步或异步构造模式'
+      '接入自定义字段和写入策略',
+      '失败与释放如何处理'
     ],
     [
       '/en/docs/store-light/field-builders-and-mutation',
-      'Extend FieldBuilder while preserving Runtime and mutation boundaries',
-      'Declare synchronous or asynchronous construction mode'
+      'Add custom fields and write policies',
+      'Failure and cleanup'
     ],
     [
-      '/zh/docs/store-light/resources-and-suspense',
-      '用 StoreResource 建立 Suspense 安全异步值',
-      '把请求取消和错误观察放进资源'
+      '/zh/docs/store-light/async-fields-and-readiness',
+      '异步字段与就绪',
+      '初始化失败也要释放已创建字段'
     ],
+    [
+      '/en/docs/store-light/async-fields-and-readiness',
+      'Asynchronous fields and readiness',
+      'Release initialized fields after another fails'
+    ],
+    ['/zh/docs/store-light/snapshots-and-hydration', '快照与恢复', '恢复旧设置'],
+    [
+      '/en/docs/store-light/snapshots-and-hydration',
+      'Snapshots and hydration',
+      'Restore older settings'
+    ],
+    ['/zh/docs/store-light/resources-and-suspense', '异步资源与 Suspense', '关闭一组报告资源'],
     [
       '/en/docs/store-light/resources-and-suspense',
-      'Build a Suspense-safe asynchronous value with StoreResource',
-      'Place request cancellation and error observation in the resource'
+      'Resources and Suspense',
+      'Close a group of report resources'
     ],
     [
       '/zh/docs/store-light/resource-versions-and-lifecycle',
-      '管理 Resource 版本、Capture 与终态',
-      '区分稳定持有与 provisional capture'
+      '版本与资源释放',
+      '等待关闭并保留失败线索'
     ],
     [
       '/en/docs/store-light/resource-versions-and-lifecycle',
-      'Manage Resource versions, captures, and terminal state',
-      'Separate stable retention from provisional capture'
+      'Resource versions and cleanup',
+      'Await cleanup and preserve failures'
     ],
-    ['/zh/docs/wasm', 'WASM 学习路径', '按宿主与数据边界进入'],
-    ['/en/docs/wasm', 'WASM learning paths', 'Enter by host and data boundary'],
-    [
-      '/zh/docs/wasm/getting-started',
-      '五分钟完成 JSON 到 MessagePack 转码',
-      '让每一个分配都有明确释放点'
-    ],
+    ['/zh/docs/wasm', 'Wasm：在一块字节内存里处理数据', '底层工具'],
+    ['/en/docs/wasm', 'Wasm: work with data in byte memory', 'Lower-level tools'],
+    ['/zh/docs/wasm/getting-started', '快速开始：写入并读取地图坐标', '继续分配时重新创建视图'],
     [
       '/en/docs/wasm/getting-started',
-      'Convert JSON to MessagePack in five minutes',
-      'Give every allocation an explicit release point'
+      'Quick start: write and read map coordinates',
+      'Recreate views when allocating more'
     ],
     [
       '/zh/docs/wasm/initialization-and-hosts',
-      '在浏览器、Node 与预编译宿主中初始化 WASM',
-      '按加载权限选择初始化方式'
+      '初始化与宿主：从本地文件启动草稿转换',
+      '使用返回的内存，转换用具名函数'
     ],
     [
       '/en/docs/wasm/initialization-and-hosts',
-      'Initialize WASM in browsers, Node, and precompiled hosts',
-      'Choose initialization by loading authority'
+      'Initialization and hosts: start draft conversion from a local file',
+      'Use returned memory and named conversion functions'
     ],
     [
       '/zh/docs/wasm/arena-memory',
-      '正确使用稳定 ID、指针与 8 字节对齐 Arena',
-      '读取每个 Arena API 的精确语义'
+      '暂存字节和数值，读取时使用当前内存',
+      '根据返回值处理分配和释放'
     ],
     [
       '/en/docs/wasm/arena-memory',
-      'Use stable ids, pointers, and the eight-byte-aligned arena correctly',
-      'Read the exact semantic of every arena API'
+      'Store bytes and numbers using the current memory',
+      'Handle allocation and release results'
     ],
     [
       '/zh/docs/wasm/conversion-boundaries',
-      '保持单文档转码与独立结果语义',
-      '只从当前 ConversionResult 判断成功'
+      '转换边界：把一份草稿存为 MessagePack，再还原',
+      '一份输入只能包含一个文档'
     ],
     [
       '/en/docs/wasm/conversion-boundaries',
-      'Preserve single-document conversion and independent result semantics',
-      'Determine success only from the current ConversionResult'
+      'Conversion boundaries: save a draft as MessagePack and restore it',
+      'One input must contain one document'
     ],
     [
       '/zh/docs/wasm/ownership-and-cleanup',
-      '确定性释放 WASM 分配并保留失败事实',
-      '为每种结果写出释放矩阵'
+      '使用后清理：转码结果和字节缓冲区分别释放',
+      '哪些数据仍然需要保留'
     ],
     [
       '/en/docs/wasm/ownership-and-cleanup',
-      'Release WASM allocations deterministically and preserve failure facts',
-      'Write a release matrix for every outcome'
+      'Clean up after use: release conversion results and byte buffers separately',
+      'Data that may still need to remain available'
     ],
-    ['/zh/docs/tray', 'Tray 学习路径', '先管理完整 Host 实例'],
-    ['/en/docs/tray', 'Tray learning paths', 'Manage complete Host instances first'],
     [
-      '/zh/docs/tray/getting-started',
-      '五分钟创建和管理 Host 实例',
-      'defineTrayHost、createTray 与 spawn'
+      '/zh/docs/wasm/troubleshooting',
+      '排错：转码没有输出，或字节视图不能用了',
+      '视图或释放结果不符合预期'
     ],
+    [
+      '/en/docs/wasm/troubleshooting',
+      'Troubleshooting: conversion has no output or a byte view stops working',
+      'Investigate unexpected view or release results'
+    ],
+    ['/zh/docs/tray', 'Tray：一起启动，也一起释放', '底层工具'],
+    ['/en/docs/tray', 'Tray: start and release an application together', 'Lower-level tools'],
+    ['/zh/docs/tray/getting-started', '从一个配置值开始', '需要多个插件实例时'],
     [
       '/en/docs/tray/getting-started',
-      'Create and manage Host instances in five minutes',
-      'defineTrayHost, createTray, and spawn'
+      'Start with one configuration value',
+      'When you need multiple plugin instances'
     ],
-    [
-      '/zh/docs/tray/static-composition',
-      '静态依赖图：Entry 定义与依赖校验',
-      '每个 Entry 只声明自己的边界'
-    ],
+    ['/zh/docs/tray/static-composition', '让计算值等待配置', '什么时候发现定义错误'],
     [
       '/en/docs/tray/static-composition',
-      'Static dependency graph: entries and dependencies',
-      'Each entry declares only its own boundary'
+      'Let computed values wait for configuration',
+      'When definition errors appear'
     ],
-    [
-      '/zh/docs/tray/readiness-and-errors',
-      '关闭 Readiness gate，并按错误身份恢复',
-      '在启动前解释 blocked 与 failed'
-    ],
+    ['/zh/docs/tray/readiness-and-errors', '确认启动条件，再处理错误', '完整错误码'],
     [
       '/en/docs/tray/readiness-and-errors',
-      'Close readiness gates and recover by error identity',
-      'Explain blocked and failed before startup'
+      'Check readiness before handling errors',
+      'All error codes'
     ],
-    ['/zh/docs/tray/resource-ownership', '让 Graph 唯一拥有 Entry 资源', '把辅助资源绑定到节点'],
+    ['/zh/docs/tray/resource-ownership', '把文件交给 Graph 释放', '取消和完成是两件事'],
     [
       '/en/docs/tray/resource-ownership',
-      'Let the Graph own entry resources exactly once',
-      'Bind auxiliary resources to the node'
+      'Let the Graph release an audit file',
+      'Cancellation and completion are separate'
     ],
-    [
-      '/zh/docs/tray/dynamic-host',
-      '创建唯一身份的托管 Plugin Host',
-      '一次性声明初始 definitions 与时间边界'
-    ],
+    ['/zh/docs/tray/dynamic-host', '运行中添加报告插件', '保留已知扩展类型'],
     [
       '/en/docs/tray/dynamic-host',
-      'Create one managed Plugin Host identity',
-      'Declare initial definitions and time boundaries once'
+      'Add a report plugin while running',
+      'Retain known extension types'
     ],
-    [
-      '/zh/docs/tray/mutation-and-blocking',
-      '解释 use、replace、unUse 与 blocked closure',
-      '读取结构化 mutation 结果'
-    ],
+    ['/zh/docs/tray/mutation-and-blocking', '补齐依赖后启用收银插件', '保留一次变更的完整观察'],
     [
       '/en/docs/tray/mutation-and-blocking',
-      'Interpret use, replace, unUse, and blocked closure',
-      'Read the structured mutation result'
+      'Enable checkout when its dependency arrives',
+      'Retain the complete mutation observation'
     ],
-    [
-      '/zh/docs/tray/physical-cleanup',
-      '区分逻辑提交与物理清理完成',
-      '始终保留同一个 physicalCompletion'
-    ],
+    ['/zh/docs/tray/physical-cleanup', '卸载后等待报告任务结束', '按实际资源关系关闭'],
     [
       '/en/docs/tray/physical-cleanup',
-      'Separate logical commit from physical cleanup completion',
-      'Retain and observe the same physicalCompletion'
+      'Wait for report completion after removal',
+      'Close according to resource ownership'
+    ],
+    ['/zh/docs/tray/loaders-and-adapters', '从文件加载报告插件', '区分返回资源和资源释放'],
+    [
+      '/en/docs/tray/loaders-and-adapters',
+      'Load a report plugin from a file',
+      'Separate artifacts from their release'
+    ],
+    ['/zh/docs/tray/runtime-tasks', '完成报告任务后卸载自身', '在当前一代中执行回调'],
+    [
+      '/en/docs/tray/runtime-tasks',
+      'Remove a report plugin after its task finishes',
+      'Execute against the current generation'
+    ],
+    ['/zh/docs/tray/instances-and-routing', '管理实例与选择报价路由', '按当前记录处理调用失败'],
+    [
+      '/en/docs/tray/instances-and-routing',
+      'Manage instances and route pricing calls',
+      'Handle calls according to the current record'
+    ],
+    [
+      '/zh/docs/tray/native-thread-and-process',
+      '运行真实 Worker 和子进程',
+      '区分已运行场景和源码说明'
+    ],
+    [
+      '/en/docs/tray/native-thread-and-process',
+      'Run real Workers and child processes',
+      'Separate executed examples from source-based options'
+    ],
+    ['/zh/docs/tray/topics-and-events', '发布业务消息与观察实例事件', '观察事件并结束等待'],
+    [
+      '/en/docs/tray/topics-and-events',
+      'Publish topics and observe instance events',
+      'Observe events and finish waiting'
     ],
     ['/zh/docs/utils', 'Utils：库代码常用的基础工具', '按子路径查找'],
     ['/en/docs/utils', 'Utils: everyday building blocks for library code', 'Find tools by subpath'],
@@ -2454,7 +2926,7 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     ['/zh/docs/utils/error-identity-and-causes', '错误身份与原因链', '本包的错误代码'],
     [
       '/en/docs/utils/error-identity-and-causes',
-      'Error identity and causes',
+      'Error identification and causes',
       'Error codes of this package'
     ],
     ['/zh/docs/utils/bytes-and-text', '字节与文本：Base64 和 UTF-8', 'ArrayBuffer 和 Uint8Array'],
@@ -2487,169 +2959,145 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'String templates and number formatting',
       'Number formatting'
     ],
-    ['/zh/docs/rpc-core', 'RPC 学习路径', '从实际宿主入口开始'],
-    ['/en/docs/rpc-core', 'RPC learning paths', 'Start from the actual host entry'],
-    [
-      '/zh/docs/rpc-core/getting-started',
-      '从 Runtime Peer 与插件建立首条调用链',
-      '浏览器：createBrowserPeer'
-    ],
+    ['/zh/docs/rpc-core', '跨端点调用业务方法', '底层工具'],
+    ['/en/docs/rpc-core', 'Call application methods across endpoints', 'Lower-level tools'],
+    ['/zh/docs/rpc-core/getting-started', '安装并计算商品小计', '端点返回什么'],
     [
       '/en/docs/rpc-core/getting-started',
-      'Build the first call path with Runtime Peers and plugins',
-      'Browser: createBrowserPeer'
+      'Install and calculate an item subtotal',
+      'What the endpoint returns'
     ],
-    [
-      '/zh/docs/rpc-core/endpoint-composition',
-      '高级组合：精确选择 Endpoint 能力',
-      '选择 Endpoint preset 或显式 Feature 图'
-    ],
+    ['/zh/docs/rpc-core/endpoint-composition', '选择端点需要的功能', '接已有运行时连接'],
     [
       '/en/docs/rpc-core/endpoint-composition',
-      'Advanced composition: select Endpoint capabilities precisely',
-      'Choose an Endpoint preset or an explicit Feature graph'
-    ],
-    [
-      '/zh/docs/rpc-core/calls-and-cancellation',
-      '正确选择调用、广播、通知与取消语义',
-      '不要用一个方法模拟另一种语义'
-    ],
-    [
-      '/en/docs/rpc-core/calls-and-cancellation',
-      'Choose call, fan-out, notification, and cancellation semantics correctly',
-      'Do not use one operation to imitate another'
+      'Select the endpoint features you need',
+      'Connect existing runtime operations'
     ],
     [
       '/zh/docs/rpc-core/providers-and-contracts',
-      '用 Provider 与 Contract 固定网络边界',
-      '为每个公开方法声明参数与结果'
+      '注册服务并检查业务数据',
+      '限制服务同时处理的工作'
     ],
     [
       '/en/docs/rpc-core/providers-and-contracts',
-      'Fix the network boundary with providers and contracts',
-      'Declare parameters and results for every public method'
+      'Register providers and check application data',
+      'Limit concurrent provider work'
+    ],
+    ['/zh/docs/rpc-core/extension-authoring', '给 RPC 增加能力与安装工作', '扩展作者的其他入口'],
+    [
+      '/en/docs/rpc-core/extension-authoring',
+      'Extend RPC capabilities and installation',
+      'Other extension tools'
     ],
     [
       '/zh/docs/rpc-core/transports-and-security',
-      '按拓扑选择 Transport，并建立真实安全边界',
-      '先声明真实拓扑'
+      '把 RPC 接到实际消息通道',
+      '适配器工具与后续阅读'
     ],
     [
       '/en/docs/rpc-core/transports-and-security',
-      'Choose a transport by topology and establish a real security boundary',
-      'Declare the real topology first'
+      'Connect RPC to physical message channels',
+      'Adapter tools and next steps'
     ],
     [
-      '/zh/docs/rpc-core/extension-authoring',
-      '扩展 RPC：Feature 边界与自定义 Middleware',
-      '编写一个可释放的自定义 Middleware'
+      '/zh/docs/rpc-core/calls-and-cancellation',
+      '选择调用方式并取消无用等待',
+      '按错误来源选择恢复动作'
     ],
     [
-      '/en/docs/rpc-core/extension-authoring',
-      'Extend RPC: Feature boundaries and custom middleware',
-      'Author disposable custom middleware'
+      '/en/docs/rpc-core/calls-and-cancellation',
+      'Choose calls and cancel unused work',
+      'Choose recovery from the error source'
     ],
-    [
-      '/zh/docs/rpc-core/discovery-and-control',
-      '发现远端能力，并显式启用控制面',
-      '把自动发现与手动发现当成不同策略'
-    ],
+    ['/zh/docs/rpc-core/discovery-and-control', '发现服务并选择一个接收端', '健康检测与关闭通知'],
     [
       '/en/docs/rpc-core/discovery-and-control',
-      'Discover remote capabilities and enable the control plane explicitly',
-      'Treat automatic and manual discovery as different policies'
+      'Discover a service and select a receiver',
+      'Health checks and close announcements'
     ],
-    [
-      '/zh/docs/rpc-core/chunking-and-backpressure',
-      '在明确容量预算下启用分片',
-      '同时选择 chunk Feature 与策略 middleware'
-    ],
+    ['/zh/docs/rpc-core/chunking-and-backpressure', '按需读取，并限制帧与发送队列', '限制发送积压'],
     [
       '/en/docs/rpc-core/chunking-and-backpressure',
-      'Enable chunking under explicit capacity budgets',
-      'Select both the chunk Feature and policy middleware'
+      'Read on demand and bound frames and queues',
+      'Bound outgoing backlog'
     ],
     [
       '/zh/docs/rpc-core/replay-retry-and-lifecycle',
-      '区分重放保护、业务重试与 Endpoint 终态',
-      '按双向请求吞吐配置重放窗口'
+      '复用业务键，并由创建者关闭连接',
+      '关闭后创建新的连接'
     ],
     [
       '/en/docs/rpc-core/replay-retry-and-lifecycle',
-      'Separate replay protection, business retry, and endpoint terminal state',
-      'Size the replay window from bidirectional request throughput'
+      'Reuse business keys and close owned connections',
+      'Create a new connection after closure'
     ],
-    ['/zh/docs/storage-web', 'Storage Web 学习路径', '先根据能力选择存储'],
-    ['/en/docs/storage-web', 'Storage Web learning paths', 'Choose storage by capability first'],
+    ['/zh/docs/storage-web', '保存页面偏好、草稿和离线记录', '底层与扩展工具'],
     [
-      '/zh/docs/storage-web/getting-started',
-      '五分钟选择并使用 Storage Web 后端',
-      'Local Storage 异步契约：保持调用模型可替换'
+      '/en/docs/storage-web',
+      'Save preferences, drafts, and offline records',
+      'Lower-level and extension tools'
     ],
-    [
-      '/en/docs/storage-web/getting-started',
-      'Choose and use a Storage Web backend in five minutes',
-      'Local Storage async contract for a replaceable call model'
-    ],
-    [
-      '/zh/docs/storage-web/indexeddb-and-transactions',
-      '用 IndexedDB 管理记录与事务',
-      '完成一条 record 的创建、读取、更新、删除与遍历'
-    ],
-    [
-      '/en/docs/storage-web/indexeddb-and-transactions',
-      'Manage records and transactions with IndexedDB',
-      'Create, read, update, delete, and iterate one record'
-    ],
+    ['/zh/docs/storage-web/getting-started', '安装并保存第一项设置', '命名空间编解码器'],
+    ['/en/docs/storage-web/getting-started', 'Install and save a setting', 'Namespace codec'],
     [
       '/zh/docs/storage-web/entity-schema-and-codecs',
-      '组合 Entity、Schema、Codec 与迁移',
-      '用一个定义产生 repository'
+      '校验、查询并升级业务记录',
+      '版本升级与迁移统计'
     ],
     [
       '/en/docs/storage-web/entity-schema-and-codecs',
-      'Compose Entity, Schema, Codec, and migrations',
-      'Produce a repository from one definition'
+      'Validate, query, and upgrade application records',
+      'Version upgrades and migration counts'
     ],
     [
       '/zh/docs/storage-web/host-and-plugins',
-      '用 Storage Host 组合多个后端',
-      '整个 plugins 数组全部成功后'
+      '按名称组合存储并统一关闭',
+      '插件编写者使用的辅助入口'
     ],
     [
       '/en/docs/storage-web/host-and-plugins',
-      'Compose several backends with Storage Host',
-      'The Host exposes backends only after the whole plugin array succeeds'
+      'Compose named stores and close them together',
+      'Helpers for plugin authors'
+    ],
+    [
+      '/zh/docs/storage-web/indexeddb-and-transactions',
+      'IndexedDB：记录、分页与事务',
+      '让升级和关闭完成'
+    ],
+    [
+      '/en/docs/storage-web/indexeddb-and-transactions',
+      'IndexedDB records, scans, and transactions',
+      'Allow upgrade and shutdown'
     ],
     [
       '/zh/docs/storage-web/reactive-live-queries',
-      '创建可取消的 Reactive live query',
-      'Live Query 解决“数据变了，读取结果何时重算”'
+      '持续查询：让页面跟随存储变化',
+      '页面关闭时停止查询'
     ],
     [
       '/en/docs/storage-web/reactive-live-queries',
-      'Create a cancellable reactive live query',
-      'Live Query answers when a read must rerun after data changes'
+      'Live queries that follow storage changes',
+      'Stop querying when the page closes'
     ],
     [
       '/zh/docs/storage-web/cookies-and-security',
-      '正确处理 Cookie scope 与安全边界',
-      '把 scope 当作 Cookie 持久身份的一部分'
+      'Cookie：路径、删除与可见范围',
+      '区分可见偏好与认证数据'
     ],
     [
       '/en/docs/storage-web/cookies-and-security',
-      'Handle cookie scope and security boundaries correctly',
-      'Treat scope as part of persistent Cookie identity'
+      'Cookie paths, deletion, and visibility',
+      'Separate visible preferences from authentication data'
     ],
     [
       '/zh/docs/storage-web/cancellation-errors-and-shutdown',
-      '处理取消、错误与 Storage 终态',
-      '用户不再需要结果时，用 AbortController 主动取消'
+      '取消、错误与关闭',
+      '关闭访问对象，保留持久数据'
     ],
     [
       '/en/docs/storage-web/cancellation-errors-and-shutdown',
-      'Handle cancellation, errors, and Storage terminal state',
-      'Use AbortController when the user no longer needs a result'
+      'Cancellation, errors, and shutdown',
+      'Close the accessor and keep persisted data'
     ],
     ['/zh/docs/logger', 'Logger：按需组合能力的日志库', '内置插件'],
     ['/en/docs/logger', 'Logger: a logging library you assemble from plugins', 'Built-in plugins'],
@@ -2721,47 +3169,55 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Remove, disable, and replace',
       'Disable: pause without releasing'
     ],
-    ['/zh/docs/capability', 'Capability 学习路径', '从变化发生在哪里开始'],
-    ['/en/docs/capability', 'Capability learning paths', 'Start with where change occurs'],
+    ['/zh/docs/capability', 'Capability：让可选功能按需打开和关闭', '底层工具'],
     [
-      '/zh/docs/capability/getting-started',
-      '五分钟建立可回退的运行时能力',
-      '登记惰性能力并保留释放句柄'
+      '/en/docs/capability',
+      'Capability: open and close optional features on demand',
+      'Lower-level tools'
     ],
+    ['/zh/docs/capability/getting-started', '快速开始：打开通知功能，再关闭它', '启用结果与状态'],
     [
       '/en/docs/capability/getting-started',
-      'Build a revocable runtime capability in five minutes',
-      'Register a lazy capability with an owned release handle'
+      'Quick start: open a notification feature, then close it',
+      'Enable results and states'
     ],
-    [
-      '/zh/docs/capability/graph',
-      '启动一个封闭的静态 Capability Graph',
-      '声明直接 provider，而不是在 start 内隐式查找'
-    ],
+    ['/zh/docs/capability/graph', '读取配置后启动界面', '按错误码找到问题'],
     [
       '/en/docs/capability/graph',
-      'Start a closed static Capability Graph',
-      'Declare direct providers instead of discovering them inside start'
+      'Start a view after loading configuration',
+      'Find the cause by error code'
     ],
     [
       '/zh/docs/capability/graph-dynamic',
-      '在运行中安全替换 Capability Graph 节点',
-      '把一次变更当作受影响闭包事务'
+      '动态 Graph：运行中更换服务，等待旧请求结束',
+      '由组合层启动和释放实例'
     ],
     [
       '/en/docs/capability/graph-dynamic',
-      'Replace Capability Graph nodes safely at runtime',
-      'Treat one mutation as an affected-closure transaction'
+      'Dynamic Graph: replace a service after old requests finish',
+      'Let the composition layer start and release instances'
     ],
-    [
-      '/zh/docs/capability/graph-topology',
-      '为组合层构建不可变拓扑快照',
-      '只在你已经拥有 lifecycle 时使用'
-    ],
+    ['/zh/docs/capability/graph-topology', '先检查依赖，再计算启动顺序', '解释检查失败的原因'],
     [
       '/en/docs/capability/graph-topology',
-      'Build an immutable topology snapshot for a composition layer',
-      'Use it only when you already own lifecycle'
+      'Check dependencies before choosing startup order',
+      'Understand validation failures'
+    ],
+    [
+      '/zh/docs/capability/graph-dependency',
+      '依赖计划：删除或替换功能前，先安排步骤',
+      '读取步骤、顺序和依赖记录'
+    ],
+    [
+      '/en/docs/capability/graph-dependency',
+      'Dependency plans: arrange steps before removing or replacing a feature',
+      'Read steps, order, and dependency records'
+    ],
+    ['/zh/docs/capability/troubleshooting', '排错：功能没有启用，或关闭没有完成', 'Host 错误码'],
+    [
+      '/en/docs/capability/troubleshooting',
+      'Troubleshooting: a feature will not open or finish closing',
+      'Host error codes'
     ],
     [
       '/zh/docs/middleware-pipeline',
@@ -2875,63 +3331,747 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
       'Waiting for listener results',
       'Choosing among six functions'
     ],
-    ['/zh/docs/lifecycle', 'Lifecycle 学习路径', '按所有权问题选择原语'],
-    ['/zh/docs/lifecycle/getting-started', '五分钟建立资源 Scope', '登记资源并统一释放'],
-    ['/en/docs/lifecycle', 'Lifecycle learning paths', 'Choose a primitive by ownership problem'],
+    ['/zh/docs/lifecycle', 'Lifecycle：离开页面时，一起释放资源', '底层工具'],
+    ['/en/docs/lifecycle', 'Lifecycle: release page resources together', 'Lower-level tools'],
+    ['/zh/docs/lifecycle/getting-started', '快速开始：一起结束页面里的连接和订阅', '构造选项'],
     [
       '/en/docs/lifecycle/getting-started',
-      'Build a resource Scope in five minutes',
-      'Own resources and release them together'
+      'Quick start: release a page connection and subscription',
+      'Constructor options'
     ],
-    ['/zh/docs/lifecycle/scope', '用 Scope 表达资源所有权', 'Scope 是所有权边界'],
+    ['/zh/docs/lifecycle/scope', '作用域：谁负责释放资源', '只记录关闭状态'],
     [
       '/en/docs/lifecycle/scope',
-      'Express resource ownership with Scope',
-      'A Scope is an ownership boundary'
+      'Scopes: decide who releases each resource',
+      'Record closure without releasing resources'
     ],
-    ['/zh/docs/lifecycle/disposal', '组合可追踪的释放事务', '先归一化释放意图'],
+    [
+      '/zh/docs/lifecycle/disposal',
+      '释放资源：正常关闭、超时和清理失败',
+      '先启动全部清理，再等待异步步骤'
+    ],
     [
       '/en/docs/lifecycle/disposal',
-      'Compose traceable disposal transactions',
-      'Normalize release intent first'
+      'Release resources: normal closure, timeouts, and failures',
+      'Start all cleanup before waiting for async steps'
     ],
-    ['/zh/docs/lifecycle/abort', '让取消由明确的 owner 驱动', '组合外部 signal 与本地取消'],
+    ['/zh/docs/lifecycle/abort', '取消与监听器：页面关闭后停止处理请求', '取消动作失败时怎么处理'],
     [
       '/en/docs/lifecycle/abort',
-      'Let one explicit owner drive cancellation',
-      'Compose an external signal with local cancellation'
+      'Cancellation and listeners: stop using a request after the page closes',
+      'Handle a failed cancellation action'
     ],
-    ['/zh/docs/lifecycle/quiescence', '证明任务与 lease 已经归零', '先登记，再封闭，最后等待'],
+    ['/zh/docs/lifecycle/quiescence', '等保存任务结束后再关闭文档', '计数不会替你释放资源'],
     [
       '/en/docs/lifecycle/quiescence',
-      'Prove that tasks and leases reached zero',
-      'Retain first, seal admission, then wait'
+      'Close a document after its saves finish',
+      'Counting does not release resources'
     ],
     [
       '/zh/docs/lifecycle/scheduler',
-      '统一生命周期时间与调度',
-      '生产使用系统时间，测试使用手动时间'
+      '时间与等待：给保存任务一个截止时间',
+      '接收一个调用方提供的调度器'
     ],
     [
       '/en/docs/lifecycle/scheduler',
-      'Unify lifecycle time and scheduling',
-      'Use system time in production and manual time in tests'
+      'Time and waiting: give a save task a deadline',
+      'Accept a caller-provided scheduler'
     ],
-    ['/zh/docs/lifecycle/generation', '只接纳最新一代异步结果', '为每次启动捕获独立 token'],
+    ['/zh/docs/lifecycle/generation', '只显示最新请求的结果', '取消、完成与释放失败'],
     [
       '/en/docs/lifecycle/generation',
-      'Adopt only the latest asynchronous generation',
-      'Capture a distinct token for every start'
+      'Display only the latest request result',
+      'Cancellation, completion, and release failures'
+    ],
+    ['/zh/docs/lifecycle/application-load-state', '由应用保存加载状态', '处理当前请求的失败'],
+    [
+      '/en/docs/lifecycle/application-load-state',
+      'Keep loading state in application code',
+      'Handle current request failures'
+    ],
+    ['/zh/docs/lifecycle/mutation-queue', '按提交顺序保存草稿', '排队太久或等待了自己的后续任务'],
+    [
+      '/en/docs/lifecycle/mutation-queue',
+      'Save drafts in submission order',
+      'Long waits and waiting for your own next task'
     ],
     [
       '/zh/docs/lifecycle/errors',
-      '选择错误策略，而不是吞掉 cleanup 失败',
-      '按调用边界选择四种结果'
+      '清理失败：收集错误，也保留最初的原因',
+      '回调可能返回 Promise 时'
     ],
     [
       '/en/docs/lifecycle/errors',
-      'Choose an error policy instead of swallowing cleanup failures',
-      'Choose one of four outcomes at the call boundary'
+      'Cleanup failures: collect errors and keep the original cause',
+      'When a callback may return a Promise'
+    ],
+    ['/zh/docs/lifecycle/troubleshooting', '排错：资源没释放，或关闭一直在等待', '错误代码'],
+    [
+      '/en/docs/lifecycle/troubleshooting',
+      'Troubleshooting: unreleased resources or shutdown waits',
+      'Error codes'
+    ],
+    ['/zh/docs/serialize', 'Serialize：保存数据时，保留它的格式', '底层工具'],
+    [
+      '/en/docs/serialize',
+      'Serialize: keep the format with the data you save',
+      'Lower-level tools'
+    ],
+    [
+      '/zh/docs/serialize/getting-started',
+      '快速开始：保存并读取一份草稿',
+      '本例使用的参数与返回值'
+    ],
+    [
+      '/en/docs/serialize/getting-started',
+      'Quick start: save and read a draft',
+      'Inputs and results in the example'
+    ],
+    [
+      '/zh/docs/serialize/chunk-shapes-and-wire-conversion',
+      '把文本和字节转换成接收方需要的格式',
+      '逐段处理附件'
+    ],
+    [
+      '/en/docs/serialize/chunk-shapes-and-wire-conversion',
+      'Convert text and bytes for the receiver',
+      'Process an attachment in parts'
+    ],
+    [
+      '/zh/docs/serialize/registry-and-plugins',
+      'Registry 与插件：写新格式，也能读取旧存档',
+      'JSON 写入时去掉本地缓存'
+    ],
+    [
+      '/en/docs/serialize/registry-and-plugins',
+      'Registry and plugins: write a new format and read old records',
+      'Remove local cache data from saved settings'
+    ],
+    [
+      '/zh/docs/serialize/streaming-and-backpressure',
+      '流式处理：逐批导入订单，限制同时编码的批数',
+      '读取失败或提前停止'
+    ],
+    [
+      '/en/docs/serialize/streaming-and-backpressure',
+      'Streaming: import orders in batches and bound concurrent encoding',
+      'Handle read failure or stop early'
+    ],
+    ['/zh/docs/serialize/portable-values', '准备可保存的数据与配置文本', '读取转换结果或只取值'],
+    [
+      '/en/docs/serialize/portable-values',
+      'Prepare values and configuration text for storage',
+      'Read the metadata result or just the value'
+    ],
+    [
+      '/zh/docs/serialize/codecs',
+      '选择 Codec：把设置或消息变成可保存的数据',
+      '只有实现 Codec 时才需要的工具'
+    ],
+    [
+      '/en/docs/serialize/codecs',
+      'Choose a Codec: turn settings or messages into stored data',
+      'Tools for libraries implementing Codecs'
+    ],
+    [
+      '/zh/docs/serialize/shutdown-and-errors',
+      '关闭与排错：保存失败或退出迟迟未完成',
+      '自定义 parser 如何保留原生错误类型'
+    ],
+    [
+      '/en/docs/serialize/shutdown-and-errors',
+      'Shutdown and troubleshooting: saving fails or exit never finishes',
+      'Keep native error types in a custom parser'
+    ],
+    ['/zh/docs/supervision', 'Supervision：让后台任务可以启动、替换和结束', '底层工具'],
+    [
+      '/en/docs/supervision',
+      'Supervision: start, replace, and stop background work',
+      'Lower-level tools'
+    ],
+    ['/zh/docs/supervision/getting-started', '快速开始：启动一个草稿格式化任务', '其余构造选项'],
+    [
+      '/en/docs/supervision/getting-started',
+      'Quick start: launch a draft formatter',
+      'Remaining constructor options'
+    ],
+    [
+      '/zh/docs/supervision/budget-and-queues',
+      '预算与排队：一次只导出一个文件',
+      '关闭预算不会结束已有任务'
+    ],
+    [
+      '/en/docs/supervision/budget-and-queues',
+      'Budgets and queues: export one file at a time',
+      'Closing a budget does not stop held work'
+    ],
+    [
+      '/zh/docs/supervision/supervisor-control',
+      '控制服务：启动、停止和替换运行中的任务',
+      '停止分几步等待'
+    ],
+    [
+      '/en/docs/supervision/supervisor-control',
+      'Control a service: start, stop, and replace running work',
+      'Wait through the shutdown phases'
+    ],
+    [
+      '/zh/docs/supervision/restart-and-health',
+      '重启与健康：重新连接服务，并观察检查结果',
+      '状态面板能读到什么'
+    ],
+    [
+      '/en/docs/supervision/restart-and-health',
+      'Restart and health: reconnect a service and inspect checks',
+      'Fields for a status panel'
+    ],
+    [
+      '/zh/docs/supervision/profiles-and-hooks',
+      '适配器与回调：服务什么时候算准备好',
+      '订阅状态变化而不启动任务'
+    ],
+    [
+      '/en/docs/supervision/profiles-and-hooks',
+      'Adapters and callbacks: decide when a service is ready',
+      'Observe changes without starting work'
+    ],
+    [
+      '/zh/docs/supervision/coroutine-tasks',
+      '协程任务：打开草稿读取接口，离开时停止',
+      '从启动结果读取任务接口与退出情况'
+    ],
+    [
+      '/en/docs/supervision/coroutine-tasks',
+      'Coroutine tasks: open a draft reader and stop it on departure',
+      'Read the task interface and fulfilled exit status'
+    ],
+    [
+      '/zh/docs/supervision/coroutine-heartbeat',
+      '协程心跳：扫描完成一页就报告进度',
+      '检查最近进度，保持任务可取消'
+    ],
+    [
+      '/en/docs/supervision/coroutine-heartbeat',
+      'Coroutine heartbeat: report progress after scanning a page',
+      'Check recent progress while keeping work cancellable'
+    ],
+    [
+      '/zh/docs/supervision/troubleshooting',
+      '排错：服务没有 ready，或者停止后容量没归还',
+      '按现象决定下一步'
+    ],
+    [
+      '/en/docs/supervision/troubleshooting',
+      'Troubleshooting: startup is not ready or capacity remains occupied',
+      'Choose the next step from the symptom'
+    ],
+    [
+      '/zh/docs/supervision/thread-profile',
+      '线程配置：把报告任务交给应用的启动器',
+      '只报告这一个线程能提供的数据'
+    ],
+    [
+      '/en/docs/supervision/thread-profile',
+      'Thread profile: hand a report task to an application launcher',
+      'Report only data available for this thread'
+    ],
+    ['/zh/docs/supervision/process-profile', '配置进程命令和宿主适配器', '用共同命令管理这个进程'],
+    [
+      '/en/docs/supervision/process-profile',
+      'Configure a process command and host adapter',
+      'Manage the process with the shared commands'
+    ],
+    [
+      '/zh/docs/supervision/process-output-and-usage',
+      '读取最近输出并检查进程用量',
+      '区分用量超限和采样失败'
+    ],
+    [
+      '/en/docs/supervision/process-output-and-usage',
+      'Read recent output and check process usage',
+      'Distinguish exceeded limits from failed samples'
+    ],
+    [
+      '/zh/docs/supervision/process-recovery',
+      '扫描父进程上次留下的进程记录',
+      '逐条处理探测、停止和删除'
+    ],
+    [
+      '/en/docs/supervision/process-recovery',
+      'Scan process records left by a previous parent',
+      'Handle probing, termination, and removal per record'
+    ],
+    [
+      '/zh/docs/supervision/process-prewarm',
+      '准备备用 worker 并在关闭应用时撤下它们',
+      '接手时保留原预算名额'
+    ],
+    [
+      '/en/docs/supervision/process-prewarm',
+      'Prepare standby workers and retire them on shutdown',
+      'Keep the existing budget slot during handover'
+    ],
+    [
+      '/zh/docs/supervision/process-parent-loss',
+      '父进程断开后停止接收任务并关闭服务',
+      '把关闭函数和退出函数分开'
+    ],
+    [
+      '/en/docs/supervision/process-parent-loss',
+      'Stop accepting work and shut down after parent loss',
+      'Keep shutdown and exit callbacks separate'
+    ],
+    ['/zh/docs/storage-contract', '让业务接入不同存储', '后端实现者使用的工具'],
+    [
+      '/en/docs/storage-contract',
+      'Use different stores from application code',
+      'Tools for backend implementations'
+    ],
+    ['/zh/docs/storage-contract/getting-started', '安装并保存第一项偏好', '字符串存储的完整方法'],
+    [
+      '/en/docs/storage-contract/getting-started',
+      'Install and save a preference',
+      'All string-store methods'
+    ],
+    [
+      '/zh/docs/storage-contract/capability-narrowing',
+      '根据后端能力选择方法',
+      '需要同步访问时检查后端文档'
+    ],
+    [
+      '/en/docs/storage-contract/capability-narrowing',
+      'Choose methods from backend capabilities',
+      'Consult the backend for synchronous access'
+    ],
+    ['/zh/docs/storage-contract/safe-operations-and-keys', '保存操作参数与查询键', '范围读取参数'],
+    [
+      '/en/docs/storage-contract/safe-operations-and-keys',
+      'Capture operation options and query keys',
+      'Range-read options'
+    ],
+    [
+      '/zh/docs/storage-contract/records-indexes-and-transactions',
+      '记录、事务与二级索引',
+      '索引事务中的方法'
+    ],
+    [
+      '/en/docs/storage-contract/records-indexes-and-transactions',
+      'Records, transactions, and secondary indexes',
+      'Methods inside an indexed transaction'
+    ],
+    [
+      '/zh/docs/storage-contract/change-feed-and-subscription-ownership',
+      '根据变更更新界面并及时退订',
+      '每次通知包含什么'
+    ],
+    [
+      '/en/docs/storage-contract/change-feed-and-subscription-ownership',
+      'Update a view from changes and unsubscribe',
+      'Fields in each notification'
+    ],
+    ['/zh/docs/storage-contract/codecs-and-errors', '编解码与按现象排错', '二进制与诊断辅助函数'],
+    [
+      '/en/docs/storage-contract/codecs-and-errors',
+      'Codecs and troubleshooting',
+      'Binary and diagnostic helpers'
+    ],
+    ['/zh/docs/rpc-contract', '让两端按同一种格式交换数据', '底层工具'],
+    ['/en/docs/rpc-contract', 'Use the same data format on both sides', 'Lower-level tools'],
+    ['/zh/docs/rpc-contract/getting-started', '安装并检查库存查询消息', '把检查后的值交给连接层'],
+    [
+      '/en/docs/rpc-contract/getting-started',
+      'Install and check a stock-query message',
+      'Pass the checked value to a connection'
+    ],
+    [
+      '/zh/docs/rpc-contract/descriptors-and-envelopes',
+      '说明组件版本与消息字段',
+      '避免重复提示未知字段'
+    ],
+    [
+      '/en/docs/rpc-contract/descriptors-and-envelopes',
+      'Describe component versions and message fields',
+      'Avoid repeated unknown-field warnings'
+    ],
+    ['/zh/docs/rpc-contract/portable-values', '准备能传给对端的业务值', '普通 JSON 与原生二进制'],
+    [
+      '/en/docs/rpc-contract/portable-values',
+      'Prepare values the receiver can represent',
+      'Ordinary JSON and native binary'
+    ],
+    ['/zh/docs/rpc-contract/real-world-bindings', '同一份消息定义接入不同宿主', '选择实际宿主'],
+    [
+      '/en/docs/rpc-contract/real-world-bindings',
+      'Share message definitions across hosts',
+      'Choose the actual host'
+    ],
+    ['/zh/docs/rpc-contract/fetch', '用 HTTP 读取共享格式的订单', '格式检查与 HTTP 各负责什么'],
+    [
+      '/en/docs/rpc-contract/fetch',
+      'Read an order with shared JSON over HTTP',
+      'Responsibilities of formatting and HTTP'
+    ],
+    ['/zh/docs/rpc-contract/websocket', '用 WebSocket 读取共享订单', '一条业务消息的处理次序'],
+    [
+      '/en/docs/rpc-contract/websocket',
+      'Read a shared order over WebSocket',
+      'Handle one business message'
+    ],
+    ['/zh/docs/rpc-contract/sse', '用 SSE 接收订单金额', '事件流与上行请求分开'],
+    [
+      '/en/docs/rpc-contract/sse',
+      'Receive an order amount through SSE',
+      'Separate server events from upstream requests'
+    ],
+    ['/zh/docs/rpc-contract/process', '用 Node IPC 读取订单', '进程由创建它的一方关闭'],
+    [
+      '/en/docs/rpc-contract/process',
+      'Read an order through Node IPC',
+      'The creating parent closes the process'
+    ],
+    [
+      '/zh/docs/rpc-contract/framing-and-streams',
+      '还原完整消息，再读取流项目',
+      '检查流项目与已经持有的额度'
+    ],
+    [
+      '/en/docs/rpc-contract/framing-and-streams',
+      'Reassemble messages before reading stream items',
+      'Check stream items against held demand'
+    ],
+    [
+      '/zh/docs/rpc-contract/wire-errors-and-metadata',
+      '传递错误链，并选择对外内容',
+      '按来源与错误码定位'
+    ],
+    [
+      '/en/docs/rpc-contract/wire-errors-and-metadata',
+      'Transfer error chains and select public details',
+      'Locate failures by source and code'
+    ],
+    [
+      '/zh/docs/rpc-contract/runtime-bindings',
+      '构造运行时消息，并检查启动数据',
+      '在真实 MessageChannel 上交换能力数据'
+    ],
+    [
+      '/en/docs/rpc-contract/runtime-bindings',
+      'Construct runtime messages and inspect startup data',
+      'Exchange capability data over a real MessageChannel'
+    ],
+    [
+      '/zh/docs/rpc-contract/binary-messages',
+      '保存二进制内容并核对完整性',
+      '宿主在接收前测量原生包装'
+    ],
+    [
+      '/en/docs/rpc-contract/binary-messages',
+      'Preserve binary data and verify integrity',
+      'Let the host inspect native wrappers before restore'
+    ],
+    ['/zh/docs/rpc-process', '在子进程计算业务结果', '底层工具'],
+    [
+      '/en/docs/rpc-process',
+      'Calculate application results in a child process',
+      'Lower-level tools'
+    ],
+    ['/zh/docs/rpc-process/getting-started', '安装并启动价格服务', 'Peer 创建选项'],
+    [
+      '/en/docs/rpc-process/getting-started',
+      'Install and launch a pricing service',
+      'Peer factory options'
+    ],
+    ['/zh/docs/rpc-process/peers-and-sources', '选择进程来源并读取结果', '自定义运行时加载器'],
+    [
+      '/en/docs/rpc-process/peers-and-sources',
+      'Choose a process source and read results',
+      'Custom runtime loaders'
+    ],
+    [
+      '/zh/docs/rpc-process/plugins-and-exposure',
+      '让 Host 管理进程与公开方法',
+      '检查可以保存的部署描述'
+    ],
+    [
+      '/en/docs/rpc-process/plugins-and-exposure',
+      'Let a Host manage processes and exposed methods',
+      'Validate persistable deployment descriptions'
+    ],
+    [
+      '/zh/docs/rpc-process/launchers-and-stdio',
+      '启动原生进程并管理标准流',
+      '选择已支持的宿主能力'
+    ],
+    [
+      '/en/docs/rpc-process/launchers-and-stdio',
+      'Launch a native process and manage stdio',
+      'Choose host capabilities'
+    ],
+    [
+      '/zh/docs/rpc-process/socket-and-message-channels',
+      '连接已有进程与消息端口',
+      '通过真实消息端口交付订单'
+    ],
+    [
+      '/en/docs/rpc-process/socket-and-message-channels',
+      'Connect an existing process or message port',
+      'Deliver an order through real message ports'
+    ],
+    [
+      '/zh/docs/rpc-process/protocol-and-bootstrap',
+      '连接字节流并读取启动信息',
+      '读取自动启动信息与稳定常量'
+    ],
+    [
+      '/en/docs/rpc-process/protocol-and-bootstrap',
+      'Connect byte streams and read launch metadata',
+      'Read launch metadata and stable constants'
+    ],
+    ['/zh/docs/rpc-process/resilience-and-shutdown', '限制连接并按顺序关闭', '采用真实认证连接'],
+    [
+      '/en/docs/rpc-process/resilience-and-shutdown',
+      'Bound connections and close in order',
+      'Adopt actual authenticated connections'
+    ],
+    [
+      '/zh/docs/rpc-process/troubleshooting',
+      '从业务异常和宿主提示定位问题',
+      '先检查可观察的配置差异'
+    ],
+    [
+      '/en/docs/rpc-process/troubleshooting',
+      'Separate business failures from host diagnostics',
+      'Check observable configuration differences first'
+    ],
+    ['/zh/docs/rpc-threads', '在线程中计算业务结果', '底层工具'],
+    ['/en/docs/rpc-threads', 'Calculate application results in a Worker', 'Lower-level tools'],
+    ['/zh/docs/rpc-threads/getting-started', '安装并启动价格 Worker', 'Peer 创建选项'],
+    [
+      '/en/docs/rpc-threads/getting-started',
+      'Install and launch a pricing Worker',
+      'Peer factory options'
+    ],
+    [
+      '/zh/docs/rpc-threads/peers-and-sources',
+      '选择 Worker 来源并读取结果',
+      '原生模块加载与子端接入'
+    ],
+    [
+      '/en/docs/rpc-threads/peers-and-sources',
+      'Choose a Worker source and read results',
+      'Native module loading and child setup'
+    ],
+    ['/zh/docs/rpc-threads/plugins-and-hosts', '让 Host 管理 Worker 与公开方法', '重启完成后调用'],
+    [
+      '/en/docs/rpc-threads/plugins-and-hosts',
+      'Let a Host manage Workers and exposed methods',
+      'Calling after restart'
+    ],
+    ['/zh/docs/rpc-threads/native-launchers', '选择真正启动 Worker 的宿主', '选择其他 Worker 宿主'],
+    [
+      '/en/docs/rpc-threads/native-launchers',
+      'Choose the host that launches the Worker',
+      'Choose another Worker host'
+    ],
+    [
+      '/zh/docs/rpc-threads/channels-and-bootstrap',
+      '借用消息端口并读取启动配置',
+      '准备好配置后再通知启动方'
+    ],
+    [
+      '/en/docs/rpc-threads/channels-and-bootstrap',
+      'Borrow message ports and read startup data',
+      'Prepare configuration before acknowledging startup'
+    ],
+    [
+      '/zh/docs/rpc-threads/binary-and-transfer',
+      '复制附件或交出原缓冲区',
+      '把附件缓冲区交给 Worker'
+    ],
+    [
+      '/en/docs/rpc-threads/binary-and-transfer',
+      'Copy an attachment or hand over its buffer',
+      'Hand the attachment buffer to the Worker'
+    ],
+    [
+      '/zh/docs/rpc-threads/troubleshooting',
+      '区分业务异常与 Worker 资源错误',
+      '从现象检查入口和关闭方式'
+    ],
+    [
+      '/en/docs/rpc-threads/troubleshooting',
+      'Separate business errors from Worker resource failures',
+      'Check entry selection and cleanup by symptom'
+    ],
+    ['/zh/docs/rpc-browser', '从页面调用 iframe 的业务方法', '底层工具'],
+    ['/en/docs/rpc-browser', 'Call iframe methods from a page', 'Lower-level tools'],
+    ['/zh/docs/rpc-browser/getting-started', '安装并连接价格 iframe', 'Peer 创建选项'],
+    [
+      '/en/docs/rpc-browser/getting-started',
+      'Install and connect a pricing iframe',
+      'Peer factory options'
+    ],
+    ['/zh/docs/rpc-browser/peers-and-window', '选择来源并接入窗口消息', '物理观察数据'],
+    [
+      '/en/docs/rpc-browser/peers-and-window',
+      'Choose a source and connect window messages',
+      'Physical observation data'
+    ],
+    ['/zh/docs/rpc-browser/shared-workers', '让多个连接共享购物车 Worker', '直接借用已有端口'],
+    [
+      '/en/docs/rpc-browser/shared-workers',
+      'Share a cart Worker across connections',
+      'Borrow a port directly'
+    ],
+    [
+      '/zh/docs/rpc-browser/rtc-data-channels',
+      '在已连通的 RTC 频道上调用订单服务',
+      '直接使用字符串 transport'
+    ],
+    [
+      '/en/docs/rpc-browser/rtc-data-channels',
+      'Call an order service over a connected RTC channel',
+      'Use the string transport directly'
+    ],
+    [
+      '/zh/docs/rpc-browser/broadcast-and-service-workers',
+      '广播变化并与ServiceWorker通信',
+      '需要RPC调用时交给Endpoint'
+    ],
+    [
+      '/en/docs/rpc-browser/broadcast-and-service-workers',
+      'Broadcast changes and communicate with ServiceWorkers',
+      'Use an Endpoint for RPC calls'
+    ],
+    [
+      '/zh/docs/rpc-browser/web-transport-datagrams',
+      '把数据报流接入字节传输',
+      '关闭流并保留数据报限制'
+    ],
+    [
+      '/en/docs/rpc-browser/web-transport-datagrams',
+      'Adapt datagram streams to byte transport',
+      'Close streams and retain datagram limits'
+    ],
+    [
+      '/zh/docs/rpc-browser/troubleshooting',
+      '区分业务异常、解码失败和载体关闭',
+      '先检查连接来源与关闭责任'
+    ],
+    [
+      '/en/docs/rpc-browser/troubleshooting',
+      'Separate business errors, decoding failures, and carrier closure',
+      'Check source selection and cleanup responsibility'
+    ],
+    ['/zh/docs/rpc-devtools', '查看真实 RPC 调用留下的事件', '底层工具'],
+    ['/en/docs/rpc-devtools', 'Inspect events from real RPC calls', 'Lower-level tools'],
+    ['/zh/docs/rpc-devtools/getting-started', '安装并查看价格 RPC', '创建采集器的全部选项'],
+    [
+      '/en/docs/rpc-devtools/getting-started',
+      'Install and inspect a pricing RPC',
+      'All collector construction options'
+    ],
+    [
+      '/zh/docs/rpc-devtools/collector-and-queries',
+      '筛选事件、统计与捕获内容',
+      '直接 emit 接收什么'
+    ],
+    [
+      '/en/docs/rpc-devtools/collector-and-queries',
+      'Filter events, statistics and captured content',
+      'Inputs consumed by direct emit'
+    ],
+    [
+      '/zh/docs/rpc-devtools/recordings-and-service',
+      '保存一次真实调用并提供远程查询',
+      '从独立服务连接查询订单调用'
+    ],
+    [
+      '/en/docs/rpc-devtools/recordings-and-service',
+      'Record a real call and expose remote queries',
+      'Query the call through a separate service connection'
+    ],
+    [
+      '/zh/docs/rpc-devtools/hub-and-offline',
+      '聚合已有服务并查询离线录制',
+      '在关闭业务连接后读取录制'
+    ],
+    [
+      '/en/docs/rpc-devtools/hub-and-offline',
+      'Aggregate existing services and offline recordings',
+      'Read the recording after business close'
+    ],
+    [
+      '/zh/docs/rpc-devtools/log-ingestion',
+      '把 RPC 慢调用写入真实日志文件',
+      '让日志系统负责输出与收尾'
+    ],
+    [
+      '/en/docs/rpc-devtools/log-ingestion',
+      'Write slow RPC calls to a real log file',
+      'Let the logger own delivery and cleanup'
+    ],
+    ['/zh/docs/rpc-devtools/troubleshooting', '先区分没有捕获与没有事件', '检查保留范围与时间基准'],
+    [
+      '/en/docs/rpc-devtools/troubleshooting',
+      'Distinguish uncaptured content from missing events',
+      'Check retention and time baselines'
+    ],
+    ['/zh/docs/rpc-pool', '把订单计算分配给 Worker', '池与 Peer 各自负责什么'],
+    ['/en/docs/rpc-pool', 'Assign order calculations to Workers', 'What the pool and Peers manage'],
+    ['/zh/docs/rpc-pool/getting-started', '启动处理订单的线程池', '公开类型对应到哪里'],
+    [
+      '/en/docs/rpc-pool/getting-started',
+      'Start an order-processing Thread pool',
+      'Where public types apply'
+    ],
+    [
+      '/zh/docs/rpc-pool/choose-thread-or-process',
+      '把报价任务交给线程或子进程',
+      '两个工厂只有这些配置'
+    ],
+    [
+      '/en/docs/rpc-pool/choose-thread-or-process',
+      'Run pricing work in a thread or child process',
+      'Use the two factories’ actual options'
+    ],
+    ['/zh/docs/rpc-pool/dispatch-and-queue', '忙时让订单等待可用成员', '读取统计时各字段代表什么'],
+    [
+      '/en/docs/rpc-pool/dispatch-and-queue',
+      'Let orders wait for an available member',
+      'What each stats field means'
+    ],
+    [
+      '/zh/docs/rpc-pool/notifications-and-streams',
+      '消费订单流，让通知只等待发送',
+      '结束读取时归还成员'
+    ],
+    [
+      '/en/docs/rpc-pool/notifications-and-streams',
+      'Consume an order stream and wait only for notification send',
+      'Release a member when reading ends'
+    ],
+    ['/zh/docs/rpc-pool/resize-and-idle-members', '调整成员数并回收空闲成员', '空闲回收与按需补齐'],
+    [
+      '/en/docs/rpc-pool/resize-and-idle-members',
+      'Resize and retire idle members',
+      'Idle retirement and refill'
+    ],
+    [
+      '/zh/docs/rpc-pool/cancellation-and-shutdown',
+      '关闭时完成已接受的订单',
+      'close 的等待与错误结果'
+    ],
+    [
+      '/en/docs/rpc-pool/cancellation-and-shutdown',
+      'Finish accepted orders during closure',
+      'Understand close waiting and errors'
+    ],
+    ['/zh/docs/rpc-pool/troubleshooting', '排查池的排队与关闭问题', '启动回滚与清理错误'],
+    [
+      '/en/docs/rpc-pool/troubleshooting',
+      'Diagnose queueing and close problems',
+      'Startup rollback and cleanup errors'
     ]
   ] as const
 
@@ -2951,7 +4091,14 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.doesNotMatch(gettingStarted, /维护示例/)
   assert.doesNotMatch(gettingStarted, /VersionClock|DependencyTracker|node-internals/)
 
-  const capabilityTopics = ['getting-started', 'graph', 'graph-dynamic', 'graph-topology']
+  const capabilityTopics = [
+    'getting-started',
+    'graph',
+    'graph-dynamic',
+    'graph-topology',
+    'graph-dependency',
+    'troubleshooting'
+  ]
     .map((topic) =>
       readFileSync(join(buildRoot, artifactPath(`/en/docs/capability/${topic}`)), 'utf8')
     )
@@ -2960,13 +4107,17 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(capabilityTopics, /createCapabilityGraph/)
   assert.match(capabilityTopics, /createDynamicCapabilityGraph/)
   assert.match(capabilityTopics, /buildCapabilityTopology/)
-  assert.match(guideSource, /await import\('\.\/persistence\.js'\)/)
-  assert.match(guideSource, /mutationAdmissionMs: 1_000/)
+  assert.match(capabilityTopics, /Notification:[\s\S]*?Ada Draft saved/)
+  assert.match(capabilityTopics, /mutationAdmissionMs[\s\S]*?finite and nonnegative/)
+  assert.match(capabilityTopics, /Running work is not timed out/)
   assert.doesNotMatch(guideSource, /host\.enable\([^)]*\) === true/)
   assert.match(capabilityTopics, /every capability is gated/)
   assert.match(capabilityTopics, /setFlags\(next\)/)
-  assert.match(capabilityTopics, /startBatch and releaseBatch transfer ownership/)
-  assert.match(capabilityTopics, /does not bound start or release execution/)
+  assert.match(capabilityTopics, /partial-resource cleanup to the batch callback/)
+  assert.match(
+    capabilityTopics,
+    /queued change can time out even while its predecessor remains stuck/
+  )
 
   const middlewareTopics = [
     'getting-started',
@@ -3014,6 +4165,8 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'chunk-shapes-and-wire-conversion',
     'registry-and-plugins',
     'streaming-and-backpressure',
+    'portable-values',
+    'codecs',
     'shutdown-and-errors'
   ]
     .map((topic) =>
@@ -3023,16 +4176,17 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   const serializeText = renderedText(serializeTopics)
   assert.match(serializeText, /createSerializeRegistry/)
   assert.match(serializeText, /chunkToBytes/)
-  assert.match(serializeText, /string-only channel/)
+  assert.match(serializeText, /convert to text or Base64 when it requires strings/)
   assert.match(serializeText, /replacer/)
   assert.match(serializeText, /TextDecoder/)
   assert.match(serializeText, /primaryType/)
   assert.match(serializeText, /maxInFlight/)
   assert.match(serializeText, /deadlineAt/)
   assert.match(serializeText, /CODEC_NOT_FOUND/)
-  assert.match(guideSource, /type: registry\.primaryType,\\n    chunk: await registry\.encode/)
-  assert.match(guideSource, /for \(const textPart of streamBase64Chunks\(payload\)\)/)
-  assert.match(guideSource, /scheduler: systemScheduler,\\n  targetMs: 8/)
+  assert.match(guideSource, /type: registry\.primaryType,\\n  chunk: await registry\.encode/)
+  assert.match(guideSource, /for \(const part of streamBase64Chunks\(attachment\)\)/)
+  assert.match(serializeText, /targetMs[\s\S]*?default is 8 milliseconds/)
+  assert.match(serializeText, /This desired slice duration is not an execution timeout/)
 
   const storageContractTopics = [
     'getting-started',
@@ -3050,15 +4204,15 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   assert.match(storageContractText, /snapshotKeyValueStore/)
   assert.match(storageContractText, /isRecordStore/)
   assert.match(storageContractText, /pageSize/)
-  assert.match(storageContractText, /generation-bound handle/)
-  assert.match(storageContractText, /Events arrive after commit/)
-  assert.match(storageContractText, /sequence detects duplicates or reordering/)
-  assert.match(storageContractText, /Call unsubscribe\(\)/)
+  assert.match(storageContractText, /it identifies one built index configuration/)
+  assert.match(storageContractText, /This real memory backend emits events after a write commits/)
+  assert.match(storageContractText, /The example skips non-increasing numbers/)
+  assert.match(storageContractText, /Call unsubscribe\(\) when the view closes/)
   assert.match(storageContractText, /collectionsJsonCodec/)
   assert.match(storageContractText, /UNSUPPORTED_CAPABILITY/)
-  assert.match(guideSource, /const stableKey = snapshotStorageKey\(key, store\.backend/)
+  assert.match(guideSource, /const stableKey = snapshotStorageKey\(key, 'memory'/)
   assert.match(guideSource, /change\.sequence <= sequence/)
-  assert.match(guideSource, /stableCodec\.output === 'binary'/)
+  assert.match(storageContractText, /Inspection does not route or save it/)
 
   const pluginHostTopics = [
     'getting-started',
@@ -3127,13 +4281,12 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     'utf8'
   )
   const storageWebStartText = renderedText(storageWebStart)
-  assert.match(storageWebStartText, /store\.capabilities|capabilities\.syncRead/)
+  assert.match(storageWebStartText, /secondaryIndexes[\s\S]*changeFeed/)
   assert.match(storageWebStartText, /putRecord/)
-  assert.match(storageWebStartText, /createStorageHost/)
-  assert.match(storageWebStartText, /memoryBackendPlugin/)
-  assert.match(storageWebStartText, /dispose terminates the store without deleting persistent data/)
-  assert.match(guideSource, /namespace: 'settings'/)
-  assert.match(guideSource, /plugins: \[memoryBackendPlugin\(\{ id: 'cache' \}\)\] as const/)
+  assert.match(storageWebStartText, /Compose backends/)
+  assert.match(storageWebStartText, /memoryStorageHost/)
+  assert.match(storageWebStartText, /Close the instance without deleting browser-persistent data/)
+  assert.match(storageWebStartText, /namespaceCodec/)
 
   const storageWebTopics = [
     'indexeddb-and-transactions',
@@ -3150,47 +4303,66 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
   const storageWebText = renderedText(storageWebTopics)
   assert.match(storageWebText, /TRANSACTION_CONFLICT/)
   assert.match(storageWebText, /cleanupLegacyRecords/)
-  assert.match(storageWebText, /factory \/ keyRange/)
+  assert.match(storageWebText, /factory[\s\S]*keyRange/)
   assert.match(storageWebText, /validate → normalize → schema\.encode → codec\.encode/)
   assert.match(storageWebText, /STORAGE_HOST_BUSY/)
   assert.match(storageWebText, /keepPreviousData/)
   assert.match(storageWebText, /COOKIE_SCOPE_AMBIGUOUS/)
   assert.match(storageWebText, /StorageContractError/)
+  assert.match(storageWebText, /memoryBackendPlugin\(\{ id: 'drafts' \}\)/)
   assert.match(guideSource, /await db\.transaction\(async \(tx\)/)
-  assert.match(guideSource, /plugins: \[indexedDbReactive\(\{[\s\S]*?id: 'primary'/)
+  assert.match(storageWebText, /indexedDbReactive\(\{ id: 'users'/)
 
-  /** The first RPC task teaches Runtime Peers and Host connection plugins. */
+  /** The first RPC task uses the current public client/provider presets for one price call. */
   const rpcStart = readFileSync(
     join(buildRoot, artifactPath('/en/docs/rpc-core/getting-started')),
     'utf8'
   )
-  /** Actual task results and ownership replace the old low-level Endpoint introduction. */
+  /** Rendered code and output must agree with the independently executed example. */
   const rpcStartText = renderedText(rpcStart)
-  assert.match(rpcStartText, /createBrowserPeer/)
-  assert.match(rpcStartText, /peer\.request\('double', 21\) === 42/)
-  assert.match(rpcStartText, /provide: \{/)
-  assert.match(rpcStartText, /await peer\.close\(\)/)
-  assert.match(rpcStartText, /createProcessPlugin/)
-  assert.match(rpcStartText, /createThreadPlugin/)
-  assert.match(rpcStartText, /host\.process!\.request\('service', 'math\.double', 21\) === 42/)
-  assert.match(rpcStartText, /host\.thread!\.request\('worker', 'math\.double', 21\) === 42/)
-  assert.match(rpcStartText, /createCoroutinePlugin/)
-  assert.match(rpcStartText, /host\.coroutine!\.request\('math', 'math\.double', 21\) === 42/)
-  assert.match(rpcStartText, /finally \{\s+await host\.dispose\(\)/)
-  assert.match(rpcStartText, /connect and listen own only the local connection/)
-  assert.match(rpcStartText, /cannot be forcibly stopped/)
-  assert.match(rpcStartText, /Choose advanced Endpoint composition afterwards/)
-  assert.match(guideSource, /middlewares: \[\\n\s+contract\(\{ version: '1' \}\),/)
-  assert.match(guideSource, /await Promise\.all\(\[client\.dispose\(\), provider\.dispose\(\)\]\)/)
+  assert.match(rpcStartText, /createClientEndpoint/)
+  assert.match(rpcStartText, /createProviderEndpoint/)
+  assert.match(rpcStartText, /createMemoryTransportPair/)
+  assert.match(rpcStartText, /send<number>\('catalog', 'subtotal', 2\)/)
+  assert.match(rpcStartText, /Item subtotal: 25/)
+  assert.match(rpcStartText, /await client\.dispose\(\)/)
+  assert.match(rpcStartText, /await provider\.dispose\(\)/)
   assert.match(guideSource, /path: 'endpoint-composition'/)
-  assert.match(guideSource, /createControlFeature\(outbound, discovery\)/)
-  assert.match(guideSource, /controller\.abort\(new Error\('route changed'\)\)/)
-  assert.match(guideSource, /params: z\.object\(\{ a: z\.number\(\), b: z\.number\(\) \}\)/)
-  assert.match(guideSource, /providerLimits\.maxGlobal defaults to 256/)
-  assert.match(guideSource, /Misreporting a multiplexed or broadcast channel as exclusive/)
-  assert.match(guideSource, /endpoint\.discovery is a readonly remote snapshot/)
-  assert.match(guideSource, /maxConcurrentMessages \/ maxConcurrentMessagesPerPeer/)
-  assert.match(guideSource, /A terminal endpoint cannot be revived/)
+
+  /**
+   * Task-specific assertions follow each example instead of requiring all scenarios in the start
+   * page.
+   */
+  const rpcTopics = [
+    'endpoint-composition',
+    'extension-authoring',
+    'calls-and-cancellation',
+    'providers-and-contracts',
+    'transports-and-security',
+    'discovery-and-control',
+    'chunking-and-backpressure',
+    'replay-retry-and-lifecycle'
+  ]
+    .map((topic) =>
+      renderedText(
+        readFileSync(join(buildRoot, artifactPath(`/en/docs/rpc-core/${topic}`)), 'utf8')
+      )
+    )
+    .join('\n')
+  assert.match(rpcTopics, /createControlFeature\(outboundCapability, discoveryCapability\)/)
+  assert.match(rpcTopics, /defineFeature\(\(\) => \(\{ currency: 'USD' \}\)\)/)
+  assert.match(rpcTopics, /core\.own\(timer, \(\) => clearInterval\(timer\)\)/)
+  assert.match(rpcTopics, /controller\.abort\('route changed'\)/)
+  assert.match(
+    rpcTopics,
+    /schemas: \{ subtotal: \{ params: numberSchema, result: numberSchema \} \}/
+  )
+  assert.match(rpcTopics, /maxGlobal\?: number[\s\S]*?the default is 256/)
+  assert.match(rpcTopics, /exclusive\/multiplexed\/broadcast topology/)
+  assert.match(rpcTopics, /Read a new snapshot rather than retaining internal mutable records/)
+  assert.match(rpcTopics, /maxConcurrentMessages\?: number/)
+  assert.match(rpcTopics, /No per-peer concurrency option exists/)
+  assert.match(rpcTopics, /An old Peer is not revived into a new connection/)
 
   const eventStart = readFileSync(
     join(buildRoot, artifactPath('/en/docs/event-subscriber/getting-started')),
@@ -3229,14 +4401,24 @@ test('SITE-T-GUIDE-JOURNEYS gives primary tasks independent bilingual pages', ()
     )
     .join('\n')
   assert.doesNotMatch(guideSource, /scope\.own\(\(\)|createAbortController\(\{|advanceBy\(/)
-  assert.match(guideSource, /scope\.own\([^,]+, \{ force:/)
+  assert.match(guideSource, /page\.own\([^,]+, \{(?:\\n\s*| )force:/)
   assert.match(lifecycleTopics, /observeAbortSubscription/)
   assert.match(lifecycleTopics, /scheduler[\s\S]*?advance/)
   assert.match(lifecycleTopics, /gracefulTimeoutMs/)
-  assert.match(guideSource, /failures\.length > 0/)
-  assert.match(lifecycleTopics, /higher values release first/)
+  assert.match(guideSource, /console\.log\('Cleanup failures:', failures\.length\)/)
+  assert.match(lifecycleTopics, /Higher finite numbers release first/)
   assert.match(guideSource, /requests\.adopt\(request\.token/)
   assert.match(guideSource, /createErrorCollector\('collect'/)
+  for (const locale of ['zh', 'en']) {
+    /** The rendered overview must expose both API groups and actual local reference links. */
+    const home = readFileSync(join(buildRoot, artifactPath(`/${locale}/docs/lifecycle`)), 'utf8')
+    assert.ok(home.includes(locale === 'zh' ? '常用 API' : 'Everyday APIs'))
+    assert.ok(home.includes(locale === 'zh' ? '底层工具' : 'Lower-level tools'))
+    assert.ok(
+      home.includes(`href="/${locale}/docs/lifecycle/api/disposal/executeReleaseDescriptor"`)
+    )
+    assert.ok(home.includes(`href="/${locale}/docs/lifecycle/api/errors/containAsyncRejection"`))
+  }
 })
 
 test('SITE-T-REACTIVE-START flushes the queued rerun before disposing the Effect', () => {
@@ -3255,7 +4437,7 @@ test('SITE-T-REACTIVE-START flushes the queued rerun before disposing the Effect
 })
 
 test('SITE-T-REACTIVE-START explains graph tracking, scheduling, and exact cleanup', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/reactive')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/reactive/readme')), 'utf8')
   const text = renderedText(html)
 
   assert.match(text, /Effect → Computed → Signal.*?依赖自动登记/s)
@@ -3437,9 +4619,9 @@ test('SITE-T-WEBRPC-ENDPOINT-SELECTION explains advanced factories and the lower
       'provider.dispose()'
     ])
       assert.ok(text.includes(contract), `${path} misses ${contract}`)
-    assert.match(text, /=== 42/)
-    assert.match(text, /send\(targetId, method, payload\)/)
-    assert.match(text, /request\(method, payload\)/)
+    assert.ok(text.includes(locale === 'zh' ? '商品单价: 12.5' : 'Item unit price: 12.5'))
+    assert.ok(text.includes('send<T>(targetId, method, data, options?)'))
+    assert.ok(text.includes('request(method, payload?, options?)'))
     assert.match(text, /createCanonicalChunkFeature/)
     assert.ok(page.includes(`/${locale}/docs/rpc-core/extension-authoring`))
   }
@@ -3451,10 +4633,10 @@ test('SITE-T-WEBRPC-EXTENSIONS documents the public Feature boundary and custom 
     const page = readFileSync(join(buildRoot, artifactPath(path)), 'utf8')
     for (const contract of [
       'IRpcPlugin',
-      'reportTransportErrors',
-      'scope.own',
-      'IRpcEndpointModule',
-      'defineEndpointModule'
+      'defineFeature',
+      'defineMiddleware',
+      'core.own',
+      'publicKeys'
     ])
       assert.ok(page.includes(contract), `${path} misses ${contract}`)
     assert.ok(page.includes(`/${locale}/docs/rpc-core/endpoint-composition`))
@@ -3525,7 +4707,12 @@ test('SITE-T-TRAY-LINKS keeps every maintained Tray continuation resolvable', ()
     'resource-ownership',
     'dynamic-host',
     'mutation-and-blocking',
-    'physical-cleanup'
+    'physical-cleanup',
+    'loaders-and-adapters',
+    'runtime-tasks',
+    'instances-and-routing',
+    'native-thread-and-process',
+    'topics-and-events'
   ]
 
   for (const locale of ['en', 'zh']) {
@@ -3558,18 +4745,18 @@ test('SITE-T-TRAY-RUNTIME explains Host options, managed reads, and every mutati
     [
       '/zh/docs/tray/mutation-and-blocking',
       [
-        'ok:true, committed:true',
-        'ok:false, committed:false',
-        'ok:false, committed:true',
+        'ok:true / committed:true',
+        'ok:false / committed:false',
+        'ok:false / committed:true',
         'removed:false'
       ]
     ],
     [
       '/en/docs/tray/mutation-and-blocking',
       [
-        'ok:true, committed:true',
-        'ok:false, committed:false',
-        'ok:false, committed:true',
+        'ok:true / committed:true',
+        'ok:false / committed:false',
+        'ok:false / committed:true',
         'removed:false'
       ]
     ]
@@ -3590,7 +4777,8 @@ test('SITE-T-WASM-LINKS keeps every maintained WASM continuation resolvable', ()
     'initialization-and-hosts',
     'arena-memory',
     'conversion-boundaries',
-    'ownership-and-cleanup'
+    'ownership-and-cleanup',
+    'troubleshooting'
   ]
 
   for (const locale of ['en', 'zh']) {
@@ -3621,9 +4809,11 @@ test('SITE-T-WASM-OWNERSHIP releases both arena ids and ConversionResult wrapper
       'utf8'
     )
 
-    assert.match(gettingStarted, /using(?:<!-- -->|\s)+result/)
-    assert.match(gettingStarted, /Symbol\.dispose/)
-    assert.match(ownership, /ConversionResult wrapper/)
+    assert.match(gettingStarted, /alloc_bytes/)
+    assert.match(gettingStarted, /dealloc_bytes/)
+    assert.match(ownership, /ConversionResult/)
+    assert.match(ownership, /result\?\.free\(\)/)
+    assert.match(ownership, /Symbol\.dispose/)
     assert.match(ownership, /dealloc_bytes/)
   }
 })
@@ -3661,11 +4851,11 @@ test('SITE-T-STORE-LIGHT-LINKS keeps every maintained Store Light continuation r
 test('SITE-T-STORE-LIGHT-CONFIG explains Store, hydration, and Resource option defaults', () => {
   const expectations = [
     [
-      'object-store-model',
+      'getting-started',
       ['runtime', 'defaultRuntime', 'debugName', 'warnAsyncActions', 'mutationPolicy']
     ],
-    ['snapshots-and-hydration', ['ignore（默认）', 'report', 'strict', 'onUnknown']],
-    ['resources-and-suspense', ['keepAliveMs', '1000 ms', 'dispose', 'onError', 'onTerminal']]
+    ['snapshots-and-hydration', ['ignore', 'report', 'strict', 'onUnknown']],
+    ['resources-and-suspense', ['keepAliveMs', 'dispose', 'onError', 'onTerminal']]
   ] as const
 
   for (const locale of ['en', 'zh']) {
@@ -3675,12 +4865,19 @@ test('SITE-T-STORE-LIGHT-CONFIG explains Store, hydration, and Resource option d
         'utf8'
       )
       for (const fragment of fragments) {
-        const localized =
-          locale === 'en' && fragment === 'ignore（默认）' ? 'ignore (default)' : fragment
         assert.ok(
-          html.includes(localized),
-          `/${locale}/docs/store-light/${topic} misses ${localized}`
+          html.includes(fragment),
+          `/${locale}/docs/store-light/${topic} misses ${fragment}`
         )
+      }
+      if (topic === 'snapshots-and-hydration') {
+        assert.match(
+          renderedText(html),
+          locale === 'zh' ? /默认\s*'ignore'/ : /Defaults to\s*'ignore'/
+        )
+      }
+      if (topic === 'resources-and-suspense') {
+        assert.match(renderedText(html), locale === 'zh' ? /默认\s*1000/ : /Defaults to\s*1000/)
       }
     }
   }
@@ -3774,7 +4971,7 @@ test('SITE-T-STORE-INDEXED-LINKS keeps every maintained Store Indexed continuati
 test('SITE-T-STORE-INDEXED-CONFIG explains construction defaults and mutation boundaries', () => {
   for (const locale of ['en', 'zh']) {
     const page = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/docs/store-indexed/choose-a-collection`)),
+      join(buildRoot, artifactPath(`/${locale}/docs/store-indexed/getting-started`)),
       'utf8'
     )
 
@@ -3878,10 +5075,15 @@ test('SITE-T-STORE-PERSIST-LINKS keeps every maintained Store Persist continuati
 
 test('SITE-T-STORE-PERSIST-KEYED exposes the real handle and post-hydration read path', () => {
   for (const locale of ['en', 'zh']) {
-    const adapter = readFileSync(
-      join(buildRoot, artifactPath(`/${locale}/docs/store-persist/choose-an-adapter`)),
-      'utf8'
-    )
+    /** Adapter selection and retry guidance document the shared handle controls. */
+    const handleGuides = ['choose-an-adapter', 'retry-errors-and-shutdown']
+      .map((topic) =>
+        readFileSync(
+          join(buildRoot, artifactPath(`/${locale}/docs/store-persist/${topic}`)),
+          'utf8'
+        )
+      )
+      .join('\n')
     const keyed = readFileSync(
       join(buildRoot, artifactPath(`/${locale}/docs/store-persist/keyed-families-and-clear`)),
       'utf8'
@@ -3889,19 +5091,13 @@ test('SITE-T-STORE-PERSIST-KEYED exposes the real handle and post-hydration read
 
     for (const fragment of ['IPersistHandle', 'ready', 'retryHydrate', 'flush', 'clear'])
       assert.ok(
-        `${adapter}${keyed}`.includes(fragment),
+        `${handleGuides}${keyed}`.includes(fragment),
         `/${locale}/docs/store-persist keyed misses ${fragment}`
       )
-    for (const fragment of [
-      'await handle.ready',
-      'atomStore',
-      'get',
-      'sessionDef',
-      'construction'
-    ]) {
+    for (const fragment of ['await handle.ready', 'atomStore.get(definition)', 'initial u1']) {
       if (locale === 'en')
         assert.ok(
-          keyed.includes(fragment),
+          renderedText(keyed).includes(fragment),
           `/${locale}/docs/store-persist keyed misses ${fragment}`
         )
     }
@@ -4137,6 +5333,8 @@ test('SITE-T-SERIALIZE-LINKS keeps every maintained Serialize continuation resol
     'chunk-shapes-and-wire-conversion',
     'registry-and-plugins',
     'streaming-and-backpressure',
+    'portable-values',
+    'codecs',
     'shutdown-and-errors'
   ]
 
@@ -4274,7 +5472,7 @@ test('SITE-T-STORAGE-WEB-LINKS keeps every maintained Storage Web continuation r
 })
 
 test('SITE-T-STORAGE-WEB-STRUCTURED-CODEC explains selection and the real clone boundary', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/storage-web')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/storage-web/readme')), 'utf8')
 
   assert.match(html, /四者不是同一种格式的别名/)
   assert.match(html, /真正的复制发生在 IndexedDB\/Memory 的 structured clone/)

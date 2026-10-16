@@ -7,6 +7,9 @@ export const DOMAINS = ['docs'] as const
 /** Path segment that separates API reference pages from guide topics inside one library. */
 export const API_SEGMENT = 'api'
 
+/** Topic segment of a library's maintained README page, kept out of the learning path. */
+export const README_SEGMENT = 'readme'
+
 export type ILocale = (typeof LOCALES)[number]
 
 /**

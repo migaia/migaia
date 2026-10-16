@@ -1,4 +1,11 @@
-export { API_SEGMENT, domainPath, guidePath, type IDomain, type ILocale } from './route-contract.js'
+export {
+  API_SEGMENT,
+  README_SEGMENT,
+  domainPath,
+  guidePath,
+  type IDomain,
+  type ILocale
+} from './route-contract.js'
 
 /** Generated library fact used by navigation and page recipes. */
 export type ILibrary = {

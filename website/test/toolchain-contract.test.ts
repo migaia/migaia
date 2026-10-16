@@ -484,91 +484,160 @@ test('SITE-T-WEB-RPC-GUIDES gives every runtime export an explicit bilingual dec
 })
 
 test('SITE-T-WEB-RPC-TRANSPORTS gives every public adapter a bilingual runnable tutorial', () => {
+  /** Each adapter retains its Core overview section, public API owner and maintained example. */
   const transports = [
-    ['memory-transport', 'createMemoryTransportPair'],
-    ['window-transport', 'createWindowMessageTransport'],
-    ['browser-message-port-transport', 'createBrowserMessagePortTransport'],
-    ['node-message-port-transport', 'createNodeMessagePortTransport'],
-    ['web-worker-transport', 'createWebWorkerTransport'],
-    ['shared-worker-transport', 'createSharedWorkerTransport'],
-    ['service-worker-transport', 'createServiceWorkerTransport'],
-    ['broadcast-channel-transport', 'createBroadcastChannelTransport'],
-    ['rtc-data-channel-transport', 'createRtcDataChannelTransport'],
-    ['web-transport-datagram-transport', 'createWebTransportDatagramTransport']
+    [
+      'memory-transport',
+      'rpc-core',
+      'adapters/memory',
+      'createMemoryTransportPair',
+      'getting-started'
+    ],
+    [
+      'window-transport',
+      'rpc-browser',
+      'adapters/window',
+      'createWindowMessageTransport',
+      'peers-and-window'
+    ],
+    [
+      'browser-message-port-transport',
+      'rpc-core',
+      'adapters/message-port',
+      'createBrowserMessagePortTransport',
+      null
+    ],
+    [
+      'node-message-port-transport',
+      'rpc-core',
+      'adapters/message-port',
+      'createNodeMessagePortTransport',
+      'transports-and-security'
+    ],
+    ['web-worker-transport', 'rpc-core', 'adapters/web-worker', 'createWebWorkerTransport', null],
+    [
+      'shared-worker-transport',
+      'rpc-browser',
+      'adapters/shared-worker',
+      'createSharedWorkerTransport',
+      'shared-workers'
+    ],
+    [
+      'service-worker-transport',
+      'rpc-browser',
+      'adapters/service-worker',
+      'createServiceWorkerTransport',
+      'broadcast-and-service-workers'
+    ],
+    [
+      'broadcast-channel-transport',
+      'rpc-browser',
+      'adapters/broadcast-channel',
+      'createBroadcastChannelTransport',
+      'broadcast-and-service-workers'
+    ],
+    [
+      'rtc-data-channel-transport',
+      'rpc-browser',
+      'adapters/rtc-data-channel',
+      'createRtcDataChannelTransport',
+      'rtc-data-channels'
+    ],
+    [
+      'web-transport-datagram-transport',
+      'rpc-browser',
+      'adapters/web-transport',
+      'createWebTransportDatagramTransport',
+      'web-transport-datagrams'
+    ]
   ] as const
 
   for (const locale of ['en', 'zh'] as const) {
+    /** Core keeps an overview for all ten APIs, with one complete real Node-port call. */
     const journey = findGuideJourney('rpc-core', 'transports-and-security', locale)
     assert.ok(journey)
-    const completeGuideCode = journey.document.sections
-      .flatMap((section) => section.blocks)
-      .filter((block) => block.type === 'code')
-      .map((block) => block.code)
+    /** The request/provider example may use the actual narrower public factory entries. */
+    const nodeSection = journey.document.sections.find(
+      (section) => section.id === 'node-message-port-transport'
+    )
+    assert.ok(nodeSection)
+    /** Real stock RPC must retain host construction, method registration, typed call and cleanup. */
+    const nodeCode = nodeSection.blocks
+      .flatMap((block) => (block.type === 'code' && block.language === 'ts' ? [block.code] : []))
       .join('\n')
-    assert.doesNotMatch(completeGuideCode, /createClientEndpoint/u)
-    assert.doesNotMatch(completeGuideCode, /createProviderEndpoint/u)
-    for (const [sectionId, factory] of transports) {
+    assert.match(nodeCode, /new MessageChannel\(/u)
+    assert.match(nodeCode, /createNodeMessagePortTransport/u)
+    assert.match(nodeCode, /from '@migaia\/rpc-core\/client'/u)
+    assert.match(nodeCode, /from '@migaia\/rpc-core\/provider'/u)
+    assert.match(nodeCode, /context\.success\(7\)/u)
+    assert.match(nodeCode, /\.provide\(/u)
+    assert.match(nodeCode, /\.send<number>/u)
+    assert.match(nodeCode, /await client\.dispose\(\)/u)
+    assert.match(nodeCode, /await provider\.dispose\(\)/u)
+    assert.match(nodeCode, /port1\.close\(\)/u)
+    assert.match(nodeCode, /port2\.close\(\)/u)
+
+    for (const [sectionId, owner, module, factory, topic] of transports) {
+      /** Every original section still explains and links the actual public factory. */
       const section = journey.document.sections.find((candidate) => candidate.id === sectionId)
       assert.ok(section, `${locale} transport guide misses ${sectionId}`)
-      const code = section.blocks
-        .filter((block) => block.type === 'code')
-        .map((block) => block.code)
+      /** Paragraph/list/table prose contains the canonical API link rather than an invented owner. */
+      const prose = section.blocks
+        .flatMap((block) =>
+          block.type === 'paragraph'
+            ? [block.text]
+            : block.type === 'list'
+              ? block.items
+              : block.type === 'table'
+                ? block.rows.flat()
+                : []
+        )
         .join('\n')
-      assert.match(code, new RegExp(`\\b${factory}\\b`, 'u'))
-      assert.match(code, /createEndpoint/u, `${locale} ${sectionId} has no direct endpoint example`)
-      assert.ok(section.blocks.some((block) => block.type === 'paragraph'))
-      assert.ok(section.blocks.some((block) => block.type === 'list'))
-    }
-    for (const sectionId of [
-      'memory-transport',
-      'window-transport',
-      'web-worker-transport',
-      'shared-worker-transport',
-      'broadcast-channel-transport'
-    ]) {
-      const section = journey.document.sections.find((candidate) => candidate.id === sectionId)
-      assert.ok(section)
-      const code = section.blocks
-        .filter((block) => block.type === 'code')
-        .map((block) => block.code)
-        .join('\n')
-      assert.match(code, /createEndpoint/u)
-      assert.match(code, /\.provide\(/u)
-      assert.match(code, /\.send</u)
-    }
-    for (const sectionId of [
-      'browser-message-port-transport',
-      'node-message-port-transport',
-      'service-worker-transport',
-      'rtc-data-channel-transport',
-      'web-transport-datagram-transport'
-    ]) {
-      const section = journey.document.sections.find((candidate) => candidate.id === sectionId)
-      assert.ok(section)
-      const code = section.blocks
-        .filter((block) => block.type === 'code')
-        .map((block) => block.code)
-        .join('\n')
-      assert.match(code, /\.provide\(/u)
-      assert.match(code, /\.send(?:<|\()/u)
-    }
-    for (const sectionId of [
-      'browser-message-port-transport',
-      'node-message-port-transport',
-      'shared-worker-transport',
-      'service-worker-transport',
-      'broadcast-channel-transport',
-      'rtc-data-channel-transport',
-      'web-transport-datagram-transport'
-    ]) {
-      const tutorial = journey.document.sections.find((candidate) => candidate.id === sectionId)
-      assert.ok(tutorial)
-      assert.ok(tutorial.blocks.filter((block) => block.type === 'paragraph').length >= 2)
-      assert.ok(tutorial.blocks.some((block) => block.type === 'table'))
-      assert.ok(
-        tutorial.blocks.filter((block) => block.type === 'list').flatMap((block) => block.items)
-          .length >= 8
+      /** The generated public manifest protects actual ownership and symbol existence. */
+      const api = generatedApis.find(
+        (candidate) =>
+          candidate.library === owner &&
+          candidate.module === module &&
+          candidate.symbols.some((symbol) => symbol.name === factory && symbol.kind !== 'type')
       )
+      assert.ok(api, `${owner}/${module} does not export ${factory}`)
+      /** Link to the actual API page, including the six Browser-owned adapters. */
+      const apiPath = `/${locale}/docs/${owner}/api/${module}/${factory}`
+      assert.ok(prose.includes(`](${apiPath})`), `${locale} ${sectionId} misses ${apiPath}`)
+      assert.ok(section.blocks.some((block) => block.type === 'table'))
+      /** Each referenced API retains a direct adapter/Endpoint installation and release example. */
+      const apiGuide = findApiGuide(owner, module, factory, locale)
+      assert.ok(apiGuide?.quickStart, `${locale} ${factory} has no API example`)
+      assert.match(apiGuide.quickStart, new RegExp(`\\b${factory}\\b`, 'u'))
+      assert.match(apiGuide.quickStart, /createEndpoint/u)
+      assert.match(apiGuide.quickStart, /\.provide\(/u)
+      assert.match(apiGuide.quickStart, /\.dispose\(\)/u)
+      if (topic === null) continue
+
+      /** Complete business examples live on their actual owner task page, not ten inline scenes. */
+      const ownerJourney = findGuideJourney(owner, topic, locale)
+      assert.ok(ownerJourney, `${locale} ${owner}/${topic} has no business example`)
+      /** Preserve the real host input and public messaging behavior of that task. */
+      const ownerCode = ownerJourney.document.sections
+        .flatMap((candidate) => candidate.blocks)
+        .flatMap((block) => (block.type === 'code' && block.language === 'ts' ? [block.code] : []))
+        .join('\n')
+      assert.ok(ownerCode.trim(), `${locale} ${owner}/${topic} has no TypeScript example`)
+      assert.match(ownerCode, /\.send(?:<|\()|\.request\(|\.subscribe\(/u)
+      if (factory === 'createSharedWorkerTransport') {
+        assert.match(ownerCode, /new SharedWorker\(/u)
+        assert.match(ownerCode, /createBrowserPeer/u)
+      } else if (factory === 'createRtcDataChannelTransport') {
+        assert.match(ownerCode, /new RTCPeerConnection\(/u)
+        assert.match(ownerCode, /createBrowserPeer/u)
+      } else {
+        assert.match(ownerCode, new RegExp(`\\b${factory}\\b`, 'u'))
+      }
+      if (owner !== 'rpc-core' || topic !== 'transports-and-security') {
+        /** An overview link must reach the actual task example instead of stopping at declarations. */
+        const taskPath = `/${locale}/docs/${owner}/${topic}`
+        assert.ok(prose.includes(`](${taskPath})`), `${locale} ${sectionId} misses ${taskPath}`)
+      }
     }
   }
 })
@@ -732,17 +801,17 @@ test('SITE-T-LIFECYCLE-GUIDES protects the primary ownership and sequencing path
 
 test('SITE-T-LIFECYCLE-COMPOSITION documents release, quiescence, time, and cancellation axes', () => {
   const compositionApis = [
-    ['disposal', 'createDisposeTransaction'],
-    ['disposal', 'executeReleaseDescriptor'],
-    ['quiescence', 'createPendingTracker'],
-    ['quiescence', 'createQuiescenceTracker'],
-    ['scheduler', 'createManualScheduler'],
-    ['abort', 'createAbortController']
+    ['lifecycle', 'disposal', 'createDisposeTransaction'],
+    ['lifecycle', 'disposal', 'executeReleaseDescriptor'],
+    ['lifecycle', 'quiescence', 'createPendingTracker'],
+    ['lifecycle', 'quiescence', 'createQuiescenceTracker'],
+    ['utils', 'scheduler', 'createManualScheduler'],
+    ['lifecycle', 'abort', 'createAbortController']
   ] as const
-  for (const [moduleName, symbolName] of compositionApis)
+  for (const [library, moduleName, symbolName] of compositionApis)
     for (const locale of ['en', 'zh'] as const) {
-      const guide = findApiGuide('lifecycle', moduleName, symbolName, locale)
-      assert.ok(guide, `lifecycle:${moduleName}#${symbolName} has no ${locale} guide`)
+      const guide = findApiGuide(library, moduleName, symbolName, locale)
+      assert.ok(guide, `${library}:${moduleName}#${symbolName} has no ${locale} guide`)
       assert.ok(guide.quickStart)
       assert.ok(guide.scenarios.length >= 2)
       assert.ok(guide.avoidWhen.length >= 2)
@@ -1634,6 +1703,10 @@ test('SITE-T-STORE-MIDDLEWARE-HOST documents binding, plugins, DevTools, and eve
   for (const [symbolName, expectedOptions] of targets)
     for (const locale of ['en', 'zh'] as const) {
       const guide = findApiGuide('store-middleware', 'index', symbolName, locale)
+      if (symbolName === 'StoreMiddlewareHost') {
+        assert.equal(guide, undefined, 'Internal Host classes must not regain a public API guide')
+        continue
+      }
       assert.ok(guide, `store-middleware:index#${symbolName} has no ${locale} Host guide`)
       assert.ok(guide.quickStart?.trim())
       assert.ok(guide.scenarios.length >= 3)
@@ -1697,7 +1770,9 @@ test('SITE-T-STORE-PERSIST-CORE documents lifecycle, codec routing, and every co
         'options.migrate',
         'options.partialize',
         'options.merge',
-        'options.debounceMs'
+        'options.debounceMs',
+        'options.maxWaitMs',
+        'options.scheduler'
       ]
     ],
     ['defaultJsonCodec', []],
@@ -1774,7 +1849,9 @@ test('SITE-T-STORE-PERSIST-ADAPTERS separates flat, collection, keyed, and famil
         'options.version',
         'options.migrate',
         'options.partialize',
-        'options.debounceMs'
+        'options.debounceMs',
+        'options.maxWaitMs',
+        'options.scheduler'
       ]
     ],
     [
@@ -1789,7 +1866,9 @@ test('SITE-T-STORE-PERSIST-ADAPTERS separates flat, collection, keyed, and famil
         'options.migrate',
         'options.partialize',
         'options.merge',
-        'options.debounceMs'
+        'options.debounceMs',
+        'options.maxWaitMs',
+        'options.scheduler'
       ]
     ],
     [
@@ -1804,6 +1883,8 @@ test('SITE-T-STORE-PERSIST-ADAPTERS separates flat, collection, keyed, and famil
         'options.codec',
         'options.version',
         'options.debounceMs',
+        'options.maxWaitMs',
+        'options.scheduler',
         'options.partialize',
         'options.merge'
       ]

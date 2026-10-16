@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, type MetaFunction as IMetaFunction } from 'react-router'
 import {
   API_SEGMENT,
+  README_SEGMENT,
   domainPath,
   guidePath,
   isCallableApiSymbol,
@@ -62,15 +63,20 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
   const guideLocale = locale === 'zh' ? 'zh' : 'en'
   const journeyExists =
     domain === 'guides' && Boolean(journeyModule.findGuideJourney(librarySlug, topic, guideLocale))
-  /** The Chinese package home also carries the full README as the package description. */
+  /**
+   * A package home without a hand-written learning path falls back to the maintained README and
+   * usage guide; a home with a learning path shows only that path.
+   */
   const packageHome = domain === 'guides' && topic === 'index'
+  /** The README page renders only the maintained package README. */
+  const readmePage = domain === 'guides' && topic === README_SEGMENT
   const documentation =
     locale !== 'zh'
       ? 'none'
-      : domain === 'docs' || (packageHome && !journeyExists)
-        ? 'all'
-        : packageHome
-          ? 'readme'
+      : readmePage
+        ? 'readme'
+        : domain === 'docs' || (packageHome && !journeyExists)
+          ? 'all'
           : !journeyExists
             ? 'guide'
             : 'none'
@@ -269,7 +275,10 @@ export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, params })
       ? symbol
         ? `${symbol.name} · ${library.slug}`
         : library.slug
-      : (data.journey?.title ?? (parts.slice(1).join('/') || library.slug))
+      : (data.journey?.title ??
+        (parts[1] === README_SEGMENT
+          ? `${library.slug} ${readmeTitle(locale)}`
+          : parts.slice(1).join('/') || library.slug))
   /** Existing maintained ledes remain the source of search descriptions. */
   const purpose =
     domain === 'docs'
@@ -330,6 +339,11 @@ function Docs({ params, loaderData }: IDocsRouteProps) {
       journeyTopics={loaderData?.journeyTopics ?? []}
     />
   )
+}
+
+/** Reader-facing name of the README page. */
+function readmeTitle(locale: ILocale): string {
+  return locale === 'zh' ? '包说明（README）' : 'Package README'
 }
 
 /**
@@ -782,6 +796,15 @@ function LibraryNavigation({
         >
           {locale === 'zh' ? 'API 参考' : 'API reference'}
         </Link>
+        {/* Maintained READMEs are Chinese only, so the English rail does not link an empty page. */}
+        {locale === 'zh' ? (
+          <Link
+            className={activeTopic === README_SEGMENT ? 'active' : ''}
+            to={guidePath(locale, librarySlug, README_SEGMENT)}
+          >
+            {readmeTitle(locale)}
+          </Link>
+        ) : null}
       </div>
       <LibraryModuleLinks
         api={api}
@@ -2702,9 +2725,21 @@ function InlineText({
       .replace(/(?<!GitHub |[\w.:/-])packages(?![\w.:/-])/gi, 'libraries')
       .replace(/(?<![\w.:/-])package(?![\w.:/-])/gi, 'library')
       .split(
-        /(`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
+        /(\[[^\]\n]+\]\(\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+\)|`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
       )
       .map((part, index) => {
+        /** Maintained API tables link to existing local guides without accepting external URLs. */
+        const maintainedLink = part.match(
+          /^\[([^\]\n]+)\]\((\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+)\)$/
+        )
+        if (maintainedLink) {
+          const [, label, target] = maintainedLink
+          return (
+            <Link className="text-link" key={index} to={target}>
+              {label}
+            </Link>
+          )
+        }
         const inlineCode = part.startsWith('`') && part.endsWith('`')
         const value = inlineCode ? part.slice(1, -1) : part
         const errorCode = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/.test(value)
@@ -2840,9 +2875,6 @@ function DomainLibrary({
   const document = library.documentation.guide
   /** Visible guide headings back the right-side reading outline. */
   const guideSections = journey?.document.sections ?? []
-  /** Maintained positioning paragraph: what the library is for and where it sits among the others. */
-  const packagePosition =
-    LIBRARY_ARCHITECTURE_LEDES_ZH[library.slug as keyof typeof LIBRARY_ARCHITECTURE_LEDES_ZH]
   /** The library sidebar is identical on guide and API pages; only the active entry differs. */
   const pageNavigation = useMemo(
     () => (
@@ -2866,14 +2898,27 @@ function DomainLibrary({
         locale={locale}
         domain="guides"
         library={library.slug}
-        moduleName={topic === 'index' ? undefined : (journey?.title ?? topic)}
+        moduleName={
+          topic === 'index'
+            ? undefined
+            : topic === README_SEGMENT
+              ? readmeTitle(locale)
+              : (journey?.title ?? topic)
+        }
       />
       <div className="reading-layout">
         <article className="article-column">
           <p className="eyebrow">
             {locale === 'zh' ? '指南' : 'Guide'} · {library.slug}
           </p>
-          <h1>{journey?.title ?? (modulePath ? topic : library.slug)}</h1>
+          <h1>
+            {journey?.title ??
+              (topic === README_SEGMENT
+                ? `${library.slug} ${readmeTitle(locale)}`
+                : modulePath
+                  ? topic
+                  : library.slug)}
+          </h1>
           <p className="lede">
             <InlineText
               library={library.slug}
@@ -2888,14 +2933,6 @@ function DomainLibrary({
               }
             />
           </p>
-          {topic === 'index' && journey && locale === 'zh' && packagePosition ? (
-            <section className="section-block" aria-labelledby="package-position">
-              <h2 id="package-position">在 migaia 中的位置</h2>
-              <p className="package-position">
-                <InlineText library={library.slug} locale={locale} text={packagePosition} />
-              </p>
-            </section>
-          ) : null}
           {journey ? (
             <GuideJourneyContent journey={journey} library={library.slug} locale={locale} />
           ) : locale === 'zh' && document ? (
@@ -2906,7 +2943,9 @@ function DomainLibrary({
               locale={locale}
             />
           ) : null}
-          {topic === 'index' && locale === 'zh' && library.documentation.readme ? (
+          {(topic === README_SEGMENT || (topic === 'index' && !journey)) &&
+          locale === 'zh' &&
+          library.documentation.readme ? (
             <section className="section-block" aria-labelledby="package-readme">
               <h2 id="package-readme">包说明</h2>
               <MaintainedDocument
