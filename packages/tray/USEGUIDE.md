@@ -355,6 +355,16 @@ import { defineAdapter } from '@migaia/tray/adapter'
 import { createRuntime } from '@migaia/tray/runtime'
 ```
 
+托管 Host 的类型保留具体 source Host、已登记插件和 ready 插件；`createRuntime(host)`
+直接沿用这些类型，不需要把装有扩展的 Host 转成 `any`。`createHost` 的工厂同时支持
+PluginHost class 与 `defineHost()` handle。插件 hook 使用 source Host 声明的 domain core
+和 lifecycle core，安装入口会检查插件所需的能力。
+
+`use()`、`replace()` 和 `loadIntoHost()` 成功后，从 `result.view` 继续操作，才能保留新安装
+插件的静态能力。Loader 的返回值可通过 `ok`、`committed` 区分成功和失败，并读取对应
+`view`；传给 `createRuntime(result.view)` 后，字面量插件名会决定 callback 的 extensions
+类型。blocked 插件不贡献 ready 能力，动态名称沿用保守推导。
+
 `defineLoader()` 快照一次 `load` contract，并兼容同步值、原生 Promise 与 foreign thenable；
 结果必须提供 `value` 与可调用的 lifecycle `release` descriptor。`defineAdapter()` 同样只
 快照并执行一次转换，不拥有 Host、Graph、scope 或 artifact 清理。`loadIntoHost()` 是唯一事务

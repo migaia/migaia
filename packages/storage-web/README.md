@@ -77,7 +77,7 @@ const store = localStorageHost({ storage: myFakeStorage }) // 测试环境注入
 ## `cookiesHost` 模块
 
 ```ts
-import { cookiesHost } from '@migaia/storage-web/cookiesHost'
+import { cookiesHost } from '@migaia/storage-web/cookies'
 ```
 
 **`cookiesHost`｜10 秒上手**：
@@ -476,7 +476,7 @@ console.log(result.migrated, result.conflicted)
 
 ```ts
 import { asRecordStore, isRecordStore } from '@migaia/storage-contract'
-import { cookiesHost } from '@migaia/storage-web/cookiesHost'
+import { cookiesHost } from '@migaia/storage-web/cookies'
 import { memoryStorageHost } from '@migaia/storage-web/memory'
 
 const primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })

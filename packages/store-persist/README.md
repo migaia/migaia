@@ -39,7 +39,6 @@ pnpm add @migaia/store-persist @migaia/storage-contract @migaia/storage-web
 
 ```ts
 import { persist } from '@migaia/store-persist/light';
-// 或：import { persist } from '@migaia/store-persist';（包根统一转出全部子路径）
 ```
 
 **`persist`｜10 秒上手** —— 给 `createStore()` 产出的扁平 Store 接上自动持久化：

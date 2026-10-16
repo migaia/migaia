@@ -494,7 +494,7 @@ if (error.code === StoreKeyedErrorCode.atomStoreDisposed) {
 }
 ```
 
-全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`familyDisposed`(`FAMILY_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`evictionFailed`(`EVICTION_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。
+全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。
 
 **`STORE_KEYED_SOURCE`｜3 秒上手** —— 字符串常量 `'@migaia/store-keyed'`，无调用参数：
 
@@ -613,9 +613,11 @@ function openChat(runtime: IRuntime, chatId: string) {
 ### 3. 测试期用 `override` 替身某个派生定义
 
 ```ts
-import { createAtomStore, derivedDef } from '@migaia/store-keyed'
+import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'
 import { createRuntime } from '@migaia/reactive'
 
+const todosDef = atomDef([{ done: true }, { done: false }])
+const doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)
 const store = createAtomStore(createRuntime())
 const undo = store.override(
   doneCountDef,

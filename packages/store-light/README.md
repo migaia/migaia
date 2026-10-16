@@ -335,11 +335,22 @@ store.$hydrate(restored, {
 
 ```ts
 import { createStore } from '@migaia/store-light'
-import { createObjectLeaseRegistry } from '@migaia/lifecycle'
 
 const store = createStore({ items: [] as string[] })
-const registry = store.$own(createObjectLeaseRegistry())
-// registry 会在 store.$dispose() 时一并释放，无需单独管理
+const timer = setInterval(() => console.log('poll'), 1_000)
+let disposed = false
+// $own 接收 IDisposable（dispose() + disposed），典型资源是 collection 等外部结构
+const poller = store.$own({
+  get disposed() {
+    return disposed
+  },
+  dispose() {
+    if (disposed) return
+    disposed = true
+    clearInterval(timer)
+  }
+})
+// poller 会在 store.$dispose() 时一并释放，无需单独管理
 ```
 
 ### 4. 自定义 FieldBuilder 接入 Store
@@ -362,6 +373,7 @@ function counterField(initial: number): IFieldBuilder<ICounterField> {
     create({ createSource }: IFieldContext): ICounterField {
       const source = createSource('CounterField')
       let value = initial
+      let disposed = false
       return {
         get value() {
           source.track()
@@ -372,7 +384,12 @@ function counterField(initial: number): IFieldBuilder<ICounterField> {
             value = v
           })
         },
+        get disposed() {
+          return disposed
+        },
         dispose() {
+          if (disposed) return
+          disposed = true
           source.dispose()
         }
       }

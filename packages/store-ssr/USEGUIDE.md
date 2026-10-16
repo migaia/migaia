@@ -284,8 +284,8 @@ JSON 合法性校验(`dehydrate()` 的深拷贝路径与纯校验路径共用同
 ## 11. 内联进 HTML:纯 JSON 版本
 
 ```ts
-// 写入
-const html = createSSRStateScript(state); // 默认 elementId = '__STORE_STATE__'
+// 写入(服务端)
+const html = createSSRStateScript(scope.dehydrate()); // 默认 elementId = '__STORE_STATE__'
 // => <script type="application/json" id="__STORE_STATE__">{"version":1,...}</script>
 
 // 读取(浏览器端)
@@ -317,8 +317,8 @@ import { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/
 
 const codecs = createSerializeRegistry([jsonPlugin()]);
 
-// 写入
-const html = await createSSRStateScriptWith(state, { codecs });
+// 写入(服务端)
+const html = await createSSRStateScriptWith(scope.dehydrate(), { codecs });
 
 // 读取
 const state = await readSSRStateFromDocumentWith({ codecs, document });

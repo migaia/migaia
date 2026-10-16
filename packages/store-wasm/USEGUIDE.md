@@ -45,7 +45,7 @@ await ensureWasm() // 之后所有字段构造器的 create() 才能同步工作
 
 ## 2. 与 `createStore()` 集成
 
-字段构造器实现的是 `@migaia/store-light` 的 `SyncFieldBuilder` 协议（`mode: 'sync'`），可以直接放进 `createStore()` 的字段声明：
+字段构造器实现的是 `@migaia/store-light` 的 `ISyncFieldBuilder` 协议（`mode: 'sync'`），可以直接放进 `createStore()` 的字段声明：
 
 ```ts
 import { createStore } from '@migaia/store-light'
@@ -75,7 +75,7 @@ store.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配
 - **`createStore()` 只接受 `mode: 'sync'` 的字段构造器**，`store-wasm` 的全部构造器都满足这一点，可以直接用 `createStore()`，不需要 `createAsyncStore()`。真正的"异步"部分（WASM 加载）必须在调用 `createStore()` 之前用 `await ensureWasm()` 完成。
 - **字段本身就是 `store.<key>` 的值**，不是被拆包的原始类型——`number()`/`boolean()`/`string()` 产出的字段要通过 `.value` 读写（`store.hp.value`），`record()` 产出的字段直接把每个 key 暴露成可读写属性（`store.pos.x`），`array()` 产出的字段要用 `at()`/`setAt()`/`setRange()`/`view()`。
 - **Store 拥有字段的生命周期**：`createStore()` 内部会把每个 wasm 字段登记进 Store 自己的 disposal scope，`store.$dispose()` 时自动调用每个字段的 `dispose()`。业务代码不需要、也不应该在 Store 存活期间手动 `dispose()` 单个 wasm 字段。
-- 如果不经过 `createStore()`，而是直接拿字段构造器手写 `builder.create(context)`（比如写测试、写自定义 runtime 集成），字段的生命周期完全由调用方负责，`context` 需要自己提供符合 `FieldContext`（`runtime`、`signal`、`createSource`）形状的对象，这是 `@migaia/store-light` 定义的协议，详见该包文档。
+- 如果不经过 `createStore()`，而是直接拿字段构造器手写 `builder.create(context)`（比如写测试、写自定义 runtime 集成），字段的生命周期完全由调用方负责，`context` 需要自己提供符合 `IFieldContext`（`runtime`、`signal`、`createSource`）形状的对象，这是 `@migaia/store-light` 定义的协议，详见该包文档。
 
 ---
 
@@ -255,8 +255,8 @@ type IWasmRecordField<Shape> = { [K in keyof Shape]: number } & {
 | `allocate`/`allocateSync` 的 `byteLen` 不是 `[0, 0xffff_ffff]` 内的安全整数 | `RangeError` | `wasm.allocate: byteLen must fit an unsigned 32-bit integer`                                |
 | 字段构造时 WASM 尚未就绪（未 `await ensureWasm()`）                         | `Error`      | `[store] WASM is not initialized; await ensureWasm() or use StoreProvider`                  |
 | 字段构造时 `context.signal` 已经 aborted                                    | `Error`      | `[store] field init aborted`                                                                |
-| `number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`                | `Error`      | `[store] cannot read a disposed wasm field`                                                 |
-| `number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`                | `Error`      | `[store] cannot write a disposed wasm field`                                                |
+| `number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`                | `Error`      | `[store] cannot use a disposed wasm field`                                                  |
+| `number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`                | `Error`      | `[store] cannot use a disposed wasm field`                                                  |
 | `array()` 字段 dispose 后调用任意方法                                       | `Error`      | `[store] cannot use a disposed wasm field`                                                  |
 | `array()` 的 `length` 超出 `[0, floor(0xffff_ffff/8)]`                      | `RangeError` | `wasm.array: length exceeds the Wasm32 allocation limit`                                    |
 | `array()` 的 `granularity` 不是正安全整数                                   | `RangeError` | `wasm.array: granularity must be a positive safe integer`                                   |
@@ -302,7 +302,8 @@ const StoreWasmErrorCode = {
   reservedFieldName: 'RESERVED_FIELD_NAME',
   allocationFailed: 'ALLOCATION_FAILED',
   invalidOption: 'INVALID_OPTION',
-  cleanupFailed: 'CLEANUP_FAILED'
+  cleanupFailed: 'CLEANUP_FAILED',
+  instancePoisoned: 'INSTANCE_POISONED'
 } as const
 type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]
 ```
@@ -318,6 +319,7 @@ type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErr
 | `allocationFailed`  | WASM 分配失败或对齐/长度校验失败                                                   |
 | `invalidOption`     | 构造/写入参数非法（超容量、下标越界、granularity 非法等）                          |
 | `cleanupFailed`     | 字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`） |
+| `instancePoisoned`  | WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程 |
 
 ```ts
 const STORE_WASM_SOURCE: '@migaia/store-wasm'

@@ -235,6 +235,16 @@ artifact 由对应 definition generation 清理。Runtime 从托管 Host 取得 
 新 run、abort active signal，并按 `bounded` 或 `strict-drain` 策略观察真实完成，不宣称终止
 不合作的 same-realm callback。
 
+`createHost({ create })` 接受 PluginHost class 实例或 `defineHost()` 返回的 handle，并保留
+具体 Host 的 domain core、pipeline 和初始插件类型。插件的 `install(core)` 接收 domain core
+与 PluginHost lifecycle core；它不接收 Host handle 本身。`plugins`、`use()`、`replace()`、
+`loadIntoHost()` 和 Runtime 的 `self.replace()` 都按该 Host 的能力检查插件准入。
+
+安装后的精确能力位于成功结果的 `view`：检查 `result.ok` 后，将 `result.view` 传给
+`createRuntime()`，`run('插件名', ...)` 的 callback 即可获得对应插件的 extensions 类型。
+`loadIntoHost()` 同样保留原 Host、目标插件及 `use`/`replace` 的结果类型。原 Host 变量不会
+因一次安装调用自动改变静态类型；动态插件名称仍按既有规则返回保守视图。
+
 Runtime callback 同时收到只绑定当前 run、插件名称与 generation 的 `context.self`。调用
 `self.unUse()` 或 `self.replace(plugin)` 会同步返回不具 thenable 行为的 ticket；ticket 的
 `completion` 只在 callback settle、lease release 后由 managed Host queue 执行。callback 内

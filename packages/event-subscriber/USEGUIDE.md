@@ -105,15 +105,6 @@ type IEventChannel<T, R = void> = {
     listener: IEventListener<T, R>,
     options?: { readonly taskId?: string }
   ): IEventChannelSubscription<T, R>
-  subscribeOnce(
-    listener: IEventListener<T, R>,
-    options?: { readonly taskId?: string }
-  ): IUnsubscribe
-  subscribeUntil(
-    signal: IAbortSignal,
-    listener: IEventListener<T, R>,
-    options?: { readonly taskId?: string }
-  ): IUnsubscribe
   publish(value: T): void
   filterTaskId(taskId: string): IFilteredEventChannel<T, R>
   clear(): void
@@ -122,7 +113,7 @@ type IEventChannel<T, R = void> = {
 ```
 
 - `subscribe(listener, options?)` —— 登记一个 listener，返回可直接调用的[订阅句柄](#订阅句柄)（同时是 `unsubscribe` 函数、`.unsubscribe` 自身别名、可链式 `.subscribe()` 追加更多订阅）。`listener` 非函数抛 `INVALID_LISTENER`；`options.taskId` 提供但非非空字符串抛 `INVALID_TASK_ID`；`options` 本身不是普通对象抛 `INVALID_OPTIONS`。缺省 `multiple` 下相同 listener 重复订阅会产生两份独立 registration（各自可单独退订）；显式 `unique` 的行为见上。
-- `subscribeOnce`/`subscribeUntil` —— 与下方 [Helper 模块](#helper-模块)的同名独立函数语义完全一致，channel 上直接暴露方便链式调用。
+- channel 本身没有 `subscribeOnce`/`subscribeUntil` 方法；一次性或带 signal 的订阅用下方 [Helper 模块](#helper-模块)的同名独立函数，第一个参数传 channel。
 - `publish(value)` —— 按注册顺序（快照）同步调用全部 listener，**不等待**返回的 Promise；默认同步重入 publish 递归交付，只有 `dispatchPolicy: EventDispatchPolicy.queued` 才会排队到当前快照完成后再交付。listener **同步抛出**的错误会被收集并以携带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出；listener 返回的 thenable **迟到 reject**（即在 `publish()` 同步返回之后才拒绝）会转发给 `options.report`（见上），不计入 `publish()` 本身抛出的错误。
 - `filterTaskId(taskId)` —— 创建一个只读的 task 选择 view（`IFilteredEventChannel`），交给[异步发布](#async-模块) helper 使用；`taskId` 必须是非空字符串，否则抛 `INVALID_TASK_ID`。
 - `clear()` —— 清空全部 registration，**不**执行 listener 自身的 cleanup（listener 本身没有 dispose 概念，只是不再被调用）。
@@ -144,6 +135,8 @@ style 是构造阶段的一次性命名投影。四个 preset 映射如下：
 自定义对象的方向固定为 `{ subscribe: 'observe', publish: 'dispatch', unsubscribe: 'dispose' }`，其中 `unsubscribe` 可省略并回退为 canonical `unsubscribe`。Channel 泛型顺序是 `<T, R, S>`，Hub 是 `<C, S>`；显式提供 payload/event map 后，custom style 必须显式提供对应的 `S`，不会依赖 partial generic inference。预声明对象推荐 `defineEventApiStyle()`，也可以使用 TypeScript 的 `as const`；widened 为普通 `string` 的对象不会产生任意字符串 index signature，因此不能据此声称存在精确 alias。
 
 ```ts
+import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'
+
 const events = createEventChannel<number>({ style: 'on-trigger' })
 const off = events.on((event) => console.log(event.value))
 events.trigger(1)
@@ -426,6 +419,8 @@ type IEventMap = object // 事件名到 payload 类型的映射
 type IEventHubOptions<C extends IEventMap> = {
   readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>
   readonly terminalReport?: (error: unknown) => void | PromiseLike<void>
+  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style
+  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致
 }
 type IEventHubReport<C extends IEventMap> = {
   [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }
@@ -551,6 +546,7 @@ import {
 | `subscriptionClosed`                 | `SUBSCRIPTION_CLOSED`                   | 订阅句柄链已关闭后又调用其 `.subscribe()` 追加新订阅                                                                                                     |
 | `subscriptionHandleProjectionFailed` | `SUBSCRIPTION_HANDLE_PROJECTION_FAILED` | handle alias descriptor projection fails after registration; the first registration is rolled back and the original projection failure remains reachable |
 | `invocationClosed`                   | `INVOCATION_CLOSED`                     | 已完成或已调用过的捕获 invocation 被再次调用                                                                                                             |
+| `subscriptionDisposeFailed`          | `SUBSCRIPTION_DISPOSE_FAILED`           | 关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误                                                                       |
 
 调用方应始终以 `error.code === EventSubscriberErrorCode.xxx` 判别，不要硬编码码值字符串。
 
@@ -562,7 +558,7 @@ import {
 
 `EventSubscriberErrorText` 是包内维护错误文案的唯一来源，但**不是公开导出**，业务代码不能从 `@migaia/event-subscriber` 导入它。生产代码应按上方公开的 `error.source` 与 `error.code` 分支；测试若要锁定面向用户的文案，可以直接断言实际抛出错误的 `message`，不要依赖内部源码路径。
 
-内部文本与 17 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`。
+内部文本与 18 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`、`subscriptionDisposeFailed`。
 
 ---
 

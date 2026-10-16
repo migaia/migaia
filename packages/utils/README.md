@@ -587,7 +587,7 @@ Object.isFrozen(next); // false：immutable update 不等于 freeze
 
 ```ts
 parseObjectPath('user.tags.[0]'); // ['user', 'tags', 0]
-probeObjectPath(data, 'user.x.y'); // { kind: 'missing' | 'blocked' | 'failed' | 'value', ... }
+probeObjectPath(data, 'user.name'); // { kind: 'value' | 'missing' | 'blocked' | 'failed', ... }
 ```
 
 均无可选项。限制：单段最长 512 字符、路径最多 256 段、字符串路径总长上限 4096 字符，`__proto__`/`prototype`/`constructor` 一律拒绝。
@@ -629,11 +629,12 @@ import type {
   IObjectPathWriteValue,
   IProbePropertyResult,
   IAbortSignal,
-  IDeferred
+  IDeferred,
+  INativeAbortSignal
 } from '@migaia/utils/typing';
 ```
 
-`/typing` 是**纯 type-only** 子入口（不含任何运行时导出，`import type` 即可，打包后不会产生任何 JS 代码），且**只能通过这个子路径导入**——不经过根入口 `@migaia/utils` 重新导出。它做两件事：把散落在 `/object`（`IObjectPath`/`IObjectPathInput`/`IObjectPathSegment`/`IObjectPathTuple`/`IObjectPathTupleFor`/`IObjectPathValue`/`IObjectPathWriteValue`/`IProbePropertyResult`）与 `/promise`（`IAbortSignal`/`IDeferred`）里的类型汇总到一个跨项目复用的稳定入口；再提供两个 `/object` 里没有的全新类型工具，用来把带判别字段的联合类型（discriminated union）转成按判别值分组的映射类型。
+`/typing` 是**纯 type-only** 子入口（不含任何运行时导出，`import type` 即可，打包后不会产生任何 JS 代码），且**只能通过这个子路径导入**——不经过根入口 `@migaia/utils` 重新导出。它做两件事：把散落在 `/object`（`IObjectPath`/`IObjectPathInput`/`IObjectPathSegment`/`IObjectPathTuple`/`IObjectPathTupleFor`/`IObjectPathValue`/`IObjectPathWriteValue`/`IProbePropertyResult`）与 `/promise`（`IAbortSignal`/`IDeferred`/`INativeAbortSignal`）里的类型汇总到一个跨项目复用的稳定入口；再提供两个 `/object` 里没有的全新类型工具，用来把带判别字段的联合类型（discriminated union）转成按判别值分组的映射类型。
 
 **`IDiscriminatedByField`｜5 秒上手** —— 按顶层判别字段分组：
 
@@ -867,6 +868,8 @@ const [routerConfig, telemetryConfig] = await Promise.all([
 ```ts
 import { collect } from '@migaia/utils';
 
+type IUser = { active: boolean; profile: { 'name-zh': string; 'name-en': string } };
+const users: readonly IUser[] = [{ active: true, profile: { 'name-zh': '你好 world', 'name-en': 'hello world' } }];
 const collector = collect(users)
   .fieldBy('profile.name-zh', 'profile.name-en')
   .like(' world ')
@@ -907,7 +910,7 @@ const request = withTimeout(
         if (signal.aborted) throw signal.reason;
         return config.endpoint;
       },
-      { maxAttempts: config.retries, scheduler }
+      { maxAttempts: config.retries, shouldRetry: () => true, scheduler }
     ),
   { timeoutMs: 100, scheduler }
 );

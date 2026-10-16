@@ -83,7 +83,9 @@ await pipeline.run(
     }
   ],
   1,
-  async (value) => trace.push(`done:${value}`)
+  async (value) => {
+    trace.push(`done:${value}`)
+  }
 )
 
 // ['before', 'done:2', 'after']

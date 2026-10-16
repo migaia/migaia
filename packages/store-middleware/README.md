@@ -38,7 +38,6 @@ import {
   MiddlewareCommandType,
   createReduxDevToolsAdapter,
   createStoreMiddlewareHost,
-  StoreMiddlewareHost,
   middlewarePlugin,
   loggerMiddleware,
   bindStoreMiddleware,
@@ -112,10 +111,15 @@ const host = createStoreMiddlewareHost({
 - `pipeline?: { mode?: IMiddlewarePipelineMode }` —— **会被构造函数强制覆盖成 `MiddlewarePipelineMode.sync`**，传别的值不生效
 - `diagnostic?` / `scheduler?` / `queueAdmissionTimeoutMs?` / `queueAdmissionDiagnosticMs?` / `disposeStepTimeoutMs?` —— 透传给 `@migaia/plugin-host` 的 `PluginHost`，语义见其 USEGUIDE
 
-**`StoreMiddlewareHost`｜10 秒上手** —— `createStoreMiddlewareHost()` 背后的类，`extends PluginHost`：
+**`IStoreMiddlewareHost<S>`｜10 秒上手** —— `createStoreMiddlewareHost()` 返回的冻结句柄（不是类，没有 `new`）。它通过 `@migaia/plugin-host` 的 `defineHost` 组合而成，同时带有宿主公共成员（`use`/`unUse`/`dispose` 等）和下面的 Store 领域成员：
 
 ```ts
-const host = new StoreMiddlewareHost({
+import { createRuntime } from '@migaia/reactive';
+import { createStoreMiddlewareHost } from '@migaia/store-middleware';
+
+const runtime = createRuntime();
+let state = { count: 0 };
+const host = createStoreMiddlewareHost({
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
   runtime,
   getState: () => state
@@ -123,10 +127,10 @@ const host = new StoreMiddlewareHost({
 host.runAction('increment', () => {
   state = { ...state, count: state.count + 1 };
 });
-  await host.dispose(); // returns the structured PluginHost disposal result
+await host.dispose(); // returns the structured PluginHost disposal result
 ```
 
-构造参数同 `createStoreMiddlewareHost`。实例成员：
+领域成员：
 
 - `readonly mutationPolicy: MutationPolicy`
 - `emit(event: IMiddlewareEvent<S>): void` —— 同步跑一遍 pipeline；某个 stage 忘了调用 `next()` 不会抛错，而是以 `code: 'MIDDLEWARE_NOT_CHAINED'` 上报给 `runtime.reportError()`
@@ -135,7 +139,7 @@ host.runAction('increment', () => {
 - `recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void` —— 派发一个 `error` 事件；重入（处理上一个 `error` 事件期间又调用）时直接转发给 `runtime.reportError`，不再触发一轮 pipeline
 - `connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>` —— `name` 默认 `'store-devtools'`
 - `attachBindingDisposer(disposer: IDisposer): void` —— 登记额外的清理函数，`dispose()` 时按后进先出顺序先于插件卸载执行
-- `override dispose(): Promise<void>` —— 稳定 Promise（重复调用返回同一个）；多项清理失败抛 `code: 'CLEANUP_FAILED'` 的 `AggregateError`
+- `dispose()` —— 先逆序执行绑定 disposer，再委托 plugin-host 卸载插件；返回结构化结果 `{ logicalTerminal, cleanupComplete, cleanupErrors }`，绑定 disposer 抛出的错误排在 `cleanupErrors` 前面，不会以异常形式抛出
 
 **`middlewarePlugin`｜5 秒上手** —— 把旧式 `(event, context, next) => void` 中间件函数适配成插件：
 
@@ -191,7 +195,7 @@ await host.dispose(); // 只释放这次绑定，Store 本身不受影响
 - `actionPrefix?: string` —— 只转发 `event.name` 以该前缀开头的 Runtime action trace
 - `clone?: (state: Record<string, unknown>) => Record<string, unknown>` —— 默认 `state => ClonePolicy.diagnostic(state)`（尽力而为，不抛错）；`getState()`/状态订阅每次都会调用它产出一份新的独立快照
 
-返回值是 `StoreMiddlewareHost` 实例，额外挂了只读的 `store` 属性指回传入的 Store。
+返回值是一个新的冻结对象：带有 `IStoreMiddlewareHost` 的全部成员，外加只读的 `store` 属性指回传入的 Store。若绑定过程中订阅失败且回滚清理也失败，`bindStoreMiddleware()` 抛 `code: 'CLEANUP_FAILED'` 的 `AggregateError`（原始错误位于 `errors[0]`）。
 
 **`ClonePolicy`｜5 秒上手** —— 三种"给调用方一份拷贝"的显式策略常量表：
 
@@ -286,7 +290,7 @@ import {
 } from '@migaia/store-middleware/tolerant-clone';
 ```
 
-与根导出中同名的 `ClonePolicy`/`immutableSnapshotClone`/`opaqueReferenceClone`/`diagnosticClone`/`tolerantClone` 是**同一份实现**（根导出 `export * from './tolerant-clone.js'`）；这个子路径只是给只需要克隆策略、不想连带引入 `StoreMiddlewareHost`/`bindStoreMiddleware` 等其余符号的调用方一个更窄的导入面。用法与全部选项见上方[根导出](#根导出)对应条目。
+与根导出中同名的 `ClonePolicy`/`immutableSnapshotClone`/`opaqueReferenceClone`/`diagnosticClone`/`tolerantClone` 是**同一份实现**（根导出 `export * from './tolerant-clone.js'`）；这个子路径只是给只需要克隆策略、不想连带引入 `createStoreMiddlewareHost`/`bindStoreMiddleware` 等其余符号的调用方一个更窄的导入面。用法与全部选项见上方[根导出](#根导出)对应条目。
 
 ---
 
@@ -320,7 +324,7 @@ const host = bindStoreMiddleware(store, {
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
   mutationPolicy
 });
-await host.use(loggerMiddleware());
+await host.use(loggerMiddleware<Record<string, unknown>>());
 await host.connectDevTools(createReduxDevToolsAdapter(connection));
 
 store.increment(); // 允许：action 内

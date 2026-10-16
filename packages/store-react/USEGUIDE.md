@@ -118,7 +118,7 @@ type IStoreProviderConfig = {
 
 - **元素身份在挂载后被锁定**。`config.ready` 数组第一次渲染时的值会被存入 `ref`，后续渲染即使传入新数组，只要按元素浅比较（`===`，逐项）与旧数组相等就视为同一份；只要有一项引用变了，就会触发身份变化处理——但**新数组不会生效**，Provider 继续用挂载时那份旧屏障，同时在开发环境 `console.warn`、生产环境 `console.error` 一条 `[store] StoreProvider ready barriers changed identity; ...`。这意味着内联字面量 `config={{ ready: [fetchUser()] }}` 每次 render 都会打印警告且不会重新等待——**务必**用 `useMemo` 或模块级常量稳住 `ready` 数组与其元素的引用。
 - **工厂函数只执行一次（按屏障列表身份缓存）**。`ready: [() => ensureWasm()]` 里的工厂在同一个 barrier 数组的生命周期内只会被调用一次，结果被 `WeakMap` 缓存复用；但缓存 key 是"归一化后的屏障数组"本身，不是全局按工厂函数缓存——不同的 Provider/SSR 请求作用域各自独立执行一次，互不共享。工厂执行不保证在"React 放弃的渲染"下恰好执行一次；非幂等的初始化逻辑应该自己用一个模块级 memoized Promise，而不是依赖这里的缓存语义。
-- **reject 会变成一个真实抛出的 `Error`**。非 `Error` 类型的 reject 原因会被包装成 `new Error(\`[store] ready barrier rejected: ${String(reason)}\`)`；`ReadyBoundary`在 render 阶段`throw` 它，只能被外层 React Error Boundary 捕获，`StoreProvider` 自己不提供错误 UI。
+- **reject 会变成一个真实抛出的 `Error`**。非 `Error` 类型的 reject 原因会被包装成消息为 `[store] ready barrier rejected`、`code: 'READY_REJECTED'` 的 `Error`，原始原因在 `cause` 上；`ReadyBoundary`在 render 阶段`throw` 它，只能被外层 React Error Boundary 捕获，`StoreProvider` 自己不提供错误 UI。
 - **已经 settle 的 Promise 不保证首帧同步生效**。`ITrackedReady.status()` 是同步查询，但 track 逻辑是在 Promise then 回调（微任务）里更新状态，所以哪怕传入的 Promise 已经 resolve，`ReadyBoundary` 首次渲染仍可能读到 `pending`，随后一个 effect 里同步刷新到 `ready`——多数场景感知不到，但如果你依赖"reload 后立刻同步渲染最终内容、不闪 fallback"，需要注意这个微任务延迟。
 
 ### 2.4 `StoreProviderState` / `IStoreProviderState`
@@ -323,7 +323,7 @@ function useAssertStoreFeature(path: 'wasm' | `experimental.${string}`, apiName?
 function createStoreToken<T>(debugName: string): StoreToken<T>;
 ```
 
-产出一个冻结的、带类型参数 `T` 的 key（内部是一个 `Symbol`）。`debugName` 为空字符串会抛 `[store] StoreToken requires a debug name`——它同时是调试信息，出现在所有相关报错消息里，务必取一个能定位到业务含义的名字。
+产出一个冻结的、带类型参数 `T` 的 key（内部是一个 `Symbol`）。`debugName` 为空字符串会抛 `[store] IStoreToken requires a debug name`——它同时是调试信息，出现在所有相关报错消息里，务必取一个能定位到业务含义的名字。
 
 ### 4.2 `StoreRegistry` 类
 
@@ -359,7 +359,7 @@ function createStoreRegistry(runtime?: IRuntime): StoreRegistry;
 - `dispose()` 是同步、幂等的：反向遍历已注册的 owned 实体逐个释放，再释放 `atomStore`；某个实体的 `dispose()` 若返回一个 thenable，`dispose()` 不会等它（本身是同步方法），但会跟踪这个 Promise 并在其 reject 时经 `runtime.reportError` 上报，不会变成未处理的 rejection。多个实体报错时抛 `AggregateError('[store] provider registry disposal failed')`。
 - `disposeAsync()` 是异步、单飞（多次并发调用共享同一次执行）的对应版本：会真正 `await` 每个 thenable 释放结果；对一个已经同步 `dispose()` 过的 Registry 调用，不会当作"已经完成"直接 resolve，而是等待 `dispose()` 当时来不及等待、仍在跑的那些异步释放全部 settle。
 - thenable 采用 lifecycle 的统一接纳语义：只读取一次 `then` getter，并以原 thenable 作为 receiver 调用捕获到的函数。getter 抛出的原始异常不会被替换；同步 `dispose()` 会原样抛出，之后的 `disposeAsync()` 会通过其稳定 Promise 原样重放。
-- `whenTerminal()` / `lifecycle`：暴露统一的 `AsyncLifecycle` 形状（`open` → `closing` → `terminal`），`whenTerminal()` 在真正走到 `terminal`（含所有异步释放都 settle）才 resolve。
+- `whenTerminal()` / `lifecycle`：暴露统一的生命周期形状（`@migaia/lifecycle` 的 `ILifecycleState`：`open` → `closing` → `terminal`），`whenTerminal()` 在真正走到 `terminal`（含所有异步释放都 settle）才 resolve。
 
 ## 5. 错误处理完整参考
 
@@ -384,7 +384,7 @@ function createStoreRegistry(runtime?: IRuntime): StoreRegistry;
 | `[store] StoreProvider registry/runtime ownership mismatch`                                                                   | 同时传 `registry` 与 `runtime` 且二者不属于同一 Runtime                                                                                                     | 只传其中一个，或保证 `registry.runtime === runtime`                                                  |
 | `[store] StoreProvider ready barriers changed identity; ...`（console.warn/console.error，不抛）                              | `config.ready` 数组在挂载后按元素比较发生了变化                                                                                                             | 用 `useMemo`/模块级常量稳住 `ready` 数组与元素引用                                                   |
 | `[store] features.wasm is true but config.ready is empty; pass ensureWasm from @migaia/store-wasm (e.g. ready: [ensureWasm])` | `features.wasm: true` 但没提供 `ready`                                                                                                                      | 传入 `ready: [ensureWasm]`（来自 `@migaia/store-wasm`）或其它就绪 Promise                            |
-| `[store] ready barrier rejected: ...`                                                                                         | 某个 `ready` 屏障 reject 且原因不是 `Error` 实例                                                                                                            | 检查具体屏障的失败原因；这个 Error 会从 `ReadyBoundary` 的 render 抛出，需要外层 Error Boundary 捕获 |
+| `[store] ready barrier rejected`（原因在 `cause`）                                                                            | 某个 `ready` 屏障 reject 且原因不是 `Error` 实例                                                                                                            | 检查具体屏障的失败原因；这个 Error 会从 `ReadyBoundary` 的 render 抛出，需要外层 Error Boundary 捕获 |
 | `[store] hook requires a StoreProvider`                                                                                       | `useStoreRegistry`/`useStoreRuntime`/`useStoreFromProvider`/`useProvidedStore`/`useAtomDefinition`/`useSetAtomDefinition` 在没有 `StoreProvider` 的树里调用 | 在组件树更靠上的位置套一层 `<StoreProvider>`                                                         |
 | `[store] ${apiName} requires a StoreProvider (feature "X")`                                                                   | `useAssertStoreFeature`/`assertStoreFeature` 在没有 Provider 的树里调用                                                                                     | 套 `StoreProvider`                                                                                   |
 | `[store] ${apiName} requires feature "X" to be explicitly enabled on StoreProvider config`                                    | 有 Provider，但对应 feature 未在 `config.features` 里显式置 `true`                                                                                          | 在 `StoreProvider` 的 `config.features` 里显式开启                                                   |
@@ -392,7 +392,7 @@ function createStoreRegistry(runtime?: IRuntime): StoreRegistry;
 | `[store] duplicate provider store token: X`                                                                                   | 同一个 `StoreToken` 被 `register` 两次                                                                                                                      | 改用 `replace`，或确认没有重复挂载注册逻辑                                                           |
 | `[store] missing provider store: X`                                                                                           | `require(token)`/`useStoreFromProvider(token)` 在对应实例注册之前调用                                                                                       | 确认注册逻辑先于消费者渲染执行；或先用 `has`/`get` 判断                                              |
 | `[store] provider store "X" belongs to a different Runtime`                                                                   | 注册进 Registry 的值所属 Runtime 与 `registry.runtime` 不同                                                                                                 | 用同一个 Runtime 创建要注册的实例，或换一个 Registry                                                 |
-| `[store] StoreToken requires a debug name`                                                                                    | `createStoreToken('')`                                                                                                                                      | 传一个非空的调试名                                                                                   |
+| `[store] IStoreToken requires a debug name`                                                                                    | `createStoreToken('')`                                                                                                                                      | 传一个非空的调试名                                                                                   |
 | `AggregateError('[store] provider registry disposal failed')`                                                                 | `dispose()`/`disposeAsync()` 时多个 owned 实体的释放各自抛错                                                                                                | 展开 `error.errors` 逐个排查；单个实体报错时会直接抛出那个原始 error，不包一层                       |
 
 ## 6. 生命周期与资源释放细节

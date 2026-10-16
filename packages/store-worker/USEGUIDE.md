@@ -7,7 +7,7 @@
 1. [核心概念详解](#1-核心概念详解)
 2. [`WorkerAdapter` 完整参考](#2-workeradapter-完整参考)
 3. [`createWorkerHandler` 完整参考](#3-createworkerhandler-完整参考)
-4. [`ManagedRpcHandler` 生命周期细节](#4-managedrpchandler-生命周期细节)
+4. [`IManagedRpcHandler` 生命周期细节](#4-imanagedrpchandler-生命周期细节)
 5. [`workerComputed` 完整参考](#5-workercomputed-完整参考)
 6. [序列化 Worker 集成完整参考](#6-序列化-worker-集成完整参考)
 7. [常量与错误码完整参考](#7-常量与错误码完整参考)
@@ -37,12 +37,12 @@
 
 两条路径共享同一个 RPC 方法名约定：`send(targetId, 'call', payload)`。这不是巧合——两条路径底层都是"主线程发一个 `call` 请求，Worker 侧的单个 `provide('call', ...)` 处理它",只是 payload 的形状不同（前者是任意 `Input`，后者是 `{ phase, chunk }`）。
 
-### 1.3 `ManagedRpcHandler`：Worker 侧的统一外壳
+### 1.3 `IManagedRpcHandler`：Worker 侧的统一外壳
 
-`createWorkerHandler` 和 `createSerializeWorkerHandler` 都返回一个 `ManagedRpcHandler`：
+`createWorkerHandler` 和 `createSerializeWorkerHandler` 都返回一个 `IManagedRpcHandler`：
 
 ```ts
-export type ManagedRpcHandler = {
+export type IManagedRpcHandler = {
   (message: unknown): Promise<void>;
   dispose(): Promise<void>;
   close(): void;
@@ -59,7 +59,7 @@ export type ManagedRpcHandler = {
 
 ```ts
 type IWebWorkerLikePort = {
-  postMessage(message: unknown, transfer?: readonly Transferable[]): void;
+  postMessage(message: unknown, transfer?: readonly unknown[]): void;
   addEventListener(
     type: 'message' | 'error' | 'messageerror',
     listener: (event: MessageEvent<unknown> | Event) => void
@@ -86,7 +86,7 @@ class WorkerAdapter {
   readonly disposed: boolean;
   request<Input, Output>(
     payload: Input,
-    options?: { signal?: AbortSignal; transfer?: readonly Transferable[] }
+    options?: { signal?: IAbortSignal; transfer?: readonly unknown[] }
   ): Promise<Output>;
   close(): void;
   dispose(): Promise<void>;
@@ -112,19 +112,19 @@ function createWorkerHandler<Input, Output>(
   compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,
   postMessage: (message: unknown) => void,
   options?: { readonly timeoutMs?: number }
-): ManagedRpcHandler;
+): IManagedRpcHandler;
 ```
 
 - **`compute`**：真正干活的函数，接收主线程传来的 `payload` 和一个 `{ signal }` 上下文——`signal` 在调用方取消/超时时触发，`compute` 内部如果是可中断的长任务，应该监听它并尽早退出（框架不会强行中断正在跑的同步/异步代码，只是让最终结果被丢弃、返回给一个已经不再等待的调用方）。
 - **`postMessage`**：Worker 侧真正发消息出去的函数，通常传 `(message) => self.postMessage(message)`。之所以是参数而不是包内部写死 `self.postMessage`，是为了同一份实现能在真正的 Worker、`SharedWorker` 的某个 `port`、甚至单元测试的内存桩上复用。
 - **`options.timeoutMs`**：Worker 侧对每次请求处理设的超时（一般主线程侧的 `timeoutMs` 已经够用，Worker 侧这个是双保险）。
-- **返回值**：一个 `ManagedRpcHandler`，需要手动接上 `self.onmessage = (event) => { void handler(event.data); }`（返回的 Promise 通常不需要显式处理——错误会被 RPC core 转成 RPC 失败响应发回主线程，不会变成 unhandled rejection）。
+- **返回值**：一个 `IManagedRpcHandler`，需要手动接上 `self.onmessage = (event) => { void handler(event.data); }`（返回的 Promise 通常不需要显式处理——错误会被 RPC core 转成 RPC 失败响应发回主线程，不会变成 unhandled rejection）。
 
 内部实现上，`provide('call', ...)` 里对 `compute` 的调用结果统一走 `context.success(...)` 包装；`compute` 抛出的异常由 RPC core 端点框架捕获并转成失败响应，不会让异常逃逸成 Worker 全局的 unhandled error。
 
 ---
 
-## 4. `ManagedRpcHandler` 生命周期细节
+## 4. `IManagedRpcHandler` 生命周期细节
 
 ```ts
 const handler = createWorkerHandler(compute, postMessage);
@@ -149,7 +149,7 @@ await handler.dispose(); // 先 close()，再等底层端点初始化并 dispose
 ```ts
 type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {
   readonly runtime?: IRuntime;
-  readonly transfer?: (input: Input) => readonly Transferable[];
+  readonly transfer?: (input: Input) => readonly unknown[];
 };
 
 function workerComputed<Input, Output>(
@@ -218,7 +218,7 @@ type IWorkerPluginOptions = {
 - `decode(chunk, context)`：请求 Worker 解码，返回值取自结果段的负载（`result[1]`），调用方拿到的就是还原后的值本身，不是包一层的 `ISerializeChunk`。
 - `dispose()`：异步 dispose 底层端点，并在 `terminateOnDispose: true` 时继续尝试 `worker.terminate?.()`；两步都会执行。单个 cleanup 失败会被原样 reject，端点与 terminate 都失败时返回 `CLEANUP_FAILED` `AggregateError`，不会吞掉 parser/endpoint/terminate 错误。
 
-`context.signal` 会作为这次 RPC 调用的取消信号透传；调用被取消时，`request` 内部会把泛化的 `AbortError` 重新包装成 `SerializeError`（见 [§9](#9-错误处理)），带上 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 这些定位信息，而不是让调用方拿到一个语义模糊的通用 abort 错误。
+`context.signal` 会作为这次 RPC 调用的取消信号透传；调用被取消时，`request` 内部会把泛化的 `AbortError` 重新包装成 `SerializeCodecError`（见 [§9](#9-错误处理)），带上 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 这些定位信息，而不是让调用方拿到一个语义模糊的通用 abort 错误。
 
 ### 6.3 `workerPlugin(options): ISerializePlugin`
 
@@ -231,13 +231,13 @@ const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin => ({
 
 纯粹是 `{ type, parser: workerParser(options) }` 的包装，产出可以直接塞进 `createSerializeRegistry([...])` 插件数组的标准形状。
 
-### 6.4 `createSerializeWorkerHandler(parser, post): ManagedRpcHandler`
+### 6.4 `createSerializeWorkerHandler(parser, post): IManagedRpcHandler`
 
 ```ts
 function createSerializeWorkerHandler(
   parser: ISerializeParser,
-  post: (message: unknown, transfer?: readonly Transferable[]) => void
-): ManagedRpcHandler;
+  post: (message: unknown, transfer?: readonly unknown[]) => void
+): IManagedRpcHandler;
 ```
 
 Worker 侧的对端：把一个**普通的、跑在 Worker 里就地工作的** `ISerializeParser`（不需要知道自己在被 RPC 调用）接成 `'call'` 方法的处理器。
@@ -281,7 +281,7 @@ const WorkerDiagnosticType = { worker: 'worker' } as const;
 type IWorkerDiagnosticType = 'worker';
 ```
 
-无调用参数，常量对象；`WorkerDiagnosticType.worker`（即字符串 `'worker'`）是 `workerParser`/`createSerializeWorkerHandler` 产出的 `SerializeError`/`SerializeCodecError` 的 `type` 字段默认值（未显式传 `type`/`options.type` 时使用）。
+无调用参数，常量对象；`WorkerDiagnosticType.worker`（即字符串 `'worker'`）是 `workerParser`/`createSerializeWorkerHandler` 产出的 `SerializeCodecError` 的 `type` 字段默认值（未显式传 `type`/`options.type` 时使用）。
 
 ### 7.2 `StoreWorkerErrorCode` 与错误工厂
 
@@ -370,13 +370,15 @@ type IByteOwnership = 'copy' | 'transfer';
 
 ### 8.2 `workerParser` 的 abort 特殊处理
 
-`workerParser` 请求被 `AbortSignal` 取消时,底层 `endpoint.send()` 会 reject 一个 `name === 'AbortError'` 的错误——`workerParser` 会拦下这个泛化错误,重新包装成 `SerializeError`（来自 `@migaia/serialize`）：
+`workerParser` 请求被 `AbortSignal` 取消时,底层 `endpoint.send()` 会 reject 一个 `name === 'AbortError'` 的错误——`workerParser` 会拦下这个泛化错误,重新包装成 `SerializeCodecError`（来自 `@migaia/serialize`，`code: 'REQUEST_ABORTED'`，原始 abort 错误在 `cause` 上）：
 
 ```ts
-class SerializeError extends Error {
-  readonly type: string; // 插件的 type 标签
+class SerializeCodecError<TCode> extends Error {
+  readonly source: string; // 恒为 '@migaia/store-worker'
+  readonly code: TCode; // 'REQUEST_ABORTED'
+  readonly context?: string; // 出错时定位是哪个 store/key 的辅助字段
+  readonly type: string; // 插件的 type 标签，缺省 WorkerDiagnosticType.worker
   readonly phase: 'encode' | 'decode';
-  readonly source: string; // 出错时定位是哪个 store/key 的辅助字段
   readonly chunkIndex: number; // 恒为 0（这一层不涉及分片索引）
   readonly bytesConsumed: number; // 输入是 bytes 段时为其字节长度，否则 0
 }
@@ -419,7 +421,7 @@ const handler = createWorkerHandler<readonly Row[], Record<string, number>>(
   (rows, { signal }) => {
     const totals: Record<string, number> = {};
     for (const row of rows) {
-      signal.throwIfAborted?.();
+      if (signal.aborted) throw signal.reason;
       totals[row.category] = (totals[row.category] ?? 0) + row.amount;
     }
     return totals;
@@ -494,16 +496,16 @@ registry.dispose(); // 连带 dispose workerParser 的端点,并 terminate worke
 ## 12. 常见问题排查
 
 **Q:`request()`/`refetch()` 一直不 resolve 也不 reject。**
-确认 Worker 侧确实调用了 `self.onmessage = (event) => handler(event.data)`——`ManagedRpcHandler` 不会自己挂监听,忘记接线是最常见的原因。其次检查 `WorkerAdapter`/`workerParser` 的 `timeoutMs` 是否设置了合理值,默认不限时意味着 Worker 真的没有响应时会一直挂起。
+确认 Worker 侧确实调用了 `self.onmessage = (event) => handler(event.data)`——`IManagedRpcHandler` 不会自己挂监听,忘记接线是最常见的原因。其次检查 `WorkerAdapter`/`workerParser` 的 `timeoutMs` 是否设置了合理值,默认不限时意味着 Worker 真的没有响应时会一直挂起。
 
 **Q:传了 `ownership: 'transfer'`,但性能并没有明显提升,像是走了复制。**
 检查传入的 `Uint8Array` 是不是通过 `subarray()`/切片得到的局部视图——只有恰好覆盖整个 `ArrayBuffer` 的顶层视图才会真正被 transfer,局部视图会静默回退成复制,见 [§8](#8-字节转移语义ibyteownership)。
 
-**Q:取消请求后想重试,但 `SerializeError` 提示"transferred input is detached and cannot be retried"。**
+**Q:取消请求后想重试,但 `SerializeCodecError` 提示"transferred input is detached and cannot be retried"。**
 这不是可重试的错误——`ownership: 'transfer'` 场景下,一旦请求被送出、随即又被取消,原始 `ArrayBuffer` 已经在传输过程中被 detach,数据回不来了。需要重试的调用点应该改用 `ownership: 'copy'`,或者在业务层保留一份数据副本用于重试。
 
 **Q:Worker 里的 `parser.encode()` 返回了多段(可迭代对象),主线程收到的结果不对。**
-多段拼装只发生在 Worker 内部(`createSerializeWorkerHandler` 就地拼装后才回包给主线程,见 [§6.5](#65-多段结果的本地拼装)),主线程收到的应该始终是拼装后的单个 `ISerializeChunk`。如果结果不对,先确认 `parser.encode()` 各段的形态是否一致(全 `'text'` 才会走字符串拼接,否则统一按字节拼接)。`'value'` 是已经物化的对象图，不能与 text/bytes 混合拼装；混合时会直接抛出 `SerializeError`，不会隐式转成 `"[object Object]"`。
+多段拼装只发生在 Worker 内部(`createSerializeWorkerHandler` 就地拼装后才回包给主线程,见 [§6.5](#65-多段结果的本地拼装)),主线程收到的应该始终是拼装后的单个 `ISerializeChunk`。如果结果不对,先确认 `parser.encode()` 各段的形态是否一致(全 `'text'` 才会走字符串拼接,否则统一按字节拼接)。`'value'` 是已经物化的对象图，不能与 text/bytes 混合拼装；混合时会直接抛出 `SerializeCodecError`，不会隐式转成 `"[object Object]"`。
 
 **Q:`adapter.dispose()`/`registry.dispose()` 之后,Worker 进程/线程还活着。**
 `WorkerAdapter.dispose()`/`workerParser` 的 `dispose()` 默认只 dispose RPC 端点,不会 terminate 底层 `Worker`——外部传入的 Worker 默认被认为归调用方所有。需要连带终止 Worker,`workerPlugin`/`workerParser` 传 `terminateOnDispose: true`;`WorkerAdapter` 场景下需要调用方自己在合适的时机调用 `worker.terminate()`。

@@ -7,7 +7,7 @@
 1. [定位与依赖关系](#1-定位与依赖关系)
 2. [事件模型](#2-事件模型)
 3. [MutationPolicy 写入策略](#3-mutationpolicy-写入策略)
-4. [StoreMiddlewareHost API 参考](#4-storemiddlewarehost-api-参考)
+4. [IStoreMiddlewareHost API 参考](#4-istoremiddlewarehost-api-参考)
 5. [bindStoreMiddleware 完整行为](#5-bindstoremiddleware-完整行为)
 6. [编写中间件插件](#6-编写中间件插件)
 7. [DevTools 集成](#7-devtools-集成)
@@ -21,11 +21,11 @@
 
 ## 1. 定位与依赖关系
 
-`@migaia/store-middleware` 依赖 `@migaia/store-light`（Store 本体）、`@migaia/reactive`（Runtime）和 `@migaia/plugin-host`（通用插件宿主机制）。它自己不实现插件安装/卸载/资源清理这些通用能力，全部通过继承 `PluginHost` 复用；这一层只负责"Store 领域该有哪些事件、哪些写入策略"。
+`@migaia/store-middleware` 依赖 `@migaia/store-light`（Store 本体）、`@migaia/reactive`（Runtime）和 `@migaia/plugin-host`（通用插件宿主机制）。它自己不实现插件安装/卸载/资源清理这些通用能力，全部通过 `@migaia/plugin-host` 的 `defineHost` 组合复用；这一层只负责"Store 领域该有哪些事件、哪些写入策略"。
 
 ```ts
-import { StoreMiddlewareHost } from '@migaia/store-middleware';
-// StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>>
+import { createStoreMiddlewareHost, type IStoreMiddlewareHost } from '@migaia/store-middleware';
+// IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Store 领域成员
 ```
 
 不熟悉 `PluginHost` 的插件安装、卸载、pipeline、错误码等通用机制，先读 `@migaia/plugin-host` 的 USEGUIDE——本文只讲 Store 领域特有的部分，通用机制不重复。
@@ -149,12 +149,14 @@ policy.runInAction(() => {
 
 ---
 
-## 4. StoreMiddlewareHost API 参考
+## 4. IStoreMiddlewareHost API 参考
 
 ```ts
-class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {
+function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;
+
+// 冻结句柄：IHostHandle 的公共成员（use/unUse/dispose 等）加下列 Store 领域成员
+type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & {
   readonly mutationPolicy: MutationPolicy;
-  constructor(options: IStoreMiddlewareHostOptions<S>);
   emit(event: IMiddlewareEvent<S>): void;
   runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;
   recordState(
@@ -166,8 +168,7 @@ class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddle
   recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;
   connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'
   attachBindingDisposer(disposer: IDisposer): void;
-  override dispose(): Promise<void>;
-}
+};
 
 type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {
   runtime: IRuntime;
@@ -177,7 +178,7 @@ type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {
 };
 ```
 
-构造函数会**强制把 pipeline 模式覆盖成 `'sync'`**——即便 `options.pipeline.mode` 传了别的值也会被覆盖。原因：Store 领域事件要求同步、可预测的处理顺序，中间件不应该让一次状态变化的观察产生跨微任务的乱序。这意味着所有中间件插件只能用 `core.usePipeline`，调用 `core.useAsyncPipeline`/`core.useGeneratorPipeline` 会触发 `@migaia/plugin-host` 的 `PIPELINE_MODE_MISMATCH` 错误。
+`createStoreMiddlewareHost()` 会**强制把 pipeline 模式覆盖成 `'sync'`**——即便 `options.pipeline.mode` 传了别的值也会被覆盖。原因：Store 领域事件要求同步、可预测的处理顺序，中间件不应该让一次状态变化的观察产生跨微任务的乱序。这意味着所有中间件插件只能用 `core.usePipeline`，调用 `core.useAsyncPipeline`/`core.useGeneratorPipeline` 会触发 `@migaia/plugin-host` 的 `PIPELINE_MODE_MISMATCH` 错误。
 
 | 方法                                           | 参数类型                                                                                 | 同步/异步 | 行为                                                                                                                                                                                                               | 抛错语义                                    |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
@@ -185,7 +186,7 @@ type IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {
 | `runAction(name, fn, metadata?)`               | `name: string`；`fn: () => T`；`metadata?: Readonly<Record<string, unknown>>`            | 同步      | 派发 `action:start` → 用 `mutationPolicy.runInAction(() => runtime.batch(fn))` 执行 `fn` → 成功派发 `action:end`（带 `durationMs`），失败派发 `action:error` 后**重新抛出原始异常**                                | `fn` 抛出的异常会正常向调用方传播           |
 | `recordState(name, previous, next, metadata?)` | `name: string`；`previous: S`；`next: S`；`metadata?: Readonly<Record<string, unknown>>` | 同步      | 派发一个 `state` 事件                                                                                                                                                                                              | 中间件抛错被隔离，不会传给调用方            |
 | `recordError(phase, error, metadata?)`         | `phase: string`；`error: unknown`；`metadata?: Readonly<Record<string, unknown>>`        | 同步      | 派发一个 `error` 事件；如果在处理上一个 `error` 事件期间**又**调用了 `recordError`（重入），直接把新错误转发给 `runtime.reportError({ phase: 'trace-listener' })`，不会再触发一轮 pipeline，避免错误处理本身死循环 | 不抛错                                      |
-| `connectDevTools(adapter, name?)`              | `adapter: IDevToolsAdapter<S>`；`name?: string`                                          | 异步      | 见 [§7](#7-devtools-集成)                                                                                                                                                                                          | 安装失败按 `PluginHost.use()` 的规则处理    |
+| `connectDevTools(adapter, name?)`              | `adapter: IDevToolsAdapter<S>`；`name?: string`                                          | 异步      | 见 [§7](#7-devtools-集成)                                                                                                                                                                                          | 安装失败按 `host.use()` 的规则处理    |
 | `attachBindingDisposer(disposer)`              | `disposer: IDisposer`                                                                    | 同步      | 登记一个额外的清理函数，`dispose()` 时按后进先出顺序执行，先于插件卸载                                                                                                                                             | —                                           |
 
 **所有派发方法（`runAction`/`recordState`/`recordError`）对中间件本身抛出的异常都是隔离的**——一个写日志的中间件报错，不会影响业务代码继续执行；唯一的例外是 `runAction()` 包裹的**业务函数 `fn`** 抛错，这个异常按原样向外传播，因为那是业务逻辑本身的失败，不是中间件诊断层的失败。
@@ -213,10 +214,10 @@ type IStoreMiddlewareBindingOptions = {
   };
   mutationPolicy?: MutationPolicy;
   actionPrefix?: string;
-  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 structuredClone
+  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 ClonePolicy.diagnostic
 };
 
-type IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<
+type IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<
   Record<string, unknown>
 > & { readonly store: IReactiveStore<S> };
 
@@ -228,7 +229,7 @@ function bindStoreMiddleware<S extends Record<string, unknown>>(
 
 这是接入一个已有 `@migaia/store-light` Store 的推荐入口，内部做了三件事：
 
-1. **创建 Host**：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `structuredClone`，因此每次读取都是一份新的独立快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。
+1. **创建 Host**：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `ClonePolicy.diagnostic`（尽力深拷贝，不抛错），因此每次读取都是一份新的快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。
 2. **订阅状态变化**：`store.$subscribe(() => { ... })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。
    - `previous` 的初值是**绑定那一刻**的 `clone(store.$plain())`——如果 Store 在 `bindStoreMiddleware()` 调用之前已经有过状态变化，这些历史变化不会被回溯出事件，第一条 `state` 事件的 `previous` 反映的是"绑定时刻"的状态，不是"Store 创建时刻"的状态。
 3. **订阅 Runtime action trace**：`store.$runtime.subscribeTrace((event) => { ... })`——只转发 `event.type === 'action'` 的 trace，且如果传了 `actionPrefix`，只转发 `event.name` 以该前缀开头的 action；转发时直接调用 `host.emit(...)` 构造对应的 `action:start`/`action:end`/`action:error` 事件（**不经过** `host.runAction()`，不会重复触发 `mutationPolicy.runInAction`）。
@@ -237,7 +238,7 @@ function bindStoreMiddleware<S extends Record<string, unknown>>(
 
 `host.dispose()` 时，`attachBindingDisposer` 登记的两个 disposer（状态订阅、trace 订阅）会先于插件卸载被清理；`bindStoreMiddleware()` 本身**不持有 Store 或 Runtime 的所有权**，`dispose()` 之后 Store 仍然正常工作，只是不再有中间件观察它。
 
-返回值是 `StoreMiddlewareHost` 实例本身，额外挂了一个只读的 `store` 属性指回传入的 Store，方便拿到 Host 后还能访问原始 Store。
+返回值是一个新的冻结对象：带有 Host 句柄的全部成员，额外挂了一个只读的 `store` 属性指回传入的 Store，方便拿到 Host 后还能访问原始 Store。
 
 ---
 
@@ -359,7 +360,7 @@ const tolerantClone: typeof diagnosticClone;
 | `ClonePolicy.opaque`（`opaqueReferenceClone(value)`）      | `value: T` | 同步      | 不做任何拷贝，直接返回同一个引用                                                                                                                                                   | 已经明确知道部分状态不可克隆、接受引用共享，或只是想要最低开销的"快照"                             |
 | `ClonePolicy.diagnostic`（`diagnosticClone(value)`）       | `value: T` | 同步      | 优先 `structuredClone`；失败时退回递归拷贝：可以拷贝的部分（plain object/array）逐层深拷贝，**只有真正不可克隆的那个子树**按引用保留，不会因为树里一处不可克隆就放弃整棵树的独立性 | 中间件、DevTools 这类诊断场景——可用性优先于严格性，一个不常见的字段值不应该让整条诊断链路崩溃      |
 
-`bindStoreMiddleware()` 默认用的是 `state => structuredClone(state)`，语义上等同于手写了一份不带错误兜底的 `immutable`。如果 Store 状态里可能出现不可结构化克隆的值（比如存了一个类实例、`Map`、外部句柄），默认 `clone` 会直接抛错；这种情况下应该显式传 `options.clone: ClonePolicy.diagnostic`（保留诊断可用性）或 `ClonePolicy.opaque`（接受引用共享、换取零开销）。
+`bindStoreMiddleware()` 默认用的是 `state => ClonePolicy.diagnostic(state)`：尽力深拷贝，遇到不可结构化克隆的值（类实例、外部句柄等）时按引用保留那个子树，不抛错。需要严格独立快照时显式传 `options.clone: ClonePolicy.immutable`（做不到就抛错）；接受引用共享、换取零开销时传 `ClonePolicy.opaque`。
 
 `diagnosticClone` 的递归兜底细节：数组逐项递归；非 `Object.prototype` 原型的值（`Map`/`Set`/`Date`/`RegExp`/类实例/Proxy/宿主对象）直接按引用返回，不会伪造一个丢失原型和方法的普通对象；plain object 只拷贝可枚举属性，accessor 属性会读取其当前值合入拷贝（和 `structuredClone` 的行为保持一致），并对 `__proto__` 键做了显式处理避免原型链污染；用 `WeakMap` 记录已访问对象处理循环引用。
 
@@ -369,13 +370,13 @@ const tolerantClone: typeof diagnosticClone;
 
 包边界错误带 `source: '@migaia/store-middleware'` 与稳定 `code`。`actions-only` 越界写入为
 `ACTION_SCOPE_REQUIRED`；不可克隆值为 `CLONE_UNSUPPORTED`；遗漏 `next()` 只经 Runtime 报告
-`MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；多项清理失败为 `CLEANUP_FAILED`。
+`MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；`bindStoreMiddleware()` 绑定失败且回滚清理也失败时为 `CLEANUP_FAILED`。
 
-`StoreMiddlewareHost` 的 pipeline 模式**固定是 `sync`**（见 [§4](#4-storemiddlewarehost-api-参考)），这决定了：
+Host 的 pipeline 模式**固定是 `sync`**（见 [§4](#4-istoremiddlewarehost-api-参考)），这决定了：
 
 - 中间件只能用 `core.usePipeline((event, next) => void)`，`next(event)` 必须在 stage 函数返回前调用。
 - sync 是"扁平转换管道"：`next()` 只是记录下一个值，下游 stage 在当前 stage 返回**之后**才执行，当前 stage 调用 `next()` 之后无法同步观察到下游已经处理完的结果（想要"后置逻辑能看到下游效果"的洋葱模型语义，需要 async pipeline——但本包的 Host 不支持切换）。
-- `emit()`/`runAction()`/`recordState()`/`recordError()` 内部统一走 `#emitIsolated()`：中间件 stage 抛出的异常会被捕获，通过 `runtime.reportError(error, { phase: 'trace-listener' })` 上报，**不会**从 `recordState()`/`recordError()` 等调用点抛出；唯一的例外是 `runAction()` 包裹的业务函数本身抛错——那是业务异常，会原样重新抛出给调用方。
+- `emit()`/`runAction()`/`recordState()`/`recordError()` 内部统一走隔离派发（`emitIsolated`）：中间件 stage 抛出的异常会被捕获，通过 `runtime.reportError(error, { phase: 'trace-listener' })` 上报，**不会**从 `recordState()`/`recordError()` 等调用点抛出；唯一的例外是 `runAction()` 包裹的业务函数本身抛错——那是业务异常，会原样重新抛出给调用方。
 - 如果一个 pipeline stage 忘了调用 `next()`，`emit()` 会检测到 `completed` 标记未被置位，同样以 `phase: 'trace-listener'` 上报一条 `[store] middleware did not call next()` 错误。
 
 更细的 pipeline 执行顺序、错误码、`onDispose` 清理协议等通用机制，见 `@migaia/plugin-host` 的 USEGUIDE。
@@ -385,7 +386,7 @@ const tolerantClone: typeof diagnosticClone;
 ## 10. 生命周期与资源释放
 
 - `host.use(plugin)` / `host.unUse(name)` / `host.dispose()` 都是异步 API，语义完全继承自 `@migaia/plugin-host`——安装失败自动回滚，卸载资源自动逆序清理。
-- `StoreMiddlewareHost` 重写了 `dispose()`：先按后进先出顺序执行 `attachBindingDisposer()` 登记的 disposer（`bindStoreMiddleware()` 用它登记状态订阅和 trace 订阅的取消函数），再调用 `super.dispose()` 卸载所有已安装插件。
+- Host 通过 `defineHost` 的 `dispose` 钩子：先按后进先出顺序执行 `attachBindingDisposer()` 登记的 disposer（`bindStoreMiddleware()` 用它登记状态订阅和 trace 订阅的取消函数），再委托 plugin-host 卸载所有已安装插件。结果是结构化的 `{ logicalTerminal, cleanupComplete, cleanupErrors }`，绑定 disposer 的错误排在 `cleanupErrors` 前面，不以异常抛出。
 - `host.dispose()` **不会**销毁 Store 或 Runtime，只释放这个 middleware Host 自己拥有的资源（订阅、已安装插件）。
 - 同一个 Host 内插件名称必须唯一；重复安装同名插件会按 `@migaia/plugin-host` 的规则报错。
 - middleware 诊断层的失败不应该、也不会阻断业务写入；真正的业务异常仍按原始异常传播（见 [§9](#9-pipeline-模式与错误边界)）。
@@ -411,22 +412,22 @@ const tolerantClone: typeof diagnosticClone;
 检查是否把**同一个** `MutationPolicy` 实例同时传给了 `createStore({ mutationPolicy })` 和 `bindStoreMiddleware(store, { mutationPolicy })`。只传给其中一个不会生效——真正拦截写入的是 `createStore` 那一侧，见 [§3](#3-mutationpolicy-写入策略)。
 
 **Q：装了一个用 `useAsyncPipeline` 注册 stage 的插件，报 `PIPELINE_MODE_MISMATCH`。**
-`StoreMiddlewareHost` 的 pipeline 模式固定是 `sync`，构造时传的 `pipeline.mode` 会被强制覆盖，见 [§4](#4-storemiddlewarehost-api-参考)。中间件只能用 `core.usePipeline`。
+Host 的 pipeline 模式固定是 `sync`，创建时传的 `pipeline.mode` 会被强制覆盖，见 [§4](#4-istoremiddlewarehost-api-参考)。中间件只能用 `core.usePipeline`。
 
 **Q：`connectDevTools()` 报错 `[store] DevTools state command requires applyState`。**
-构造 `StoreMiddlewareHost` 时没有传 `applyState`；如果是自己 `new StoreMiddlewareHost(...)` 而不是用 `bindStoreMiddleware()`，需要手动提供 `applyState` 才能支持 DevTools 的 `jump`/`reset`。
+创建 Host 时没有传 `applyState`；如果是自己调用 `createStoreMiddlewareHost(...)` 而不是用 `bindStoreMiddleware()`，需要手动提供 `applyState` 才能支持 DevTools 的 `jump`/`reset`。
 
 **Q：`state` 事件里的 `previous`/`next` 拿到的是同一个对象，改了一个另一个也变了。**
-检查是否自定义了 `options.clone` 且传的是 `ClonePolicy.opaque`（有意不拷贝，返回同一引用）——如果需要独立快照，用默认的 `structuredClone` 或显式传 `ClonePolicy.immutable`/`ClonePolicy.diagnostic`。
+检查是否自定义了 `options.clone` 且传的是 `ClonePolicy.opaque`（有意不拷贝，返回同一引用）——如果需要独立快照，用默认的 `ClonePolicy.diagnostic` 或显式传 `ClonePolicy.immutable`。
 
 **Q：`getState()` 在状态树很大、事件很密集时明显拖慢速度。**
-默认 `clone` 是 `structuredClone`，每次调用都做一次完整深拷贝。如果不需要"绝对独立"这个保证，换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。
+默认 `clone` 是 `ClonePolicy.diagnostic`，每次调用都做一次尽力深拷贝。如果不需要"绝对独立"这个保证，换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。
 
 **Q：同一个 action 在中间件里被记录了两次。**
 检查是否在 `bindStoreMiddleware()` 已经转发了 Store 自身 action trace 的情况下，又手动用 `host.runAction()` 包了一遍同一个 Store 方法——两条路径都会各自派发一次 `action` 事件，见 [§5](#5-bindstoremiddleware-完整行为)。
 
-**Q：`host.dispose()` 抛了一个 `AggregateError`。**
-检查 `error.errors`——里面是绑定 disposer（状态订阅、trace 订阅）和插件卸载各自抛出的原始错误；`code` 固定是 `CLEANUP_FAILED`，见 [§10](#10-生命周期与资源释放)。
+**Q：`host.dispose()` 的清理错误在哪里？**
+`dispose()` 不抛清理错误，而是返回 `{ logicalTerminal, cleanupComplete, cleanupErrors }`；`cleanupErrors` 里先是绑定 disposer（状态订阅、trace 订阅）的原始错误，再是插件卸载的错误，见 [§10](#10-生命周期与资源释放)。`CLEANUP_FAILED` 的 `AggregateError` 只出现在 `bindStoreMiddleware()` 绑定失败且回滚清理也失败时。
 
 ```bash
 pnpm run fmt && pnpm run lint && pnpm run typecheck && pnpm run typecheck:test && pnpm run test
