@@ -192,7 +192,7 @@ describe('A8/A9 store-worker exports', () => {
       providerSignal = context.signal
       await new Promise<void>((resolve) => {
         lateResolve = resolve
-        context.signal.addEventListener('abort', resolve, { once: true })
+        context.signal.addEventListener('abort', () => resolve(), { once: true })
       })
       return 'late'
     })

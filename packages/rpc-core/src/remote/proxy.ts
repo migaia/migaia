@@ -1,5 +1,5 @@
 import { deferTask } from '@migaia/utils/scheduler'
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { createRpcAbortError, createRpcError, isRpcRemoteError } from '../core/errors.js'
 import { createRuntimeBindingCalls } from './internal/runtime-call.js'
 import type { IRuntimeCallOptions } from './runtime-api/typing.js'
@@ -544,7 +544,7 @@ class RemoteRegistration<TUnit, TSpec> {
 
   /** Same preparation path is called by first setup and later rebinding. */
   async prepareGeneration(
-    signal: IAbortSignal,
+    signal: INativeAbortSignal,
     own: (dispose: () => Promise<void>) => void
   ): Promise<number> {
     if (this.#releasePromise) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)

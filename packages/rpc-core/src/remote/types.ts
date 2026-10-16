@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { ICodec } from '@migaia/serialize/codec'
 import type { ISupervisor } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
@@ -49,7 +49,7 @@ export type IRemoteBinding<TUnit, TSpec> = Readonly<{
   ownership: 'owned' | 'borrowed'
   supervisor: ISupervisor<TUnit, TSpec>
   scheduler: IScheduler
-  openChannel(unit: TUnit, signal: IAbortSignal): Promise<IRemoteChannel>
+  openChannel(unit: TUnit, signal: INativeAbortSignal): Promise<IRemoteChannel>
   /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */
   trackRequest?: IRemoteRequestTracker
 }>
@@ -64,7 +64,7 @@ export type IRemoteServeEndpoint = Readonly<{
 /** One endpoint factory receives the whole channel rather than a guessed default codec. */
 export type IRemoteEndpointFactory = (
   channel: IRemoteChannel,
-  signal: IAbortSignal
+  signal: INativeAbortSignal
 ) => Promise<IRemoteServeEndpoint>
 
 /** Request and stream options are local control data, never method params. */

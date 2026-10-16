@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { IDisposable, IRuntime } from '@migaia/reactive'
 import { StoreFieldMode } from './field-mode-constants.js'
 
@@ -38,7 +38,7 @@ export type IFieldSource = IDisposable & {
  */
 export type IFieldContext = {
   runtime: IRuntime
-  signal: IAbortSignal
+  signal: INativeAbortSignal
   createSource(debugName?: string): IFieldSource
 }
 

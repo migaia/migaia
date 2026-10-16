@@ -110,11 +110,7 @@ describe('A12 coroutine profile', () => {
           }
         },
         {
-          signal: {
-            aborted: false,
-            addEventListener: () => undefined,
-            removeEventListener: () => undefined
-          }
+          signal: new AbortController().signal
         }
       )
       terminateCoroutineHandle(handle)

@@ -16,7 +16,7 @@ export function pluginScope(
   return {
     id: 'a',
     transport,
-    signal: { aborted: false, addEventListener() {}, removeEventListener() {} },
+    signal: new AbortController().signal,
     hooks: () => undefined,
     getPort: () => undefined,
     own: <T>(resource: T): T => resource

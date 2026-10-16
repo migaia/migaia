@@ -61,7 +61,7 @@ describe('A13 coroutine abandonment and heartbeat', () => {
       spec: {
         task: ({ signal }) =>
           new Promise<void>((resolve) => {
-            signal.addEventListener('abort', resolve, { once: true })
+            signal.addEventListener('abort', () => resolve(), { once: true })
           })
       },
       budget: createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false, scheduler }),

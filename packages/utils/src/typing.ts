@@ -10,7 +10,7 @@ export type {
   IObjectPathWriteValue
 } from './object-path.js'
 export type { IProbePropertyResult } from './object.js'
-export type { IAbortSignal, IDeferred } from './promise.js'
+export type { IAbortSignal, IDeferred, INativeAbortSignal } from './promise.js'
 export type { IUrlLike } from './url.js'
 
 /** Groups a discriminated union by one top-level property-key field. */

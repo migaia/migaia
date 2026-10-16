@@ -106,11 +106,7 @@ describe('A3 supervisor startup', () => {
     expect(supervisor.inspect().abandoned).toBe(1)
     expect((reported[0] as { code?: string })?.code).toBe(SupervisionErrorCode.reapTimeout)
     const handle = await memory.launch('a', {
-      signal: {
-        aborted: false,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined
-      }
+      signal: new AbortController().signal
     })
     late.resolve(handle)
     await flush()

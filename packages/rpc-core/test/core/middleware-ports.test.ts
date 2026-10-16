@@ -3323,7 +3323,7 @@ describe('B12a atomic middleware and claim contracts', () => {
     const result = await plugin.install({
       id: 'b12b03-native-timeout-install',
       transport,
-      signal: new AbortController().signal as IAbortSignal,
+      signal: new AbortController().signal,
       hooks: () => undefined,
       getPort: () => undefined,
       own: <T>(resource: T) => resource

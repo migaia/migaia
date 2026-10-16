@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcConfigurationError,
   createRpcError,
@@ -301,7 +301,7 @@ export class RpcProviderAttachment {
     method: string,
     handler: (
       message: unknown,
-      createContext: (signal: IAbortSignal) => IRpcContext
+      createContext: (signal: INativeAbortSignal) => IRpcContext
     ) => void | Promise<void>
   ): () => void {
     this.#kernel.assertActive()

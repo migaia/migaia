@@ -499,12 +499,12 @@ describe('AF-T75 retry admission abort race', () => {
       ({ signal }) => {
         attempts++
         if (attempts === 1) {
-          signal.addEventListener = (_type, listener) => {
+          signal.addEventListener = (_type: string, listener: () => void) => {
             addCalls++
             if (addCalls === 1) listener()
             storedListeners.add(listener)
           }
-          signal.removeEventListener = (_type, listener) => {
+          signal.removeEventListener = (_type: string, listener: () => void) => {
             removeCalls++
             storedListeners.delete(listener)
           }
@@ -651,12 +651,12 @@ describe('AF-T85 withAbort signal registration race', () => {
     const resource = new Resource(
       ({ signal }) => {
         Object.defineProperty(signal, 'aborted', { configurable: true, get: () => aborted })
-        signal.addEventListener = (_type, listener) => {
+        signal.addEventListener = (_type: string, listener: () => void) => {
           addCalls++
           aborted = true
           storedListeners.add(listener)
         }
-        signal.removeEventListener = (_type, listener) => {
+        signal.removeEventListener = (_type: string, listener: () => void) => {
           removeCalls++
           storedListeners.delete(listener)
         }
@@ -686,12 +686,12 @@ describe('AF-T85 withAbort signal registration race', () => {
     let removeCalls = 0
     const resource = new Resource(
       ({ signal }) => {
-        signal.addEventListener = (_type, listener) => {
+        signal.addEventListener = (_type: string, listener: () => void) => {
           addCalls++
           listener()
           storedListeners.add(listener)
         }
-        signal.removeEventListener = (_type, listener) => {
+        signal.removeEventListener = (_type: string, listener: () => void) => {
           removeCalls++
           storedListeners.delete(listener)
         }
@@ -718,11 +718,11 @@ describe('AF-T85 withAbort signal registration race', () => {
     let removeCalls = 0
     const resource = new Resource(
       ({ signal }) => {
-        signal.addEventListener = (_type, listener) => {
+        signal.addEventListener = (_type: string, listener: () => void) => {
           storedListeners.add(listener)
           throw registrationError
         }
-        signal.removeEventListener = (_type, listener) => {
+        signal.removeEventListener = (_type: string, listener: () => void) => {
           removeCalls++
           storedListeners.delete(listener)
         }

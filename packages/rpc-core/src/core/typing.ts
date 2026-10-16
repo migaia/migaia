@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IRpcProviderRejection } from './provider-admission.js'
 import type {
   RpcProviderRejectionReason,
@@ -31,7 +31,7 @@ export type IRpcContext = {
   /** The final provider fence is the selected accepted identity, never an attempt counter. */
   readonly targetGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration
   readonly data: unknown
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */
   readonly senderId: string
   /** Remaining provider deadline, calculated with the original endpoint's monotonic clock. */
@@ -345,7 +345,7 @@ export type IRpcPluginMetadata = {
 export type IRpcPluginInstallScope = {
   readonly id: string
   readonly transport: IRpcTransport
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   readonly hooks: (event: IRpcHookEvent) => void
   readonly getPort: (key: PropertyKey) => unknown
   own<T>(resource: T, release: () => void | Promise<void>): T

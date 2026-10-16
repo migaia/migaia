@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { processSessionManager } from '../resilience/index.js'
 import type { IPluginRemoval } from '@migaia/plugin-host'
 import { createAdapterId as defaultRpcId } from '@migaia/rpc-core/adapter/internal-advanced'
@@ -94,7 +94,7 @@ export async function adoptHostRegistration(
     callGuard: resilience.callGuard(id),
     endpointFactory: async (
       channel: Parameters<typeof options.endpointFactory>[0],
-      signal: IAbortSignal
+      signal: INativeAbortSignal
     ) => {
       const endpoint = await options.endpointFactory(channel, signal, {
         identity: candidate.identity,

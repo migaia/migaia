@@ -1,9 +1,9 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { createCoroutinePlugin, type ICoroutineTaskContext } from '../../dist/remote/index.js'
 
-/** Public signal follows supervision's cooperative signal contract without a cast. */
-declare const signal: IAbortSignal
-/** Task context accepts the original lifecycle signal exactly. */
+/** Public signal is the host AbortSignal that supervision's native controller produces. */
+declare const signal: INativeAbortSignal
+/** Task context accepts the host signal exactly, so it reaches host APIs without a cast. */
 const contextSignal: ICoroutineTaskContext['signal'] = signal
 void contextSignal
 /** Explicit remote typing must leave the provide option usable. */

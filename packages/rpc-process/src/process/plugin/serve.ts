@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type {
   IAdapterListenerPreparation,
   IAdapterListenerSession
@@ -148,7 +148,7 @@ export type IProcessReadySession = Readonly<{
   channel: IRemoteChannel
   endpoint: IRemoteServeEndpoint
   identity: IProcessSessionIdentity
-  signal: IAbortSignal
+  signal: INativeAbortSignal
   /** Genuine Core runtime operation retains its prepared endpoint and Peer internally. */
   runtime?: IAdapterListenerSession
 }>

@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { defineNativeReactiveFeature } from './host/contracts.js'
 import { createStorageTypeError, StorageErrorCode } from './types/errors.js'
 import { StorageErrorText } from './error-text.js'
@@ -16,7 +16,7 @@ import type { IStorageReactiveAdapter, IStorageReactiveService } from './host/re
 export type IReactiveAdapterContext<TStore extends IKeyValueStore> = {
   readonly store: TStore
   readonly scheduler: IScheduler
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   readonly invalidate: (change?: IStorageChange) => void
   readonly report: (error: unknown) => void
 }

@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcAbortError,
   createRpcError,
@@ -198,7 +198,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
     method: string,
     handler: (
       message: unknown,
-      createContext: (signal: IAbortSignal) => IRpcContext
+      createContext: (signal: INativeAbortSignal) => IRpcContext
     ) => void | Promise<void>
   ) => () => void
   /** Connection capability decision supplied by the channel owner. */
@@ -233,7 +233,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       method: string,
       handler: (
         message: unknown,
-        createContext: (signal: IAbortSignal) => IRpcContext
+        createContext: (signal: INativeAbortSignal) => IRpcContext
       ) => void | Promise<void>
     ) => () => void,
     capability?: IRpcStreamCapabilityPort
@@ -371,7 +371,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
       method,
       retainProviderPreflight(
         run,
-        (message: unknown, createContext: (signal: IAbortSignal) => IRpcContext) =>
+        (message: unknown, createContext: (signal: INativeAbortSignal) => IRpcContext) =>
           this.#acceptRequest(message, run, createContext)
       )
     )
@@ -1041,7 +1041,7 @@ export class RpcStreamOwner implements IRpcStreamRuntime {
   async #acceptRequest(
     message: unknown,
     run: IRpcStreamRun,
-    createContext: (signal: IAbortSignal) => IRpcContext
+    createContext: (signal: INativeAbortSignal) => IRpcContext
   ): Promise<void> {
     /** Only the final executor can attach this opt-in start/seal/control provenance. */
     const runtime = (message as { runtime?: IProviderRuntimeStream }).runtime

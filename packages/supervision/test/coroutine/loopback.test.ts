@@ -24,7 +24,7 @@ describe('A14 in-memory exposed port', () => {
           if (generation === 2) await secondReady.promise
           expose({ call: (value: number) => value })
           await new Promise<void>((resolve) => {
-            signal.addEventListener('abort', resolve, { once: true })
+            signal.addEventListener('abort', () => resolve(), { once: true })
           })
           cleanup.push(generation)
         }
