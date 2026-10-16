@@ -14,6 +14,7 @@ import {
   type ITrayHost,
   type ITrayHostDynamic,
   type ITrayResolvedHost,
+  type ITrayPluginCore,
   type ITrayPluginMutationResult,
   type ITrayPluginRemovalResult
 } from '../src/host/index.js'
@@ -23,6 +24,8 @@ type ITestCore = Record<string, never>
 type IReadyConfig = Readonly<{ readonly enabled: boolean }>
 
 class TypeHost extends PluginHost<ITestCore, string> {}
+/** Hooks of managed Tray plugins receive the declared domain core, not the Host handle. */
+type ITypeCore = ITrayPluginCore<TypeHost>
 
 const baselinePlugin = {
   name: 'baseline',
@@ -31,10 +34,12 @@ const baselinePlugin = {
 } satisfies IPlugin<any, { readonly baselineExtension: boolean }, IReadyConfig>
 
 class BaselineTypeHost extends PluginHost<ITestCore, string, readonly [typeof baselinePlugin]> {}
+/** Domain core seen by plugins managed on the baseline Host. */
+type IBaselineTypeCore = ITrayPluginCore<BaselineTypeHost>
 
 type IBaselinePlugins = IHostBaselinePlugins<BaselineTypeHost>
 const baselineTupleLength: IBaselinePlugins['length'] = 1
-type IWidenedManagedDefinitions = readonly (IPlugin<BaselineTypeHost> & {
+type IWidenedManagedDefinitions = readonly (IPlugin<IBaselineTypeCore> & {
   readonly name: string
 })[]
 type IWidenedResolvedHost = ITrayResolvedHost<BaselineTypeHost, IWidenedManagedDefinitions>
@@ -50,8 +55,8 @@ const readyPlugin = {
   name: 'ready',
   config: { enabled: true },
   features: { ready: defineFeature(() => ({ readyValue: 42 })) },
-  install: (_core: TypeHost) => ({ readyExtension: true })
-} satisfies IPlugin<TypeHost, { readonly readyExtension: boolean }, IReadyConfig> & {
+  install: (_core: ITypeCore) => ({ readyExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly readyExtension: boolean }, IReadyConfig> & {
   readonly name: 'ready'
 }
 
@@ -90,19 +95,19 @@ const blockedPlugin = {
   features: {
     blocked: defineFeature(() => ({}), { missing: missingProvider.getFeature('capability') })
   },
-  install: (_core: TypeHost) => ({ blockedExtension: true })
-} satisfies IPlugin<TypeHost, { readonly blockedExtension: boolean }>
+  install: (_core: ITypeCore) => ({ blockedExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly blockedExtension: boolean }>
 
 const latePlugin = {
   name: 'late' as const,
-  install: (_core: TypeHost) => ({ lateExtension: true })
-} satisfies IPlugin<TypeHost, { readonly lateExtension: boolean }>
+  install: (_core: ITypeCore) => ({ lateExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly lateExtension: boolean }>
 
 /** Public references carry this provider's literal name into exact Tray inference. */
 const providerPlugin = definePlugin({
   name: 'provider',
   features: { capability: providerCapability },
-  install: (_core: TypeHost) => ({ providerExtension: true })
+  install: (_core: ITypeCore) => ({ providerExtension: true })
 })
 
 /** The dependent follows the same Feature edge at runtime and in mutation view types. */
@@ -111,8 +116,8 @@ const dependentPlugin = {
   features: {
     dependent: defineFeature(() => ({}), { provider: providerPlugin.getFeature('capability') })
   },
-  install: (_core: TypeHost) => ({ dependentExtension: true })
-} satisfies IPlugin<TypeHost, { readonly dependentExtension: boolean }>
+  install: (_core: ITypeCore) => ({ dependentExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly dependentExtension: boolean }>
 
 /** Separate definitions mint the references needed to declare a cross-plugin cycle. */
 const cycleAProvider = definePlugin({
@@ -133,8 +138,8 @@ const cycleA = {
   features: {
     capability: defineFeature(() => ({}), { b: cycleBProvider.getFeature('capability') })
   },
-  install: (_core: TypeHost) => ({ cycleAExtension: true })
-} satisfies IPlugin<TypeHost, { readonly cycleAExtension: boolean }>
+  install: (_core: ITypeCore) => ({ cycleAExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly cycleAExtension: boolean }>
 
 /** This admitted definition closes the required cycle. */
 const cycleB = {
@@ -142,8 +147,8 @@ const cycleB = {
   features: {
     capability: defineFeature(() => ({}), { a: cycleAProvider.getFeature('capability') })
   },
-  install: (_core: TypeHost) => ({ cycleBExtension: true })
-} satisfies IPlugin<TypeHost, { readonly cycleBExtension: boolean }>
+  install: (_core: ITypeCore) => ({ cycleBExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly cycleBExtension: boolean }>
 
 /** An optional absent provider contributes ordering without excluding its consumer. */
 const optionalPlugin = {
@@ -153,8 +158,8 @@ const optionalPlugin = {
       missing: missingProvider.getFeature('capability', { optional: true })
     })
   },
-  install: (_core: TypeHost) => ({ optionalExtension: true })
-} satisfies IPlugin<TypeHost, { readonly optionalExtension: boolean }>
+  install: (_core: ITypeCore) => ({ optionalExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly optionalExtension: boolean }>
 
 /** Local Feature closures must retain dependencies even when only the outer Feature is a root. */
 const nestedDependency = defineFeature(() => ({}), {
@@ -164,8 +169,8 @@ const nestedDependency = defineFeature(() => ({}), {
 const nestedPlugin = {
   name: 'nested' as const,
   features: { outer: defineFeature(() => ({}), { inner: nestedDependency }) },
-  install: (_core: TypeHost) => ({ nestedExtension: true })
-} satisfies IPlugin<TypeHost, { readonly nestedExtension: boolean }>
+  install: (_core: ITypeCore) => ({ nestedExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly nestedExtension: boolean }>
 
 /** Erasing a required provider literal forces a conservative dynamic view. */
 const widenedRequiredReference: IFeatureReference<object> = providerPlugin.getFeature('capability')
@@ -178,14 +183,14 @@ const widenedOptionalReference: IFeatureReference<object, true> = providerPlugin
 const widenedRequiredPlugin = {
   name: 'widened-required' as const,
   features: { capability: defineFeature(() => ({}), { provider: widenedRequiredReference }) },
-  install: (_core: TypeHost) => ({ widenedRequiredExtension: true })
-} satisfies IPlugin<TypeHost, { readonly widenedRequiredExtension: boolean }>
+  install: (_core: ITypeCore) => ({ widenedRequiredExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly widenedRequiredExtension: boolean }>
 /** Unknown optional providers cannot claim an exact independent-definition view either. */
 const widenedOptionalPlugin = {
   name: 'widened-optional' as const,
   features: { capability: defineFeature(() => ({}), { provider: widenedOptionalReference }) },
-  install: (_core: TypeHost) => ({ widenedOptionalExtension: true })
-} satisfies IPlugin<TypeHost, { readonly widenedOptionalExtension: boolean }>
+  install: (_core: ITypeCore) => ({ widenedOptionalExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly widenedOptionalExtension: boolean }>
 
 type IFeatureChainHost = ITrayResolvedHost<
   TypeHost,
@@ -233,8 +238,8 @@ void widenedOptionalExtension
 
 const replacementPlugin = {
   name: 'ready',
-  install: (_core: TypeHost) => ({ replacementExtension: true })
-} satisfies IPlugin<TypeHost, { readonly replacementExtension: boolean }>
+  install: (_core: ITypeCore) => ({ replacementExtension: true })
+} satisfies IPlugin<ITypeCore, { readonly replacementExtension: boolean }>
 
 const hostOptions = {
   create: () =>
@@ -448,7 +453,7 @@ describe('TPD-T45 through TPD-T49 managed Host declaration contract', () => {
     const host = await createHost(hostOptions)
     const result = await host.use({
       name: 'branch',
-      install: (_core: TypeHost) => ({ branchExtension: true })
+      install: (_core: ITypeCore) => ({ branchExtension: true })
     })
     if (result.ok) {
       expect(result.committed).toBe(true)

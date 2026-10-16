@@ -259,6 +259,7 @@ import {
   type ITrayHostEventMap,
   type ITrayHostState,
   type ITrayPluginConstraint,
+  type ITrayPluginCore,
   type ITrayPluginMutationObservation,
   type ITrayPluginMutationResult,
   type ITrayPluginPhysicalCleanupResult,
@@ -270,7 +271,8 @@ import {
 
 type ICore = Record<string, never>
 class ConsumerHost extends PluginHost<ICore, string> {}
-const plugin = { name: 'packed', install: (_core: ConsumerHost) => ({ packedExtension: true }) } satisfies IPlugin<ConsumerHost, { readonly packedExtension: boolean }>
+type IConsumerCore = ITrayPluginCore<ConsumerHost>
+const plugin = { name: 'packed', install: (_core: IConsumerCore) => ({ packedExtension: true }) } satisfies IPlugin<IConsumerCore, { readonly packedExtension: boolean }>
 const options = {
   create: () => new ConsumerHost({ execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }),
   plugins: [plugin] as const,
