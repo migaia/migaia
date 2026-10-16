@@ -2,10 +2,7 @@ import { createHash } from 'node:crypto'
 import { join, relative } from 'node:path'
 import { isAlias, isNode, parseAllDocuments, visit } from 'yaml'
 
-/** Exact pnpm release whose dependency-path filename algorithm this tool mirrors. */
-export const storageV2PinnedPnpmVersion = '11.20.0'
-
-/** Pnpm 11.20.0 virtual-store filename limit required from the fresh consumer. */
+/** Pnpm default virtual-store filename limit required from the fresh consumer. */
 export const storageV2VirtualStoreDirMaxLength = 120
 
 /** Allowed top-level keys for the fresh pnpm lockfile profile owned by C2-R4. */
@@ -27,7 +24,7 @@ const importerGroupKeys = new Set(['dependencies'])
 /** Exact fields owned by one importer dependency edge. */
 const importerDependencyKeys = new Set(['specifier', 'version'])
 
-/** Closed package-row fields accepted from pnpm 11.20.0 packed tarball resolution. */
+/** Closed package-row fields accepted from pnpm packed tarball resolution. */
 const packageRowKeys = new Set([
   'resolution',
   'name',
@@ -312,7 +309,7 @@ export function parseStorageV2PnpmLockfile(lockfile) {
 }
 
 /**
- * Reproduces pnpm 11.20.0's dependency-path filename without following installed links.
+ * Reproduces pnpm's dependency-path filename without following installed links.
  *
  * @param {string} dependencyPath Exact lock identity
  * @returns {string} Virtual-store directory filename

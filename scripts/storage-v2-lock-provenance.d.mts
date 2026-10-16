@@ -1,4 +1,3 @@
-export const storageV2PinnedPnpmVersion: '11.20.0'
 export const storageV2VirtualStoreDirMaxLength: 120
 
 export type IStorageV2ArtifactProvenance = {
