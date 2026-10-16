@@ -196,6 +196,14 @@
               },
               {
                 "type": "paragraph",
+                "text": "`createHost({ create })` 接受 PluginHost class 实例或 `defineHost()` 返回的 handle，并保留 具体 Host 的 domain core、pipeline 和初始插件类型。插件的 `install(core)` 接收 domain core 与 PluginHost lifecycle core；它不接收 Host handle 本身。`plugins`、`use()`、`replace()`、 `loadIntoHost()` 和 Runtime 的 `self.replace()` 都按该 Host 的能力检查插件准入。"
+              },
+              {
+                "type": "paragraph",
+                "text": "安装后的精确能力位于成功结果的 `view`：检查 `result.ok` 后，将 `result.view` 传给 `createRuntime()`，`run('插件名', .)` 的 callback 即可获得对应插件的 extensions 类型。 `loadIntoHost()` 同样保留原 Host、目标插件及 `use`/`replace` 的结果类型。原 Host 变量不会 因一次安装调用自动改变静态类型；动态插件名称仍按既有规则返回保守视图。"
+              },
+              {
+                "type": "paragraph",
                 "text": "Runtime callback 同时收到只绑定当前 run、插件名称与 generation 的 `context.self`。调用 `self.unUse()` 或 `self.replace(plugin)` 会同步返回不具 thenable 行为的 ticket；ticket 的 `completion` 只在 callback settle、lease release 后由 managed Host queue 执行。callback 内 等待同一 ticket 的 completion 会立即得到 `RUNTIME_CONTRACT_INVALID`，而 callback 返回 ticket 后可在外层等待 `ticket.completion`。外部 `host."
               },
               {
@@ -770,6 +778,14 @@
                 "type": "code",
                 "language": "ts",
                 "code": "import { defineLoader, loadIntoHost } from '@migaia/tray/loader'\nimport { defineAdapter } from '@migaia/tray/adapter'\nimport { createRuntime } from '@migaia/tray/runtime'"
+              },
+              {
+                "type": "paragraph",
+                "text": "托管 Host 的类型保留具体 source Host、已登记插件和 ready 插件；`createRuntime(host)` 直接沿用这些类型，不需要把装有扩展的 Host 转成 `any`。`createHost` 的工厂同时支持 PluginHost class 与 `defineHost()` handle。插件 hook 使用 source Host 声明的 domain core 和 lifecycle core，安装入口会检查插件所需的能力。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`use()`、`replace()` 和 `loadIntoHost()` 成功后，从 `result.view` 继续操作，才能保留新安装 插件的静态能力。Loader 的返回值可通过 `ok`、`committed` 区分成功和失败，并读取对应 `view`；传给 `createRuntime(result.view)` 后，字面量插件名会决定 callback 的 extensions 类型。blocked 插件不贡献 ready 能力，动态名称沿用保守推导。"
               },
               {
                 "type": "paragraph",
@@ -2346,8 +2362,8 @@
         {
           "name": "ITrayEntryContext",
           "kind": "type",
-          "signature": "export type ITrayEntryContext = { readonly signal: IAbortSignal; get<T>(key: ITrayKey): T; own<T>(resource: T, descriptor: IReleaseDescriptor): T; };",
-          "declarationLine": 12,
+          "signature": "export type ITrayEntryContext = { readonly signal: INativeAbortSignal; get<T>(key: ITrayKey): T; own<T>(resource: T, descriptor: IReleaseDescriptor): T; };",
+          "declarationLine": 13,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryContext is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryContext.",
@@ -2365,7 +2381,7 @@
           "aliasOf": "ITrayEntryContext",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ITrayEntryContext = { readonly signal: IAbortSignal; get<T>(key: ITrayKey): T; own<T>(resource: T, descriptor: IReleaseDescriptor): T; };"
+            "export type ITrayEntryContext = { readonly signal: INativeAbortSignal; get<T>(key: ITrayKey): T; own<T>(resource: T, descriptor: IReleaseDescriptor): T; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -2404,7 +2420,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryContext:export type ITrayEntryContext = { readonly signal: IAbortSignal; get<T>(key: ITrayKey): T; own<T>(resource: T, descriptor: IReleaseDescriptor): T; };",
+          "identity": "packages/tray/dist/contract.d.ts:ITrayEntryContext:export type ITrayEntryContext = { readonly signal: INativeAbortSignal; get<T>(key: ITrayKey): T; own<T>(resource: T, descriptor: IReleaseDescriptor): T; };",
           "guidance": [],
           "usageScore": 28,
           "configuration": [],
@@ -2414,7 +2430,7 @@
           "name": "ITrayEntryDefinition",
           "kind": "type",
           "signature": "export type ITrayEntryDefinition<T> = { readonly key: ITrayKey; readonly kind: ITrayEntryKind; readonly requires?: readonly ITrayKey[]; /** * Initial fact is captured at admission. Only a blocked ready() may reacquire this property; * supply a getter for fresh provider snapshots. Failed results remain cached permanently. */ readonly readiness?: IGraphReadinessSnapshot; readonly start: (context: ITrayEntryContext) => ITrayEntryInstance<T> | PromiseLike<ITrayEntryInstance<T>>; };",
-          "declarationLine": 17,
+          "declarationLine": 18,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryDefinition is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryDefinition.",
@@ -2483,7 +2499,7 @@
           "name": "ITrayEntryInstance",
           "kind": "type",
           "signature": "export type ITrayEntryInstance<T> = { readonly value: T; readonly release: (context: IGraphReleaseContext) => void | PromiseLike<void>; };",
-          "declarationLine": 8,
+          "declarationLine": 9,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryInstance is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryInstance.",
@@ -2550,7 +2566,7 @@
           "name": "ITrayEntryKind",
           "kind": "type",
           "signature": "export type ITrayEntryKind = TrayEntryKind;",
-          "declarationLine": 7,
+          "declarationLine": 8,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayEntryKind is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayEntryKind.",
@@ -2744,7 +2760,7 @@
           "name": "ITrayGraph",
           "kind": "type",
           "signature": "export type ITrayGraph = { readonly keys: readonly ITrayKey[]; readonly state: ITrayState; readonly error: unknown | undefined; ready(): Promise<void>; get<T>(key: ITrayKey): T; entryState(key: ITrayKey): IGraphNodeState; dispose(): Promise<void>; };",
-          "declarationLine": 29,
+          "declarationLine": 30,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayGraph is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayGraph.",
@@ -3291,7 +3307,7 @@
           "name": "ITrayKey",
           "kind": "type",
           "signature": "export type ITrayKey = string & { readonly __trayKey: unique symbol; };",
-          "declarationLine": 4,
+          "declarationLine": 5,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayKey is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayKey.",
@@ -4435,7 +4451,7 @@
           "name": "ITrayState",
           "kind": "type",
           "signature": "export type ITrayState = ICapabilityGraphState;",
-          "declarationLine": 28,
+          "declarationLine": 29,
           "source": "packages/tray/dist/contract.d.ts",
           "purpose": "ITrayState is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayState.",
@@ -5827,21 +5843,21 @@
         {
           "name": "defineAdapter",
           "kind": "function",
-          "signature": "export declare function defineAdapter<TArtifact, THost extends import('@migaia/plugin-host').PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>;",
+          "signature": "export declare function defineAdapter<TArtifact, THost extends import('../host/typing.js').ITrayHostSource, const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>;",
           "declarationLine": 3,
           "source": "packages/tray/dist/adapter/define-adapter.d.ts",
           "purpose": "Snapshots adapter invocation once and assimilates foreign thenables safely.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for defineAdapter.",
           "advanced": "No additional advanced behavior is declared for defineAdapter.",
-          "parameters": ["'@migaia/plugin-host': unknown"],
+          "parameters": ["'../host/typing.js': unknown"],
           "parameterDetails": [
             {
-              "name": "'@migaia/plugin-host'",
+              "name": "'../host/typing.js'",
               "type": "unknown",
               "optional": false
             }
           ],
-          "returns": ".PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>",
+          "returns": ".ITrayHostSource, const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>",
           "errors": ["No documented errors are declared for defineAdapter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineAdapter.",
           "examples": [],
@@ -5849,19 +5865,19 @@
           "aliasOf": "defineAdapter",
           "exportPath": "./adapter",
           "overloadSignatures": [
-            "export declare function defineAdapter<TArtifact, THost extends import('@migaia/plugin-host').PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>;"
+            "export declare function defineAdapter<TArtifact, THost extends import('../host/typing.js').ITrayHostSource, const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "'@migaia/plugin-host'",
+                "name": "'../host/typing.js'",
                 "type": "unknown",
                 "optional": false
               }
             ]
           ],
           "overloadReturns": [
-            ".PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>"
+            ".ITrayHostSource, const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>"
           ],
           "whenToUse": "Use defineAdapter when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when defineAdapter does not match the required inputs or return contract.",
@@ -5898,7 +5914,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/adapter/define-adapter.d.ts:defineAdapter:export declare function defineAdapter<TArtifact, THost extends import('@migaia/plugin-host').PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>;",
+          "identity": "packages/tray/dist/adapter/define-adapter.d.ts:defineAdapter:export declare function defineAdapter<TArtifact, THost extends import('../host/typing.js').ITrayHostSource, const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin>;",
           "guidance": [],
           "usageScore": 22,
           "configuration": [],
@@ -5907,8 +5923,8 @@
         {
           "name": "IAdapter",
           "kind": "type",
-          "signature": "export type IAdapter<TArtifact, THost extends PluginHost<any, any, any>, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly adapt: (artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>; }>;",
-          "declarationLine": 10,
+          "signature": "export type IAdapter<TArtifact, THost extends ITrayHostSource, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly adapt: (artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>; }>;",
+          "declarationLine": 9,
           "source": "packages/tray/dist/adapter/typing.d.ts",
           "purpose": "One-shot conversion contract from an external artifact to a canonical plugin.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAdapter.",
@@ -5923,7 +5939,7 @@
           "aliasOf": "IAdapter",
           "exportPath": "./adapter",
           "overloadSignatures": [
-            "export type IAdapter<TArtifact, THost extends PluginHost<any, any, any>, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly adapt: (artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>; }>;"
+            "export type IAdapter<TArtifact, THost extends ITrayHostSource, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly adapt: (artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5962,7 +5978,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/adapter/typing.d.ts:IAdapter:export type IAdapter<TArtifact, THost extends PluginHost<any, any, any>, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly adapt: (artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>; }>;",
+          "identity": "packages/tray/dist/adapter/typing.d.ts:IAdapter:export type IAdapter<TArtifact, THost extends ITrayHostSource, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly adapt: (artifact: TArtifact, context: IAdapterContext) => TPlugin | PromiseLike<TPlugin>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -5971,8 +5987,8 @@
         {
           "name": "IAdapterContext",
           "kind": "type",
-          "signature": "export type IAdapterContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; }>;",
-          "declarationLine": 5,
+          "signature": "export type IAdapterContext = Readonly<{ readonly signal: INativeAbortSignal; readonly deadlineAt: number | undefined; }>;",
+          "declarationLine": 4,
           "source": "packages/tray/dist/adapter/typing.d.ts",
           "purpose": "Runtime-neutral context supplied during one pure artifact conversion.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IAdapterContext.",
@@ -5987,7 +6003,7 @@
           "aliasOf": "IAdapterContext",
           "exportPath": "./adapter",
           "overloadSignatures": [
-            "export type IAdapterContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; }>;"
+            "export type IAdapterContext = Readonly<{ readonly signal: INativeAbortSignal; readonly deadlineAt: number | undefined; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6026,7 +6042,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/adapter/typing.d.ts:IAdapterContext:export type IAdapterContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; }>;",
+          "identity": "packages/tray/dist/adapter/typing.d.ts:IAdapterContext:export type IAdapterContext = Readonly<{ readonly signal: INativeAbortSignal; readonly deadlineAt: number | undefined; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6054,8 +6070,8 @@
         {
           "name": "createHost",
           "kind": "function",
-          "signature": "export declare function createHost<THost extends PluginHost<any, any, any>, const TPlugins extends readonly ITrayPluginConstraint<THost>[]>(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>>;",
-          "declarationLine": 4,
+          "signature": "export declare function createHost<THost extends ITrayHostSource, const TPlugins extends readonly ITrayPluginConstraint<THost>[]>(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>>;",
+          "declarationLine": 3,
           "source": "packages/tray/dist/host/create-host.d.ts",
           "purpose": "Creates one Tray-owned managed Host and resolves only after its graph is active.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createHost.",
@@ -6078,7 +6094,7 @@
           "aliasOf": "createHost",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export declare function createHost<THost extends PluginHost<any, any, any>, const TPlugins extends readonly ITrayPluginConstraint<THost>[]>(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>>;"
+            "export declare function createHost<THost extends ITrayHostSource, const TPlugins extends readonly ITrayPluginConstraint<THost>[]>(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>>;"
           ],
           "overloadParameterDetails": [
             [
@@ -6133,7 +6149,7 @@
             },
             {
               "name": "plugins",
-              "type": "TPlugins",
+              "type": "TPlugins & ITrayPluginAdmission<NoInfer<THost>, TPlugins>",
               "optional": false,
               "description": "Initial plugin definitions admitted and installed in tuple order."
             },
@@ -6168,9 +6184,9 @@
               "description": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure."
             }
           ],
-          "identity": "packages/tray/dist/host/create-host.d.ts:createHost:export declare function createHost<THost extends PluginHost<any, any, any>, const TPlugins extends readonly ITrayPluginConstraint<THost>[]>(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>>;",
+          "identity": "packages/tray/dist/host/create-host.d.ts:createHost:export declare function createHost<THost extends ITrayHostSource, const TPlugins extends readonly ITrayPluginConstraint<THost>[]>(options: ICreateHostOptions<THost, TPlugins>): Promise<ITrayResolvedHost<THost, TPlugins>>;",
           "guidance": [],
-          "usageScore": 30,
+          "usageScore": 36,
           "configuration": [
             {
               "name": "create",
@@ -6182,11 +6198,11 @@
             },
             {
               "name": "plugins",
-              "type": "TPlugins",
+              "type": "TPlugins & ITrayPluginAdmission<NoInfer<THost>, TPlugins>",
               "optional": false,
-              "description": "Initial plugin definitions admitted and installed in tuple order.",
+              "description": "`createHost({ create })` 接受 PluginHost class 实例或 `defineHost()` 返回的 handle，并保留 具体 Host 的 domain core、pipeline 和初始插件类型。插件的 `install(core)` 接收 domain core 与 PluginHost lifecycle core；它不接收 Host handle 本身。`plugins`、`use()`、`replace()`、 `loadIntoHost()` 和 Runtime 的 `self.replace()` 都按该 Host 的能力检查插件准入。",
               "descriptionEn": "Initial plugin definitions admitted and installed in tuple order.",
-              "descriptionZh": ""
+              "descriptionZh": "`createHost({ create })` 接受 PluginHost class 实例或 `defineHost()` 返回的 handle，并保留 具体 Host 的 domain core、pipeline 和初始插件类型。插件的 `install(core)` 接收 domain core 与 PluginHost lifecycle core；它不接收 Host handle 本身。`plugins`、`use()`、`replace()`、 `loadIntoHost()` 和 Runtime 的 `self.replace()` 都按该 Host 的能力检查插件准入。"
             },
             {
               "name": "mutationAdmissionMs",
@@ -6235,7 +6251,7 @@
           "name": "ICanResolveReadyDefinitions",
           "kind": "type",
           "signature": "export type ICanResolveReadyDefinitions<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? false : string extends ITrayDefinitionNames<TDefinitions> ? false : IReadyInferenceExceeded<TDefinitions> extends true ? false : IHasWidenedProviders<TDefinitions> extends true ? false : true;",
-          "declarationLine": 57,
+          "declarationLine": 81,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Whether the public resolver may safely retain an exact finite readiness tuple.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICanResolveReadyDefinitions.",
@@ -6298,8 +6314,8 @@
         {
           "name": "ICreateHostOptions",
           "kind": "type",
-          "signature": "export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
-          "declarationLine": 173,
+          "signature": "export type ICreateHostOptions<THost extends ITrayHostSource, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins & ITrayPluginAdmission<NoInfer<THost>, TPlugins>; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
+          "declarationLine": 205,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Host creation options.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ICreateHostOptions.",
@@ -6316,7 +6332,7 @@
           "aliasOf": "ICreateHostOptions",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;"
+            "export type ICreateHostOptions<THost extends ITrayHostSource, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins & ITrayPluginAdmission<NoInfer<THost>, TPlugins>; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6355,7 +6371,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:ICreateHostOptions:export type ICreateHostOptions<THost extends PluginHost<any, any, any>, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
+          "identity": "packages/tray/dist/host/typing.d.ts:ICreateHostOptions:export type ICreateHostOptions<THost extends ITrayHostSource, TPlugins extends readonly ITrayPluginConstraint<THost>[]> = Readonly<{ /** Constructs the one PluginHost instance owned by the resulting Tray host. */ readonly create: () => THost; /** Initial plugin definitions admitted and installed in tuple order. */ readonly plugins: TPlugins & ITrayPluginAdmission<NoInfer<THost>, TPlugins>; /** Maximum wait for a serialized graph mutation to enter execution. */ readonly mutationAdmissionMs: number; /** Maximum bounded-shutdown wait for physical plugin quiescence. */ readonly quiescenceMs: number; /** Selects bounded shutdown or a strict drain that waits for physical completion. */ readonly shutdown: Readonly<{ /** Uses a bounded wait or waits strictly until every physical plugin release completes. */ readonly mode: TrayShutdownMode; }>; /** Receives contained lifecycle and cleanup diagnostics without replacing the primary failure. */ readonly report?: (error: unknown) => void; }>;",
           "guidance": [],
           "usageScore": 10,
           "configuration": [],
@@ -6364,8 +6380,8 @@
         {
           "name": "IHostBaselinePlugins",
           "kind": "type",
-          "signature": "export type IHostBaselinePlugins<THost extends PluginHost<any, any, any>> = IPluginHostInstalledPlugins<THost> extends readonly IPluginConstraint<any>[] ? IPluginHostInstalledPlugins<THost> : readonly [];",
-          "declarationLine": 7,
+          "signature": "export type IHostBaselinePlugins<THost extends ITrayHostSource> = THost extends PluginHost<any, any, any> ? IPluginHostInstalledPlugins<THost> : THost extends { readonly __installedPlugins?: infer TInstalled; } ? Extract<TInstalled, readonly IPluginConstraint<any>[]> : readonly [];",
+          "declarationLine": 27,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Constructor-installed plugins remain part of every exact and dynamic Tray view.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IHostBaselinePlugins.",
@@ -6380,7 +6396,7 @@
           "aliasOf": "IHostBaselinePlugins",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type IHostBaselinePlugins<THost extends PluginHost<any, any, any>> = IPluginHostInstalledPlugins<THost> extends readonly IPluginConstraint<any>[] ? IPluginHostInstalledPlugins<THost> : readonly [];"
+            "export type IHostBaselinePlugins<THost extends ITrayHostSource> = THost extends PluginHost<any, any, any> ? IPluginHostInstalledPlugins<THost> : THost extends { readonly __installedPlugins?: infer TInstalled; } ? Extract<TInstalled, readonly IPluginConstraint<any>[]> : readonly [];"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6419,7 +6435,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:IHostBaselinePlugins:export type IHostBaselinePlugins<THost extends PluginHost<any, any, any>> = IPluginHostInstalledPlugins<THost> extends readonly IPluginConstraint<any>[] ? IPluginHostInstalledPlugins<THost> : readonly [];",
+          "identity": "packages/tray/dist/host/typing.d.ts:IHostBaselinePlugins:export type IHostBaselinePlugins<THost extends ITrayHostSource> = THost extends PluginHost<any, any, any> ? IPluginHostInstalledPlugins<THost> : THost extends { readonly __installedPlugins?: infer TInstalled; } ? Extract<TInstalled, readonly IPluginConstraint<any>[]> : readonly [];",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6429,7 +6445,7 @@
           "name": "IPluginWithSynchronousShared",
           "kind": "type",
           "signature": "export type IPluginWithSynchronousShared<TPlugin> = TPlugin & { readonly shared?: (core: unknown) => Record<PropertyKey, unknown>; };",
-          "declarationLine": 69,
+          "declarationLine": 93,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Awaitable values accepted at lifecycle boundaries.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IPluginWithSynchronousShared.",
@@ -6493,7 +6509,7 @@
           "name": "IResolveReadyTrayPlugins",
           "kind": "type",
           "signature": "export type IResolveReadyTrayPlugins<TDefinitions extends readonly unknown[]> = number extends TDefinitions['length'] ? readonly [] : string extends ITrayDefinitionNames<TDefinitions> ? readonly [] : IReadyInferenceExceeded<TDefinitions> extends true ? readonly [] : IAllDefinitionsIndependent<TDefinitions> extends true ? TDefinitions : IHasWidenedProviders<TDefinitions> extends true ? readonly [] : IResolveReadyWithFuel<TDefinitions>;",
-          "declarationLine": 67,
+          "declarationLine": 91,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Exact readiness is selected only for finite, literal, at-most-128 definition tuples.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IResolveReadyTrayPlugins.",
@@ -6556,8 +6572,8 @@
         {
           "name": "ITrayHost",
           "kind": "type",
-          "signature": "export type ITrayHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<IResolveReadyTrayPlugins<TDefinitions>, readonly ITrayPluginConstraint<THost>[]>> = Readonly<{ readonly plugins: readonly string[]; readonly readyPlugins: readonly string[]; readonly state: ITrayHostState; readonly isActive: boolean; readonly error: unknown | undefined; readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>; readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>; pluginState(name: string): string; on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe; use<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayResolvedHost<THost, readonly [...TDefinitions, TPlugin]>, ITrayHostDynamic<THost>>>; unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; replace<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayMutationView<THost, TDefinitions, TReady, TPlugin>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; dispose(): Promise<ITrayHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }>;",
-          "declarationLine": 152,
+          "signature": "export type ITrayHost<THost extends ITrayHostSource, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<IResolveReadyTrayPlugins<TDefinitions>, readonly ITrayPluginConstraint<THost>[]>> = Readonly<{ /** No runtime property is emitted; each facade keeps its source and plugin tuples in declarations. */ readonly [trayHostTypes]: Readonly<{ readonly host: THost; readonly definitions: TDefinitions; readonly ready: TReady; }>; readonly plugins: readonly string[]; readonly readyPlugins: readonly string[]; readonly state: ITrayHostState; readonly isActive: boolean; readonly error: unknown | undefined; readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>; readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>; pluginState(name: string): string; on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe; use<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>; unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>; dispose(): Promise<ITrayHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }>;",
+          "declarationLine": 178,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Public managed Host surface.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHost.",
@@ -6572,7 +6588,7 @@
           "aliasOf": "ITrayHost",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ITrayHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<IResolveReadyTrayPlugins<TDefinitions>, readonly ITrayPluginConstraint<THost>[]>> = Readonly<{ readonly plugins: readonly string[]; readonly readyPlugins: readonly string[]; readonly state: ITrayHostState; readonly isActive: boolean; readonly error: unknown | undefined; readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>; readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>; pluginState(name: string): string; on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe; use<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayResolvedHost<THost, readonly [...TDefinitions, TPlugin]>, ITrayHostDynamic<THost>>>; unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; replace<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayMutationView<THost, TDefinitions, TReady, TPlugin>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; dispose(): Promise<ITrayHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }>;"
+            "export type ITrayHost<THost extends ITrayHostSource, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<IResolveReadyTrayPlugins<TDefinitions>, readonly ITrayPluginConstraint<THost>[]>> = Readonly<{ /** No runtime property is emitted; each facade keeps its source and plugin tuples in declarations. */ readonly [trayHostTypes]: Readonly<{ readonly host: THost; readonly definitions: TDefinitions; readonly ready: TReady; }>; readonly plugins: readonly string[]; readonly readyPlugins: readonly string[]; readonly state: ITrayHostState; readonly isActive: boolean; readonly error: unknown | undefined; readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>; readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>; pluginState(name: string): string; on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe; use<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>; unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>; dispose(): Promise<ITrayHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6611,7 +6627,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:ITrayHost:export type ITrayHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<IResolveReadyTrayPlugins<TDefinitions>, readonly ITrayPluginConstraint<THost>[]>> = Readonly<{ readonly plugins: readonly string[]; readonly readyPlugins: readonly string[]; readonly state: ITrayHostState; readonly isActive: boolean; readonly error: unknown | undefined; readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>; readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>; pluginState(name: string): string; on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe; use<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayResolvedHost<THost, readonly [...TDefinitions, TPlugin]>, ITrayHostDynamic<THost>>>; unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; replace<TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin): Promise<ITrayPluginMutationResult<ITrayHost<THost, TDefinitions, TReady>, ITrayMutationView<THost, TDefinitions, TReady, TPlugin>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; dispose(): Promise<ITrayHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }>;",
+          "identity": "packages/tray/dist/host/typing.d.ts:ITrayHost:export type ITrayHost<THost extends ITrayHostSource, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[] = Extract<IResolveReadyTrayPlugins<TDefinitions>, readonly ITrayPluginConstraint<THost>[]>> = Readonly<{ /** No runtime property is emitted; each facade keeps its source and plugin tuples in declarations. */ readonly [trayHostTypes]: Readonly<{ readonly host: THost; readonly definitions: TDefinitions; readonly ready: TReady; }>; readonly plugins: readonly string[]; readonly readyPlugins: readonly string[]; readonly state: ITrayHostState; readonly isActive: boolean; readonly error: unknown | undefined; readonly extensions: Readonly<IMergePluginExts<readonly [...IHostBaselinePlugins<THost>, ...TReady]>>; readonly config: IPluginHostConfigFor<readonly [...IHostBaselinePlugins<THost>, ...TReady]>; pluginState(name: string): string; on<TKey extends keyof ITrayHostEventMap>(type: TKey, listener: (event: IEventContext<ITrayHostEventMap[TKey]>) => void | PromiseLike<void>): IUnsubscribe; use<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'use'>>; unUse<const TName extends string>(name: TName): Promise<TName extends ITrayDefinitionNames<TDefinitions> ? ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, IRemoveTrayDefinition<TDefinitions, TName> extends readonly ITrayPluginConstraint<THost>[] ? ITrayResolvedHost<THost, IRemoveTrayDefinition<TDefinitions, TName>> : ITrayHostDynamic<THost>> : ITrayPluginRemovalResult<ITrayHost<THost, TDefinitions, TReady>, ITrayHostDynamic<THost, Extract<IMergePluginExts<TReady>, object>>>>; replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): Promise<ITrayHostMutationResult<THost, TDefinitions, TReady, TPlugin, 'replace'>>; dispose(): Promise<ITrayHostDisposalResult>; [asyncDisposeKey](): Promise<void>; }>;",
           "guidance": [
             {
               "id": "host-定义与构造选项",
@@ -6697,7 +6713,7 @@
           "name": "ITrayHostCreationError",
           "kind": "type",
           "signature": "export type ITrayHostCreationError = Error & Readonly<{ readonly detail: ITrayHostCreationFailureDetail; }>;",
-          "declarationLine": 201,
+          "declarationLine": 233,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostCreationError is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostCreationError.",
@@ -6761,7 +6777,7 @@
           "name": "ITrayHostCreationFailureDetail",
           "kind": "type",
           "signature": "export type ITrayHostCreationFailureDetail = ICleanupResult & Readonly<{ readonly phase: 'factory' | 'admission' | 'graph' | 'setup' | 'commit'; readonly cleanupComplete: boolean; }>;",
-          "declarationLine": 197,
+          "declarationLine": 229,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostCreationFailureDetail is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostCreationFailureDetail.",
@@ -6825,7 +6841,7 @@
           "name": "ITrayHostDisposalResult",
           "kind": "type",
           "signature": "export type ITrayHostDisposalResult = ICleanupResult & Readonly<{ readonly state: 'terminal'; readonly termination: 'managed' | 'external-host'; readonly cleanupComplete: boolean; readonly error?: Error; }>;",
-          "declarationLine": 191,
+          "declarationLine": 223,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostDisposalResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDisposalResult.",
@@ -6888,8 +6904,8 @@
         {
           "name": "ITrayHostDynamic",
           "kind": "type",
-          "signature": "export type ITrayHostDynamic<THost extends PluginHost<any, any, any>, TManagedBaseline extends object = object> = Omit<ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, 'extensions'> & Readonly<{ readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>; }>;",
-          "declarationLine": 169,
+          "signature": "export type ITrayHostDynamic<THost extends ITrayHostSource, TManagedBaseline extends object = object> = Omit<ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, 'extensions'> & Readonly<{ readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>; }>;",
+          "declarationLine": 201,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Conservative dynamic view returned after widened or committed-failure mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostDynamic.",
@@ -6904,7 +6920,7 @@
           "aliasOf": "ITrayHostDynamic",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ITrayHostDynamic<THost extends PluginHost<any, any, any>, TManagedBaseline extends object = object> = Omit<ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, 'extensions'> & Readonly<{ readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>; }>;"
+            "export type ITrayHostDynamic<THost extends ITrayHostSource, TManagedBaseline extends object = object> = Omit<ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, 'extensions'> & Readonly<{ readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6943,7 +6959,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:ITrayHostDynamic:export type ITrayHostDynamic<THost extends PluginHost<any, any, any>, TManagedBaseline extends object = object> = Omit<ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, 'extensions'> & Readonly<{ readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>; }>;",
+          "identity": "packages/tray/dist/host/typing.d.ts:ITrayHostDynamic:export type ITrayHostDynamic<THost extends ITrayHostSource, TManagedBaseline extends object = object> = Omit<ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, 'extensions'> & Readonly<{ readonly extensions: Readonly<IHostBaselineExtensions<THost> & TManagedBaseline & Record<PropertyKey, unknown>>; }>;",
           "guidance": [],
           "usageScore": 4,
           "configuration": [],
@@ -6953,7 +6969,7 @@
           "name": "ITrayHostEventMap",
           "kind": "type",
           "signature": "export type ITrayHostEventMap = { readonly use: Readonly<Record<string, unknown>>; readonly unUse: Readonly<Record<string, unknown>>; readonly replace: Readonly<Record<string, unknown>>; /** Settled lifecycle aliases describe the logical operation without exposing Graph authority. */ readonly registered: Readonly<Record<string, unknown>>; readonly removed: Readonly<Record<string, unknown>>; readonly replaced: Readonly<Record<string, unknown>>; readonly mutationFailed: Readonly<{ readonly operation: 'use' | 'unUse' | 'replace'; readonly name: string; readonly error: Error; }>; readonly disposing: Readonly<{ readonly state: 'closing'; }>; readonly disposed: Readonly<{ readonly state: 'terminal'; readonly cleanupComplete: boolean; }>; };",
-          "declarationLine": 81,
+          "declarationLine": 105,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Event payloads published after settled managed mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostEventMap.",
@@ -7014,10 +7030,74 @@
           "fragment": "tray-host--ITrayHostEventMap"
         },
         {
+          "name": "ITrayHostSource",
+          "kind": "type",
+          "signature": "export type ITrayHostSource = PluginHost<any, any, any> | IHostHandle<any, any, any>;",
+          "declarationLine": 7,
+          "source": "packages/tray/dist/host/typing.d.ts",
+          "purpose": "Both canonical PluginHost entries expose the same managed composition capability.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostSource.",
+          "advanced": "No additional advanced behavior is declared for ITrayHostSource.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITrayHostSource."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayHostSource.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ITrayHostSource",
+          "exportPath": "./host",
+          "overloadSignatures": [
+            "export type ITrayHostSource = PluginHost<any, any, any> | IHostHandle<any, any, any>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITrayHostSource when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITrayHostSource does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Both canonical PluginHost entries expose the same managed composition capability."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITrayHostSource from @migaia/tray/host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITrayHostSource when its type contract and declared inputs match the result you need. Choose a different public symbol when ITrayHostSource does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostSource."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITrayHostSource."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/host/typing.d.ts:ITrayHostSource:export type ITrayHostSource = PluginHost<any, any, any> | IHostHandle<any, any, any>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "tray-host--ITrayHostSource"
+        },
+        {
           "name": "ITrayHostState",
           "kind": "type",
           "signature": "export type ITrayHostState = (typeof TrayHostState)[keyof typeof TrayHostState];",
-          "declarationLine": 79,
+          "declarationLine": 103,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayHostState is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayHostState.",
@@ -7080,8 +7160,8 @@
         {
           "name": "ITrayPluginConstraint",
           "kind": "type",
-          "signature": "export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost>;",
-          "declarationLine": 11,
+          "signature": "export type ITrayPluginConstraint<THost extends ITrayHostSource> = IPluginConstraint<ITrayPluginCore<THost>>;",
+          "declarationLine": 33,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Plugin descriptor accepted by the managed Tray Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginConstraint.",
@@ -7096,7 +7176,7 @@
           "aliasOf": "ITrayPluginConstraint",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost>;"
+            "export type ITrayPluginConstraint<THost extends ITrayHostSource> = IPluginConstraint<ITrayPluginCore<THost>>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7135,17 +7215,81 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:ITrayPluginConstraint:export type ITrayPluginConstraint<THost extends PluginHost<any, any, any>> = IPluginConstraint<THost>;",
+          "identity": "packages/tray/dist/host/typing.d.ts:ITrayPluginConstraint:export type ITrayPluginConstraint<THost extends ITrayHostSource> = IPluginConstraint<ITrayPluginCore<THost>>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
           "fragment": "tray-host--ITrayPluginConstraint"
         },
         {
+          "name": "ITrayPluginCore",
+          "kind": "type",
+          "signature": "export type ITrayPluginCore<THost extends ITrayHostSource> = IPluginHostCoreFor<THost>;",
+          "declarationLine": 9,
+          "source": "packages/tray/dist/host/typing.d.ts",
+          "purpose": "Plugin hooks receive the declared domain core and lifecycle core, rather than the Host handle.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginCore.",
+          "advanced": "No additional advanced behavior is declared for ITrayPluginCore.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for ITrayPluginCore."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITrayPluginCore.",
+          "examples": [],
+          "members": [],
+          "aliasOf": "ITrayPluginCore",
+          "exportPath": "./host",
+          "overloadSignatures": [
+            "export type ITrayPluginCore<THost extends ITrayHostSource> = IPluginHostCoreFor<THost>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use ITrayPluginCore when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when ITrayPluginCore does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Plugin hooks receive the declared domain core and lifecycle core, rather than the Host handle."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ITrayPluginCore from @migaia/tray/host, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ITrayPluginCore when its type contract and declared inputs match the result you need. Choose a different public symbol when ITrayPluginCore does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginCore."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for ITrayPluginCore."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/tray/dist/host/typing.d.ts:ITrayPluginCore:export type ITrayPluginCore<THost extends ITrayHostSource> = IPluginHostCoreFor<THost>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "tray-host--ITrayPluginCore"
+        },
+        {
           "name": "ITrayPluginMutationObservation",
           "kind": "type",
           "signature": "export type ITrayPluginMutationObservation<TView> = ICleanupResult & Readonly<{ readonly operation: 'use' | 'replace'; readonly name: string; readonly affected: readonly string[]; readonly topologyChanged: boolean; readonly view: TView; readonly cleanupComplete: boolean; }>;",
-          "declarationLine": 106,
+          "declarationLine": 130,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginMutationObservation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginMutationObservation.",
@@ -7209,7 +7353,7 @@
           "name": "ITrayPluginMutationResult",
           "kind": "type",
           "signature": "export type ITrayPluginMutationResult<TPreviousView, TSuccessView, TCommittedFailureView> = (ITrayPluginMutationObservation<TSuccessView> & Readonly<{ readonly ok: true; readonly committed: true; }>) | (ITrayPluginMutationObservation<TPreviousView> & Readonly<{ readonly ok: false; readonly committed: false; readonly error: Error; }>) | (ITrayPluginMutationObservation<TCommittedFailureView> & Readonly<{ readonly ok: false; readonly committed: true; readonly error: Error; }>);",
-          "declarationLine": 114,
+          "declarationLine": 138,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginMutationResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginMutationResult.",
@@ -7273,7 +7417,7 @@
           "name": "ITrayPluginPhysicalCleanupResult",
           "kind": "type",
           "signature": "export type ITrayPluginPhysicalCleanupResult = ICleanupResult;",
-          "declarationLine": 105,
+          "declarationLine": 129,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Cleanup observation returned by managed mutations.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginPhysicalCleanupResult.",
@@ -7335,7 +7479,7 @@
           "name": "ITrayPluginRemovalObservation",
           "kind": "type",
           "signature": "export type ITrayPluginRemovalObservation<TView> = ICleanupResult & Readonly<{ readonly name: string; readonly affected: readonly string[]; readonly view: TView; readonly cleanupComplete: boolean; }>;",
-          "declarationLine": 126,
+          "declarationLine": 152,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginRemovalObservation is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginRemovalObservation.",
@@ -7399,7 +7543,7 @@
           "name": "ITrayPluginRemovalResult",
           "kind": "type",
           "signature": "export type ITrayPluginRemovalResult<TPreviousView, TCommittedView> = (ITrayPluginRemovalObservation<TPreviousView> & Readonly<{ readonly ok: true; readonly committed: false; readonly removed: false; }>) | (ITrayPluginRemovalObservation<TCommittedView> & Readonly<{ readonly ok: true; readonly committed: true; readonly removed: true; }>) | (ITrayPluginRemovalObservation<TPreviousView> & Readonly<{ readonly ok: false; readonly committed: false; readonly removed: false; readonly error: Error; }>) | (ITrayPluginRemovalObservation<TCommittedView> & Readonly<{ readonly ok: false; readonly committed: true; readonly removed: true; readonly error: Error; }>);",
-          "declarationLine": 132,
+          "declarationLine": 158,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayPluginRemovalResult is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayPluginRemovalResult.",
@@ -7462,8 +7606,8 @@
         {
           "name": "ITrayResolvedHost",
           "kind": "type",
-          "signature": "export type ITrayResolvedHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[]> = ICanResolveReadyDefinitions<TDefinitions> extends true ? ITrayHost<THost, TDefinitions> : ITrayHostDynamic<THost>;",
-          "declarationLine": 190,
+          "signature": "export type ITrayResolvedHost<THost extends ITrayHostSource, TDefinitions extends readonly ITrayPluginConstraint<THost>[]> = ICanResolveReadyDefinitions<TDefinitions> extends true ? ITrayHost<THost, TDefinitions> : ITrayHostDynamic<THost>;",
+          "declarationLine": 222,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "ITrayResolvedHost is part of this module's public type contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ITrayResolvedHost.",
@@ -7480,7 +7624,7 @@
           "aliasOf": "ITrayResolvedHost",
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ITrayResolvedHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[]> = ICanResolveReadyDefinitions<TDefinitions> extends true ? ITrayHost<THost, TDefinitions> : ITrayHostDynamic<THost>;"
+            "export type ITrayResolvedHost<THost extends ITrayHostSource, TDefinitions extends readonly ITrayPluginConstraint<THost>[]> = ICanResolveReadyDefinitions<TDefinitions> extends true ? ITrayHost<THost, TDefinitions> : ITrayHostDynamic<THost>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7519,7 +7663,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/host/typing.d.ts:ITrayResolvedHost:export type ITrayResolvedHost<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[]> = ICanResolveReadyDefinitions<TDefinitions> extends true ? ITrayHost<THost, TDefinitions> : ITrayHostDynamic<THost>;",
+          "identity": "packages/tray/dist/host/typing.d.ts:ITrayResolvedHost:export type ITrayResolvedHost<THost extends ITrayHostSource, TDefinitions extends readonly ITrayPluginConstraint<THost>[]> = ICanResolveReadyDefinitions<TDefinitions> extends true ? ITrayHost<THost, TDefinitions> : ITrayHostDynamic<THost>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -7529,7 +7673,7 @@
           "name": "IUnsubscribe",
           "kind": "type",
           "signature": "export type IUnsubscribe = () => void;",
-          "declarationLine": 103,
+          "declarationLine": 127,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Minimal unsubscribe contract shared with event-subscriber without a runtime dependency.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IUnsubscribe.",
@@ -7591,7 +7735,7 @@
           "name": "TrayHostState",
           "kind": "const",
           "signature": "export declare const TrayHostState: { readonly active: \"active\"; readonly closing: \"closing\"; readonly terminal: \"terminal\"; readonly failed: \"failed\"; };",
-          "declarationLine": 73,
+          "declarationLine": 97,
           "source": "packages/tray/dist/host/typing.d.ts",
           "purpose": "Public lifecycle states for a managed Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for TrayHostState.",
@@ -7752,7 +7896,7 @@
           "name": "ILoadedArtifact",
           "kind": "type",
           "signature": "export type ILoadedArtifact<TArtifact> = Readonly<{ readonly value: TArtifact; readonly release: IReleaseDescriptor; }>;",
-          "declarationLine": 7,
+          "declarationLine": 6,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "Artifact plus its explicit lifecycle release contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoadedArtifact.",
@@ -7816,7 +7960,7 @@
           "name": "ILoader",
           "kind": "type",
           "signature": "export type ILoader<TSource, TArtifact> = Readonly<{ readonly load: (source: TSource, context: ILoaderContext) => ILoadedArtifact<TArtifact> | PromiseLike<ILoadedArtifact<TArtifact>>; }>;",
-          "declarationLine": 18,
+          "declarationLine": 17,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "One-shot source-to-artifact loader contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoader.",
@@ -7879,8 +8023,8 @@
         {
           "name": "ILoaderContext",
           "kind": "type",
-          "signature": "export type ILoaderContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; readonly report: (error: unknown) => void; }>;",
-          "declarationLine": 12,
+          "signature": "export type ILoaderContext = Readonly<{ readonly signal: INativeAbortSignal; readonly deadlineAt: number | undefined; readonly report: (error: unknown) => void; }>;",
+          "declarationLine": 11,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "Runtime-neutral input context for one loader admission.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoaderContext.",
@@ -7895,7 +8039,7 @@
           "aliasOf": "ILoaderContext",
           "exportPath": "./loader",
           "overloadSignatures": [
-            "export type ILoaderContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; readonly report: (error: unknown) => void; }>;"
+            "export type ILoaderContext = Readonly<{ readonly signal: INativeAbortSignal; readonly deadlineAt: number | undefined; readonly report: (error: unknown) => void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7934,7 +8078,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/loader/typing.d.ts:ILoaderContext:export type ILoaderContext = Readonly<{ readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; readonly report: (error: unknown) => void; }>;",
+          "identity": "packages/tray/dist/loader/typing.d.ts:ILoaderContext:export type ILoaderContext = Readonly<{ readonly signal: INativeAbortSignal; readonly deadlineAt: number | undefined; readonly report: (error: unknown) => void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7943,8 +8087,8 @@
         {
           "name": "ILoadIntoHostOptions",
           "kind": "type",
-          "signature": "export type ILoadIntoHostOptions<TSource, TArtifact, THost extends PluginHost<any, any, any>, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly host: ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>; readonly source: TSource; readonly loader: ILoader<TSource, TArtifact>; readonly adapter: IAdapter<TArtifact, THost, TPlugin>; readonly mutation: 'use' | 'replace'; readonly signal?: IAbortSignal; readonly timeoutMs: number | false; readonly report?: (error: unknown) => void; }>;",
-          "declarationLine": 22,
+          "signature": "export type ILoadIntoHostOptions<TSource, TArtifact, THost extends ITrayHostSource, TPlugin extends ITrayPluginConstraint<THost>, TManagedHost extends ITrayHostTypeInfo = ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, TMutation extends 'use' | 'replace' = 'use' | 'replace'> = Readonly<{ readonly host: TManagedHost & Pick<ITrayHost<ITrayHostSourceOf<NoInfer<TManagedHost>>, ITrayHostDefinitions<NoInfer<TManagedHost>>, ITrayHostReadyPlugins<NoInfer<TManagedHost>>>, 'use' | 'replace'>; readonly source: TSource; readonly loader: ILoader<TSource, TArtifact>; readonly adapter: IAdapter<TArtifact, NoInfer<THost>, TPlugin & ITrayPluginAdmission<NoInfer<THost>, readonly [TPlugin], ITrayHostReadyPlugins<NoInfer<TManagedHost>>>[0]>; readonly mutation: TMutation; readonly signal?: IAbortSignal; readonly timeoutMs: number | false; readonly report?: (error: unknown) => void; }>;",
+          "declarationLine": 21,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "Atomic Loader to Adapter to managed Host transaction options.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoadIntoHostOptions.",
@@ -7959,7 +8103,7 @@
           "aliasOf": "ILoadIntoHostOptions",
           "exportPath": "./loader",
           "overloadSignatures": [
-            "export type ILoadIntoHostOptions<TSource, TArtifact, THost extends PluginHost<any, any, any>, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly host: ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>; readonly source: TSource; readonly loader: ILoader<TSource, TArtifact>; readonly adapter: IAdapter<TArtifact, THost, TPlugin>; readonly mutation: 'use' | 'replace'; readonly signal?: IAbortSignal; readonly timeoutMs: number | false; readonly report?: (error: unknown) => void; }>;"
+            "export type ILoadIntoHostOptions<TSource, TArtifact, THost extends ITrayHostSource, TPlugin extends ITrayPluginConstraint<THost>, TManagedHost extends ITrayHostTypeInfo = ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, TMutation extends 'use' | 'replace' = 'use' | 'replace'> = Readonly<{ readonly host: TManagedHost & Pick<ITrayHost<ITrayHostSourceOf<NoInfer<TManagedHost>>, ITrayHostDefinitions<NoInfer<TManagedHost>>, ITrayHostReadyPlugins<NoInfer<TManagedHost>>>, 'use' | 'replace'>; readonly source: TSource; readonly loader: ILoader<TSource, TArtifact>; readonly adapter: IAdapter<TArtifact, NoInfer<THost>, TPlugin & ITrayPluginAdmission<NoInfer<THost>, readonly [TPlugin], ITrayHostReadyPlugins<NoInfer<TManagedHost>>>[0]>; readonly mutation: TMutation; readonly signal?: IAbortSignal; readonly timeoutMs: number | false; readonly report?: (error: unknown) => void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7998,7 +8142,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/loader/typing.d.ts:ILoadIntoHostOptions:export type ILoadIntoHostOptions<TSource, TArtifact, THost extends PluginHost<any, any, any>, TPlugin extends ITrayPluginConstraint<THost>> = Readonly<{ readonly host: ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>; readonly source: TSource; readonly loader: ILoader<TSource, TArtifact>; readonly adapter: IAdapter<TArtifact, THost, TPlugin>; readonly mutation: 'use' | 'replace'; readonly signal?: IAbortSignal; readonly timeoutMs: number | false; readonly report?: (error: unknown) => void; }>;",
+          "identity": "packages/tray/dist/loader/typing.d.ts:ILoadIntoHostOptions:export type ILoadIntoHostOptions<TSource, TArtifact, THost extends ITrayHostSource, TPlugin extends ITrayPluginConstraint<THost>, TManagedHost extends ITrayHostTypeInfo = ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>, TMutation extends 'use' | 'replace' = 'use' | 'replace'> = Readonly<{ readonly host: TManagedHost & Pick<ITrayHost<ITrayHostSourceOf<NoInfer<TManagedHost>>, ITrayHostDefinitions<NoInfer<TManagedHost>>, ITrayHostReadyPlugins<NoInfer<TManagedHost>>>, 'use' | 'replace'>; readonly source: TSource; readonly loader: ILoader<TSource, TArtifact>; readonly adapter: IAdapter<TArtifact, NoInfer<THost>, TPlugin & ITrayPluginAdmission<NoInfer<THost>, readonly [TPlugin], ITrayHostReadyPlugins<NoInfer<TManagedHost>>>[0]>; readonly mutation: TMutation; readonly signal?: IAbortSignal; readonly timeoutMs: number | false; readonly report?: (error: unknown) => void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8007,8 +8151,8 @@
         {
           "name": "ILoadIntoHostResult",
           "kind": "type",
-          "signature": "export type ILoadIntoHostResult = ITrayPluginMutationResult<unknown, unknown, unknown>;",
-          "declarationLine": 33,
+          "signature": "export type ILoadIntoHostResult<THost extends ITrayHostTypeInfo = ITrayHostTypeInfo, TPlugin extends ITrayPluginConstraint<ITrayHostSourceOf<THost>> = ITrayPluginConstraint<ITrayHostSourceOf<THost>>, TMutation extends 'use' | 'replace' = 'use' | 'replace'> = ITrayHostMutationResult<ITrayHostSourceOf<THost>, ITrayHostDefinitions<THost>, ITrayHostReadyPlugins<THost>, TPlugin, TMutation>;",
+          "declarationLine": 32,
           "source": "packages/tray/dist/loader/typing.d.ts",
           "purpose": "Result shape returned by the managed mutation after custody transfer.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for ILoadIntoHostResult.",
@@ -8023,7 +8167,7 @@
           "aliasOf": "ILoadIntoHostResult",
           "exportPath": "./loader",
           "overloadSignatures": [
-            "export type ILoadIntoHostResult = ITrayPluginMutationResult<unknown, unknown, unknown>;"
+            "export type ILoadIntoHostResult<THost extends ITrayHostTypeInfo = ITrayHostTypeInfo, TPlugin extends ITrayPluginConstraint<ITrayHostSourceOf<THost>> = ITrayPluginConstraint<ITrayHostSourceOf<THost>>, TMutation extends 'use' | 'replace' = 'use' | 'replace'> = ITrayHostMutationResult<ITrayHostSourceOf<THost>, ITrayHostDefinitions<THost>, ITrayHostReadyPlugins<THost>, TPlugin, TMutation>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8062,7 +8206,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/loader/typing.d.ts:ILoadIntoHostResult:export type ILoadIntoHostResult = ITrayPluginMutationResult<unknown, unknown, unknown>;",
+          "identity": "packages/tray/dist/loader/typing.d.ts:ILoadIntoHostResult:export type ILoadIntoHostResult<THost extends ITrayHostTypeInfo = ITrayHostTypeInfo, TPlugin extends ITrayPluginConstraint<ITrayHostSourceOf<THost>> = ITrayPluginConstraint<ITrayHostSourceOf<THost>>, TMutation extends 'use' | 'replace' = 'use' | 'replace'> = ITrayHostMutationResult<ITrayHostSourceOf<THost>, ITrayHostDefinitions<THost>, ITrayHostReadyPlugins<THost>, TPlugin, TMutation>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8071,21 +8215,23 @@
         {
           "name": "loadIntoHost",
           "kind": "function",
-          "signature": "export declare function loadIntoHost<TSource, TArtifact, THost extends import('@migaia/plugin-host').PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(options: ILoadIntoHostOptions<TSource, TArtifact, THost, TPlugin>): Promise<unknown>;",
-          "declarationLine": 3,
+          "signature": "export declare function loadIntoHost<TSource, TArtifact, THost extends ITrayHostTypeInfo, const TPlugin extends ITrayPluginConstraint<ITrayHostSourceOf<THost>>, TMutation extends 'use' | 'replace'>(options: ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<THost>, TPlugin, THost, TMutation>): Promise<ILoadIntoHostResult<THost, TPlugin, TMutation>>;",
+          "declarationLine": 4,
           "source": "packages/tray/dist/loader/load-into-host.d.ts",
           "purpose": "Executes one atomic load/adapt/managed-mutation transaction with exact artifact custody.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for loadIntoHost.",
           "advanced": "No additional advanced behavior is declared for loadIntoHost.",
-          "parameters": ["'@migaia/plugin-host': unknown"],
+          "parameters": [
+            "options: ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<THost>, TPlugin, THost, TMutation>"
+          ],
           "parameterDetails": [
             {
-              "name": "'@migaia/plugin-host'",
-              "type": "unknown",
+              "name": "options",
+              "type": "ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<THost>, TPlugin, THost, TMutation>",
               "optional": false
             }
           ],
-          "returns": ".PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(options: ILoadIntoHostOptions<TSource, TArtifact, THost, TPlugin>): Promise<unknown>",
+          "returns": "Promise<ILoadIntoHostResult<THost, TPlugin, TMutation>>",
           "errors": ["No documented errors are declared for loadIntoHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for loadIntoHost.",
           "examples": [],
@@ -8093,20 +8239,18 @@
           "aliasOf": "loadIntoHost",
           "exportPath": "./loader",
           "overloadSignatures": [
-            "export declare function loadIntoHost<TSource, TArtifact, THost extends import('@migaia/plugin-host').PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(options: ILoadIntoHostOptions<TSource, TArtifact, THost, TPlugin>): Promise<unknown>;"
+            "export declare function loadIntoHost<TSource, TArtifact, THost extends ITrayHostTypeInfo, const TPlugin extends ITrayPluginConstraint<ITrayHostSourceOf<THost>>, TMutation extends 'use' | 'replace'>(options: ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<THost>, TPlugin, THost, TMutation>): Promise<ILoadIntoHostResult<THost, TPlugin, TMutation>>;"
           ],
           "overloadParameterDetails": [
             [
               {
-                "name": "'@migaia/plugin-host'",
-                "type": "unknown",
+                "name": "options",
+                "type": "ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<THost>, TPlugin, THost, TMutation>",
                 "optional": false
               }
             ]
           ],
-          "overloadReturns": [
-            ".PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(options: ILoadIntoHostOptions<TSource, TArtifact, THost, TPlugin>): Promise<unknown>"
-          ],
+          "overloadReturns": ["Promise<ILoadIntoHostResult<THost, TPlugin, TMutation>>"],
           "whenToUse": "Use loadIntoHost when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when loadIntoHost does not match the required inputs or return contract.",
           "sections": [
@@ -8144,7 +8288,7 @@
           "declaredConfiguration": [
             {
               "name": "host",
-              "type": "ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>",
+              "type": "TManagedHost & Pick<ITrayHost<ITrayHostSourceOf<NoInfer<TManagedHost>>, ITrayHostDefinitions<NoInfer<TManagedHost>>, ITrayHostReadyPlugins<NoInfer<TManagedHost>>>, 'use' | 'replace'>",
               "optional": false,
               "description": ""
             },
@@ -8162,13 +8306,13 @@
             },
             {
               "name": "adapter",
-              "type": "IAdapter<TArtifact, THost, TPlugin>",
+              "type": "IAdapter<TArtifact, NoInfer<THost>, TPlugin & ITrayPluginAdmission<NoInfer<THost>, readonly [TPlugin], ITrayHostReadyPlugins<NoInfer<TManagedHost>>>[0]>",
               "optional": false,
               "description": ""
             },
             {
               "name": "mutation",
-              "type": "'use' | 'replace'",
+              "type": "TMutation",
               "optional": false,
               "description": ""
             },
@@ -8191,17 +8335,17 @@
               "description": "Receives contained lifecycle and cleanup diagnostics without replacing the primary failure."
             }
           ],
-          "identity": "packages/tray/dist/loader/load-into-host.d.ts:loadIntoHost:export declare function loadIntoHost<TSource, TArtifact, THost extends import('@migaia/plugin-host').PluginHost<any, any, any>, TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>>(options: ILoadIntoHostOptions<TSource, TArtifact, THost, TPlugin>): Promise<unknown>;",
+          "identity": "packages/tray/dist/loader/load-into-host.d.ts:loadIntoHost:export declare function loadIntoHost<TSource, TArtifact, THost extends ITrayHostTypeInfo, const TPlugin extends ITrayPluginConstraint<ITrayHostSourceOf<THost>>, TMutation extends 'use' | 'replace'>(options: ILoadIntoHostOptions<TSource, TArtifact, ITrayHostSourceOf<THost>, TPlugin, THost, TMutation>): Promise<ILoadIntoHostResult<THost, TPlugin, TMutation>>;",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 32,
           "configuration": [
             {
               "name": "host",
-              "type": "ITrayHost<THost, readonly ITrayPluginConstraint<THost>[], readonly ITrayPluginConstraint<THost>[]>",
+              "type": "TManagedHost & Pick<ITrayHost<ITrayHostSourceOf<NoInfer<TManagedHost>>, ITrayHostDefinitions<NoInfer<TManagedHost>>, ITrayHostReadyPlugins<NoInfer<TManagedHost>>>, 'use' | 'replace'>",
               "optional": false,
-              "description": "ticket 不可 thenable，且只在 callback 已 settle 并释放 generation lease 后才调度 canonical managed Host mutation。callback 内等待 `ticket.completion` 会 fail fast 并返回 `RUNTIME_CONTRACT_INVALID`；外部 `host.unUse/replace` 仍按既有 queue 等待 exact lease。不要 从 callback 捕获 concrete Host 执行 self mutation。",
+              "description": "托管 Host 的类型保留具体 source Host、已登记插件和 ready 插件；`createRuntime(host)` 直接沿用这些类型，不需要把装有扩展的 Host 转成 `any`。`createHost` 的工厂同时支持 PluginHost class 与 `defineHost()` handle。插件 hook 使用 source Host 声明的 domain core 和 lifecycle core，安装入口会检查插件所需的能力。",
               "descriptionEn": "",
-              "descriptionZh": "ticket 不可 thenable，且只在 callback 已 settle 并释放 generation lease 后才调度 canonical managed Host mutation。callback 内等待 `ticket.completion` 会 fail fast 并返回 `RUNTIME_CONTRACT_INVALID`；外部 `host.unUse/replace` 仍按既有 queue 等待 exact lease。不要 从 callback 捕获 concrete Host 执行 self mutation。"
+              "descriptionZh": "托管 Host 的类型保留具体 source Host、已登记插件和 ready 插件；`createRuntime(host)` 直接沿用这些类型，不需要把装有扩展的 Host 转成 `any`。`createHost` 的工厂同时支持 PluginHost class 与 `defineHost()` handle。插件 hook 使用 source Host 声明的 domain core 和 lifecycle core，安装入口会检查插件所需的能力。"
             },
             {
               "name": "source",
@@ -8221,7 +8365,7 @@
             },
             {
               "name": "adapter",
-              "type": "IAdapter<TArtifact, THost, TPlugin>",
+              "type": "IAdapter<TArtifact, NoInfer<THost>, TPlugin & ITrayPluginAdmission<NoInfer<THost>, readonly [TPlugin], ITrayHostReadyPlugins<NoInfer<TManagedHost>>>[0]>",
               "optional": false,
               "description": "",
               "descriptionEn": "",
@@ -8229,7 +8373,7 @@
             },
             {
               "name": "mutation",
-              "type": "'use' | 'replace'",
+              "type": "TMutation",
               "optional": false,
               "description": "callback context 的 `self` 是当前 run/name/generation 专属 mutation capability。 下面的函数接收已有的 Runtime；其中 `search` 必须已 ready：",
               "descriptionEn": "",
@@ -8284,20 +8428,20 @@
         {
           "name": "createRuntime",
           "kind": "function",
-          "signature": "export declare function createRuntime<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[]>(host: ITrayHost<THost, TDefinitions, TReady>, options?: Readonly<{ readonly shutdown?: IRuntimeShutdownOptions; readonly report?: (error: unknown) => void; }>): IRuntime<TReady>;",
-          "declarationLine": 5,
+          "signature": "export declare function createRuntime<THost extends ITrayHostTypeInfo & Pick<ITrayHost<any, any, any>, 'on'>>(host: THost, options?: Readonly<{ readonly shutdown?: IRuntimeShutdownOptions; readonly report?: (error: unknown) => void; }>): IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>>;",
+          "declarationLine": 4,
           "source": "packages/tray/dist/runtime/create-runtime.d.ts",
           "purpose": "Creates an exact-generation Runtime that never owns or disposes the managed Host.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createRuntime.",
           "advanced": "No additional advanced behavior is declared for createRuntime.",
           "parameters": [
-            "host: ITrayHost<THost, TDefinitions, TReady>",
+            "host: THost",
             "options: Readonly<{ readonly shutdown?: IRuntimeShutdownOptions; readonly report?: (error: unknown) => void; }> (optional)"
           ],
           "parameterDetails": [
             {
               "name": "host",
-              "type": "ITrayHost<THost, TDefinitions, TReady>",
+              "type": "THost",
               "optional": false
             },
             {
@@ -8306,7 +8450,7 @@
               "optional": true
             }
           ],
-          "returns": "IRuntime<TReady>",
+          "returns": "IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>>",
           "errors": ["No documented errors are declared for createRuntime."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRuntime.",
           "examples": [],
@@ -8314,13 +8458,13 @@
           "aliasOf": "createRuntime",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export declare function createRuntime<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[]>(host: ITrayHost<THost, TDefinitions, TReady>, options?: Readonly<{ readonly shutdown?: IRuntimeShutdownOptions; readonly report?: (error: unknown) => void; }>): IRuntime<TReady>;"
+            "export declare function createRuntime<THost extends ITrayHostTypeInfo & Pick<ITrayHost<any, any, any>, 'on'>>(host: THost, options?: Readonly<{ readonly shutdown?: IRuntimeShutdownOptions; readonly report?: (error: unknown) => void; }>): IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>>;"
           ],
           "overloadParameterDetails": [
             [
               {
                 "name": "host",
-                "type": "ITrayHost<THost, TDefinitions, TReady>",
+                "type": "THost",
                 "optional": false
               },
               {
@@ -8330,7 +8474,7 @@
               }
             ]
           ],
-          "overloadReturns": ["IRuntime<TReady>"],
+          "overloadReturns": ["IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>>"],
           "whenToUse": "Use createRuntime when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createRuntime does not match the required inputs or return contract.",
           "sections": [
@@ -8379,9 +8523,9 @@
               "description": "Maximum bounded-shutdown wait for physical plugin quiescence."
             }
           ],
-          "identity": "packages/tray/dist/runtime/create-runtime.d.ts:createRuntime:export declare function createRuntime<THost extends PluginHost<any, any, any>, TDefinitions extends readonly ITrayPluginConstraint<THost>[], TReady extends readonly ITrayPluginConstraint<THost>[]>(host: ITrayHost<THost, TDefinitions, TReady>, options?: Readonly<{ readonly shutdown?: IRuntimeShutdownOptions; readonly report?: (error: unknown) => void; }>): IRuntime<TReady>;",
+          "identity": "packages/tray/dist/runtime/create-runtime.d.ts:createRuntime:export declare function createRuntime<THost extends ITrayHostTypeInfo & Pick<ITrayHost<any, any, any>, 'on'>>(host: THost, options?: Readonly<{ readonly shutdown?: IRuntimeShutdownOptions; readonly report?: (error: unknown) => void; }>): IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>>;",
           "guidance": [],
-          "usageScore": 18,
+          "usageScore": 28,
           "configuration": [
             {
               "name": "mode",
@@ -8405,8 +8549,8 @@
         {
           "name": "IRuntime",
           "kind": "type",
-          "signature": "export type IRuntime<TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ readonly state: 'active' | 'closing' | 'terminal'; readonly activeRuns: number; run<TName extends string, TResult>(name: TName, options: IRuntimeRunOptions, execute: (context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>>) => TResult | PromiseLike<TResult>): Promise<TResult>; dispose(): Promise<IRuntimeDisposalResult>; readonly [Symbol.asyncDispose]: () => Promise<void>; }>;",
-          "declarationLine": 47,
+          "signature": "export type IRuntime<TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[], THost extends ITrayHostSource = ITrayHostSource> = Readonly<{ readonly state: 'active' | 'closing' | 'terminal'; readonly activeRuns: number; run<TName extends string, TResult>(name: TName, options: IRuntimeRunOptions, execute: (context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>, THost, TReady>) => TResult | PromiseLike<TResult>): Promise<TResult>; dispose(): Promise<IRuntimeDisposalResult>; readonly [Symbol.asyncDispose]: () => Promise<void>; }>;",
+          "declarationLine": 48,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Public Runtime lifecycle and exact-generation execution surface.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntime.",
@@ -8423,7 +8567,7 @@
           "aliasOf": "IRuntime",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IRuntime<TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ readonly state: 'active' | 'closing' | 'terminal'; readonly activeRuns: number; run<TName extends string, TResult>(name: TName, options: IRuntimeRunOptions, execute: (context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>>) => TResult | PromiseLike<TResult>): Promise<TResult>; dispose(): Promise<IRuntimeDisposalResult>; readonly [Symbol.asyncDispose]: () => Promise<void>; }>;"
+            "export type IRuntime<TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[], THost extends ITrayHostSource = ITrayHostSource> = Readonly<{ readonly state: 'active' | 'closing' | 'terminal'; readonly activeRuns: number; run<TName extends string, TResult>(name: TName, options: IRuntimeRunOptions, execute: (context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>, THost, TReady>) => TResult | PromiseLike<TResult>): Promise<TResult>; dispose(): Promise<IRuntimeDisposalResult>; readonly [Symbol.asyncDispose]: () => Promise<void>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8462,7 +8606,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntime:export type IRuntime<TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ readonly state: 'active' | 'closing' | 'terminal'; readonly activeRuns: number; run<TName extends string, TResult>(name: TName, options: IRuntimeRunOptions, execute: (context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>>) => TResult | PromiseLike<TResult>): Promise<TResult>; dispose(): Promise<IRuntimeDisposalResult>; readonly [Symbol.asyncDispose]: () => Promise<void>; }>;",
+          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntime:export type IRuntime<TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[], THost extends ITrayHostSource = ITrayHostSource> = Readonly<{ readonly state: 'active' | 'closing' | 'terminal'; readonly activeRuns: number; run<TName extends string, TResult>(name: TName, options: IRuntimeRunOptions, execute: (context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>, THost, TReady>) => TResult | PromiseLike<TResult>): Promise<TResult>; dispose(): Promise<IRuntimeDisposalResult>; readonly [Symbol.asyncDispose]: () => Promise<void>; }>;",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],
@@ -8472,7 +8616,7 @@
           "name": "IRuntimeDisposalResult",
           "kind": "type",
           "signature": "export type IRuntimeDisposalResult = Readonly<{ readonly state: 'terminal'; readonly cleanupComplete: boolean; }>;",
-          "declarationLine": 42,
+          "declarationLine": 43,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Physical runtime disposal observation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeDisposalResult.",
@@ -8536,7 +8680,7 @@
           "name": "IRuntimeExtensionsFor",
           "kind": "type",
           "signature": "export type IRuntimeExtensionsFor<TReady extends readonly IPluginConstraint<any>[], TName extends string> = string extends TName ? Readonly<Record<PropertyKey, unknown>> : [Extract<TReady[number], { readonly name: TName; }>] extends [never] ? Readonly<Record<PropertyKey, unknown>> : IExtractPluginExt<Extract<TReady[number], { readonly name: TName; }>>;",
-          "declarationLine": 5,
+          "declarationLine": 6,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Resolves exact extension types for literal ready plugin names and stays unknown when widened.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeExtensionsFor.",
@@ -8599,8 +8743,8 @@
         {
           "name": "IRuntimeRunContext",
           "kind": "type",
-          "signature": "export type IRuntimeRunContext<TExtensions = Readonly<Record<PropertyKey, unknown>>> = Readonly<{ readonly runId: number; readonly plugin: string; readonly extensions: TExtensions; readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; readonly self: IRuntimeSelfMutation; }>;",
-          "declarationLine": 11,
+          "signature": "export type IRuntimeRunContext<TExtensions = Readonly<Record<PropertyKey, unknown>>, THost extends ITrayHostSource = ITrayHostSource, TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ readonly runId: number; readonly plugin: string; readonly extensions: TExtensions; readonly signal: INativeAbortSignal; readonly deadlineAt: number | undefined; readonly self: IRuntimeSelfMutation<THost, TReady>; }>;",
+          "declarationLine": 12,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Context exposed to one callback with an exact plugin-generation extension snapshot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeRunContext.",
@@ -8615,7 +8759,7 @@
           "aliasOf": "IRuntimeRunContext",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IRuntimeRunContext<TExtensions = Readonly<Record<PropertyKey, unknown>>> = Readonly<{ readonly runId: number; readonly plugin: string; readonly extensions: TExtensions; readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; readonly self: IRuntimeSelfMutation; }>;"
+            "export type IRuntimeRunContext<TExtensions = Readonly<Record<PropertyKey, unknown>>, THost extends ITrayHostSource = ITrayHostSource, TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ readonly runId: number; readonly plugin: string; readonly extensions: TExtensions; readonly signal: INativeAbortSignal; readonly deadlineAt: number | undefined; readonly self: IRuntimeSelfMutation<THost, TReady>; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8654,7 +8798,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntimeRunContext:export type IRuntimeRunContext<TExtensions = Readonly<Record<PropertyKey, unknown>>> = Readonly<{ readonly runId: number; readonly plugin: string; readonly extensions: TExtensions; readonly signal: IAbortSignal; readonly deadlineAt: number | undefined; readonly self: IRuntimeSelfMutation; }>;",
+          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntimeRunContext:export type IRuntimeRunContext<TExtensions = Readonly<Record<PropertyKey, unknown>>, THost extends ITrayHostSource = ITrayHostSource, TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ readonly runId: number; readonly plugin: string; readonly extensions: TExtensions; readonly signal: INativeAbortSignal; readonly deadlineAt: number | undefined; readonly self: IRuntimeSelfMutation<THost, TReady>; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8664,7 +8808,7 @@
           "name": "IRuntimeRunOptions",
           "kind": "type",
           "signature": "export type IRuntimeRunOptions = Readonly<{ readonly signal?: IAbortSignal; readonly timeoutMs: number | false; }>;",
-          "declarationLine": 32,
+          "declarationLine": 33,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Caller cancellation and callback admission deadline.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeRunOptions.",
@@ -8727,8 +8871,8 @@
         {
           "name": "IRuntimeSelfMutation",
           "kind": "type",
-          "signature": "export type IRuntimeSelfMutation = Readonly<{ /** Schedules removal of the callback's exact plugin generation after settlement. */ readonly unUse: () => IRuntimeSelfMutationTicket; /** Schedules replacement of the callback's exact plugin generation after settlement. */ readonly replace: (plugin: IPluginConstraint<any>) => IRuntimeSelfMutationTicket; }>;",
-          "declarationLine": 25,
+          "signature": "export type IRuntimeSelfMutation<THost extends ITrayHostSource = ITrayHostSource, TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ /** Schedules removal of the callback's exact plugin generation after settlement. */ readonly unUse: () => IRuntimeSelfMutationTicket; /** Schedules replacement of the callback's exact plugin generation after settlement. */ replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): IRuntimeSelfMutationTicket; }>;",
+          "declarationLine": 26,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Runtime-neutral self-mutation capability bound to the current callback generation.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeSelfMutation.",
@@ -8743,7 +8887,7 @@
           "aliasOf": "IRuntimeSelfMutation",
           "exportPath": "./runtime",
           "overloadSignatures": [
-            "export type IRuntimeSelfMutation = Readonly<{ /** Schedules removal of the callback's exact plugin generation after settlement. */ readonly unUse: () => IRuntimeSelfMutationTicket; /** Schedules replacement of the callback's exact plugin generation after settlement. */ readonly replace: (plugin: IPluginConstraint<any>) => IRuntimeSelfMutationTicket; }>;"
+            "export type IRuntimeSelfMutation<THost extends ITrayHostSource = ITrayHostSource, TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ /** Schedules removal of the callback's exact plugin generation after settlement. */ readonly unUse: () => IRuntimeSelfMutationTicket; /** Schedules replacement of the callback's exact plugin generation after settlement. */ replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): IRuntimeSelfMutationTicket; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -8782,7 +8926,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntimeSelfMutation:export type IRuntimeSelfMutation = Readonly<{ /** Schedules removal of the callback's exact plugin generation after settlement. */ readonly unUse: () => IRuntimeSelfMutationTicket; /** Schedules replacement of the callback's exact plugin generation after settlement. */ readonly replace: (plugin: IPluginConstraint<any>) => IRuntimeSelfMutationTicket; }>;",
+          "identity": "packages/tray/dist/runtime/typing.d.ts:IRuntimeSelfMutation:export type IRuntimeSelfMutation<THost extends ITrayHostSource = ITrayHostSource, TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]> = Readonly<{ /** Schedules removal of the callback's exact plugin generation after settlement. */ readonly unUse: () => IRuntimeSelfMutationTicket; /** Schedules replacement of the callback's exact plugin generation after settlement. */ replace<const TPlugin extends ITrayPluginConstraint<THost>>(plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]): IRuntimeSelfMutationTicket; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8792,7 +8936,7 @@
           "name": "IRuntimeSelfMutationTicket",
           "kind": "type",
           "signature": "export type IRuntimeSelfMutationTicket<TResult = unknown> = Readonly<{ /** Resolves only after callback settlement and canonical Host mutation completion. */ readonly completion: Promise<TResult>; }>;",
-          "declarationLine": 20,
+          "declarationLine": 21,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Deferred exact-generation mutation result exposed by a Runtime callback.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeSelfMutationTicket.",
@@ -8856,7 +9000,7 @@
           "name": "IRuntimeShutdownOptions",
           "kind": "type",
           "signature": "export type IRuntimeShutdownOptions = Readonly<{ readonly mode: TrayShutdownMode; readonly quiescenceMs?: number; }>;",
-          "declarationLine": 37,
+          "declarationLine": 38,
           "source": "packages/tray/dist/runtime/typing.d.ts",
           "purpose": "Runtime shutdown policy.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IRuntimeShutdownOptions.",

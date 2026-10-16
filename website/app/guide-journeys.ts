@@ -11279,7 +11279,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { setTimeout } from 'node:timers/promises'\nimport { createWorkerHandler } from '@migaia/store-worker'\nimport { port, serve } from './worker-host.ts'\n\nconst handler = createWorkerHandler<string, string>(\n  async (value, { signal }) => {\n    await setTimeout(1_000, undefined, { signal: signal as AbortSignal })\n    return value.toUpperCase()\n  },\n  (message) => port.postMessage(message)\n)\nserve(handler)"
+                code: "import { setTimeout } from 'node:timers/promises'\nimport { createWorkerHandler } from '@migaia/store-worker'\nimport { port, serve } from './worker-host.ts'\n\nconst handler = createWorkerHandler<string, string>(\n  async (value, { signal }) => {\n    await setTimeout(1_000, undefined, { signal })\n    return value.toUpperCase()\n  },\n  (message) => port.postMessage(message)\n)\nserve(handler)"
               },
               {
                 type: 'paragraph',
@@ -11436,7 +11436,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { setTimeout } from 'node:timers/promises'\nimport { createWorkerHandler } from '@migaia/store-worker'\nimport { port, serve } from './worker-host.ts'\n\nconst handler = createWorkerHandler<string, string>(\n  async (value, { signal }) => {\n    await setTimeout(1_000, undefined, { signal: signal as AbortSignal })\n    return value.toUpperCase()\n  },\n  (message) => port.postMessage(message)\n)\nserve(handler)"
+                code: "import { setTimeout } from 'node:timers/promises'\nimport { createWorkerHandler } from '@migaia/store-worker'\nimport { port, serve } from './worker-host.ts'\n\nconst handler = createWorkerHandler<string, string>(\n  async (value, { signal }) => {\n    await setTimeout(1_000, undefined, { signal })\n    return value.toUpperCase()\n  },\n  (message) => port.postMessage(message)\n)\nserve(handler)"
               },
               {
                 type: 'paragraph',
@@ -40212,7 +40212,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { PluginHost } from '@migaia/plugin-host'\nimport { createHost, type ITrayPluginConstraint } from '@migaia/tray/host'\nexport class AppHost extends PluginHost<Record<string, never>, string> {}\nexport const openHost = <const T extends readonly ITrayPluginConstraint<AppHost>[]>(plugins: T) =>\n  createHost({\n    create: () => new AppHost({\n      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n    }),\n    plugins,\n    mutationAdmissionMs: 100,\n    quiescenceMs: 0,\n    shutdown: { mode: 'bounded' }\n  })"
+                code: "import { PluginHost } from '@migaia/plugin-host'\nimport { createHost, type ICreateHostOptions, type ITrayPluginConstraint } from '@migaia/tray/host'\nexport class AppHost extends PluginHost<Record<string, never>, string> {}\nexport const openHost = <const T extends readonly ITrayPluginConstraint<AppHost>[]>(\n  plugins: T & ICreateHostOptions<AppHost, T>['plugins']\n) =>\n  createHost<AppHost, T>({\n    create: () => new AppHost({\n      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n    }),\n    plugins,\n    mutationAdmissionMs: 100,\n    quiescenceMs: 0,\n    shutdown: { mode: 'bounded' }\n  })"
               },
               {
                 type: 'paragraph',
@@ -40406,7 +40406,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { PluginHost } from '@migaia/plugin-host'\nimport { createHost, type ITrayPluginConstraint } from '@migaia/tray/host'\nexport class AppHost extends PluginHost<Record<string, never>, string> {}\nexport const openHost = <const T extends readonly ITrayPluginConstraint<AppHost>[]>(plugins: T) =>\n  createHost({\n    create: () => new AppHost({\n      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n    }),\n    plugins,\n    mutationAdmissionMs: 100,\n    quiescenceMs: 0,\n    shutdown: { mode: 'bounded' }\n  })"
+                code: "import { PluginHost } from '@migaia/plugin-host'\nimport { createHost, type ICreateHostOptions, type ITrayPluginConstraint } from '@migaia/tray/host'\nexport class AppHost extends PluginHost<Record<string, never>, string> {}\nexport const openHost = <const T extends readonly ITrayPluginConstraint<AppHost>[]>(\n  plugins: T & ICreateHostOptions<AppHost, T>['plugins']\n) =>\n  createHost<AppHost, T>({\n    create: () => new AppHost({\n      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }\n    }),\n    plugins,\n    mutationAdmissionMs: 100,\n    quiescenceMs: 0,\n    shutdown: { mode: 'bounded' }\n  })"
               },
               {
                 type: 'paragraph',
@@ -40882,7 +40882,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { setTimeout } from 'node:timers/promises'\nimport { createRuntime } from '@migaia/tray/runtime'\nimport { openHost, type AppHost } from './managed-host.ts'\nimport { reportPlugins } from './report-plugin.ts'\nconst host = await openHost(reportPlugins)\nconst runtime = createRuntime<AppHost, typeof reportPlugins, typeof reportPlugins>(host)\ntry {\n  const task = runtime.run('report', { timeoutMs: false }, async ({ extensions }) => {\n    const text = extensions.render()\n    await setTimeout(10)\n    return text\n  })\n  const removal = await host.unUse('report')\n  console.log(JSON.stringify({ removed: removal.removed, complete: removal.cleanupComplete }))\n  console.log(await task)\n  await removal.physicalCompletion\n} finally {\n  await runtime.dispose()\n  await host.dispose()\n}"
+                code: "import { setTimeout } from 'node:timers/promises'\nimport { createRuntime } from '@migaia/tray/runtime'\nimport { openHost } from './managed-host.ts'\nimport { reportPlugins } from './report-plugin.ts'\nconst host = await openHost(reportPlugins)\nconst runtime = createRuntime(host)\ntry {\n  const task = runtime.run('report', { timeoutMs: false }, async ({ extensions }) => {\n    const text = extensions.render()\n    await setTimeout(10)\n    return text\n  })\n  const removal = await host.unUse('report')\n  console.log(JSON.stringify({ removed: removal.removed, complete: removal.cleanupComplete }))\n  console.log(await task)\n  await removal.physicalCompletion\n} finally {\n  await runtime.dispose()\n  await host.dispose()\n}"
               },
               {
                 type: 'code',
@@ -41000,7 +41000,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { setTimeout } from 'node:timers/promises'\nimport { createRuntime } from '@migaia/tray/runtime'\nimport { openHost, type AppHost } from './managed-host.ts'\nimport { reportPlugins } from './report-plugin.ts'\nconst host = await openHost(reportPlugins)\nconst runtime = createRuntime<AppHost, typeof reportPlugins, typeof reportPlugins>(host)\ntry {\n  const task = runtime.run('report', { timeoutMs: false }, async ({ extensions }) => {\n    const text = extensions.render()\n    await setTimeout(10)\n    return text\n  })\n  const removal = await host.unUse('report')\n  console.log(JSON.stringify({ removed: removal.removed, complete: removal.cleanupComplete }))\n  console.log(await task)\n  await removal.physicalCompletion\n} finally {\n  await runtime.dispose()\n  await host.dispose()\n}"
+                code: "import { setTimeout } from 'node:timers/promises'\nimport { createRuntime } from '@migaia/tray/runtime'\nimport { openHost } from './managed-host.ts'\nimport { reportPlugins } from './report-plugin.ts'\nconst host = await openHost(reportPlugins)\nconst runtime = createRuntime(host)\ntry {\n  const task = runtime.run('report', { timeoutMs: false }, async ({ extensions }) => {\n    const text = extensions.render()\n    await setTimeout(10)\n    return text\n  })\n  const removal = await host.unUse('report')\n  console.log(JSON.stringify({ removed: removal.removed, complete: removal.cleanupComplete }))\n  console.log(await task)\n  await removal.physicalCompletion\n} finally {\n  await runtime.dispose()\n  await host.dispose()\n}"
               },
               {
                 type: 'code',
@@ -60130,7 +60130,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'pipeline.run([trim, rejectEmpty, toUpperCase], text, save)'
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.sync })\nconst trim = (text: string, next: (value: string) => void) => next(text.trim())\nconst rejectEmpty = (text: string, next: (value: string) => void) => { if (text) next(text) }\nconst toUpperCase = (text: string, next: (value: string) => void) => next(text.toUpperCase())\nconst save = (text: string) => console.log('saved:', text)\n\npipeline.run([trim, rejectEmpty, toUpperCase], '  hello  ', save) // saved: HELLO"
               },
               {
                 type: 'paragraph',
@@ -60258,7 +60258,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: 'pipeline.run([trim, rejectEmpty, toUpperCase], text, save)'
+                code: "import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'\n\nconst pipeline = createPipeline<string>({ mode: MiddlewarePipelineMode.sync })\nconst trim = (text: string, next: (value: string) => void) => next(text.trim())\nconst rejectEmpty = (text: string, next: (value: string) => void) => { if (text) next(text) }\nconst toUpperCase = (text: string, next: (value: string) => void) => next(text.toUpperCase())\nconst save = (text: string) => console.log('saved:', text)\n\npipeline.run([trim, rejectEmpty, toUpperCase], '  hello  ', save) // saved: HELLO"
               },
               {
                 type: 'paragraph',
@@ -61716,7 +61716,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** 模拟一个 30 毫秒后返回的接口。 */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  // 运行时就是 AbortSignal，但类型声明较窄，传给需要 AbortSignal 的 API 时要断言\n  ({ signal }) => fetchUser('1', signal as AbortSignal),\n  runtime\n)\n\n// 在 Effect 里读取 state：状态变化时自动重新运行\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success) console.log('用户:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('出错:', state.error)\n})\n\nawait user.promise // 等这次请求完成\nruntime.flush() // 让 Effect 立即读到新状态\nstop.dispose()\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** 模拟一个 30 毫秒后返回的接口。 */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  ({ signal }) => fetchUser('1', signal),\n  runtime\n)\n\n// 在 Effect 里读取 state：状态变化时自动重新运行\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('加载中…')\n  if (state.status === ResourceStatus.success) console.log('用户:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('出错:', state.error)\n})\n\nawait user.promise // 等这次请求完成\nruntime.flush() // 让 Effect 立即读到新状态\nstop.dispose()\nuser.dispose()"
               },
               {
                 type: 'paragraph',
@@ -61737,7 +61737,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '注意类型：fetcher 收到的 signal 在运行时就是 AbortSignal，但声明的类型较窄，直接传给 fetch(url, { signal }) 在严格模式下会报类型错误，需要写成 signal as AbortSignal。'
+                text: '注意类型：在带 DOM 或 Node 类型的项目里，fetcher 收到的 signal 类型就是宿主 AbortSignal，可以直接写 fetch(url, { signal })，不需要断言。'
               }
             ]
           },
@@ -61859,7 +61859,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** A fake endpoint that answers after 30 ms. */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  // At runtime this is an AbortSignal, but its declared type is narrower, so assert it for APIs that need AbortSignal\n  ({ signal }) => fetchUser('1', signal as AbortSignal),\n  runtime\n)\n\n// Read state inside an Effect so it reruns on every change\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading…')\n  if (state.status === ResourceStatus.success) console.log('user:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('failed:', state.error)\n})\n\nawait user.promise // wait for this request\nruntime.flush() // let the Effect see the new state now\nstop.dispose()\nuser.dispose()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { Resource, ResourceStatus } from '@migaia/resource'\n\ntype IUser = { id: string; name: string }\n/** A fake endpoint that answers after 30 ms. */\nconst fetchUser = async (id: string, signal: AbortSignal): Promise<IUser> => {\n  await new Promise((resolve) => setTimeout(resolve, 30))\n  signal.throwIfAborted()\n  return { id, name: id === '1' ? 'Ada' : 'Grace' }\n}\n\nconst runtime = createRuntime()\nconst user = new Resource<IUser>(\n  ({ signal }) => fetchUser('1', signal),\n  runtime\n)\n\n// Read state inside an Effect so it reruns on every change\nconst stop = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading…')\n  if (state.status === ResourceStatus.success) console.log('user:', state.data.name)\n  if (state.status === ResourceStatus.error) console.log('failed:', state.error)\n})\n\nawait user.promise // wait for this request\nruntime.flush() // let the Effect see the new state now\nstop.dispose()\nuser.dispose()"
               },
               {
                 type: 'paragraph',
@@ -61880,7 +61880,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'Mind the type: the signal is an AbortSignal at runtime, but its declared type is narrower, so fetch(url, { signal }) fails strict type checking; write signal as AbortSignal.'
+                text: 'Mind the type: in a project with DOM or Node types, the fetcher signal is typed as the host AbortSignal, so fetch(url, { signal }) type-checks without an assertion.'
               }
             ]
           },
@@ -62537,7 +62537,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'fetcher 收到的 signal 在运行时是 AbortSignal，但声明为更窄的接口类型。写成 fetch(url, { signal: signal as AbortSignal })。'
+                text: '在带 DOM 或 Node 类型的项目里，fetcher 收到的 signal 类型就是宿主 AbortSignal，直接写 fetch(url, { signal })。'
               }
             ]
           },
@@ -62620,7 +62620,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The signal is an AbortSignal at runtime but declared as a narrower interface. Write fetch(url, { signal: signal as AbortSignal }).'
+                text: 'In a project with DOM or Node types, the signal is typed as the host AbortSignal. Write fetch(url, { signal }).'
               }
             ]
           },
@@ -69626,7 +69626,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'lifecycle:mutation-queue': {
     zh: {
       title: '按提交顺序保存草稿',
-      lede: '`MutationQueue` 在一个任务结束后才开始下一项，并按提交顺序执行。交给这个队列的保存操作不会同时执行。',
+      lede: '`createMutationQueue()` 返回的队列在一个任务结束后才开始下一项，并按提交顺序执行。交给这个队列的保存操作不会同时执行。',
       document: {
         sections: [
           {
@@ -69758,7 +69758,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     },
     en: {
       title: 'Save drafts in submission order',
-      lede: '`MutationQueue` starts the next task only after the current one finishes, following submission order. Save operations submitted to this queue do not run together.',
+      lede: 'The queue returned by `createMutationQueue()` starts the next task only after the current one finishes, following submission order. Save operations submitted to this queue do not run together.',
       document: {
         sections: [
           {
@@ -94447,7 +94447,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { setTimeout } from 'node:timers/promises'\nimport { createRuntime } from '@migaia/tray/runtime'\nimport { openHost, type AppHost } from './managed-host.ts'\nimport { reportPlugins } from './report-plugin.ts'\nconst host = await openHost(reportPlugins)\nconst runtime = createRuntime<AppHost, typeof reportPlugins, typeof reportPlugins>(host)\ntry {\n  const result = await runtime.run('report', { timeoutMs: false }, async (context) => {\n    await setTimeout(1)\n    return { text: context.extensions.render(), ticket: context.self.unUse() }\n  })\n  console.log(result.text)\n  await result.ticket.completion\n  console.log(JSON.stringify(host.readyPlugins))\n} finally {\n  await runtime.dispose()\n  const closed = await host.dispose()\n  await closed.physicalCompletion\n}"
+                code: "import { setTimeout } from 'node:timers/promises'\nimport { createRuntime } from '@migaia/tray/runtime'\nimport { openHost } from './managed-host.ts'\nimport { reportPlugins } from './report-plugin.ts'\nconst host = await openHost(reportPlugins)\nconst runtime = createRuntime(host)\ntry {\n  const result = await runtime.run('report', { timeoutMs: false }, async (context) => {\n    await setTimeout(1)\n    return { text: context.extensions.render(), ticket: context.self.unUse() }\n  })\n  console.log(result.text)\n  await result.ticket.completion\n  console.log(JSON.stringify(host.readyPlugins))\n} finally {\n  await runtime.dispose()\n  const closed = await host.dispose()\n  await closed.physicalCompletion\n}"
               },
               {
                 type: 'code',
@@ -94569,7 +94569,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { setTimeout } from 'node:timers/promises'\nimport { createRuntime } from '@migaia/tray/runtime'\nimport { openHost, type AppHost } from './managed-host.ts'\nimport { reportPlugins } from './report-plugin.ts'\nconst host = await openHost(reportPlugins)\nconst runtime = createRuntime<AppHost, typeof reportPlugins, typeof reportPlugins>(host)\ntry {\n  const result = await runtime.run('report', { timeoutMs: false }, async (context) => {\n    await setTimeout(1)\n    return { text: context.extensions.render(), ticket: context.self.unUse() }\n  })\n  console.log(result.text)\n  await result.ticket.completion\n  console.log(JSON.stringify(host.readyPlugins))\n} finally {\n  await runtime.dispose()\n  const closed = await host.dispose()\n  await closed.physicalCompletion\n}"
+                code: "import { setTimeout } from 'node:timers/promises'\nimport { createRuntime } from '@migaia/tray/runtime'\nimport { openHost } from './managed-host.ts'\nimport { reportPlugins } from './report-plugin.ts'\nconst host = await openHost(reportPlugins)\nconst runtime = createRuntime(host)\ntry {\n  const result = await runtime.run('report', { timeoutMs: false }, async (context) => {\n    await setTimeout(1)\n    return { text: context.extensions.render(), ticket: context.self.unUse() }\n  })\n  console.log(result.text)\n  await result.ticket.completion\n  console.log(JSON.stringify(host.readyPlugins))\n} finally {\n  await runtime.dispose()\n  const closed = await host.dispose()\n  await closed.physicalCompletion\n}"
               },
               {
                 type: 'code',

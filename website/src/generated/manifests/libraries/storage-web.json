@@ -154,7 +154,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { cookiesHost } from '@migaia/storage-web/cookiesHost'"
+                "code": "import { cookiesHost } from '@migaia/storage-web/cookies'"
               },
               {
                 "type": "paragraph",
@@ -609,7 +609,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookiesHost'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
+                "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookies'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
               }
             ]
           },
@@ -932,7 +932,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { cookiesHost } from '@migaia/storage-web/cookiesHost'\n\nconst jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nconsole.log(await jar.get('session')) // 'abc123'\nawait jar.remove('session')\nconsole.log(await jar.get('session')) // null"
+                "code": "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nconsole.log(await jar.get('session')) // 'abc123'\nawait jar.remove('session')\nconsole.log(await jar.get('session')) // null"
               }
             ]
           },
@@ -1285,7 +1285,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IKeyValueStore = {\n  readonly backend: IBackendKind // 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'\n  readonly capabilities: IStorageCapabilities\n  get(key: string, ctx?: IOperationContext): Promise<string | null>\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>\n  remove(key: string, ctx?: IOperationContext): Promise<void>\n  has(key: string, ctx?: IOperationContext): Promise<boolean>\n  keys(ctx?: IOperationContext): Promise<string[]>\n  clearValues(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  dispose(): Promise<void>\n  readonly sync?: ISyncKeyValueStore // 仅同步后端提供\n}\n\ntype IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>\n  clearBytes(ctx?: IOperationContext): Promise<void>\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>\n  clearRecords(ctx?: IOperationContext): Promise<void>\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>\n    delete(key: string, ctx?: IOperationContext): Promise<void>\n  }\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}\n\ntype IStorageCapabilities = {\n  readonly syncRead: boolean\n  readonly binary: boolean\n  readonly records: boolean\n  readonly transactions: boolean\n  readonly iteration: boolean\n  readonly secondaryIndexes: boolean\n  readonly changeFeed: boolean\n  readonly maxValueBytes: number | undefined\n  readonly opaqueEntries: boolean\n}\n\ntype IOperationContext = {\n  readonly signal?: IAbortSignal // 协作式取消\n  readonly timeoutMs?: number // 内部合成为 signal；与外部 signal 同时存在时取先触发者\n  readonly pageSize?: number // IndexedDB 游标分页大小，默认 128\n}\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy }\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy }\n\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[]\ntype IKeyRange = {\n  readonly lower?: IStorageKey\n  readonly lowerOpen?: boolean\n  readonly upper?: IStorageKey\n  readonly upperOpen?: boolean\n}"
+                "code": "type IKeyValueStore = {\n  readonly backend: IBackendKind // 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'\n  readonly capabilities: IStorageCapabilities\n  get(key: string, ctx?: IOperationContext): Promise<string | null>\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>\n  remove(key: string, ctx?: IOperationContext): Promise<void>\n  has(key: string, ctx?: IOperationContext): Promise<boolean>\n  keys(ctx?: IOperationContext): Promise<string[]>\n  clearValues(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  dispose(): Promise<void>\n  readonly sync?: ISyncKeyValueStore // 仅同步后端提供\n}\n\ntype IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>\n  clearBytes(ctx?: IOperationContext): Promise<void>\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>\n  clearRecords(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>\n    delete(key: string, ctx?: IOperationContext): Promise<void>\n  }\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}\n\ntype IStorageCapabilities = {\n  readonly syncRead: boolean\n  readonly binary: boolean\n  readonly records: boolean\n  readonly transactions: boolean\n  readonly iteration: boolean\n  readonly secondaryIndexes: boolean\n  readonly changeFeed: boolean\n  readonly maxValueBytes: number | undefined\n  readonly opaqueEntries: boolean\n}\n\ntype IOperationContext = {\n  readonly signal?: IAbortSignal // 协作式取消\n  readonly timeoutMs?: number // 内部合成为 signal；与外部 signal 同时存在时取先触发者\n  readonly pageSize?: number // IndexedDB 游标分页大小，默认 128\n}\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy }\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy }\n\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[]\ntype IKeyRange = {\n  readonly lower?: IStorageKey\n  readonly lowerOpen?: boolean\n  readonly upper?: IStorageKey\n  readonly upperOpen?: boolean\n}"
               },
               {
                 "type": "paragraph",
@@ -1522,7 +1522,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
+                "code": "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy\n}"
               },
               {
                 "type": "paragraph",
@@ -1563,7 +1563,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}"
+                "code": "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  findBy(index: string, key: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  findManyBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): Promise<TDomain[]>\n  streamBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}"
               },
               {
                 "type": "paragraph",
@@ -1612,7 +1612,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
+                "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
               },
               {
                 "type": "list",
@@ -1726,7 +1726,7 @@
                   ["`plugins/memory`", "`memoryBackendPlugin`", "`memory`"],
                   ["`plugins/local-storage`", "`localStorageBackendPlugin`", "`local`"],
                   ["`plugins/session-storage`", "`sessionStorageBackendPlugin`", "`session`"],
-                  ["`plugins/cookiesHost`", "`cookieBackendPlugin`", "`cookiesHost`"],
+                  ["`plugins/cookies`", "`cookieBackendPlugin`", "`cookies`"],
                   ["`plugins/indexed-db`", "`indexedDbBackendPlugin`", "`indexed-db`"]
                 ]
               },
@@ -2104,7 +2104,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookiesHost'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
+                "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookies'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
               }
             ]
           },
@@ -2971,7 +2971,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
+                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
                 },
                 {
                   "type": "list",
@@ -3593,9 +3593,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for cookiesHost.",
           "examples": [
             "function cookiesHost(options?: ICookiesOptions): ISyncCapableStore<ICookieStore>\n\ntype ICookiesOptions = {\n  readonly namespace?: string\n  readonly namespaceCodec?: INamespaceCodec\n  readonly scope?: ICookieScope\n  readonly document?: ICookieDocument // { cookie: string }\n}\n\ntype ICookieScope = {\n  readonly path?: string\n  readonly domain?: string\n  readonly sameSite?: 'strict' | 'lax' | 'none'\n  readonly secure?: boolean\n  readonly partitioned?: boolean\n}",
-            "import { cookiesHost } from '@migaia/storage-web/cookiesHost'\n\nconst jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nconsole.log(await jar.get('session')) // 'abc123'\nawait jar.remove('session')\nconsole.log(await jar.get('session')) // null",
-            "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookiesHost'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支",
-            "import { cookiesHost } from '@migaia/storage-web/cookiesHost'",
+            "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nconsole.log(await jar.get('session')) // 'abc123'\nawait jar.remove('session')\nconsole.log(await jar.get('session')) // null",
+            "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookies'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支",
+            "import { cookiesHost } from '@migaia/storage-web/cookies'",
             "const jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nawait jar.get('session') // 'abc123'\nawait jar.remove('session')"
           ],
           "members": [],
@@ -3668,7 +3668,7 @@
           ],
           "identity": "packages/storage-web/dist/backends/cookie.d.ts:cookiesHost:export declare const cookiesHost: (options?: ICookiesOptions) => ISyncCapableStore<ICookieStore>;",
           "guidance": [],
-          "usageScore": 136,
+          "usageScore": 116,
           "configuration": [
             {
               "name": "namespace",
@@ -4010,7 +4010,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
+                  "code": "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy\n}"
                 },
                 {
                   "type": "paragraph",
@@ -4051,7 +4051,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
+                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
                 },
                 {
                   "type": "list",
@@ -4167,7 +4167,7 @@
           "errors": ["No documented errors are declared for IEntityDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEntityDefinition.",
           "examples": [
-            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
+            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy\n}"
           ],
           "members": [],
           "aliasOf": "IEntityDefinition",
@@ -4232,7 +4232,9 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IEntityIndex."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEntityIndex.",
-          "examples": [],
+          "examples": [
+            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy\n}"
+          ],
           "members": [],
           "aliasOf": "IEntityIndex",
           "exportPath": "./entity",
@@ -4278,7 +4280,7 @@
           "declaredConfiguration": [],
           "identity": "packages/storage-web/dist/entity/types.d.ts:IEntityIndex:export type IEntityIndex<TDomain> = { readonly path: IObjectPathInput<TDomain>; readonly unique?: boolean; readonly multiEntry?: boolean; readonly revision?: number; } | { readonly paths: readonly IObjectPathInput<TDomain>[]; readonly unique?: boolean; readonly multiEntry?: false; readonly revision?: number; } | { readonly select: (value: TDomain) => { readonly kind: 'single'; readonly key: IStorageKey; } | { readonly kind: 'multiple'; readonly keys: readonly IStorageKey[]; } | undefined; readonly unique?: boolean; readonly revision: number; };",
           "guidance": [],
-          "usageScore": 2,
+          "usageScore": 12,
           "configuration": [],
           "fragment": "storage-web-entity--IEntityIndex"
         },
@@ -4361,7 +4363,7 @@
           "errors": ["No documented errors are declared for IEntityOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEntityOptions.",
           "examples": [
-            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
+            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy\n}"
           ],
           "members": [],
           "aliasOf": "IEntityOptions",
@@ -4427,7 +4429,7 @@
           "errors": ["No documented errors are declared for IEntityTransactionScope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEntityTransactionScope.",
           "examples": [
-            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
+            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  findBy(index: string, key: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  findManyBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): Promise<TDomain[]>\n  streamBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
             "type IEntityTransactionScope<TDomain> = {\n  get(id: IStorageKey): Promise<TDomain | undefined>\n  put(value: TDomain): Promise<IStorageKey>\n  remove(id: IStorageKey): Promise<void>\n}"
           ],
           "members": [],
@@ -4493,7 +4495,9 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IIndexedListOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IIndexedListOptions.",
-          "examples": [],
+          "examples": [
+            "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
+          ],
           "members": [],
           "aliasOf": "IIndexedListOptions",
           "exportPath": "./entity",
@@ -4538,8 +4542,31 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/storage-web/dist/entity/types.d.ts:IIndexedListOptions:export type IIndexedListOptions<TRecord, TIndexes extends object> = { [TName in keyof TIndexes & string]: Omit<IListOptions<TRecord>, 'range' | 'index'> & { readonly index: TName; readonly range?: IKeyRange<TIndexes[TName] & IStorageKey>; }; }[keyof TIndexes & string];",
-          "guidance": [],
-          "usageScore": 0,
+          "guidance": [
+            {
+              "id": "list-options-ctx-stream-options-ctx",
+              "heading": "list(options?, ctx?) / stream(options?, ctx?)",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`range`：作用于原始 `id` 空间（不是编排后的物理 key），经 `snapshotKeyRange` 校验。",
+                    "`limit`：非负安全整数，否则抛 `INVALID_CONFIG`。",
+                    "`orderBy`：未提供时使用 `defineEntity` 的 `defaultOrderBy`（若也未提供，按扫描顺序输出）。提供 `orderBy` 时内部会先缓冲全部符合 `range` 的记录、排序后再应用 `limit`——这意味着带排序的 `list`/`stream` 不是流式内存友好的，会一次性把结果集载入内存。比较函数返回非 `number` 或 `NaN` 会抛 `StorageError(EXTENSION_FAILED, { extensionStage: 'comparator', operation: 'entity.orderBy' })`。",
+                    "`onInvalid`：取 `'skip'`（默认）、`'throw'`，或 `(issue) => 'skip' | 'throw'` 处理器函数；`issue.stage` 标识失败发生在解码（`decode`）、迁移（`migrate`）还是校验（`validate`）阶段。处理器返回非 `'skip'`/`'throw'`，或处理器自身抛错，都会归一化为对应的存储错误码（`decode` → `DESERIALIZE_FAILED`，`migrate` → `MIGRATION_FAILED`，其余 → `VALIDATION_FAILED`）。",
+                    "扫描策略：KV-only 后端（local/session/cookie）会对全部键做一次 `keys()` 扫描后按 `entityName:` 前缀过滤，并调用一次 `onDiagnostic`（`\"...list/stream on a value-only backend performs a full key scan\"`）——这不是 bug，是这类后端固有的能力限制。结构化后端（IndexedDB/memory）按 entity 的 v2 前缀 range 高效扫描一遍，再额外扫描一遍全表以兼容尚未迁移的历史形态记录（`[entityName, id]`），用 `seenIds` 去重避免同一记录在两次扫描中都被 yield。",
+                    "`list` 是 `stream` 的缓冲版本（`for await` 收集进数组后返回）；两者共享同一套过滤/排序/`onInvalid` 逻辑。"
+                  ]
+                }
+              ]
+            }
+          ],
+          "usageScore": 10,
           "configuration": [],
           "fragment": "storage-web-entity--IIndexedListOptions"
         },
@@ -4684,7 +4711,7 @@
           "errors": ["No documented errors are declared for IInvalidRecordIssue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IInvalidRecordIssue.",
           "examples": [
-            "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}",
+            "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}",
             "type IMigrateOptions<TRecord = unknown> = {\n  readonly batchSize?: number // 默认 100，正安全整数\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IMigrateResult = {\n  readonly scanned: number\n  readonly eligible: number\n  readonly migrated: number\n  readonly skipped: number\n  readonly alreadyCurrent: number\n  readonly conflicted: number\n}"
           ],
           "members": [],
@@ -4739,7 +4766,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
+                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
                 },
                 {
                   "type": "list",
@@ -4802,8 +4829,8 @@
           "errors": ["No documented errors are declared for IListOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IListOptions.",
           "examples": [
-            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
-            "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
+            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  findBy(index: string, key: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  findManyBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): Promise<TDomain[]>\n  streamBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
+            "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
           ],
           "members": [],
           "aliasOf": "IListOptions",
@@ -4857,7 +4884,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
+                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
                 },
                 {
                   "type": "list",
@@ -4873,7 +4900,7 @@
               ]
             }
           ],
-          "usageScore": 26,
+          "usageScore": 34,
           "configuration": [],
           "fragment": "storage-web-entity--IListOptions"
         },
@@ -4892,7 +4919,7 @@
           "errors": ["No documented errors are declared for IMigrateOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMigrateOptions.",
           "examples": [
-            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
+            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  findBy(index: string, key: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  findManyBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): Promise<TDomain[]>\n  streamBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
             "type IMigrateOptions<TRecord = unknown> = {\n  readonly batchSize?: number // 默认 100，正安全整数\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IMigrateResult = {\n  readonly scanned: number\n  readonly eligible: number\n  readonly migrated: number\n  readonly skipped: number\n  readonly alreadyCurrent: number\n  readonly conflicted: number\n}"
           ],
           "members": [],
@@ -4988,7 +5015,7 @@
           "errors": ["No documented errors are declared for IMigrateResult."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMigrateResult.",
           "examples": [
-            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
+            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  findBy(index: string, key: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  findManyBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): Promise<TDomain[]>\n  streamBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}",
             "type IMigrateOptions<TRecord = unknown> = {\n  readonly batchSize?: number // 默认 100，正安全整数\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IMigrateResult = {\n  readonly scanned: number\n  readonly eligible: number\n  readonly migrated: number\n  readonly skipped: number\n  readonly alreadyCurrent: number\n  readonly conflicted: number\n}"
           ],
           "members": [],
@@ -5148,8 +5175,8 @@
           "errors": ["No documented errors are declared for IRepository."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRepository.",
           "examples": [
-            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}",
-            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}"
+            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy\n}",
+            "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  findBy(index: string, key: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  findManyBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): Promise<TDomain[]>\n  streamBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}"
           ],
           "members": [],
           "aliasOf": "IRepository",
@@ -5604,7 +5631,7 @@
         {
           "name": "ILiveQueryOptions",
           "kind": "type",
-          "signature": "export type ILiveQueryOptions<TStores extends Record<string, IKeyValueStore>, TBackendId extends keyof TStores & string, T> = { readonly backendId: TBackendId; readonly runtime: IRuntime; readonly query: (context: { readonly store: TStores[TBackendId]; readonly signal: IAbortSignal; readonly scope?: string; }) => T | PromiseLike<T>; /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */ readonly scope?: string; /** Optional change predicate; failures are reported and conservatively refresh the query. */ readonly matches?: (change: IStorageChange) => boolean; /** Preserve the last visible value while Resource refreshes in the background. */ readonly keepPreviousData?: boolean; /** Compare settled values before replacing the visible value projection. */ readonly equals?: (previous: T, next: T) => boolean; /** Per-generation deadline, driven by the Host scheduler. */ readonly timeoutMs?: number; /** External cancellation for the whole query instance. */ readonly signal?: IAbortSignal; /** Report-only sink for stale settlement and cleanup failures. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
+          "signature": "export type ILiveQueryOptions<TStores extends Record<string, IKeyValueStore>, TBackendId extends keyof TStores & string, T> = { readonly backendId: TBackendId; readonly runtime: IRuntime; readonly query: (context: { readonly store: TStores[TBackendId]; readonly signal: INativeAbortSignal; readonly scope?: string; }) => T | PromiseLike<T>; /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */ readonly scope?: string; /** Optional change predicate; failures are reported and conservatively refresh the query. */ readonly matches?: (change: IStorageChange) => boolean; /** Preserve the last visible value while Resource refreshes in the background. */ readonly keepPreviousData?: boolean; /** Compare settled values before replacing the visible value projection. */ readonly equals?: (previous: T, next: T) => boolean; /** Per-generation deadline, driven by the Host scheduler. */ readonly timeoutMs?: number; /** External cancellation for the whole query instance. */ readonly signal?: IAbortSignal; /** Report-only sink for stale settlement and cleanup failures. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
           "declarationLine": 164,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Query input shell retaining the exact backend ID and store type.",
@@ -5619,7 +5646,7 @@
           "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type ILiveQueryOptions<TStores extends Record<string, IKeyValueStore>, TBackendId extends keyof TStores & string, T> = { readonly backendId: TBackendId; readonly runtime: IRuntime; readonly query: (context: { readonly store: TStores[TBackendId]; readonly signal: IAbortSignal; readonly scope?: string; }) => T | PromiseLike<T>; /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */ readonly scope?: string; /** Optional change predicate; failures are reported and conservatively refresh the query. */ readonly matches?: (change: IStorageChange) => boolean; /** Preserve the last visible value while Resource refreshes in the background. */ readonly keepPreviousData?: boolean; /** Compare settled values before replacing the visible value projection. */ readonly equals?: (previous: T, next: T) => boolean; /** Per-generation deadline, driven by the Host scheduler. */ readonly timeoutMs?: number; /** External cancellation for the whole query instance. */ readonly signal?: IAbortSignal; /** Report-only sink for stale settlement and cleanup failures. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };"
+            "export type ILiveQueryOptions<TStores extends Record<string, IKeyValueStore>, TBackendId extends keyof TStores & string, T> = { readonly backendId: TBackendId; readonly runtime: IRuntime; readonly query: (context: { readonly store: TStores[TBackendId]; readonly signal: INativeAbortSignal; readonly scope?: string; }) => T | PromiseLike<T>; /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */ readonly scope?: string; /** Optional change predicate; failures are reported and conservatively refresh the query. */ readonly matches?: (change: IStorageChange) => boolean; /** Preserve the last visible value while Resource refreshes in the background. */ readonly keepPreviousData?: boolean; /** Compare settled values before replacing the visible value projection. */ readonly equals?: (previous: T, next: T) => boolean; /** Per-generation deadline, driven by the Host scheduler. */ readonly timeoutMs?: number; /** External cancellation for the whole query instance. */ readonly signal?: IAbortSignal; /** Report-only sink for stale settlement and cleanup failures. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -5658,7 +5685,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/types.d.ts:ILiveQueryOptions:export type ILiveQueryOptions<TStores extends Record<string, IKeyValueStore>, TBackendId extends keyof TStores & string, T> = { readonly backendId: TBackendId; readonly runtime: IRuntime; readonly query: (context: { readonly store: TStores[TBackendId]; readonly signal: IAbortSignal; readonly scope?: string; }) => T | PromiseLike<T>; /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */ readonly scope?: string; /** Optional change predicate; failures are reported and conservatively refresh the query. */ readonly matches?: (change: IStorageChange) => boolean; /** Preserve the last visible value while Resource refreshes in the background. */ readonly keepPreviousData?: boolean; /** Compare settled values before replacing the visible value projection. */ readonly equals?: (previous: T, next: T) => boolean; /** Per-generation deadline, driven by the Host scheduler. */ readonly timeoutMs?: number; /** External cancellation for the whole query instance. */ readonly signal?: IAbortSignal; /** Report-only sink for stale settlement and cleanup failures. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
+          "identity": "packages/storage-web/dist/host/types.d.ts:ILiveQueryOptions:export type ILiveQueryOptions<TStores extends Record<string, IKeyValueStore>, TBackendId extends keyof TStores & string, T> = { readonly backendId: TBackendId; readonly runtime: IRuntime; readonly query: (context: { readonly store: TStores[TBackendId]; readonly signal: INativeAbortSignal; readonly scope?: string; }) => T | PromiseLike<T>; /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */ readonly scope?: string; /** Optional change predicate; failures are reported and conservatively refresh the query. */ readonly matches?: (change: IStorageChange) => boolean; /** Preserve the last visible value while Resource refreshes in the background. */ readonly keepPreviousData?: boolean; /** Compare settled values before replacing the visible value projection. */ readonly equals?: (previous: T, next: T) => boolean; /** Per-generation deadline, driven by the Host scheduler. */ readonly timeoutMs?: number; /** External cancellation for the whole query instance. */ readonly signal?: IAbortSignal; /** Report-only sink for stale settlement and cleanup failures. */ readonly report?: (error: unknown) => void | PromiseLike<void>; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -7055,7 +7082,7 @@
         {
           "name": "IStorageReactiveSubscribeContext",
           "kind": "type",
-          "signature": "export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };",
+          "signature": "export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: IScheduler; readonly signal: INativeAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };",
           "declarationLine": 24,
           "source": "packages/storage-web/dist/host/types.d.ts",
           "purpose": "Exact store/context passed to an advanced adapter source at synchronous admission.",
@@ -7070,7 +7097,7 @@
           "members": [],
           "exportPath": "./host",
           "overloadSignatures": [
-            "export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };"
+            "export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: IScheduler; readonly signal: INativeAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -7109,7 +7136,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageReactiveSubscribeContext:export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };",
+          "identity": "packages/storage-web/dist/host/types.d.ts:IStorageReactiveSubscribeContext:export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKeyValueStore> = { readonly store: TStore; /** Host-snapshotted scheduler shared with source timing and installation deadlines. */ readonly scheduler: IScheduler; readonly signal: INativeAbortSignal; readonly report: (error: unknown) => void; /** Invalidates Resource-owned query generations after an admitted backend change. */ readonly onChange: (change: IStorageChange) => void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -8502,7 +8529,7 @@
             "function memoryStorageHost<TValue = unknown>(): ISyncCapableStore<IRecordStore<TValue>>",
             "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost<{ id: string }>()\nawait store.putRecord({ id: '1' }, '1')\nconsole.log(await store.getRecord('1')) // { id: '1' }\nawait store.transaction(async (tx) => {\n  await tx.put({ id: '2' }, '2')\n})",
             "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { sessionStorageHost } from '@migaia/storage-web/session-storage'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst textOnly = sessionStorageHost()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (msg) => console.warn(msg))\nawait selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorageHost()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级",
-            "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookiesHost'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支",
+            "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookies'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支",
             "import { memoryStorageHost } from '@migaia/storage-web/memory'",
             "const store = memoryStorageHost<{ id: string }>()\nawait store.putRecord({ id: '1' }, '1')",
             "import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst textOnly = sessionStorageHost()\nconst selected = selectCodec(binaryCodec, textOnly.capabilities, (message) =>\n  console.warn('[codec fallback]', message)\n)\nconst encoded = await selected.encode(new Uint8Array([1, 2, 3])) // base64 字符串，触发一次诊断\n\nconst recordBackend = memoryStorageHost()\nconst direct = selectCodec(binaryCodec, recordBackend.capabilities)\nawait direct.encode(new Uint8Array([1, 2, 3])) // 原样透传，无降级"
@@ -10011,7 +10038,7 @@
         {
           "name": "IReactiveAdapterContext",
           "kind": "type",
-          "signature": "export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };",
+          "signature": "export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: IScheduler; readonly signal: INativeAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };",
           "declarationLine": 9,
           "source": "packages/storage-web/dist/reactive-adapter.d.ts",
           "purpose": "Advanced adapter source context; built-in backend factories are intentionally absent.",
@@ -10026,7 +10053,7 @@
           "members": [],
           "exportPath": "./reactive-adapter",
           "overloadSignatures": [
-            "export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };"
+            "export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: IScheduler; readonly signal: INativeAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10065,7 +10092,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/storage-web/dist/reactive-adapter.d.ts:IReactiveAdapterContext:export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: IScheduler; readonly signal: IAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };",
+          "identity": "packages/storage-web/dist/reactive-adapter.d.ts:IReactiveAdapterContext:export type IReactiveAdapterContext<TStore extends IKeyValueStore> = { readonly store: TStore; readonly scheduler: IScheduler; readonly signal: INativeAbortSignal; readonly invalidate: (change?: IStorageChange) => void; readonly report: (error: unknown) => void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -10293,7 +10320,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMigration.",
           "examples": [
             "function runMigrations(\n  value: unknown,\n  fromVersion: number,\n  toVersion: number,\n  migrations: Record<number, IMigration> | undefined,\n  signal?: IAbortSignal\n): Promise<unknown>\n\ntype IMigration = (previous: unknown, ctx: IMigrationContext) => Promise<unknown>\ntype IMigrationContext = {\n  readonly fromVersion: number\n  readonly toVersion: number\n  readonly signal?: IAbortSignal\n}",
-            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
+            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy\n}"
           ],
           "members": [],
           "aliasOf": "IMigration",
@@ -10428,7 +10455,7 @@
             "type ISchemaAdapter<TDomain, TStored = TDomain> = {\n  readonly name: string\n  validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>\n  encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>\n  decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>\n  normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>\n}",
             "function passthrough<T = unknown>(): ISchemaAdapter<T, T>",
             "function fromStandardSchema<T>(schema: IStandardSchemaV1<unknown, T>): ISchemaAdapter<T, T>",
-            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
+            "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy\n}"
           ],
           "members": [],
           "aliasOf": "ISchemaAdapter",

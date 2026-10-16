@@ -4033,7 +4033,7 @@
         {
           "name": "IRpcContext",
           "kind": "type",
-          "signature": "export type IRpcContext = { /** Serving endpoint identity lets mounted services exclude their own observation traffic. */ readonly localEndpointId: string; /** Present only after generation@1 directory admission for this actual runtime-profile task. */ readonly callerGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; /** The final provider fence is the selected accepted identity, never an attempt counter. */ readonly targetGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; readonly data: unknown; readonly signal: IAbortSignal; /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */ readonly senderId: string; /** Remaining provider deadline, calculated with the original endpoint's monotonic clock. */ readonly timeoutMs?: number; /** Ordered signed forwarding nodes; absent on ordinary originating calls and foreign terminals. */ readonly route?: readonly string[]; /** Opaque trace supplied by the caller; downstream sends must pass it explicitly. */ readonly trace?: string; success(data?: unknown, options?: { readonly transfer?: readonly unknown[]; }): IRpcProviderResult; failed(message: string, code: string): IRpcProviderResult; dispatchTo(input: { readonly id?: string; readonly method: string; readonly data: unknown; }): void; };",
+          "signature": "export type IRpcContext = { /** Serving endpoint identity lets mounted services exclude their own observation traffic. */ readonly localEndpointId: string; /** Present only after generation@1 directory admission for this actual runtime-profile task. */ readonly callerGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; /** The final provider fence is the selected accepted identity, never an attempt counter. */ readonly targetGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; readonly data: unknown; readonly signal: INativeAbortSignal; /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */ readonly senderId: string; /** Remaining provider deadline, calculated with the original endpoint's monotonic clock. */ readonly timeoutMs?: number; /** Ordered signed forwarding nodes; absent on ordinary originating calls and foreign terminals. */ readonly route?: readonly string[]; /** Opaque trace supplied by the caller; downstream sends must pass it explicitly. */ readonly trace?: string; success(data?: unknown, options?: { readonly transfer?: readonly unknown[]; }): IRpcProviderResult; failed(message: string, code: string): IRpcProviderResult; dispatchTo(input: { readonly id?: string; readonly method: string; readonly data: unknown; }): void; };",
           "declarationLine": 23,
           "source": "packages/rpc-core/dist/core/typing.d.ts",
           "purpose": "IRpcContext is part of this module's public type contract.",
@@ -4048,7 +4048,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRpcContext = { /** Serving endpoint identity lets mounted services exclude their own observation traffic. */ readonly localEndpointId: string; /** Present only after generation@1 directory admission for this actual runtime-profile task. */ readonly callerGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; /** The final provider fence is the selected accepted identity, never an attempt counter. */ readonly targetGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; readonly data: unknown; readonly signal: IAbortSignal; /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */ readonly senderId: string; /** Remaining provider deadline, calculated with the original endpoint's monotonic clock. */ readonly timeoutMs?: number; /** Ordered signed forwarding nodes; absent on ordinary originating calls and foreign terminals. */ readonly route?: readonly string[]; /** Opaque trace supplied by the caller; downstream sends must pass it explicitly. */ readonly trace?: string; success(data?: unknown, options?: { readonly transfer?: readonly unknown[]; }): IRpcProviderResult; failed(message: string, code: string): IRpcProviderResult; dispatchTo(input: { readonly id?: string; readonly method: string; readonly data: unknown; }): void; };"
+            "export type IRpcContext = { /** Serving endpoint identity lets mounted services exclude their own observation traffic. */ readonly localEndpointId: string; /** Present only after generation@1 directory admission for this actual runtime-profile task. */ readonly callerGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; /** The final provider fence is the selected accepted identity, never an attempt counter. */ readonly targetGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; readonly data: unknown; readonly signal: INativeAbortSignal; /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */ readonly senderId: string; /** Remaining provider deadline, calculated with the original endpoint's monotonic clock. */ readonly timeoutMs?: number; /** Ordered signed forwarding nodes; absent on ordinary originating calls and foreign terminals. */ readonly route?: readonly string[]; /** Opaque trace supplied by the caller; downstream sends must pass it explicitly. */ readonly trace?: string; success(data?: unknown, options?: { readonly transfer?: readonly unknown[]; }): IRpcProviderResult; failed(message: string, code: string): IRpcProviderResult; dispatchTo(input: { readonly id?: string; readonly method: string; readonly data: unknown; }): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4087,7 +4087,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/core/typing.d.ts:IRpcContext:export type IRpcContext = { /** Serving endpoint identity lets mounted services exclude their own observation traffic. */ readonly localEndpointId: string; /** Present only after generation@1 directory admission for this actual runtime-profile task. */ readonly callerGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; /** The final provider fence is the selected accepted identity, never an attempt counter. */ readonly targetGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; readonly data: unknown; readonly signal: IAbortSignal; /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */ readonly senderId: string; /** Remaining provider deadline, calculated with the original endpoint's monotonic clock. */ readonly timeoutMs?: number; /** Ordered signed forwarding nodes; absent on ordinary originating calls and foreign terminals. */ readonly route?: readonly string[]; /** Opaque trace supplied by the caller; downstream sends must pass it explicitly. */ readonly trace?: string; success(data?: unknown, options?: { readonly transfer?: readonly unknown[]; }): IRpcProviderResult; failed(message: string, code: string): IRpcProviderResult; dispatchTo(input: { readonly id?: string; readonly method: string; readonly data: unknown; }): void; };",
+          "identity": "packages/rpc-core/dist/core/typing.d.ts:IRpcContext:export type IRpcContext = { /** Serving endpoint identity lets mounted services exclude their own observation traffic. */ readonly localEndpointId: string; /** Present only after generation@1 directory admission for this actual runtime-profile task. */ readonly callerGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; /** The final provider fence is the selected accepted identity, never an attempt counter. */ readonly targetGeneration?: import('@migaia/rpc-contract').IRpcRuntimeGeneration; readonly data: unknown; readonly signal: INativeAbortSignal; /** Direct authenticated routing identity; forwarding never substitutes an earlier caller. */ readonly senderId: string; /** Remaining provider deadline, calculated with the original endpoint's monotonic clock. */ readonly timeoutMs?: number; /** Ordered signed forwarding nodes; absent on ordinary originating calls and foreign terminals. */ readonly route?: readonly string[]; /** Opaque trace supplied by the caller; downstream sends must pass it explicitly. */ readonly trace?: string; success(data?: unknown, options?: { readonly transfer?: readonly unknown[]; }): IRpcProviderResult; failed(message: string, code: string): IRpcProviderResult; dispatchTo(input: { readonly id?: string; readonly method: string; readonly data: unknown; }): void; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -6430,7 +6430,7 @@
         {
           "name": "IRpcPluginInstallScope",
           "kind": "type",
-          "signature": "export type IRpcPluginInstallScope = { readonly id: string; readonly transport: IRpcTransport; readonly signal: IAbortSignal; readonly hooks: (event: IRpcHookEvent) => void; readonly getPort: (key: PropertyKey) => unknown; own<T>(resource: T, release: () => void | Promise<void>): T; };",
+          "signature": "export type IRpcPluginInstallScope = { readonly id: string; readonly transport: IRpcTransport; readonly signal: INativeAbortSignal; readonly hooks: (event: IRpcHookEvent) => void; readonly getPort: (key: PropertyKey) => unknown; own<T>(resource: T, release: () => void | Promise<void>): T; };",
           "declarationLine": 330,
           "source": "packages/rpc-core/dist/core/typing.d.ts",
           "purpose": "Host-neutral scope exposed to one WebRPC plugin install body.",
@@ -6445,7 +6445,7 @@
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IRpcPluginInstallScope = { readonly id: string; readonly transport: IRpcTransport; readonly signal: IAbortSignal; readonly hooks: (event: IRpcHookEvent) => void; readonly getPort: (key: PropertyKey) => unknown; own<T>(resource: T, release: () => void | Promise<void>): T; };"
+            "export type IRpcPluginInstallScope = { readonly id: string; readonly transport: IRpcTransport; readonly signal: INativeAbortSignal; readonly hooks: (event: IRpcHookEvent) => void; readonly getPort: (key: PropertyKey) => unknown; own<T>(resource: T, release: () => void | Promise<void>): T; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6484,7 +6484,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/core/typing.d.ts:IRpcPluginInstallScope:export type IRpcPluginInstallScope = { readonly id: string; readonly transport: IRpcTransport; readonly signal: IAbortSignal; readonly hooks: (event: IRpcHookEvent) => void; readonly getPort: (key: PropertyKey) => unknown; own<T>(resource: T, release: () => void | Promise<void>): T; };",
+          "identity": "packages/rpc-core/dist/core/typing.d.ts:IRpcPluginInstallScope:export type IRpcPluginInstallScope = { readonly id: string; readonly transport: IRpcTransport; readonly signal: INativeAbortSignal; readonly hooks: (event: IRpcHookEvent) => void; readonly getPort: (key: PropertyKey) => unknown; own<T>(resource: T, release: () => void | Promise<void>): T; };",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -14701,7 +14701,7 @@
           "name": "hostRethrowReporter",
           "kind": "const",
           "signature": "export declare const hostRethrowReporter: IUtilsReporter;",
-          "declarationLine": 66,
+          "declarationLine": 80,
           "source": "packages/utils/dist/promise.d.ts",
           "purpose": "Reports a diagnostic to the host without creating an unhandled rejected Promise.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for hostRethrowReporter.",
@@ -17706,7 +17706,7 @@
         {
           "name": "ICoroutineTaskContext",
           "kind": "type",
-          "signature": "export type ICoroutineTaskContext = Readonly<{ signal: IAbortSignal; heartbeat(): void; connect: ICoroutineConnect; }>;",
+          "signature": "export type ICoroutineTaskContext = Readonly<{ signal: INativeAbortSignal; heartbeat(): void; connect: ICoroutineConnect; }>;",
           "declarationLine": 8,
           "source": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts",
           "purpose": "Cooperative task work shares the supervisor's original signal and heartbeat owner.",
@@ -17722,7 +17722,7 @@
           "aliasOf": "ICoroutineTaskContext",
           "exportPath": "./remote",
           "overloadSignatures": [
-            "export type ICoroutineTaskContext = Readonly<{ signal: IAbortSignal; heartbeat(): void; connect: ICoroutineConnect; }>;"
+            "export type ICoroutineTaskContext = Readonly<{ signal: INativeAbortSignal; heartbeat(): void; connect: ICoroutineConnect; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -17761,7 +17761,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts:ICoroutineTaskContext:export type ICoroutineTaskContext = Readonly<{ signal: IAbortSignal; heartbeat(): void; connect: ICoroutineConnect; }>;",
+          "identity": "packages/rpc-core/dist/remote/runtime-api/coroutine-task.d.ts:ICoroutineTaskContext:export type ICoroutineTaskContext = Readonly<{ signal: INativeAbortSignal; heartbeat(): void; connect: ICoroutineConnect; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -17834,7 +17834,7 @@
         {
           "name": "IRemoteBinding",
           "kind": "type",
-          "signature": "export type IRemoteBinding<TUnit, TSpec> = Readonly<{ ownership: 'owned' | 'borrowed'; supervisor: ISupervisor<TUnit, TSpec>; scheduler: IScheduler; openChannel(unit: TUnit, signal: IAbortSignal): Promise<IRemoteChannel>; /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */ trackRequest?: IRemoteRequestTracker; }>;",
+          "signature": "export type IRemoteBinding<TUnit, TSpec> = Readonly<{ ownership: 'owned' | 'borrowed'; supervisor: ISupervisor<TUnit, TSpec>; scheduler: IScheduler; openChannel(unit: TUnit, signal: INativeAbortSignal): Promise<IRemoteChannel>; /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */ trackRequest?: IRemoteRequestTracker; }>;",
           "declarationLine": 38,
           "source": "packages/rpc-core/dist/remote/types.d.ts",
           "purpose": "A launcher and channel are paired without leaking a platform handle into remote.",
@@ -17850,7 +17850,7 @@
           "aliasOf": "IRemoteBinding",
           "exportPath": "./remote",
           "overloadSignatures": [
-            "export type IRemoteBinding<TUnit, TSpec> = Readonly<{ ownership: 'owned' | 'borrowed'; supervisor: ISupervisor<TUnit, TSpec>; scheduler: IScheduler; openChannel(unit: TUnit, signal: IAbortSignal): Promise<IRemoteChannel>; /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */ trackRequest?: IRemoteRequestTracker; }>;"
+            "export type IRemoteBinding<TUnit, TSpec> = Readonly<{ ownership: 'owned' | 'borrowed'; supervisor: ISupervisor<TUnit, TSpec>; scheduler: IScheduler; openChannel(unit: TUnit, signal: INativeAbortSignal): Promise<IRemoteChannel>; /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */ trackRequest?: IRemoteRequestTracker; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -17889,7 +17889,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/types.d.ts:IRemoteBinding:export type IRemoteBinding<TUnit, TSpec> = Readonly<{ ownership: 'owned' | 'borrowed'; supervisor: ISupervisor<TUnit, TSpec>; scheduler: IScheduler; openChannel(unit: TUnit, signal: IAbortSignal): Promise<IRemoteChannel>; /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */ trackRequest?: IRemoteRequestTracker; }>;",
+          "identity": "packages/rpc-core/dist/remote/types.d.ts:IRemoteBinding:export type IRemoteBinding<TUnit, TSpec> = Readonly<{ ownership: 'owned' | 'borrowed'; supervisor: ISupervisor<TUnit, TSpec>; scheduler: IScheduler; openChannel(unit: TUnit, signal: INativeAbortSignal): Promise<IRemoteChannel>; /** Existing native drain tracks runtime requests that bypass the legacy endpoint.send wrapper. */ trackRequest?: IRemoteRequestTracker; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -18218,7 +18218,7 @@
         {
           "name": "IRemoteEndpointFactory",
           "kind": "type",
-          "signature": "export type IRemoteEndpointFactory = (channel: IRemoteChannel, signal: IAbortSignal) => Promise<IRemoteServeEndpoint>;",
+          "signature": "export type IRemoteEndpointFactory = (channel: IRemoteChannel, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>;",
           "declarationLine": 53,
           "source": "packages/rpc-core/dist/remote/types.d.ts",
           "purpose": "One endpoint factory receives the whole channel rather than a guessed default codec.",
@@ -18234,7 +18234,7 @@
           "aliasOf": "IRemoteEndpointFactory",
           "exportPath": "./remote",
           "overloadSignatures": [
-            "export type IRemoteEndpointFactory = (channel: IRemoteChannel, signal: IAbortSignal) => Promise<IRemoteServeEndpoint>;"
+            "export type IRemoteEndpointFactory = (channel: IRemoteChannel, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -18273,7 +18273,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/types.d.ts:IRemoteEndpointFactory:export type IRemoteEndpointFactory = (channel: IRemoteChannel, signal: IAbortSignal) => Promise<IRemoteServeEndpoint>;",
+          "identity": "packages/rpc-core/dist/remote/types.d.ts:IRemoteEndpointFactory:export type IRemoteEndpointFactory = (channel: IRemoteChannel, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],
@@ -20361,7 +20361,7 @@
         {
           "name": "IRuntimePeerOptions",
           "kind": "type",
-          "signature": "export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: IAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */ authentication?: IRpcAuthenticationConfig; /** Installs an endpoint-local synchronous observer without changing pipeline selection. */ probe?: IRpcProbe | readonly IRpcProbe[]; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; /** Omission reports background failures to console.error through the original owner. */ report?(error: unknown): void; }>;",
+          "signature": "export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: INativeAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */ authentication?: IRpcAuthenticationConfig; /** Installs an endpoint-local synchronous observer without changing pipeline selection. */ probe?: IRpcProbe | readonly IRpcProbe[]; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; /** Omission reports background failures to console.error through the original owner. */ report?(error: unknown): void; }>;",
           "declarationLine": 32,
           "source": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts",
           "purpose": "This internal assembly input is reused by the four platform factories.",
@@ -20377,7 +20377,7 @@
           "aliasOf": "IRuntimePeerOptions",
           "exportPath": "./remote",
           "overloadSignatures": [
-            "export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: IAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */ authentication?: IRpcAuthenticationConfig; /** Installs an endpoint-local synchronous observer without changing pipeline selection. */ probe?: IRpcProbe | readonly IRpcProbe[]; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; /** Omission reports background failures to console.error through the original owner. */ report?(error: unknown): void; }>;"
+            "export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: INativeAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */ authentication?: IRpcAuthenticationConfig; /** Installs an endpoint-local synchronous observer without changing pipeline selection. */ probe?: IRpcProbe | readonly IRpcProbe[]; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; /** Omission reports background failures to console.error through the original owner. */ report?(error: unknown): void; }>;"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -20416,7 +20416,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts:IRuntimePeerOptions:export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: IAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */ authentication?: IRpcAuthenticationConfig; /** Installs an endpoint-local synchronous observer without changing pipeline selection. */ probe?: IRpcProbe | readonly IRpcProbe[]; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; /** Omission reports background failures to console.error through the original owner. */ report?(error: unknown): void; }>;",
+          "identity": "packages/rpc-core/dist/remote/runtime-api/peer.d.ts:IRuntimePeerOptions:export type IRuntimePeerOptions = Pick<IRemoteProxyOptions<object, unknown>, 'keyFactory' | 'retryPort'> & Readonly<{ /** A custom runtime assembly receives only the operations held by this channel view. */ endpointFactory?(channel: IRemoteChannelResources, signal: INativeAbortSignal): Promise<IRemoteServeEndpoint>; self?: IRuntimePeerIdentity; provide?: IRuntimePeerProvide; spawn?: IRuntimePeerSource; connect?: IRuntimePeerSource; listen?: IRuntimePeerSource; providerLimits?: IRpcProviderLimits; /** Existing per-frame credentials enable signed native transfer without a custom endpoint. */ authentication?: IRpcAuthenticationConfig; /** Installs an endpoint-local synchronous observer without changing pipeline selection. */ probe?: IRpcProbe | readonly IRpcProbe[]; /** Only request/stream inherit this positive default in their original timeout scope. */ defaultTimeoutMs?: number; /** Explicit advanced schema, modes and idempotency retain their original contract owner. */ contract?: IRemoteContract; /** Omission reports background failures to console.error through the original owner. */ report?(error: unknown): void; }>;",
           "guidance": [],
           "usageScore": 0,
           "configuration": [],

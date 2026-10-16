@@ -22403,6 +22403,36 @@
     },
     {
       "from": "/en/docs/plugin-host/api",
+      "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "to": "/en/docs/plugin-host/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "to": "/en/docs/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/plugin-host/getting-started",
+      "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "to": "/en/docs/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/plugin-host",
+      "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/api",
       "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginDataOrderSlot",
       "type": "api-symbol"
     },
@@ -22909,6 +22939,66 @@
     {
       "from": "/en/docs/plugin-host",
       "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCore",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/api",
+      "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "to": "/en/docs/plugin-host/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "to": "/en/docs/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/plugin-host/getting-started",
+      "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "to": "/en/docs/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/plugin-host",
+      "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/api",
+      "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "to": "/en/docs/plugin-host/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "to": "/en/docs/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/plugin-host/getting-started",
+      "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "to": "/en/docs/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/plugin-host",
+      "to": "/en/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
       "type": "architecture-symbol"
     },
     {
@@ -25293,6 +25383,36 @@
     },
     {
       "from": "/zh/docs/plugin-host/api",
+      "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "to": "/zh/docs/plugin-host/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "to": "/zh/docs/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/plugin-host/getting-started",
+      "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "to": "/zh/docs/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/plugin-host",
+      "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginConstraintTuple",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api",
       "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginDataOrderSlot",
       "type": "api-symbol"
     },
@@ -25799,6 +25919,66 @@
     {
       "from": "/zh/docs/plugin-host",
       "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCore",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api",
+      "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "to": "/zh/docs/plugin-host/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "to": "/zh/docs/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/plugin-host/getting-started",
+      "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "to": "/zh/docs/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/plugin-host",
+      "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreFor",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api",
+      "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "to": "/zh/docs/plugin-host/api",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "to": "/zh/docs/plugin-host/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/plugin-host/getting-started",
+      "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
+      "to": "/zh/docs/plugin-host",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/plugin-host",
+      "to": "/zh/docs/plugin-host/api#plugin-host-index--IPluginHostCoreTypeInfo",
       "type": "architecture-symbol"
     },
     {
@@ -133103,6 +133283,36 @@
     },
     {
       "from": "/en/docs/tray/api/host",
+      "to": "/en/docs/tray/api/host#tray-host--ITrayHostSource",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/api/host#tray-host--ITrayHostSource",
+      "to": "/en/docs/tray/api/host",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/api/host#tray-host--ITrayHostSource",
+      "to": "/en/docs/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/tray/getting-started",
+      "to": "/en/docs/tray/api/host#tray-host--ITrayHostSource",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/api/host#tray-host--ITrayHostSource",
+      "to": "/en/docs/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/tray",
+      "to": "/en/docs/tray/api/host#tray-host--ITrayHostSource",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/api/host",
       "to": "/en/docs/tray/api/host#tray-host--ITrayHostState",
       "type": "api-symbol"
     },
@@ -133159,6 +133369,36 @@
     {
       "from": "/en/docs/tray",
       "to": "/en/docs/tray/api/host#tray-host--ITrayPluginConstraint",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/tray/api/host",
+      "to": "/en/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "to": "/en/docs/tray/api/host",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "to": "/en/docs/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/tray/getting-started",
+      "to": "/en/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "to": "/en/docs/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/tray",
+      "to": "/en/docs/tray/api/host#tray-host--ITrayPluginCore",
       "type": "architecture-symbol"
     },
     {
@@ -133783,6 +134023,36 @@
     },
     {
       "from": "/zh/docs/tray/api/host",
+      "to": "/zh/docs/tray/api/host#tray-host--ITrayHostSource",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/api/host#tray-host--ITrayHostSource",
+      "to": "/zh/docs/tray/api/host",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/api/host#tray-host--ITrayHostSource",
+      "to": "/zh/docs/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/tray/getting-started",
+      "to": "/zh/docs/tray/api/host#tray-host--ITrayHostSource",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/api/host#tray-host--ITrayHostSource",
+      "to": "/zh/docs/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/tray",
+      "to": "/zh/docs/tray/api/host#tray-host--ITrayHostSource",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/api/host",
       "to": "/zh/docs/tray/api/host#tray-host--ITrayHostState",
       "type": "api-symbol"
     },
@@ -133839,6 +134109,36 @@
     {
       "from": "/zh/docs/tray",
       "to": "/zh/docs/tray/api/host#tray-host--ITrayPluginConstraint",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/api/host",
+      "to": "/zh/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "to": "/zh/docs/tray/api/host",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "to": "/zh/docs/tray/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/tray/getting-started",
+      "to": "/zh/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/tray/api/host#tray-host--ITrayPluginCore",
+      "to": "/zh/docs/tray",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/tray",
+      "to": "/zh/docs/tray/api/host#tray-host--ITrayPluginCore",
       "type": "architecture-symbol"
     },
     {
@@ -135822,6 +136122,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/utils/api#IDeadlineOnlyOperation",
+      "to": "/en/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "to": "/en/docs/utils/api#IDeadlineOnlyOperation",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/utils/api#IDeferred",
       "to": "/en/docs/utils/api/promise#utils-promise--IDeferred",
       "type": "symbol-alias"
@@ -135929,6 +136239,16 @@
     {
       "from": "/en/docs/utils/api/object#utils-object--immutableSnapshot",
       "to": "/en/docs/utils/api#immutableSnapshot",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api#INativeAbortSignal",
+      "to": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/en/docs/utils/api#INativeAbortSignal",
       "type": "alias-symbol"
     },
     {
@@ -137562,6 +137882,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/zh/docs/utils/api#IDeadlineOnlyOperation",
+      "to": "/zh/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "to": "/zh/docs/utils/api#IDeadlineOnlyOperation",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/zh/docs/utils/api#IDeferred",
       "to": "/zh/docs/utils/api/promise#utils-promise--IDeferred",
       "type": "symbol-alias"
@@ -137669,6 +137999,16 @@
     {
       "from": "/zh/docs/utils/api/object#utils-object--immutableSnapshot",
       "to": "/zh/docs/utils/api#immutableSnapshot",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api#INativeAbortSignal",
+      "to": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/zh/docs/utils/api#INativeAbortSignal",
       "type": "alias-symbol"
     },
     {
@@ -146363,6 +146703,36 @@
     },
     {
       "from": "/en/docs/utils/api/promise",
+      "to": "/en/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "to": "/en/docs/utils/api/promise",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "to": "/en/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/utils/getting-started",
+      "to": "/en/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "to": "/en/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/promise",
       "to": "/en/docs/utils/api/promise#utils-promise--IDeferred",
       "type": "api-symbol"
     },
@@ -146389,6 +146759,36 @@
     {
       "from": "/en/docs/utils",
       "to": "/en/docs/utils/api/promise#utils-promise--IDeferred",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/promise",
+      "to": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/en/docs/utils/api/promise",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/en/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/en/docs/utils/getting-started",
+      "to": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/en/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/en/docs/utils",
+      "to": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
       "type": "architecture-symbol"
     },
     {
@@ -147113,6 +147513,36 @@
     },
     {
       "from": "/zh/docs/utils/api/promise",
+      "to": "/zh/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "to": "/zh/docs/utils/api/promise",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "to": "/zh/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/utils/getting-started",
+      "to": "/zh/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "to": "/zh/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils/api/promise#utils-promise--IDeadlineOnlyOperation",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise",
       "to": "/zh/docs/utils/api/promise#utils-promise--IDeferred",
       "type": "api-symbol"
     },
@@ -147139,6 +147569,36 @@
     {
       "from": "/zh/docs/utils",
       "to": "/zh/docs/utils/api/promise#utils-promise--IDeferred",
+      "type": "architecture-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise",
+      "to": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "type": "api-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/zh/docs/utils/api/promise",
+      "type": "symbol-api"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/zh/docs/utils/getting-started",
+      "type": "symbol-guide"
+    },
+    {
+      "from": "/zh/docs/utils/getting-started",
+      "to": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "type": "guide-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/zh/docs/utils",
+      "type": "symbol-architecture"
+    },
+    {
+      "from": "/zh/docs/utils",
+      "to": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
       "type": "architecture-symbol"
     },
     {
@@ -148412,6 +148872,16 @@
       "type": "alias-symbol"
     },
     {
+      "from": "/en/docs/utils/api/typing#INativeAbortSignal",
+      "to": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/en/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/en/docs/utils/api/typing#INativeAbortSignal",
+      "type": "alias-symbol"
+    },
+    {
       "from": "/en/docs/utils/api/typing#IObjectPath",
       "to": "/en/docs/utils/api/object-path#utils-object-path--IObjectPath",
       "type": "symbol-alias"
@@ -148619,6 +149089,16 @@
     {
       "from": "/zh/docs/utils/api/promise#utils-promise--IDeferred",
       "to": "/zh/docs/utils/api/typing#IDeferred",
+      "type": "alias-symbol"
+    },
+    {
+      "from": "/zh/docs/utils/api/typing#INativeAbortSignal",
+      "to": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "type": "symbol-alias"
+    },
+    {
+      "from": "/zh/docs/utils/api/promise#utils-promise--INativeAbortSignal",
+      "to": "/zh/docs/utils/api/typing#INativeAbortSignal",
       "type": "alias-symbol"
     },
     {

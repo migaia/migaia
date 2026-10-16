@@ -119,30 +119,36 @@ console.log(observed) // 1`,
  * One coherent provider-to-consumer scenario kept separate from the descriptor and short-form
  * examples.
  */
-const definePluginSharedExampleCode = `import { definePlugin, defineHost } from '@migaia/plugin-host'
-import type { IPluginHostCore } from '@migaia/plugin-host'
-
-type ICacheShared = { readProduct(id: string): number | undefined }
+const definePluginSharedExampleCode = `import { defineFeature, definePlugin, defineHost } from '@migaia/plugin-host'
 
 const prices = new Map([['sku-42', 199]])
-const cacheProvider = definePlugin<
-  Record<string, never>,
-  Record<string, never>,
-  never,
-  Record<string, never>,
-  ICacheShared
->({
+const catalog = defineFeature((core: { featureExpose: { readProduct(id: string): number | undefined } }) => ({
+  readProduct: core.featureExpose.readProduct
+}))
+const cacheProvider = definePlugin({
   name: 'cache-provider',
+  features: { catalog },
   install: () => ({}),
-  shared: () => ({ readProduct: (id: string) => prices.get(id) })
+  featureExpose: () => ({ readProduct: (id: string) => prices.get(id) })
 })
 
-const productReader = definePlugin<Record<string, never>, { loadProduct(id: string): number }>(
+// 消费者通过 provider 的 getFeature() 引用声明依赖，不再按字符串键读取 shared。
+const readerCatalog = defineFeature(
+  (_core, dependencies) => ({ readProduct: dependencies.cache.readProduct }),
+  { cache: cacheProvider.getFeature('catalog') }
+)
+const productReader = definePlugin<
+  Record<string, never>,
+  { loadProduct(id: string): number },
+  never,
   'product-reader',
-  (core: IPluginHostCore) => {
-    const readProduct = core.getShared('readProduct') as ICacheShared['readProduct']
-    return { loadProduct: (id) => readProduct(id) ?? 0 }
-  }
+  { catalog: typeof readerCatalog }
+>(
+  'product-reader',
+  (core) => ({
+    install: () => ({ loadProduct: (id: string) => core.features.catalog.readProduct(id) ?? 0 })
+  }),
+  { catalog: readerCatalog }
 )
 
 const host = defineHost({
@@ -150,9 +156,9 @@ const host = defineHost({
   domainCore: () => ({})
 })
 // provider 必须排在 consumer 前面；整批成功后才一起对外可见。
-const app = await host.use(cacheProvider, productReader)
+const [, reader] = await host.use(cacheProvider, productReader)
 
-console.log(app.extensions.loadProduct('sku-42')) // 199
+console.log(reader.extensions.loadProduct('sku-42')) // 199
 await host.dispose()`
 
 /** Complete guides for public operations added after the original website inventory. */
@@ -160,7 +166,6 @@ export const completionApiGuides: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, IApiGuide>>>>
 > = {
   'utils:scheduler:deferTask': schedulerDeferGuide,
-  'utils:index:deferTask': schedulerDeferGuide,
   'rpc-core:index:createRpcIdempotencyStore': guide({
     purposeEn:
       'Creates the RPC-owned idempotency/result store used by request keys and outcome lookup. Retention is local to its owner unless the application supplies durable storage and reconciliation.',
@@ -1696,7 +1701,7 @@ try {
     purposeZh:
       '通过原 owner 的上报边界读取可能不可信的属性；getter 失败会被报告，不会在消息处理中悄然逸出。',
     quickStart:
-      "import { safeRead } from '@migaia/rpc-core/transport-kit'\n\nconst value: unknown = { id: 'remote' }\nconsole.log(safeRead<string>(value, 'id', ({ error }) => console.error(error)))",
+      "import { safeRead } from '@migaia/rpc-core/transport-kit'\n\nconst value: unknown = { id: 'remote' }\nconsole.log(safeRead<string>(value, 'id', ({ error }) => {\n  console.error(error)\n  return undefined\n}))",
     scenariosEn: [
       'A custom adapter owns native event subscriptions and must isolate listener failure.',
       'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
@@ -1719,7 +1724,7 @@ try {
       'Converts a value to diagnostic text with an explicit fallback and reporter when conversion fails; it does not replace protocol validation.',
     purposeZh: '把值转换为诊断文本，转换失败时采用明确 fallback 并报告错误；它不替代协议校验。',
     quickStart:
-      "import { safeString } from '@migaia/rpc-core/transport-kit'\n\nconsole.log(safeString({ status: 'ready' }, 'unavailable', ({ error }) => console.error(error)))",
+      "import { safeString } from '@migaia/rpc-core/transport-kit'\n\nconsole.log(safeString({ status: 'ready' }, 'unavailable', ({ error }) => {\n  console.error(error)\n  return undefined\n}))",
     scenariosEn: [
       'A custom adapter owns native event subscriptions and must isolate listener failure.',
       'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
@@ -1735,221 +1740,6 @@ try {
     avoidZh: [
       '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
       '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-core:transport-kit:tagRpcError': guide({
-    purposeEn:
-      'Attaches the source-owned RPC code to an existing native error without replacing its type, original stack or cause identity.',
-    purposeZh: '向现有原生错误附加 RPC owner 的错误码，不替换其类型、原始 stack 或 cause 身份。',
-    quickStart:
-      "import { tagRpcError } from '@migaia/rpc-core/transport-kit'\n\nconst error = tagRpcError(new TypeError('adapter rejected a frame'), 'TRANSPORT')\nconsole.log(error.source, error.code, error instanceof TypeError)",
-    scenariosEn: [
-      'A custom adapter owns native event subscriptions and must isolate listener failure.',
-      'Channel shutdown must remove all listeners while retaining original cleanup and reporting errors.'
-    ],
-    scenariosZh: [
-      '自定义适配器持有原生事件订阅，需要隔离监听器失败。',
-      '通道关闭时必须移除全部监听器，并保留原始清理与上报错误。'
-    ],
-    avoidEn: [
-      'Ordinary application RPC code should use the maintained transport or Peer factory.',
-      'Do not swallow the returned or reported errors, or recreate them as unrelated Error objects.'
-    ],
-    avoidZh: [
-      '普通业务 RPC 代码应使用维护中的 transport 或 Peer 工厂。',
-      '不要吞掉返回或上报的错误，也不要把它们重建为无关的 Error 对象。'
-    ]
-  }),
-  'rpc-contract:index:acceptRpcHandshake': guide({
-    purposeEn:
-      'Validates a remote hello against a local offer and returns the accept text plus an agreement, or a coded rejection before application state is created.',
-    purposeZh:
-      '校验对端 hello 与本端 offer 的交集，在创建业务状态前返回 accept 文本及协议结果，或返回有错误码的拒绝。',
-    quickStart:
-      "import { acceptRpcHandshake, createRpcHello } from '@migaia/rpc-contract'\n\nconst local = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: ['runtime-api@1', 'batch@1'], peer: { id: 'caller', runtime: 'node' } }\nconst remote = { ...local, peer: { id: 'worker', runtime: 'node' } }\nconst result = acceptRpcHandshake(local, createRpcHello(remote))\nconsole.log(result.ok)",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-contract:index:completeRpcHandshake': guide({
-    purposeEn:
-      'Completes the initiator side from the received accept text; unsupported baseline capabilities are rejected during negotiation rather than business dispatch.',
-    purposeZh:
-      '根据接收的 accept 文本完成发起端协商；不支持的基线能力在握手阶段拒绝，而不是等到业务调用时才失败。',
-    quickStart:
-      "import { completeRpcHandshake, createRpcHello, acceptRpcHandshake } from '@migaia/rpc-contract'\n\nconst local = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: ['runtime-api@1', 'batch@1'], peer: { id: 'caller', runtime: 'node' } }\nconst remote = { ...local, peer: { id: 'worker', runtime: 'node' } }\nconst accepted = acceptRpcHandshake(local, createRpcHello(remote))\nif (accepted.ok) console.log(completeRpcHandshake(remote, accepted.reply))",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-contract:index:createRpcHello': guide({
-    purposeEn:
-      'Serializes the local version, codec, capability and peer offer into the canonical hello text consumed by independent peers. It is a wire helper, not a connection factory.',
-    purposeZh:
-      '把本端版本、codec、能力和 peer offer 序列化为独立对端消费的规范 hello 文本；它只构造线材，不负责创建连接。',
-    quickStart:
-      "import { createRpcHello, acceptRpcHandshake } from '@migaia/rpc-contract'\n\nconst local = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: ['runtime-api@1', 'batch@1'], peer: { id: 'caller', runtime: 'node' } }\nconst remote = { ...local, peer: { id: 'worker', runtime: 'node' } }\nconsole.log(createRpcHello(local))",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-contract:index:normalizeRpcHandshake': guide({
-    purposeEn:
-      'Parses and validates one canonical handshake text, including closed fields and protocol discriminants, before a custom connection owner inspects its step.',
-    purposeZh:
-      '在自定义连接 owner 读取 step 前，解析并校验一条规范握手文本，包括封闭字段与协议判别值。',
-    quickStart:
-      "import { normalizeRpcHandshake, createRpcHello, acceptRpcHandshake } from '@migaia/rpc-contract'\n\nconst local = { versions: [{ major: 1, minor: 1 }], codecs: ['json'], capabilities: ['runtime-api@1', 'batch@1'], peer: { id: 'caller', runtime: 'node' } }\nconst remote = { ...local, peer: { id: 'worker', runtime: 'node' } }\nconsole.log(normalizeRpcHandshake(createRpcHello(remote)))",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-contract:index:normalizePortable': guide({
-    purposeEn:
-      'Snapshots a wire value under the portable-data contract and rejects functions, cycles and unsupported object shapes before transfer. Binary data requires its explicit profile.',
-    purposeZh:
-      '按可移植数据契约快照化线材值，在传输前拒绝函数、循环和不支持的对象形态；二进制值仍需显式的二进制 profile。',
-    quickStart:
-      "import { normalizePortable } from '@migaia/rpc-contract'\n\nconst snapshot = normalizePortable({ total: 42, items: ['ready'] })\nconsole.log(snapshot)",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-contract:index:normalizeRpcSerializedError': guide({
-    purposeEn:
-      'Validates a received serialized error record before restoration, preserving source, code, name, original stack and its bounded cause chain.',
-    purposeZh:
-      '恢复错误对象前校验收到的序列化错误记录，保留 source、code、name、原始 stack 与有界 cause 链。',
-    quickStart:
-      "import { normalizeRpcSerializedError, serializeRpcError } from '@migaia/rpc-contract'\n\nconst serialized = serializeRpcError(new RangeError('local range exceeded'), { report: console.error })\nconsole.log(normalizeRpcSerializedError(serialized))",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-contract:index:fromJsonRpcError': guide({
-    purposeEn:
-      'Converts a JSON-RPC error object into the common serialized RPC error shape, retaining the explicit error data and transport-independent cause information.',
-    purposeZh:
-      '把 JSON-RPC 错误对象转换为共同的 RPC 序列化错误形态，保留明确的错误数据以及独立于载体的 cause 信息。',
-    quickStart:
-      "import { fromJsonRpcError } from '@migaia/rpc-contract'\n\nconst error = fromJsonRpcError({ code: -32603, message: 'remote failure' })\nconsole.log(error.name, error.message)",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-contract:index:toJsonRpcError': guide({
-    purposeEn:
-      'Projects a serialized RPC failure to the JSON-RPC error object while retaining the structured source/code and original trace in error data.',
-    purposeZh:
-      '把序列化 RPC 失败投影为 JSON-RPC 错误对象，并在 error data 中保留结构化 source/code 与原始错误轨迹。',
-    quickStart:
-      "import { toJsonRpcError, serializeRpcError } from '@migaia/rpc-contract'\n\nconst serialized = serializeRpcError(new RangeError('local range exceeded'), { report: console.error })\nconsole.log(toJsonRpcError(serialized, -32603))",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
     ]
   }),
   'rpc-contract:index:createRpcUnknownFieldWarner': guide({
@@ -1976,83 +1766,13 @@ try {
       '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
     ]
   }),
-  'rpc-contract:index:measurePortableStreamValue': guide({
-    purposeEn:
-      'Measures the encoded byte budget of a portable stream value before stream credit or physical-frame limits are applied by the owning layer.',
-    purposeZh: '在 stream owner 应用额度和物理帧限制前，测量一个可移植 stream 值的编码字节预算。',
-    quickStart:
-      "import { measurePortableStreamValue } from '@migaia/rpc-contract'\n\nconsole.log(measurePortableStreamValue('first chunk'))",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-contract:index:normalizeStreamPayload': guide({
-    purposeEn:
-      'Validates one stream event, sequence number and portable value before the core stream owner changes its credit or terminal state.',
-    purposeZh: '在 core stream owner 修改额度或终态前，校验一个 stream event、序号及可移植值。',
-    quickStart:
-      "import { normalizeStreamPayload } from '@migaia/rpc-contract'\n\nconsole.log(normalizeStreamPayload({ event: 'item', seq: 0, value: 'first' }))",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
-  'rpc-contract:index:invalidRpcStream': guide({
-    purposeEn:
-      'Constructs the contract-owned native TypeError for a stream violation, retaining its stable code and payload-relative pointer for diagnostics.',
-    purposeZh:
-      '构造 stream 违规对应的规范原生 TypeError，保留稳定错误码与 payload 相对 pointer，供边界诊断使用。',
-    quickStart:
-      "import { invalidRpcStream } from '@migaia/rpc-contract'\n\nconst error = invalidRpcStream('field', '/event')\nconsole.log(error.name, error.message)",
-    scenariosEn: [
-      'A custom transport or independent peer must exchange the exact maintained wire representation.',
-      'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
-    ],
-    scenariosZh: [
-      '自定义 transport 或独立语言 peer 需要交换维护中的同一份线材表示。',
-      '协议边界需要在修改业务状态前完成明确校验并保留原 owner 的错误。'
-    ],
-    avoidEn: [
-      'Use the process/thread Peer factories when the library can perform this wire work for the application.',
-      'Do not bypass source admission, authentication or frame limits by using the low-level helper alone.'
-    ],
-    avoidZh: [
-      '库能够代应用执行这些线材工作时，应使用 process/thread Peer 工厂。',
-      '不要因为使用底层 helper 就绕过 source 准入、鉴权或物理帧上限。'
-    ]
-  }),
   'rpc-contract:framing:createStringFramer': guide({
     purposeEn:
       'Creates a bounded string fragmentation/reassembly policy for transports that can carry the resulting frame objects; it does not create a socket or business endpoint.',
     purposeZh:
       '创建有界的字符串分片与重组策略，载体须能传输生成的帧对象；它不会创建 socket 或业务 endpoint。',
     quickStart:
-      "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkSize: 32 })\nconsole.log(framer.frame('small encoded message', { source: 'local', messageId: 'one' }))",
+      "import { createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkBytes: 32 })\nconsole.log(framer.frame('small encoded message', { source: 'local', messageId: 'one' }))",
     scenariosEn: [
       'A custom transport or independent peer must exchange the exact maintained wire representation.',
       'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
@@ -2076,7 +1796,7 @@ try {
     purposeZh:
       '创建有界的字节分片与重组策略；物理帧格式与业务方法路由、buffer 所有权 transfer 是独立的职责。',
     quickStart:
-      "import { createBinaryFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createBinaryFramer({ chunkSize: 32 })\nconsole.log(framer.frame(new TextEncoder().encode('payload'), { source: 'local', messageId: 'one' }))",
+      "import { createBinaryFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createBinaryFramer({ chunkBytes: 32 })\nconsole.log(framer.frame(new TextEncoder().encode('payload'), { source: 'local', messageId: 'one' }))",
     scenariosEn: [
       'A custom transport or independent peer must exchange the exact maintained wire representation.',
       'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
@@ -2100,7 +1820,7 @@ try {
     purposeZh:
       '把选定 framer 接到规范重组 owner，保留分片消息上限、source 隔离以及通道终止时的清理职责。',
     quickStart:
-      "import { createReassembler, createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkSize: 32 })\nconst receiver = createReassembler(framer)\nfor (const frame of framer.frame('payload', { source: 'local', messageId: 'one' })) console.log(receiver.accept(frame, { source: 'local', messageId: 'one' }))",
+      "import { createReassembler, createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkBytes: 32 })\nconst receiver = createReassembler(framer)\nfor (const frame of framer.frame('payload', { source: 'local', messageId: 'one' })) console.log(receiver.accept(frame, { source: 'local', messageId: 'one' }))",
     scenariosEn: [
       'A custom transport or independent peer must exchange the exact maintained wire representation.',
       'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
@@ -2124,7 +1844,7 @@ try {
     purposeZh:
       '把原始成对的 accept/frame 函数绑定到同一个入站选择器，保留适配器接收过程中的物理分片来源证明。',
     quickStart:
-      "import { bindRpcFrameIngress, createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkSize: 32 })\nconst prepare = bindRpcFrameIngress(framer.accept, framer.frame)\nconsole.log(prepare('payload', { source: 'local', messageId: 'one' }))",
+      "import { bindRpcFrameIngress, createStringFramer } from '@migaia/rpc-contract/framing'\n\nconst framer = createStringFramer({ chunkBytes: 32 })\nconst prepare = bindRpcFrameIngress(framer.accept, framer.frame)\nconsole.log(prepare('payload', { source: 'local', messageId: 'one' }))",
     scenariosEn: [
       'A custom transport or independent peer must exchange the exact maintained wire representation.',
       'A protocol boundary needs explicit validation and source-owned errors before business state is changed.'
@@ -2669,7 +2389,7 @@ try {
     purposeZh:
       '读取 Host 为本次安装创建的真实 core 所绑定的运行时集成端口。适配器作者通过其 Feature 清单和共享槽接入运行时出口，复用 Host 注册与发布状态，不能传入复制的结构对象。',
     quickStart:
-      "import { definePlugin, getPluginRuntimeIntegration } from '@migaia/plugin-host'\n\nconst integrationPlugin = definePlugin('integration', (core) => {\n  const integration = getPluginRuntimeIntegration(core)\n  return { extension: { inspectService: () => integration.readFeatureOutputs('service') } }\n})",
+      "import { definePlugin, getPluginRuntimeIntegration } from '@migaia/plugin-host'\n\nconst integrationPlugin = definePlugin('integration', (core) => {\n  const integration = getPluginRuntimeIntegration(core)\n  return { install: () => ({ inspectService: () => integration.readFeatureOutputs('service') }) }\n})",
     scenariosEn: [
       'A process or Worker adapter needs the committed Feature output belonging to one Host plugin.',
       'Several accepted connections must share one Host-owned runtime outlet and its registration lifetime.'
@@ -2693,7 +2413,7 @@ try {
     purposeZh:
       '判断值是否由 definePlugin 创建为规范的不透明插件定义。动态加载插件前，可区分定义、名称字符串和外观相同的普通对象；此检查不安装或启用插件。',
     quickStart:
-      "import { definePlugin, isDefinedPlugin } from '@migaia/plugin-host'\n\nconst plugin = definePlugin('message', () => ({ extension: { greet: () => 'hello' } }))\nconsole.log(isDefinedPlugin(plugin)) // true\nconsole.log(isDefinedPlugin({ name: 'message' })) // false",
+      "import { definePlugin, isDefinedPlugin } from '@migaia/plugin-host'\n\nconst plugin = definePlugin('message', () => ({ install: () => ({ greet: () => 'hello' }) }))\nconsole.log(isDefinedPlugin(plugin)) // true\nconsole.log(isDefinedPlugin({ name: 'message' })) // false",
     scenariosEn: [
       'A dynamic import returns an unknown value that must be checked before host.use.',
       'A loader accepts both plugin names and definitions and must distinguish the two inputs.'
@@ -2717,7 +2437,7 @@ try {
     purposeZh:
       '判断 Host handle 是否仍对应创建它时的同一个注册。disabled 和 suspended 注册仍是 current；移除、替换或销毁后，旧 handle 不再 current，此查询不授予修改权限。',
     quickStart:
-      "import { defineHost, definePlugin, isPluginHandleCurrent } from '@migaia/plugin-host'\n\nconst host = defineHost()\ntry {\n  const [handle] = await host.use(definePlugin('service', () => ({ extension: { read: () => 42 } })))\n  console.log(isPluginHandleCurrent(handle)) // true\n  await host.unUse('service')\n  console.log(isPluginHandleCurrent(handle)) // false\n} finally {\n  await host.dispose()\n}",
+      "import { defineHost, definePlugin, isPluginHandleCurrent } from '@migaia/plugin-host'\n\nconst host = defineHost({ host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } })\ntry {\n  const [handle] = await host.use(definePlugin('service', () => ({ install: () => ({ read: () => 42 }) })))\n  console.log(isPluginHandleCurrent(handle)) // true\n  await host.unUse('service')\n  console.log(isPluginHandleCurrent(handle)) // false\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
       'A UI retained a handle while an operator replaced the plugin registration.',
       'An adapter must distinguish a suspended current registration from a removed stale handle.'
@@ -2788,7 +2508,7 @@ const host = defineHost({
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
   domainCore: () => ({})
 })
-const view = await host.use(counter)
+const [view] = await host.use(counter)
 console.log(view.extensions.readMetric(), view.extensions.sumMetric())
 await host.dispose()`,
     scenariosEn: [
@@ -2870,7 +2590,7 @@ const productCache = definePlugin<
 
   // core = 应用提供的 reportCacheSize + PluginHost 提供的配置与生命周期能力。
   install(core) {
-    activeTtlMs = core.config.get().ttlMs
+    activeTtlMs = Number(core.config.get().ttlMs)
     refreshTimer = setInterval(() => cache.clear(), activeTtlMs)
     core.reportCacheSize(cache.size)
     core.onDispose(() => {
@@ -2896,10 +2616,10 @@ const host = defineHost({
   host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },
   domainCore: () => ({ reportCacheSize: (size: number) => console.log(size) })
 })
-const app = await host.use(productCache)
+const [app] = await host.use(productCache)
 
 app.extensions.clearProductCache()
-await app.config.update('product-cache', () => ({ ttlMs: 60_000 }))
+await app.config.update(() => ({ ttlMs: 60_000 }))
 await host.dispose()`,
     examplesEn: [
       {
@@ -2914,11 +2634,13 @@ type IAppCore = { audit(message: string): void }
 const greeting = definePlugin<IAppCore, { greet(name: string): string }>(
   'greeting',
   (core) => ({
-    greet(name) {
-      const message = \`Hello, \${name}\`
-      core.audit(message)
-      return message
-    }
+    install: () => ({
+      greet(name: string) {
+        const message = \`Hello, \${name}\`
+        core.audit(message)
+        return message
+      }
+    })
   })
 )
 
@@ -2926,7 +2648,7 @@ const host = defineHost({
   host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },
   domainCore: () => ({ audit: (message: string) => console.log(message) })
 })
-const app = await host.use(greeting)
+const [app] = await host.use(greeting)
 
 console.log(app.extensions.greet('Migaia'))
 await host.dispose()`
@@ -2952,11 +2674,13 @@ type IAppCore = { audit(message: string): void }
 const greeting = definePlugin<IAppCore, { greet(name: string): string }>(
   'greeting',
   (core) => ({
-    greet(name) {
-      const message = \`Hello, \${name}\`
-      core.audit(message)
-      return message
-    }
+    install: () => ({
+      greet(name: string) {
+        const message = \`Hello, \${name}\`
+        core.audit(message)
+        return message
+      }
+    })
   })
 )
 
@@ -2964,7 +2688,7 @@ const host = defineHost({
   host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },
   domainCore: () => ({ audit: (message: string) => console.log(message) })
 })
-const app = await host.use(greeting)
+const [app] = await host.use(greeting)
 
 console.log(app.extensions.greet('Migaia'))
 await host.dispose()`
@@ -2980,13 +2704,13 @@ await host.dispose()`
     scenariosEn: [
       'Core: the installer needs both application-owned services and Host-owned config, cancellation, lifetime, resource, shared-value, or pipeline capabilities.',
       'Shared: one plugin provides a capability to plugins installed after it without exposing that capability as application API.',
-      'Extension: application code should gain typed methods or values through view.extensions only after installation succeeds.',
+      'Extension: application code should gain typed methods or values through handle.extensions only after installation succeeds.',
       'The plugin needs owned configuration, update handling, and deterministic cleanup under one Host lifecycle.'
     ],
     scenariosZh: [
       'core：安装逻辑既要使用应用提供的服务，也要使用 Host 提供的配置、取消、存续信号、资源登记、shared 读取或 pipeline 能力。',
       'shared：一个插件要把内部能力提供给排在它后面安装的插件，但不希望把它直接做成业务 API。',
-      'extension：业务代码只应在安装成功后，通过 view.extensions 获得有类型的方法或值。',
+      'extension：业务代码只应在安装成功后，通过 handle.extensions 获得有类型的方法或值。',
       '插件需要由同一个 Host 统一管理配置、update 与确定性清理。'
     ],
     avoidEn: [
@@ -3005,40 +2729,40 @@ await host.dispose()`
         description:
           'Short form for a stable name and a descriptor factory whose install hook returns Host extensions.',
         whenToUse:
-          'Use when the plugin has no config, shared capability, update hook, metadata, or explicit disposer.',
+          'Use when the plugin has no config, Feature, update hook, metadata, or explicit disposer.',
         type: 'IDefinedPluginConstraint',
         optional: false
       },
       {
         name: 'core',
         description:
-          'Application domain core combined with Host config, operation/lifecycle signals, getShared(), onDispose(), and pipeline registration.',
+          'Application domain core combined with Host config, operation/lifecycle signals, resolved features, onDispose(), and pipeline registration.',
         whenToUse:
-          'Use only during install/shared/update; operation-scoped registration is rejected outside the owning lifecycle phase.',
+          'Use only during install/featureExpose/update; operation-scoped registration is rejected outside the owning lifecycle phase.',
         type: 'TCore & IPluginHostCore',
         optional: false
       },
       {
         name: 'install(core)',
         description:
-          'Creates the plugin and returns the extension object merged into view.extensions after the whole batch commits.',
+          'Creates the plugin and returns the extension object exposed as handle.extensions after the whole batch commits.',
         whenToUse:
           'Return only the application-facing surface; register owned resources with core.onDispose().',
         type: '(core) => TExtension | PromiseLike<TExtension>',
         optional: false
       },
       {
-        name: 'shared(core)',
+        name: 'features / featureExpose(core)',
         description:
-          'Publishes cross-plugin values by key after this plugin installs; later plugins read them with core.getShared(key).',
+          'Declares Feature capabilities; featureExpose supplies their implementation. Consumers depend on them through provider.getFeature(name) and read core.features. The former shared/getShared slots were removed.',
         whenToUse:
           'Use for plugin-to-plugin collaboration that should not become application-facing extension API.',
-        type: '(core) => TShared'
+        type: 'Record<string, IFeature> / (core) => TExpose'
       },
       {
         name: 'config / update(next, core)',
         description:
-          'Owns an immutable config snapshot and reacts after view.config.update() commits a patch.',
+          'Owns an immutable config snapshot and reacts after handle.config.update() or host.config.update() commits a patch.',
         whenToUse: 'Use when runtime behavior must change without uninstalling the plugin.',
         type: 'TConfig / PromiseLike<void>'
       },
@@ -3061,29 +2785,31 @@ await host.dispose()`
       {
         name: 'core',
         description:
-          '应用领域 core 与 Host 能力的组合；Host 能力包括配置、操作/存续信号、getShared()、onDispose() 和 pipeline 登记。',
+          '应用领域 core 与 Host 能力的组合；Host 能力包括配置、操作/存续信号、已解析的 features、onDispose() 和 pipeline 登记。',
         whenToUse:
-          '仅在 install/shared/update 对应阶段使用；离开所属生命周期阶段后再登记资源会被拒绝。',
+          '仅在 install/featureExpose/update 对应阶段使用；离开所属生命周期阶段后再登记资源会被拒绝。',
         type: 'TCore & IPluginHostCore',
         optional: false
       },
       {
         name: 'install(core)',
         description:
-          '创建插件并返回 extension 对象；只有整批安装提交后，它才会合并到 view.extensions。',
+          '创建插件并返回 extension 对象；只有整批安装提交后，它才会作为 handle.extensions 对外可见。',
         whenToUse: '只返回给业务宿主使用的公开能力；安装期资源通过 core.onDispose() 登记。',
         type: '(core) => TExtension | PromiseLike<TExtension>',
         optional: false
       },
       {
-        name: 'shared(core)',
-        description: '当前插件安装后按键发布跨插件能力；后续插件通过 core.getShared(key) 读取。',
+        name: 'features / featureExpose(core)',
+        description:
+          '声明 Feature 能力，featureExpose 提供实现；消费者通过 provider.getFeature(name) 建立依赖并从 core.features 读取。原 shared/getShared 已删除。',
         whenToUse: '用于插件间协作，但不希望它成为业务侧 extension API。',
-        type: '(core) => TShared'
+        type: 'Record<string, IFeature> / (core) => TExpose'
       },
       {
         name: 'config / update(next, core)',
-        description: '持有不可变配置快照，并在 view.config.update() 提交补丁后响应新配置。',
+        description:
+          '持有不可变配置快照，并在 handle.config.update() 或 host.config.update() 提交补丁后响应新配置。',
         whenToUse: '需要在不卸载插件的情况下调整运行行为时使用。',
         type: 'TConfig / PromiseLike<void>'
       },
@@ -3101,7 +2827,7 @@ await host.dispose()`
     purposeZh:
       '基于规范 PluginHost 引擎创建冻结的函数式 Host handle。domainCore 回调替代继承；use() 仍保证插件批次原子提交，dispose() 仍是唯一终态清理入口。',
     quickStart:
-      "import { definePlugin, defineHost } from '@migaia/plugin-host'\n\nconst greeting = definePlugin('greeting', (core: { prefix: string }) => ({\n  install: () => ({\n    greet: (name: string) => `${core.prefix}, ${name}`\n  })\n}))\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },\n  domainCore: () => ({ prefix: 'Hello' })\n})\nconst app = await host.use(greeting)\n\nconsole.log(app.extensions.greet('Ada'))\nawait host.dispose()",
+      "import { definePlugin, defineHost } from '@migaia/plugin-host'\n\nconst greeting = definePlugin('greeting', (core: { prefix: string }) => ({\n  install: () => ({\n    greet: (name: string) => `${core.prefix}, ${name}`\n  })\n}))\n\nconst host = defineHost({\n  host: { execution: { mutationTimeoutMs: 5_000, pipelineDrainTimeoutMs: 5_000 } },\n  domainCore: () => ({ prefix: 'Hello' })\n})\nconst [app] = await host.use(greeting)\n\nconsole.log(app.extensions.greet('Ada'))\nawait host.dispose()",
     scenariosEn: [
       'A package needs a Host value without exposing an inheritance hierarchy.',
       'Each plugin registration needs domain capabilities derived from its name or batch position.'
@@ -3206,7 +2932,6 @@ import { definePlugin } from '@migaia/plugin-host'
 
 type IAppCore = { write(message: string): void }
 type IGreetingConfig = { prefix: string }
-type IGreetingShared = { formatGreeting(name: string): string }
 
 class AppHost extends PluginHost<IAppCore, string> {
   protected createPluginDomainCore(): IAppCore {
@@ -3229,8 +2954,7 @@ const greetingPlugin = definePlugin<
   IAppCore,
   { greet(name: string): string },
   string,
-  IGreetingConfig,
-  IGreetingShared
+  IGreetingConfig
 >({
   name: 'greeting',
   config: { prefix },
@@ -3245,7 +2969,6 @@ const greetingPlugin = definePlugin<
       }
     }
   },
-  shared: () => ({ formatGreeting: (name) => prefix + ', ' + name }),
   update(next) {
     prefix = next.prefix
   }
@@ -3263,21 +2986,16 @@ const host = new AppHost({
 })
 
 // use() 整批成功后才发布新 view；失败会回滚候选插件和已登记资源。
-const view = await host.use(greetingPlugin)
-view.extensions.greet('Migaia')
-const formatGreeting = view.getShared('formatGreeting')
-console.log(formatGreeting?.('Ada'))
-await view.config.update('greeting', () => ({ prefix: 'Hi' }))
+const [handle] = await host.use(greetingPlugin)
+handle.extensions.greet('Migaia')
+await host.config.update('greeting', () => ({ prefix: 'Hi' }))
 await host.publish('order-created')
 
 console.log(host.pipelineMode, host.revision)
-const current = host.getCurrentView()
-console.log(current.extensions.greet('Grace'))
 
-// unUse() 先让能力在新 view 中消失，再报告清理是否已经完全结束。
-const removal = await current.unUse('greeting')
-if (removal.physicalCompletion) await removal.physicalCompletion
-console.log(removal.removed, removal.cleanupErrors, removal.view.extensions)
+// unUse() 按依赖策略卸载，并报告受影响的依赖者。
+const removal = await host.unUse('greeting')
+console.log(removal.ok, removal.affected)
 
 const terminal = await host.dispose()
 if (terminal.physicalCompletion) await terminal.physicalCompletion`,
@@ -3318,26 +3036,18 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       {
         name: 'use(...plugins)',
         description:
-          'Serializes one plugin batch, installs in argument order, and atomically publishes a new immutable view. Any failure rolls back the batch.',
+          'Serializes one plugin batch, installs in argument order, and returns one handle per plugin in the same order. Any failure rolls back the batch.',
         whenToUse: 'Install one or more already ordered plugins at runtime.',
-        type: 'Promise<IPluginHostView>',
+        type: 'Promise<IPluginHandleTuple<TPlugins>>',
         optional: false
       },
       {
-        name: 'view / getCurrentView()',
+        name: 'handle.extensions / handle.getFeature(name)',
         description:
-          'A frozen committed snapshot exposing host, extensions, config, getShared(), use(), and unUse(). A view captured through a removed registration is revoked.',
+          'Each handle returned by use() exposes the plugin extensions for business calls, a getFeature() reference for declaring plugin-to-plugin dependencies, and a per-plugin config facade. The former shared slots were removed; collaboration goes through Features.',
         whenToUse:
-          'Pass committed capabilities to readers without exposing candidate mutation state.',
-        type: 'IPluginHostView / IPluginHostDynamicView'
-      },
-      {
-        name: 'extensions / getShared(key)',
-        description:
-          'extensions is application-facing plugin API; shared values are plugin-to-plugin capabilities, also readable from the view or Host.',
-        whenToUse:
-          'Use extensions for business calls and shared for internal plugin collaboration.',
-        type: 'Readonly<Record<PropertyKey, unknown>>'
+          'Call extensions from application code; pass getFeature() references when another plugin depends on this one.',
+        type: 'IPluginHandle<TPlugin>'
       },
       {
         name: 'config.get() / config.update()',
@@ -3364,9 +3074,9 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       {
         name: 'unUse(name)',
         description:
-          'Logically revokes one plugin, returns the new view and cleanup diagnostics, and exposes physicalCompletion when bounded pipeline drain continues in the background.',
-        whenToUse: 'Remove a runtime capability without making cleanup latency invisible.',
-        type: 'Promise<IPluginRemovalResult>'
+          'Removes one plugin under the dependency policy (reject by default, cascade or suspend) and returns { ok, affected } or { ok: false, errors, affected }. dryRun: true returns only the dependency plan.',
+        whenToUse: 'Remove a runtime capability and inspect which dependents were affected.',
+        type: 'Promise<IPluginRemoval>'
       },
       {
         name: 'revision / pipelineMode',
@@ -3413,23 +3123,17 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       {
         name: 'use(...plugins)',
         description:
-          '把一批插件放入串行 mutation 队列，按参数顺序安装，并原子发布新的不可变 view；任一失败都会回滚整批候选。',
+          '把一批插件放入串行 mutation 队列，按参数顺序安装，并按同一顺序返回每个插件的句柄；任一失败都会回滚整批候选。',
         whenToUse: '运行时安装一个或多个已经排好顺序的插件。',
-        type: 'Promise<IPluginHostView>',
+        type: 'Promise<IPluginHandleTuple<TPlugins>>',
         optional: false
       },
       {
-        name: 'view / getCurrentView()',
+        name: 'handle.extensions / handle.getFeature(name)',
         description:
-          '冻结的已提交快照，包含 host、extensions、config、getShared()、use() 与 unUse()；其捕获的 registration 被移除后，旧 view 会撤销。',
-        whenToUse: '把已提交能力交给读取方，同时不暴露候选 mutation 状态。',
-        type: 'IPluginHostView / IPluginHostDynamicView'
-      },
-      {
-        name: 'extensions / getShared(key)',
-        description: 'extensions 是业务侧插件 API；shared 是插件间能力，也能从 view 或 Host 读取。',
-        whenToUse: '业务调用使用 extensions；插件内部协作使用 shared。',
-        type: 'Readonly<Record<PropertyKey, unknown>>'
+          'use() 返回的每个句柄提供业务侧 extensions、用于声明插件间依赖的 getFeature() 引用，以及该插件的 config facade。原 shared 槽位已删除，插件协作改走 Feature。',
+        whenToUse: '业务代码调用 extensions；其他插件依赖本插件时传入 getFeature() 引用。',
+        type: 'IPluginHandle<TPlugin>'
       },
       {
         name: 'config.get() / config.update()',
@@ -3453,9 +3157,9 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       {
         name: 'unUse(name)',
         description:
-          '先逻辑撤销一个插件，再返回新 view、清理诊断；有界 pipeline drain 尚未结束时还会返回 physicalCompletion。',
-        whenToUse: '移除运行时能力，同时不隐藏物理清理延迟。',
-        type: 'Promise<IPluginRemovalResult>'
+          '按依赖策略（默认 reject，可选 cascade、suspend）卸载一个插件，返回 { ok, affected } 或 { ok: false, errors, affected }；dryRun: true 只返回依赖计划。',
+        whenToUse: '移除运行时能力，并查看受影响的依赖者。',
+        type: 'Promise<IPluginRemoval>'
       },
       {
         name: 'revision / pipelineMode',
@@ -3486,68 +3190,13 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
       }
     ]
   }),
-  ...Object.fromEntries(
-    [
-      [
-        'adaptSyncStageToAsync',
-        '同步 next-style stage',
-        '异步 pipeline stage',
-        'useAsyncPipeline',
-        true
-      ],
-      [
-        'adaptSyncStageToGenerator',
-        '同步 next-style stage',
-        '同步 generator stage',
-        'useGeneratorPipeline',
-        true
-      ],
-      [
-        'adaptGeneratorStageToAsyncGenerator',
-        '同步 generator stage',
-        '异步 generator stage',
-        'useAsyncGeneratorPipeline',
-        false
-      ],
-      [
-        'adaptSyncStageToAsyncGenerator',
-        '同步 next-style stage',
-        '异步 generator stage',
-        'useAsyncGeneratorPipeline',
-        true
-      ]
-    ].map(([name, sourceZh, targetZh, installMethod, needsViolationHandler]) => [
-      `plugin-host:index:${name}`,
-      guide({
-        purposeEn: `Adapts an existing Plugin Host pipeline stage to the execution shape named by ${name}, while preserving value flow, terminal signals, next-call violations, and thrown error identity.`,
-        purposeZh: `把现有${sourceZh}转换为${targetZh}，同时保留 value 流、终止信号、next 调用违规和抛出错误的身份。`,
-        quickStart: `import { ${name}, defineHost } from '@migaia/plugin-host'\n\nconst stage = (value: number, next: (value: number) => number) => next(value + 1)\nconst adaptedStage = ${name}(stage${needsViolationHandler ? ', (violation) => console.warn(violation)' : ''})\nconst host = defineHost<Record<string, never>, number>({\n  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }\n})\nconst installedHost = host.${installMethod}(adaptedStage)\nconsole.log(installedHost === host) // true\nawait host.dispose()`,
-        scenariosEn: [
-          'A host selected one pipeline execution mode but an existing stage uses another supported shape.',
-          'Migration must preserve the canonical middleware violation policy.'
-        ],
-        scenariosZh: [
-          'Host 已选择一种 pipeline 执行模式，但现有 stage 使用另一种受支持形态。',
-          '迁移时必须保留规范的 middleware 违规处理策略。'
-        ],
-        avoidEn: [
-          'The stage can be authored directly in the target shape.',
-          'Do not use an adapter to hide a Promise returned from a synchronous stage.'
-        ],
-        avoidZh: [
-          'stage 可以直接按目标形态实现。',
-          '不要用 adapter 隐藏同步 stage 返回 Promise 的错误。'
-        ]
-      })
-    ])
-  ),
   'plugin-host:index:createRegistrationView': guide({
     purposeEn:
       'Publishes a frozen extension-only view for the exact live registration identified by a receipt. It rejects unknown, revoked, uninstalled, or disposing registrations instead of exposing Host internals or another plugin generation.',
     purposeZh:
       '根据注册回执，只公开对应且仍然存活的插件扩展，并返回冻结视图。回执未知、已撤销、尚未安装或正在释放时会直接拒绝；调用方拿不到 Host 内部状态，也不会误读其他插件代次。',
     quickStart:
-      "import { createRegistrationView, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nexport async function searchRegisteredPlugin(\n  receipt: Parameters<typeof createRegistrationView>[0],\n  refreshRegistration: () => void\n) {\n  try {\n    const view = createRegistrationView(receipt)\n    return await view.extensions.search('migaia')\n  } catch (error) {\n    if (error instanceof PluginHostError && error.code === PluginHostErrorCode.viewRevoked) {\n      refreshRegistration()\n    }\n    throw error\n  }\n}",
+      "import { createRegistrationView, PluginHostError, PluginHostErrorCode } from '@migaia/plugin-host'\n\nexport async function searchRegisteredPlugin(\n  receipt: Parameters<typeof createRegistrationView>[0],\n  refreshRegistration: () => void\n) {\n  try {\n    const view = createRegistrationView(receipt)\n    const search = view.extensions.search as (query: string) => Promise<unknown>\n    return await search('migaia')\n  } catch (error) {\n    if (error instanceof PluginHostError && error.code === PluginHostErrorCode.registrationRevoked) {\n      refreshRegistration()\n    }\n    throw error\n  }\n}",
     scenariosEn: [
       'A composition layer holds a registration receipt and must expose only that plugin generation’s extensions.',
       'A consumer must fail closed after logical removal instead of retaining stale extension access.'
@@ -3571,7 +3220,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '把带类型的注册 token 转成该插件精确代次的冻结扩展视图。它是 createRegistrationView 的公开类型安全入口；注册被撤销后会失败，不会继续返回过期扩展。',
     quickStart:
-      "import { createView } from '@migaia/plugin-host/composition'\n\nexport async function searchRegistration(searchRegistration: Parameters<typeof createView>[0]) {\n  const view = createView(searchRegistration)\n  return view.extensions.search('migaia')\n}",
+      "import { createView } from '@migaia/plugin-host/composition'\n\nexport async function searchRegistration(searchRegistration: Parameters<typeof createView>[0]) {\n  const view = createView(searchRegistration)\n  const search = view.extensions.search as (query: string) => Promise<unknown>\n  return search('migaia')\n}",
     scenariosEn: [
       'Typed composition code receives a registration token and needs only that plugin’s published extensions.',
       'The view must become unusable as soon as its exact registration is revoked.'
@@ -3667,7 +3316,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '返回已登记宿主的受管组合端口；目标未登记时抛出 COMPOSITION_TARGET_UNMANAGED。端口把准入与提交工作委托给宿主持有的运行时。',
     quickStart:
-      "import { isManagedHost, openComposition } from '@migaia/plugin-host/composition'\n\nexport function currentManagedView(target: unknown) {\n  if (!isManagedHost(target)) return undefined\n  return openComposition(target as object).getCurrentView()\n}",
+      "import { isManagedHost, openComposition } from '@migaia/plugin-host/composition'\n\nexport function currentManagedView(target: unknown) {\n  if (!isManagedHost(target)) return undefined\n  return openComposition(target as object).getCurrentSnapshot()\n}",
     scenariosEn: [
       'A composition adapter needs the live protocol of a recognized PluginHost host.',
       'The adapter needs the committed current view rather than a stale construction snapshot.'
@@ -3828,7 +3477,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '把具有 render/commit 阶段的宿主接入一个 reactive observer。capture 只记录读取而不发布依赖边，commit 校验快照，observe 持有订阅后的活动 Effect。',
     quickStart:
-      "import { createRuntime } from '@migaia/reactive'\nimport { createObserverBinding } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst value = runtime.signal(1)\nconst binding = createObserverBinding(runtime)\nconst stop = binding.observe(() => value.value)\nconst capture = binding.capture(() => value.value)\nif (binding.commit(capture) === 'stale') binding.retrack()\nstop()",
+      "import { createRuntime } from '@migaia/reactive'\nimport { createObserverBinding } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst value = runtime.signal(1)\nconst binding = createObserverBinding(runtime)\nconst stop = binding.observe(() => {\n  void value.value\n})\nconst capture = binding.capture(() => value.value)\nif (binding.commit(capture) === 'stale') binding.retrack()\nstop()",
     quickStartEn:
       "// Import the binding primitive and the Runtime that owns every dependency.\nimport { createRuntime } from '@migaia/reactive'\nimport { createObserverBinding } from '@migaia/reactive/extension'\n\n// Create one isolated reactive graph for this UI root.\nconst runtime = createRuntime()\n\n// Create the source that the render phase will read.\nconst value = runtime.signal(1)\n\n// Allocate one binding for one host observer; do not share it across components.\nconst binding = createObserverBinding(runtime)\n\n// Render: capture the value and dependency versions without publishing subscriptions.\nconst capture = binding.capture(() => value.value)\n\n// Use capture.result as the render snapshot; an abandoned render leaves no graph edges.\nconsole.log('rendered value:', capture.result)\n\n// Subscription/commit: install the one live Effect that will own committed dependencies.\nconst stop = binding.observe(() => console.log('schedule host update:', value.value))\n\n// Validate and publish the captured dependency set to that observer.\nconst commitResult = binding.commit(capture)\n\n// If a dependency changed after render, discard the token and force a fresh observer pass.\nif (commitResult === 'stale') binding.retrack()\n\n// Host unmount: dispose the observer and remove every dependency edge it owns.\nstop()\n\n// Release the example source after no observer can read it again.\nvalue.dispose()",
     quickStartZh:
@@ -4005,7 +3654,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '先确认 Runtime 由当前库副本创建，再返回具体的节点工厂内部能力。这样不安全的实现层类型转换只存在于一个受保护入口。',
     quickStart:
-      "import { internalRuntimeOf } from '@migaia/reactive/extension'\n\nconst internal = internalRuntimeOf(runtime)\nconst signal = internal.signal(0)",
+      "import { createRuntime } from '@migaia/reactive'\nimport { internalRuntimeOf } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst internal = internalRuntimeOf(runtime)\nconst signal = internal.signal(0)",
     scenariosEn: [
       'A built-in or third-party node factory must call the concrete Runtime implementation.',
       'The factory must reject structural Runtime lookalikes.'
@@ -4029,7 +3678,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '报告指定 Runtime 当前是否正在收集依赖读取。它只是只读实现层查询，不会开始、停止或改变 tracking。',
     quickStart:
-      "import { isRuntimeTracking } from '@migaia/reactive/extension'\n\nif (isRuntimeTracking(runtime)) source.track()",
+      "import { createRuntime } from '@migaia/reactive'\nimport { isRuntimeTracking } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconsole.log(isRuntimeTracking(runtime)) // false：当前不在 computed/effect 的依赖收集中",
     scenariosEn: [
       'A custom source avoids bookkeeping when no dependency frame is active.',
       'Diagnostics need to report tracking state for one Runtime.'
@@ -4074,7 +3723,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '登记一个受管对象属于某个 Runtime。若再把同一对象登记给另一个 Runtime 会失败，因为一个 reactive node 无法安全加入两张独立依赖图。',
     quickStart:
-      "import { claimOwnership, ownerOf } from '@migaia/reactive/extension'\n\nconst node = {}\nclaimOwnership(node, runtime)\nconsole.log(ownerOf(node) === runtime)",
+      "import { createRuntime } from '@migaia/reactive'\nimport { claimOwnership, ownerOf } from '@migaia/reactive/extension'\n\nconst runtime = createRuntime()\nconst node = {}\nclaimOwnership(node, runtime)\nconsole.log(ownerOf(node) === runtime)",
     scenariosEn: [
       'A custom node factory has finished constructing a node for one Runtime.',
       'Later graph guards must verify exact owner identity.'
@@ -4095,7 +3744,7 @@ if (terminal.physicalCompletion) await terminal.physicalCompletion`,
     purposeZh:
       '返回受管对象所属的 Runtime；未登记值和非对象返回 undefined。它用于区分普通 Registry 值与必须遵守依赖图所有权的节点。',
     quickStart:
-      "import { ownerOf } from '@migaia/reactive/extension'\n\nconst owner = ownerOf(candidate)\nif (owner) console.log('managed by a Runtime')",
+      "import { ownerOf } from '@migaia/reactive/extension'\n\nconst candidate: object = {}\nconst owner = ownerOf(candidate)\nif (owner) console.log('managed by a Runtime')",
     scenariosEn: [
       'An adapter accepts both plain values and managed reactive nodes.',
       'Diagnostics need to report the owner without changing graph state.'

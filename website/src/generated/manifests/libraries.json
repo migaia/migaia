@@ -244,7 +244,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -515,7 +515,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()"
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()"
                 }
               ]
             },
@@ -1229,7 +1229,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
+                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
                 },
                 {
                   "type": "paragraph",
@@ -1506,7 +1506,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -1766,7 +1766,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -1980,13 +1980,13 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}"
+                  "code": "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`subscribe(listener, options?)` —— 登记一个 listener，返回可直接调用的订阅句柄（同时是 `unsubscribe` 函数、`.unsubscribe` 自身别名、可链式 `.subscribe()` 追加更多订阅）。`listener` 非函数抛 `INVALID_LISTENER`；`options.taskId` 提供但非非空字符串抛 `INVALID_TASK_ID`；`options` 本身不是普通对象抛 `INVALID_OPTIONS`。缺省 `multiple` 下相同 listener 重复订阅会产生两份独立 registration（各自可单独退订）；显式 `unique` 的行为见上。",
-                    "`subscribeOnce`/`subscribeUntil` —— 与下方 Helper 模块的同名独立函数语义完全一致，channel 上直接暴露方便链式调用。",
+                    "channel 本身没有 `subscribeOnce`/`subscribeUntil` 方法；一次性或带 signal 的订阅用下方 Helper 模块的同名独立函数，第一个参数传 channel。",
                     "`publish(value)` —— 按注册顺序（快照）同步调用全部 listener，不等待返回的 Promise；默认同步重入 publish 递归交付，只有 `dispatchPolicy: EventDispatchPolicy.queued` 才会排队到当前快照完成后再交付。listener 同步抛出的错误会被收集并以携带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出；listener 返回的 thenable 迟到 reject（即在 `publish()` 同步返回之后才拒绝）会转发给 `options.report`（见上），不计入 `publish()` 本身抛出的错误。",
                     "`filterTaskId(taskId)` —— 创建一个只读的 task 选择 view（`IFilteredEventChannel`），交给异步发布 helper 使用；`taskId` 必须是非空字符串，否则抛 `INVALID_TASK_ID`。",
                     "`clear()` —— 清空全部 registration，不执行 listener 自身的 cleanup（listener 本身没有 dispose 概念，只是不再被调用）。",
@@ -2024,7 +2024,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -2284,7 +2284,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]"
+                  "code": "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style\n  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]"
                 },
                 {
                   "type": "paragraph",
@@ -2458,6 +2458,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -2477,7 +2482,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "内部文本与 17 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`。"
+                  "text": "内部文本与 18 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`、`subscriptionDisposeFailed`。"
                 }
               ]
             },
@@ -2813,7 +2818,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`own(resource, descriptor)` 返回的方法：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`；descriptor 形状非法时 `own()` 在注册时抛 `INVALID_OPTION`。环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                  "text": "`own(resource, descriptor)` 返回的方法：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`；descriptor 形状非法时 `own()` 在注册时抛 `INVALID_OPTION`。提供 `Symbol.asyncDispose`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                 },
                 {
                   "type": "paragraph",
@@ -2826,7 +2831,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部选项（`ISyncLifecycleScopeOptions`）：`errorPolicy?`（同上，默认 `'throw'`）、`report?`（同上）。约束：每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`；descriptor 形状非法（如 `order` 非有限数、缺 `force`）在 `own()` 时抛 `INVALID_OPTION`，与异步 scope 一致；某个 callback 若返回 thenable，同样在释放时抛 `SCOPE_SYNC_VIOLATION`。不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例。环境支持时挂载 `[Symbol.dispose]`。"
+                  "text": "全部选项（`ISyncLifecycleScopeOptions`）：`errorPolicy?`（同上，默认 `'throw'`）、`report?`（同上）。约束：每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`；descriptor 形状非法（如 `order` 非有限数、缺 `force`）在 `own()` 时抛 `INVALID_OPTION`，与异步 scope 一致；某个 callback 若返回 thenable，同样在释放时抛 `SCOPE_SYNC_VIOLATION`。不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例。提供 `Symbol.dispose`，可直接用于 `using`（TypeScript 需包含 `ESNext."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Disposable` 类型库）。"
                 },
                 {
                   "type": "paragraph",
@@ -3376,7 +3385,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 环境支持 `[Symbol.dispose]` 时可用 `using`\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n  // 作用域结束时自动 dispose()，移除监听器\n}"
+                  "code": "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 离开作用域时自动调用 [Symbol.dispose]()，同步释放\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n}"
                 }
               ]
             },
@@ -3569,7 +3578,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -3591,7 +3600,7 @@
                     "`release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。",
                     "`close()`：同步、幂等；`open → closing`。",
                     "`dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。",
-                    "环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                    "提供 `Symbol.asyncDispose: Promise<void>`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -3603,7 +3612,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -3627,7 +3636,7 @@
                     "某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。",
                     "降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。",
                     "`release()`/`close()` 语义与异步版本一致；`dispose()` 幂等，二次调用返回 `[]`；在 disposer 内部重入抛 `SCOPE_REENTRANT_DISPOSE`。",
-                    "环境支持时挂载 `[Symbol.dispose]`，可配合 `using` 语法。"
+                    "提供 `Symbol.dispose: void`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -3663,7 +3672,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
+                  "code": "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
                 },
                 {
                   "type": "paragraph",
@@ -3795,7 +3804,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
+                  "code": "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -4005,7 +4014,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'"
+                  "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'"
                 },
                 {
                   "type": "paragraph",
@@ -4612,13 +4621,13 @@
               ]
             },
             {
-              "id": "高阶组合示例-5-同步作用域-可暴露-using-语法的纯同步资源",
-              "heading": "高阶组合示例 · 5. 同步作用域：可暴露 using 语法的纯同步资源",
+              "id": "高阶组合示例-5-同步作用域-用-using-确定性释放纯同步资源",
+              "heading": "高阶组合示例 · 5. 同步作用域：用 using 确定性释放纯同步资源",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 环境支持 `[Symbol.dispose]` 时可用 `using`\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n  // 作用域结束时自动 dispose()，移除监听器\n}"
+                  "code": "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 离开作用域时自动调用 [Symbol.dispose]()，同步释放\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n}"
                 }
               ]
             },
@@ -4652,7 +4661,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "这里 `PendingTracker` 只负责“还有多少工作”，`LifecycleScope` 只负责“资源由谁释放”；职责不互相替代。"
+                  "text": "这里 `createPendingTracker()` 产出的 tracker 只负责“还有多少工作”，`LifecycleScope` 只负责“资源由谁释放”；职责不互相替代。"
                 }
               ]
             },
@@ -6299,7 +6308,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })\nconst trace: string[] = []\n\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('before')\n      await next(value + 1)\n      trace.push('after')\n    }\n  ],\n  1,\n  async (value) => trace.push(`done:${value}`)\n)\n\n// ['before', 'done:2', 'after']"
+                  "code": "const pipeline = createPipeline<number>({ mode: MiddlewarePipelineMode.async })\nconst trace: string[] = []\n\nawait pipeline.run(\n  [\n    async (value, next) => {\n      trace.push('before')\n      await next(value + 1)\n      trace.push('after')\n    }\n  ],\n  1,\n  async (value) => {\n    trace.push(`done:${value}`)\n  }\n)\n\n// ['before', 'done:2', 'after']"
                 },
                 {
                   "type": "paragraph",
@@ -9669,7 +9678,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// 服务端：\nconst snapshot = userResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})"
+                  "code": "// 服务端：\nconst snapshot = serverUserResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})"
                 }
               ]
             },
@@ -13948,7 +13957,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}"
+                  "code": "import {\n  createNativeProcessOffer,\n  createProcessPeer,\n  createProcessTransport,\n  type IProcessServeListenerIngress\n} from '@migaia/rpc-process'\nimport {\n  dialProcessByteChannel,\n  listenProcessByteChannel\n} from '@migaia/rpc-process/adapters/node-socket'\n\ntype IServerApi = { math: { double(value: number): number } }\nconst report = (error: unknown) => console.error(error)\n/** This example credential is local fixture data; production callers use their credential owner. */\nconst token = 'full-socket-example'\n/** The actual listener publishes its selected ephemeral port before client construction. */\nlet address = ''\n/** Independent accepted connections receive distinct diagnostic labels. */\nlet sequence = 0\nconst ingress: IProcessServeListenerIngress = {\n  kind: 'listener',\n  address: 'tcp://127.0.0.1:0',\n  listen: async (options) => {\n    const listener = await listenProcessByteChannel(options)\n    address = listener.address\n    return listener\n  },\n  verify: (auth) => {\n    if (auth !== token) throw new Error('unknown client')\n    return 'math-client'\n  },\n  offer: createNativeProcessOffer({ peer: { id: 'math-server', runtime: 'node' }, stream: true }),\n  createConnectionContext: () => {\n    sequence += 1\n    return {\n      peerId: `client-${sequence}`,\n      ipc: {\n        connectionId: `conn-${sequence}`,\n        sessionId: `session-${sequence}`,\n        log: () => undefined\n      }\n    }\n  }\n}\nconst server = await createProcessPeer({\n  listen: ingress,\n  provide: { math: { double: (value: number) => value * 2 } },\n  report\n})\ntry {\n  const client = await createProcessPeer<IServerApi>({\n    report,\n    connect: {\n      kind: 'connect',\n      address,\n      token,\n      dial: (value, signal) =>\n        dialProcessByteChannel({ address: value, signal }),\n      establish: (raw, prepared) =>\n        createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {\n          role: 'initiator',\n          offer: prepared.offer!,\n          peerId: 'math-server',\n          scheduler: prepared.scheduler,\n          signal: prepared.signal,\n          ipc: { ...prepared.session, log: () => undefined },\n          report\n        })\n    }\n  })\n  try {\n    console.log(await client.request('math.double', 21))\n  } finally {\n    await client.close()\n  }\n} finally {\n  await server.close()\n}"
                 },
                 {
                   "type": "paragraph",
@@ -14509,7 +14518,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "拒绝时为 `{ \"kind\": \"handshake\", \"step\": \"reject\", \"protocol\": \"migaia.rpc\", \"error\": <wire error> }`，wire error 的结构见 5.6 节；凭据错误用 code `AUTH_REJECTED`。"
+                  "text": "拒绝时为 `{ \"kind\": \"handshake\", \"step\": \"reject\", \"protocol\": \"migaia.rpc\", \"error\": <wire error> }`，wire error 的结构见 5.6 节；凭据错误用 source `@migaia/rpc/process`、code `PROCESS_CHANNEL_AUTH_REJECTED`。"
                 }
               ]
             },
@@ -15446,7 +15455,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\nimport type { IThreadSpec } from '@migaia/supervision/threads'\nimport type { IAbortSignal } from '@migaia/utils'\nimport type { IScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方提供真实入口与生命周期；返回后负责关闭 channel、terminate 并等待 exited。 */\nexport async function openWorkerChannel(\n  threadSpec: IThreadSpec,\n  signal: IAbortSignal,\n  scheduler: IScheduler\n) {\n  const launcher = createNodeThreadLauncher()\n  const handle = await launcher.launch(threadSpec, { signal })\n  try {\n    const channel = await handle.open(signal, { scheduler })\n    return { handle, channel }\n  } catch (primary) {\n    handle.terminate()\n    await handle.exited\n    throw primary\n  }\n}"
+                  "code": "import { createNodeThreadLauncher } from '@migaia/rpc-threads/adapters/node'\nimport type { IThreadSpec } from '@migaia/supervision/threads'\nimport type { INativeAbortSignal } from '@migaia/utils'\nimport type { IScheduler } from '@migaia/utils/scheduler'\n\n/** 调用方提供真实入口与生命周期；返回后负责关闭 channel、terminate 并等待 exited。 */\nexport async function openWorkerChannel(\n  threadSpec: IThreadSpec,\n  signal: INativeAbortSignal, // launch() 需要宿主原生 AbortSignal\n  scheduler: IScheduler\n) {\n  const launcher = createNodeThreadLauncher()\n  const handle = await launcher.launch(threadSpec, { signal })\n  try {\n    const channel = await handle.open(signal, { scheduler })\n    return { handle, channel }\n  } catch (primary) {\n    handle.terminate()\n    await handle.exited\n    throw primary\n  }\n}"
                 },
                 {
                   "type": "paragraph",
@@ -16036,11 +16045,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `IAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?"
+                  "text": "运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `IAbortSignal` 来自 `@migaia/utils/promise` 的结构化类型（`{ aborted, reason?"
                 },
                 {
                   "type": "paragraph",
-                  "text": ", addEventListener, removeEventListener }`），不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。"
+                  "text": ", addEventListener, removeEventListener }`），本包不重新导出，不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。"
                 }
               ]
             },
@@ -16855,7 +16864,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function collectStream(\n  chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,\n  encoder?: ITextEncoder\n): Promise<ISerializeChunk>;"
+                  "code": "function collectStream(\n  chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,\n  encoder?: ITextEncoder,\n  options?: {\n    readonly signal?: IAbortSignal;\n    readonly empty?: 'text' | 'reject'; // 空流返回空文本（默认）或拒绝\n    readonly context?: string;\n  }\n): Promise<ISerializeChunk>;"
                 },
                 {
                   "type": "paragraph",
@@ -17006,7 +17015,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type IAbortSignal,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';"
+                  "code": "import {\n  SERIALIZE_TYPE_PATTERN,\n  SerializeCodecError,\n  assertSerializeType,\n  isChunkShape,\n  SERIALIZE_SOURCE,\n  SerializeErrorCode,\n  tagSerializeError,\n  createSerializeError,\n  createSerializeTypeError,\n  createSerializeRangeError,\n  base64ToBytes,\n  bytesToBase64,\n  streamBase64Chunks,\n  collectStream,\n  decodeStream,\n  encodeStream,\n  sliceByFrameBudget,\n  type ISerializeChunk,\n  type ISerializeChunkType,\n  type ISerializeContext,\n  type ISerializeOutput,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ITextDecoder,\n  type ITextEncoder,\n  type ISerializeErrorCode,\n  type ISerializeTaggedError,\n  type ISerializeTypeError,\n  type ISerializeRangeError,\n  type ISerializeLifecycleError,\n  type IEncodeStreamOptions,\n  type IFrameBudgetOptions\n} from '@migaia/serialize/core';\nimport type { IAbortSignal } from '@migaia/utils/promise';"
                 },
                 {
                   "type": "paragraph",
@@ -17049,7 +17058,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type IAbortSignal,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';"
+                  "code": "import {\n  createSerializeRegistry,\n  chunkToText,\n  chunkToBytes,\n  type ISerializeChunk,\n  type ISerializeCleanupError,\n  type ISerializeContext,\n  type ISerializeParser,\n  type ISerializePhase,\n  type ISerializePlugin,\n  type ISerializeRegistry,\n  type ISerializeRegistryOptions,\n  type ISerializeTimeoutDiagnostic,\n  type ITextDecoder,\n  type ITextEncoder\n} from '@migaia/serialize/registry';\nimport type { IAbortSignal } from '@migaia/utils/promise';"
                 },
                 {
                   "type": "paragraph",
@@ -18172,7 +18181,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IStorageCapabilities = {\n  readonly syncRead: boolean;\n  readonly binary: boolean;\n  readonly records: boolean;\n  readonly transactions: boolean;\n  readonly iteration: boolean;\n  readonly maxValueBytes: number | undefined;\n  readonly opaqueEntries: boolean;\n};"
+                  "code": "type IStorageCapabilities = {\n  readonly syncRead: boolean;\n  readonly binary: boolean;\n  readonly records: boolean;\n  readonly transactions: boolean;\n  readonly iteration: boolean;\n  readonly secondaryIndexes: boolean;\n  readonly changeFeed: boolean;\n  readonly maxValueBytes: number | undefined;\n  readonly opaqueEntries: boolean;\n};"
                 },
                 {
                   "type": "paragraph",
@@ -18662,7 +18671,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { cookiesHost } from '@migaia/storage-web/cookiesHost'"
+                  "code": "import { cookiesHost } from '@migaia/storage-web/cookies'"
                 },
                 {
                   "type": "paragraph",
@@ -19117,7 +19126,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookiesHost'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
+                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookies'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
                 }
               ]
             },
@@ -19440,7 +19449,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { cookiesHost } from '@migaia/storage-web/cookiesHost'\n\nconst jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nconsole.log(await jar.get('session')) // 'abc123'\nawait jar.remove('session')\nconsole.log(await jar.get('session')) // null"
+                  "code": "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })\nawait jar.set('session', 'abc123', { maxAge: 3600 })\nconsole.log(await jar.get('session')) // 'abc123'\nawait jar.remove('session')\nconsole.log(await jar.get('session')) // null"
                 }
               ]
             },
@@ -19793,7 +19802,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IKeyValueStore = {\n  readonly backend: IBackendKind // 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'\n  readonly capabilities: IStorageCapabilities\n  get(key: string, ctx?: IOperationContext): Promise<string | null>\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>\n  remove(key: string, ctx?: IOperationContext): Promise<void>\n  has(key: string, ctx?: IOperationContext): Promise<boolean>\n  keys(ctx?: IOperationContext): Promise<string[]>\n  clearValues(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  dispose(): Promise<void>\n  readonly sync?: ISyncKeyValueStore // 仅同步后端提供\n}\n\ntype IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>\n  clearBytes(ctx?: IOperationContext): Promise<void>\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>\n  clearRecords(ctx?: IOperationContext): Promise<void>\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>\n    delete(key: string, ctx?: IOperationContext): Promise<void>\n  }\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}\n\ntype IStorageCapabilities = {\n  readonly syncRead: boolean\n  readonly binary: boolean\n  readonly records: boolean\n  readonly transactions: boolean\n  readonly iteration: boolean\n  readonly secondaryIndexes: boolean\n  readonly changeFeed: boolean\n  readonly maxValueBytes: number | undefined\n  readonly opaqueEntries: boolean\n}\n\ntype IOperationContext = {\n  readonly signal?: IAbortSignal // 协作式取消\n  readonly timeoutMs?: number // 内部合成为 signal；与外部 signal 同时存在时取先触发者\n  readonly pageSize?: number // IndexedDB 游标分页大小，默认 128\n}\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy }\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy }\n\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[]\ntype IKeyRange = {\n  readonly lower?: IStorageKey\n  readonly lowerOpen?: boolean\n  readonly upper?: IStorageKey\n  readonly upperOpen?: boolean\n}"
+                  "code": "type IKeyValueStore = {\n  readonly backend: IBackendKind // 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'\n  readonly capabilities: IStorageCapabilities\n  get(key: string, ctx?: IOperationContext): Promise<string | null>\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>\n  remove(key: string, ctx?: IOperationContext): Promise<void>\n  has(key: string, ctx?: IOperationContext): Promise<boolean>\n  keys(ctx?: IOperationContext): Promise<string[]>\n  clearValues(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  dispose(): Promise<void>\n  readonly sync?: ISyncKeyValueStore // 仅同步后端提供\n}\n\ntype IRecordStore<TValue = unknown> = IKeyValueStore & {\n  getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>\n  setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>\n  clearBytes(ctx?: IOperationContext): Promise<void>\n  getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>\n  putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>\n  deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>\n  clearRecords(ctx?: IOperationContext): Promise<void>\n  clearAll(ctx?: IOperationContext): Promise<void>\n  readonly metadata?: {\n    get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>\n    set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>\n    delete(key: string, ctx?: IOperationContext): Promise<void>\n  }\n  iterateRecords(\n    range?: IKeyRange,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<[IStorageKey, TValue]>\n  transaction<T>(\n    run: (tx: ITransactionScope<TValue>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}\n\ntype IStorageCapabilities = {\n  readonly syncRead: boolean\n  readonly binary: boolean\n  readonly records: boolean\n  readonly transactions: boolean\n  readonly iteration: boolean\n  readonly secondaryIndexes: boolean\n  readonly changeFeed: boolean\n  readonly maxValueBytes: number | undefined\n  readonly opaqueEntries: boolean\n}\n\ntype IOperationContext = {\n  readonly signal?: IAbortSignal // 协作式取消\n  readonly timeoutMs?: number // 内部合成为 signal；与外部 signal 同时存在时取先触发者\n  readonly pageSize?: number // IndexedDB 游标分页大小，默认 128\n}\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy }\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy }\n\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[]\ntype IKeyRange = {\n  readonly lower?: IStorageKey\n  readonly lowerOpen?: boolean\n  readonly upper?: IStorageKey\n  readonly upperOpen?: boolean\n}"
                 },
                 {
                   "type": "paragraph",
@@ -20030,7 +20039,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n}"
+                  "code": "function defineEntity<TDomain, TStored = TDomain>(\n  options: IEntityOptions<TDomain, TStored>\n): IEntityDefinition<TDomain>\n\ntype IEntityDefinition<TDomain> = {\n  readonly name: string\n  readonly version: number\n  connect(store: IKeyValueStore): IRepository<TDomain>\n}\n\ntype IEntityOptions<TDomain, TStored = TDomain> = {\n  readonly name: string\n  readonly key: Extract<keyof TDomain, string>\n  readonly schema?: ISchemaAdapter<TDomain, TStored>\n  readonly codec?: ICodec<unknown, unknown>\n  readonly version?: number\n  readonly migrations?: Record<number, IMigration>\n  readonly validateOnRead?: boolean\n  readonly onDiagnostic?: (message: string) => void\n  readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number\n  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy\n}"
                 },
                 {
                   "type": "paragraph",
@@ -20071,7 +20080,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}"
+                  "code": "type IRepository<TDomain> = {\n  get(id: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  put(value: TDomain, ctx?: IOperationContext): Promise<IStorageKey>\n  remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>\n  list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>\n  stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>\n  findBy(index: string, key: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>\n  findManyBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): Promise<TDomain[]>\n  streamBy(\n    index: string,\n    range?: IKeyRange,\n    options?: Omit<IListOptions<TDomain>, 'range'>,\n    ctx?: IOperationContext\n  ): AsyncIterableIterator<TDomain>\n  migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>\n  batch<T>(\n    run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,\n    ctx?: IOperationContext\n  ): Promise<T>\n}"
                 },
                 {
                   "type": "paragraph",
@@ -20120,7 +20129,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
+                  "code": "type IListOptions<TRecord = unknown> = {\n  readonly range?: IKeyRange\n  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）\n  readonly limit?: number\n  readonly orderBy?: (left: TRecord, right: TRecord) => number\n  readonly direction?: 'next' | 'prev'\n  readonly onInvalid?:\n    'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')\n}\ntype IInvalidRecordIssue<TRecord = unknown> = {\n  readonly key: IStorageKey\n  readonly raw: unknown\n  readonly record?: TRecord\n  readonly stage: 'decode' | 'migrate' | 'validate'\n  readonly cause: unknown\n}"
                 },
                 {
                   "type": "list",
@@ -20234,7 +20243,7 @@
                     ["`plugins/memory`", "`memoryBackendPlugin`", "`memory`"],
                     ["`plugins/local-storage`", "`localStorageBackendPlugin`", "`local`"],
                     ["`plugins/session-storage`", "`sessionStorageBackendPlugin`", "`session`"],
-                    ["`plugins/cookiesHost`", "`cookieBackendPlugin`", "`cookiesHost`"],
+                    ["`plugins/cookies`", "`cookieBackendPlugin`", "`cookies`"],
                     ["`plugins/indexed-db`", "`indexedDbBackendPlugin`", "`indexed-db`"]
                   ]
                 },
@@ -20616,7 +20625,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookiesHost'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
+                  "code": "import { asRecordStore, isRecordStore } from '@migaia/storage-contract'\nimport { cookiesHost } from '@migaia/storage-web/cookies'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })\nconst fallback = memoryStorageHost()\nconst store = isRecordStore(primary) ? asRecordStore(primary) : fallback\n// cookiesHost 是 L0-only，isRecordStore(primary) 为 false，实际会走 memoryStorageHost 分支"
                 }
               ]
             },
@@ -21651,7 +21660,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "if (event.operation === IndexedOperation.write) reportMutation(event)"
+                  "code": "// event 是消费方自己的诊断事件；operation 字段用 IndexedOperation 词表取值\nconst reportMutation = (event: { operation: IIndexedOperation }) => console.log('mutation', event)\nconst event: { operation: IIndexedOperation } = { operation: IndexedOperation.write }\nif (event.operation === IndexedOperation.write) reportMutation(event)"
                 },
                 {
                   "type": "paragraph",
@@ -23287,7 +23296,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`familyDisposed`(`FAMILY_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`evictionFailed`(`EVICTION_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
+                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
                 },
                 {
                   "type": "paragraph",
@@ -23389,7 +23398,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
+                  "code": "import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst todosDef = atomDef([{ done: true }, { done: false }])\nconst doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
                 }
               ]
             },
@@ -24081,7 +24090,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -24221,18 +24230,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -24896,7 +24898,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStore } from '@migaia/store-light'\nimport { createObjectLeaseRegistry } from '@migaia/lifecycle'\n\nconst store = createStore({ items: [] as string[] })\nconst registry = store.$own(createObjectLeaseRegistry())\n// registry 会在 store.$dispose() 时一并释放，无需单独管理"
+                  "code": "import { createStore } from '@migaia/store-light'\n\nconst store = createStore({ items: [] as string[] })\nconst timer = setInterval(() => console.log('poll'), 1_000)\nlet disposed = false\n// $own 接收 IDisposable（dispose() + disposed），典型资源是 collection 等外部结构\nconst poller = store.$own({\n  get disposed() {\n    return disposed\n  },\n  dispose() {\n    if (disposed) return\n    disposed = true\n    clearInterval(timer)\n  }\n})\n// poller 会在 store.$dispose() 时一并释放，无需单独管理"
                 }
               ]
             },
@@ -24907,7 +24909,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
+                  "code": "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
                 }
               ]
             },
@@ -25274,7 +25276,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "同步 vs 异步字段：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `LegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve。"
+                  "text": "同步 vs 异步字段：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `ILegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve。"
                 },
                 {
                   "type": "paragraph",
@@ -25283,7 +25285,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}"
+                  "code": "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}"
                 }
               ]
             },
@@ -25397,9 +25399,9 @@
                     [
                       "`retainVersion(version)`",
                       "`(number \\",
-                      "VersionToken) => () => void`",
+                      "IVersionToken) => () => void`",
                       "`version: number \\",
-                      "VersionToken`",
+                      "IVersionToken`",
                       "同步",
                       "锁定某个具体版本不被回收（即使后续 `retry()` 产生了新版本），常用于\"后台刷新但保留当前渲染值\""
                     ],
@@ -25407,7 +25409,7 @@
                       "`retain(version?)`",
                       "`(version?) => () => void`",
                       "`version?: number \\",
-                      "VersionToken`",
+                      "IVersionToken`",
                       "同步",
                       "`retainResource`/`retainVersion` 的兼容合并入口，已废弃，新代码请直接用上面两个"
                     ],
@@ -25465,7 +25467,7 @@
                       "`() => { value, version, token }`",
                       "无",
                       "同步",
-                      "同 `read()`，但额外带上版本号和 `VersionToken`，供需要精确版本信息的调用方使用"
+                      "同 `read()`，但额外带上版本号和 `IVersionToken`，供需要精确版本信息的调用方使用"
                     ],
                     [
                       "`captureSnapshot(existingLease?)`",
@@ -25479,8 +25481,8 @@
               ]
             },
             {
-              "id": "8-3-storeresourceoptions",
-              "heading": "8.3 StoreResourceOptions",
+              "id": "8-3-istoreresourceoptions",
+              "heading": "8.3 IStoreResourceOptions",
               "blocks": [
                 {
                   "type": "table",
@@ -25529,7 +25531,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
+                  "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`IStoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
                 },
                 {
                   "type": "paragraph",
@@ -25700,7 +25702,7 @@
                       "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
                     ],
                     [
-                      "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
+                      "`this node is already owned by another Runtime` / `${what} belongs to a different Runtime than this scope` / `${what} is not a Runtime-owned reactive node` / `${what} belongs to another Runtime`",
                       "`$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）"
                     ],
                     [
@@ -25725,7 +25727,7 @@
                     ],
                     [
                       "`[store] keepAliveMs must be a finite non-negative number`（`RangeError`）",
-                      "`StoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
+                      "`IStoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
                     ]
                   ]
                 }
@@ -25782,7 +25784,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`createStore()` 报 \"only accepts synchronous fields\"，但我看代码是同步的。 检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `LegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()` 接受。"
+                  "text": "Q：`createStore()` 报 \"only accepts synchronous fields\"，但我看代码是同步的。 检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `ILegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()` 接受。"
                 },
                 {
                   "type": "paragraph",
@@ -25923,7 +25925,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';"
+                  "code": "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';"
                 },
                 {
                   "type": "paragraph",
@@ -26007,16 +26009,16 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`StoreMiddlewareHost`｜10 秒上手 —— `createStoreMiddlewareHost()` 背后的类，`extends PluginHost`："
+                  "text": "`IStoreMiddlewareHost<S>`｜10 秒上手 —— `createStoreMiddlewareHost()` 返回的冻结句柄（不是类，没有 `new`）。它通过 `@migaia/plugin-host` 的 `defineHost` 组合而成，同时带有宿主公共成员（`use`/`unUse`/`dispose` 等）和下面的 Store 领域成员："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const host = new StoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state\n});\nhost.runAction('increment', () => {\n  state = { ...state, count: state.count + 1 };\n});\n  await host.dispose(); // returns the structured PluginHost disposal result"
+                  "code": "import { createRuntime } from '@migaia/reactive';\nimport { createStoreMiddlewareHost } from '@migaia/store-middleware';\n\nconst runtime = createRuntime();\nlet state = { count: 0 };\nconst host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state\n});\nhost.runAction('increment', () => {\n  state = { ...state, count: state.count + 1 };\n});\nawait host.dispose(); // returns the structured PluginHost disposal result"
                 },
                 {
                   "type": "paragraph",
-                  "text": "构造参数同 `createStoreMiddlewareHost`。实例成员："
+                  "text": "领域成员："
                 },
                 {
                   "type": "list",
@@ -26028,7 +26030,7 @@
                     "`recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void` —— 派发一个 `error` 事件；重入（处理上一个 `error` 事件期间又调用）时直接转发给 `runtime.reportError`，不再触发一轮 pipeline",
                     "`connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>` —— `name` 默认 `'store-devtools'`",
                     "`attachBindingDisposer(disposer: IDisposer): void` —— 登记额外的清理函数，`dispose()` 时按后进先出顺序先于插件卸载执行",
-                    "`override dispose(): Promise<void>` —— 稳定 Promise（重复调用返回同一个）；多项清理失败抛 `code: 'CLEANUP_FAILED'` 的 `AggregateError`"
+                    "`dispose()` —— 先逆序执行绑定 disposer，再委托 plugin-host 卸载插件；返回结构化结果 `{ logicalTerminal, cleanupComplete, cleanupErrors }`，绑定 disposer 抛出的错误排在 `cleanupErrors` 前面，不会以异常形式抛出"
                   ]
                 },
                 {
@@ -26086,7 +26088,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "返回值是 `StoreMiddlewareHost` 实例，额外挂了只读的 `store` 属性指回传入的 Store。"
+                  "text": "返回值是一个新的冻结对象：带有 `IStoreMiddlewareHost` 的全部成员，外加只读的 `store` 属性指回传入的 Store。若绑定过程中订阅失败且回滚清理也失败，`bindStoreMiddleware()` 抛 `code: 'CLEANUP_FAILED'` 的 `AggregateError`（原始错误位于 `errors[0]`）。"
                 },
                 {
                   "type": "paragraph",
@@ -26206,7 +26208,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "与根导出中同名的 `ClonePolicy`/`immutableSnapshotClone`/`opaqueReferenceClone`/`diagnosticClone`/`tolerantClone` 是同一份实现（根导出 `export * from './tolerant-clone.js'`）；这个子路径只是给只需要克隆策略、不想连带引入 `StoreMiddlewareHost`/`bindStoreMiddleware` 等其余符号的调用方一个更窄的导入面。用法与全部选项见上方根导出对应条目。"
+                  "text": "与根导出中同名的 `ClonePolicy`/`immutableSnapshotClone`/`opaqueReferenceClone`/`diagnosticClone`/`tolerantClone` 是同一份实现（根导出 `export * from './tolerant-clone.js'`）；这个子路径只是给只需要克隆策略、不想连带引入 `createStoreMiddlewareHost`/`bindStoreMiddleware` 等其余符号的调用方一个更窄的导入面。用法与全部选项见上方根导出对应条目。"
                 }
               ]
             },
@@ -26217,7 +26219,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();"
+                  "code": "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware<Record<string, unknown>>());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();"
                 }
               ]
             },
@@ -26296,7 +26298,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 定位与依赖关系 2. 事件模型 3. MutationPolicy 写入策略 4. StoreMiddlewareHost API 参考 5. bindStoreMiddleware 完整行为 6. 编写中间件插件 7. DevTools 集成 8. ClonePolicy 克隆策略 9. Pipeline 模式与错误边界 10. 生命周期与资源释放 11. 与相关包的关系 12. 常见问题排查"
+                  "text": "1. 定位与依赖关系 2. 事件模型 3. MutationPolicy 写入策略 4. IStoreMiddlewareHost API 参考 5. bindStoreMiddleware 完整行为 6. 编写中间件插件 7. DevTools 集成 8. ClonePolicy 克隆策略 9. Pipeline 模式与错误边界 10. 生命周期与资源释放 11. 与相关包的关系 12. 常见问题排查"
                 }
               ]
             },
@@ -26306,12 +26308,12 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`@migaia/store-middleware` 依赖 `@migaia/store-light`（Store 本体）、`@migaia/reactive`（Runtime）和 `@migaia/plugin-host`（通用插件宿主机制）。它自己不实现插件安装/卸载/资源清理这些通用能力，全部通过继承 `PluginHost` 复用；这一层只负责\"Store 领域该有哪些事件、哪些写入策略\"。"
+                  "text": "`@migaia/store-middleware` 依赖 `@migaia/store-light`（Store 本体）、`@migaia/reactive`（Runtime）和 `@migaia/plugin-host`（通用插件宿主机制）。它自己不实现插件安装/卸载/资源清理这些通用能力，全部通过 `@migaia/plugin-host` 的 `defineHost` 组合复用；这一层只负责\"Store 领域该有哪些事件、哪些写入策略\"。"
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { StoreMiddlewareHost } from '@migaia/store-middleware';\n// StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>>"
+                  "code": "import { createStoreMiddlewareHost, type IStoreMiddlewareHost } from '@migaia/store-middleware';\n// IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Store 领域成员"
                 },
                 {
                   "type": "paragraph",
@@ -26413,17 +26415,17 @@
               ]
             },
             {
-              "id": "4-storemiddlewarehost-api-参考",
-              "heading": "4. StoreMiddlewareHost API 参考",
+              "id": "4-istoremiddlewarehost-api-参考",
+              "heading": "4. IStoreMiddlewareHost API 参考",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {\n  readonly mutationPolicy: MutationPolicy;\n  constructor(options: IStoreMiddlewareHostOptions<S>);\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n  override dispose(): Promise<void>;\n}\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};"
+                  "code": "function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;\n\n// 冻结句柄：IHostHandle 的公共成员（use/unUse/dispose 等）加下列 Store 领域成员\ntype IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & {\n  readonly mutationPolicy: MutationPolicy;\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n};\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};"
                 },
                 {
                   "type": "paragraph",
-                  "text": "构造函数会强制把 pipeline 模式覆盖成 `'sync'`——即便 `options.pipeline.mode` 传了别的值也会被覆盖。原因：Store 领域事件要求同步、可预测的处理顺序，中间件不应该让一次状态变化的观察产生跨微任务的乱序。这意味着所有中间件插件只能用 `core.usePipeline`，调用 `core.useAsyncPipeline`/`core.useGeneratorPipeline` 会触发 `@migaia/plugin-host` 的 `PIPELINE_MODE_MISMATCH` 错误。"
+                  "text": "`createStoreMiddlewareHost()` 会强制把 pipeline 模式覆盖成 `'sync'`——即便 `options.pipeline.mode` 传了别的值也会被覆盖。原因：Store 领域事件要求同步、可预测的处理顺序，中间件不应该让一次状态变化的观察产生跨微任务的乱序。这意味着所有中间件插件只能用 `core.usePipeline`，调用 `core.useAsyncPipeline`/`core.useGeneratorPipeline` 会触发 `@migaia/plugin-host` 的 `PIPELINE_MODE_MISMATCH` 错误。"
                 },
                 {
                   "type": "table",
@@ -26462,7 +26464,7 @@
                       "`adapter: IDevToolsAdapter<S>`；`name?: string`",
                       "异步",
                       "见 §7",
-                      "安装失败按 `PluginHost.use()` 的规则处理"
+                      "安装失败按 `host.use()` 的规则处理"
                     ],
                     [
                       "`attachBindingDisposer(disposer)`",
@@ -26495,7 +26497,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 structuredClone\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
+                  "code": "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 ClonePolicy.diagnostic\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
                 },
                 {
                   "type": "paragraph",
@@ -26503,7 +26505,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `structuredClone`，因此每次读取都是一份新的独立快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。"
+                  "text": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `ClonePolicy.diagnostic`（尽力深拷贝，不抛错），因此每次读取都是一份新的快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。"
                 },
                 {
                   "type": "paragraph",
@@ -26525,7 +26527,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "返回值是 `StoreMiddlewareHost` 实例本身，额外挂了一个只读的 `store` 属性指回传入的 Store，方便拿到 Host 后还能访问原始 Store。"
+                  "text": "返回值是一个新的冻结对象：带有 Host 句柄的全部成员，额外挂了一个只读的 `store` 属性指回传入的 Store，方便拿到 Host 后还能访问原始 Store。"
                 }
               ]
             },
@@ -26659,7 +26661,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`bindStoreMiddleware()` 默认用的是 `state => structuredClone(state)`，语义上等同于手写了一份不带错误兜底的 `immutable`。如果 Store 状态里可能出现不可结构化克隆的值（比如存了一个类实例、`Map`、外部句柄），默认 `clone` 会直接抛错；这种情况下应该显式传 `options.clone: ClonePolicy.diagnostic`（保留诊断可用性）或 `ClonePolicy.opaque`（接受引用共享、换取零开销）。"
+                  "text": "`bindStoreMiddleware()` 默认用的是 `state => ClonePolicy.diagnostic(state)`：尽力深拷贝，遇到不可结构化克隆的值（类实例、外部句柄等）时按引用保留那个子树，不抛错。需要严格独立快照时显式传 `options.clone: ClonePolicy.immutable`（做不到就抛错）；接受引用共享、换取零开销时传 `ClonePolicy.opaque`。"
                 },
                 {
                   "type": "paragraph",
@@ -26673,18 +26675,18 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "包边界错误带 `source: '@migaia/store-middleware'` 与稳定 `code`。`actions-only` 越界写入为 `ACTION_SCOPE_REQUIRED`；不可克隆值为 `CLONE_UNSUPPORTED`；遗漏 `next()` 只经 Runtime 报告 `MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；多项清理失败为 `CLEANUP_FAILED`。"
+                  "text": "包边界错误带 `source: '@migaia/store-middleware'` 与稳定 `code`。`actions-only` 越界写入为 `ACTION_SCOPE_REQUIRED`；不可克隆值为 `CLONE_UNSUPPORTED`；遗漏 `next()` 只经 Runtime 报告 `MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；`bindStoreMiddleware()` 绑定失败且回滚清理也失败时为 `CLEANUP_FAILED`。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "`StoreMiddlewareHost` 的 pipeline 模式固定是 `sync`（见 §4），这决定了："
+                  "text": "Host 的 pipeline 模式固定是 `sync`（见 §4），这决定了："
                 },
                 {
                   "type": "list",
                   "items": [
                     "中间件只能用 `core.usePipeline((event, next) => void)`，`next(event)` 必须在 stage 函数返回前调用。",
                     "sync 是\"扁平转换管道\"：`next()` 只是记录下一个值，下游 stage 在当前 stage 返回之后才执行，当前 stage 调用 `next()` 之后无法同步观察到下游已经处理完的结果（想要\"后置逻辑能看到下游效果\"的洋葱模型语义，需要 async pipeline——但本包的 Host 不支持切换）。",
-                    "`emit()`/`runAction()`/`recordState()`/`recordError()` 内部统一走 `#emitIsolated()`：中间件 stage 抛出的异常会被捕获，通过 `runtime.reportError(error, { phase: 'trace-listener' })` 上报，不会从 `recordState()`/`recordError()` 等调用点抛出；唯一的例外是 `runAction()` 包裹的业务函数本身抛错——那是业务异常，会原样重新抛出给调用方。",
+                    "`emit()`/`runAction()`/`recordState()`/`recordError()` 内部统一走隔离派发（`emitIsolated`）：中间件 stage 抛出的异常会被捕获，通过 `runtime.reportError(error, { phase: 'trace-listener' })` 上报，不会从 `recordState()`/`recordError()` 等调用点抛出；唯一的例外是 `runAction()` 包裹的业务函数本身抛错——那是业务异常，会原样重新抛出给调用方。",
                     "如果一个 pipeline stage 忘了调用 `next()`，`emit()` 会检测到 `completed` 标记未被置位，同样以 `phase: 'trace-listener'` 上报一条 `[store] middleware did not call next()` 错误。"
                   ]
                 },
@@ -26702,7 +26704,7 @@
                   "type": "list",
                   "items": [
                     "`host.use(plugin)` / `host.unUse(name)` / `host.dispose()` 都是异步 API，语义完全继承自 `@migaia/plugin-host`——安装失败自动回滚，卸载资源自动逆序清理。",
-                    "`StoreMiddlewareHost` 重写了 `dispose()`：先按后进先出顺序执行 `attachBindingDisposer()` 登记的 disposer（`bindStoreMiddleware()` 用它登记状态订阅和 trace 订阅的取消函数），再调用 `super.dispose()` 卸载所有已安装插件。",
+                    "Host 通过 `defineHost` 的 `dispose` 钩子：先按后进先出顺序执行 `attachBindingDisposer()` 登记的 disposer（`bindStoreMiddleware()` 用它登记状态订阅和 trace 订阅的取消函数），再委托 plugin-host 卸载所有已安装插件。结果是结构化的 `{ logicalTerminal, cleanupComplete, cleanupErrors }`，绑定 disposer 的错误排在 `cleanupErrors` 前面，不以异常抛出。",
                     "`host.dispose()` 不会销毁 Store 或 Runtime，只释放这个 middleware Host 自己拥有的资源（订阅、已安装插件）。",
                     "同一个 Host 内插件名称必须唯一；重复安装同名插件会按 `@migaia/plugin-host` 的规则报错。",
                     "middleware 诊断层的失败不应该、也不会阻断业务写入；真正的业务异常仍按原始异常传播（见 §9）。"
@@ -26753,19 +26755,19 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：装了一个用 `useAsyncPipeline` 注册 stage 的插件，报 `PIPELINE_MODE_MISMATCH`。 `StoreMiddlewareHost` 的 pipeline 模式固定是 `sync`，构造时传的 `pipeline.mode` 会被强制覆盖，见 §4。中间件只能用 `core.usePipeline`。"
+                  "text": "Q：装了一个用 `useAsyncPipeline` 注册 stage 的插件，报 `PIPELINE_MODE_MISMATCH`。 Host 的 pipeline 模式固定是 `sync`，创建时传的 `pipeline.mode` 会被强制覆盖，见 §4。中间件只能用 `core.usePipeline`。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`connectDevTools()` 报错 `[store] DevTools state command requires applyState`。 构造 `StoreMiddlewareHost` 时没有传 `applyState`；如果是自己 `new StoreMiddlewareHost(.)` 而不是用 `bindStoreMiddleware()`，需要手动提供 `applyState` 才能支持 DevTools 的 `jump`/`reset`。"
+                  "text": "Q：`connectDevTools()` 报错 `[store] DevTools state command requires applyState`。 创建 Host 时没有传 `applyState`；如果是自己调用 `createStoreMiddlewareHost(.)` 而不是用 `bindStoreMiddleware()`，需要手动提供 `applyState` 才能支持 DevTools 的 `jump`/`reset`。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`state` 事件里的 `previous`/`next` 拿到的是同一个对象，改了一个另一个也变了。 检查是否自定义了 `options.clone` 且传的是 `ClonePolicy.opaque`（有意不拷贝，返回同一引用）——如果需要独立快照，用默认的 `structuredClone` 或显式传 `ClonePolicy.immutable`/`ClonePolicy.diagnostic`。"
+                  "text": "Q：`state` 事件里的 `previous`/`next` 拿到的是同一个对象，改了一个另一个也变了。 检查是否自定义了 `options.clone` 且传的是 `ClonePolicy.opaque`（有意不拷贝，返回同一引用）——如果需要独立快照，用默认的 `ClonePolicy.diagnostic` 或显式传 `ClonePolicy.immutable`。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`getState()` 在状态树很大、事件很密集时明显拖慢速度。 默认 `clone` 是 `structuredClone`，每次调用都做一次完整深拷贝。如果不需要\"绝对独立\"这个保证，换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。"
+                  "text": "Q：`getState()` 在状态树很大、事件很密集时明显拖慢速度。 默认 `clone` 是 `ClonePolicy.diagnostic`，每次调用都做一次尽力深拷贝。如果不需要\"绝对独立\"这个保证，换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。"
                 },
                 {
                   "type": "paragraph",
@@ -26773,7 +26775,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q：`host.dispose()` 抛了一个 `AggregateError`。 检查 `error.errors`——里面是绑定 disposer（状态订阅、trace 订阅）和插件卸载各自抛出的原始错误；`code` 固定是 `CLEANUP_FAILED`，见 §10。"
+                  "text": "Q：`host.dispose()` 的清理错误在哪里？ `dispose()` 不抛清理错误，而是返回 `{ logicalTerminal, cleanupComplete, cleanupErrors }`；`cleanupErrors` 里先是绑定 disposer（状态订阅、trace 订阅）的原始错误，再是插件卸载的错误，见 §10。`CLEANUP_FAILED` 的 `AggregateError` 只出现在 `bindStoreMiddleware()` 绑定失败且回滚清理也失败时。"
                 },
                 {
                   "type": "code",
@@ -26869,7 +26871,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { persist } from '@migaia/store-persist/light';\n// 或：import { persist } from '@migaia/store-persist';（包根统一转出全部子路径）"
+                  "code": "import { persist } from '@migaia/store-persist/light';"
                 },
                 {
                   "type": "paragraph",
@@ -27262,7 +27264,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\ntype IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };"
+                  "code": "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\n// 与 persist()/persistCollection() 相同的 IPersistHandle（status、ready、flush、clear、dispose 等），外加当前值\ntype IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T };"
                 }
               ]
             },
@@ -27918,7 +27920,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "单参数 `debugName: string`（必填，非空——空字符串抛 `[store] StoreToken requires a debug name`），同时作为报错信息里的可读定位名。"
+                  "text": "单参数 `debugName: string`（必填，非空——空字符串抛 `[store] IStoreToken requires a debug name`），同时作为报错信息里的可读定位名。"
                 },
                 {
                   "type": "paragraph",
@@ -28018,7 +28020,7 @@
                 {
                   "type": "code",
                   "language": "tsx",
-                  "code": "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
+                  "code": "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore, type IReactiveStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken<IReactiveStore<{ userId: string }>>('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
                 }
               ]
             },
@@ -28286,7 +28288,7 @@
                   "items": [
                     "元素身份在挂载后被锁定。`config.ready` 数组第一次渲染时的值会被存入 `ref`，后续渲染即使传入新数组，只要按元素浅比较（`===`，逐项）与旧数组相等就视为同一份；只要有一项引用变了，就会触发身份变化处理——但新数组不会生效，Provider 继续用挂载时那份旧屏障，同时在开发环境 `console.warn`、生产环境 `console.error` 一条 `[store] StoreProvider ready barriers changed identity; ...`。这意味着内联字面量 `config={{ ready: [fetchUser()] }}` 每次 render 都会打印警告且不会重新等待——务必用 `useMemo` 或模块级常量稳住 `ready` 数组与其元素的引用。",
                     "工厂函数只执行一次（按屏障列表身份缓存）。`ready: [() => ensureWasm()]` 里的工厂在同一个 barrier 数组的生命周期内只会被调用一次，结果被 `WeakMap` 缓存复用；但缓存 key 是\"归一化后的屏障数组\"本身，不是全局按工厂函数缓存——不同的 Provider/SSR 请求作用域各自独立执行一次，互不共享。工厂执行不保证在\"React 放弃的渲染\"下恰好执行一次；非幂等的初始化逻辑应该自己用一个模块级 memoized Promise，而不是依赖这里的缓存语义。",
-                    "reject 会变成一个真实抛出的 `Error`。非 `Error` 类型的 reject 原因会被包装成 `new Error(\\`[store] ready barrier rejected: ${String(reason)}\\`)`；`ReadyBoundary`在 render 阶段`throw` 它，只能被外层 React Error Boundary 捕获，`StoreProvider` 自己不提供错误 UI。",
+                    "reject 会变成一个真实抛出的 `Error`。非 `Error` 类型的 reject 原因会被包装成消息为 `[store] ready barrier rejected`、`code: 'READY_REJECTED'` 的 `Error`，原始原因在 `cause` 上；`ReadyBoundary`在 render 阶段`throw` 它，只能被外层 React Error Boundary 捕获，`StoreProvider` 自己不提供错误 UI。",
                     "已经 settle 的 Promise 不保证首帧同步生效。`ITrackedReady.status()` 是同步查询，但 track 逻辑是在 Promise then 回调（微任务）里更新状态，所以哪怕传入的 Promise 已经 resolve，`ReadyBoundary` 首次渲染仍可能读到 `pending`，随后一个 effect 里同步刷新到 `ready`——多数场景感知不到，但如果你依赖\"reload 后立刻同步渲染最终内容、不闪 fallback\"，需要注意这个微任务延迟。"
                   ]
                 }
@@ -28581,7 +28583,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "产出一个冻结的、带类型参数 `T` 的 key（内部是一个 `Symbol`）。`debugName` 为空字符串会抛 `[store] StoreToken requires a debug name`——它同时是调试信息，出现在所有相关报错消息里，务必取一个能定位到业务含义的名字。"
+                  "text": "产出一个冻结的、带类型参数 `T` 的 key（内部是一个 `Symbol`）。`debugName` 为空字符串会抛 `[store] IStoreToken requires a debug name`——它同时是调试信息，出现在所有相关报错消息里，务必取一个能定位到业务含义的名字。"
                 }
               ]
             },
@@ -28610,7 +28612,7 @@
                     "`dispose()` 是同步、幂等的：反向遍历已注册的 owned 实体逐个释放，再释放 `atomStore`；某个实体的 `dispose()` 若返回一个 thenable，`dispose()` 不会等它（本身是同步方法），但会跟踪这个 Promise 并在其 reject 时经 `runtime.reportError` 上报，不会变成未处理的 rejection。多个实体报错时抛 `AggregateError('[store] provider registry disposal failed')`。",
                     "`disposeAsync()` 是异步、单飞（多次并发调用共享同一次执行）的对应版本：会真正 `await` 每个 thenable 释放结果；对一个已经同步 `dispose()` 过的 Registry 调用，不会当作\"已经完成\"直接 resolve，而是等待 `dispose()` 当时来不及等待、仍在跑的那些异步释放全部 settle。",
                     "thenable 采用 lifecycle 的统一接纳语义：只读取一次 `then` getter，并以原 thenable 作为 receiver 调用捕获到的函数。getter 抛出的原始异常不会被替换；同步 `dispose()` 会原样抛出，之后的 `disposeAsync()` 会通过其稳定 Promise 原样重放。",
-                    "`whenTerminal()` / `lifecycle`：暴露统一的 `AsyncLifecycle` 形状（`open` → `closing` → `terminal`），`whenTerminal()` 在真正走到 `terminal`（含所有异步释放都 settle）才 resolve。"
+                    "`whenTerminal()` / `lifecycle`：暴露统一的生命周期形状（`@migaia/lifecycle` 的 `ILifecycleState`：`open` → `closing` → `terminal`），`whenTerminal()` 在真正走到 `terminal`（含所有异步释放都 settle）才 resolve。"
                   ]
                 }
               ]
@@ -28694,7 +28696,7 @@
                       "传入 `ready: [ensureWasm]`（来自 `@migaia/store-wasm`）或其它就绪 Promise"
                     ],
                     [
-                      "`[store] ready barrier rejected: ...`",
+                      "`[store] ready barrier rejected`（原因在 `cause`）",
                       "某个 `ready` 屏障 reject 且原因不是 `Error` 实例",
                       "检查具体屏障的失败原因；这个 Error 会从 `ReadyBoundary` 的 render 抛出，需要外层 Error Boundary 捕获"
                     ],
@@ -28734,7 +28736,7 @@
                       "用同一个 Runtime 创建要注册的实例，或换一个 Registry"
                     ],
                     [
-                      "`[store] StoreToken requires a debug name`",
+                      "`[store] IStoreToken requires a debug name`",
                       "`createStoreToken('')`",
                       "传一个非空的调试名"
                     ],
@@ -30892,7 +30894,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// 写入\nconst html = createSSRStateScript(state); // 默认 elementId = '__STORE_STATE__'\n// => <script type=\"application/json\" id=\"__STORE_STATE__\">{\"version\":1,...}</script>\n\n// 读取(浏览器端)\nconst state = readSSRStateFromDocument(); // 默认同一个 elementId"
+                  "code": "// 写入(服务端)\nconst html = createSSRStateScript(scope.dehydrate()); // 默认 elementId = '__STORE_STATE__'\n// => <script type=\"application/json\" id=\"__STORE_STATE__\">{\"version\":1,...}</script>\n\n// 读取(浏览器端)\nconst state = readSSRStateFromDocument(); // 默认同一个 elementId"
                 },
                 {
                   "type": "table",
@@ -30949,7 +30951,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\n\nconst codecs = createSerializeRegistry([jsonPlugin()]);\n\n// 写入\nconst html = await createSSRStateScriptWith(state, { codecs });\n\n// 读取\nconst state = await readSSRStateFromDocumentWith({ codecs, document });"
+                  "code": "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\n\nconst codecs = createSerializeRegistry([jsonPlugin()]);\n\n// 写入(服务端)\nconst html = await createSSRStateScriptWith(scope.dehydrate(), { codecs });\n\n// 读取\nconst state = await readSSRStateFromDocumentWith({ codecs, document });"
                 },
                 {
                   "type": "table",
@@ -31443,12 +31445,16 @@
                 },
                 {
                   "type": "paragraph",
+                  "text": "构造器本身返回 `FieldBuilder`（不是字段）；下面的示例都假设已 `await ensureWasm()`，并通过 `createStore()` 产出字段。"
+                },
+                {
+                  "type": "paragraph",
                   "text": "`number`｜3 秒上手 —— 单个 `f64`，8 字节："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const field = number()\nfield.value = 1.5"
+                  "code": "const store = createStore({ field: number() })\nstore.field.value = 1.5"
                 },
                 {
                   "type": "paragraph",
@@ -31461,7 +31467,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const field = boolean()\nfield.value = true"
+                  "code": "const store = createStore({ field: boolean() })\nstore.field.value = true"
                 },
                 {
                   "type": "paragraph",
@@ -31474,7 +31480,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const field = string(64) // 最多 64 字节\nfield.value = 'hello'"
+                  "code": "const store = createStore({ field: string(64) }) // 最多 64 字节\nstore.field.value = 'hello'"
                 },
                 {
                   "type": "paragraph",
@@ -31487,7 +31493,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const field = array(number(), 1000) // length=1000, granularity 默认 64\nfield.setAt(0, 1)\nfield.setRange(1, 3, [2, 3])"
+                  "code": "const store = createStore({ field: array(number(), 1000) }) // length=1000, granularity 默认 64\nstore.field.setAt(0, 1)\nstore.field.setRange(1, 3, [2, 3])"
                 },
                 {
                   "type": "paragraph",
@@ -31516,7 +31522,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const field = record({ x: number(), y: number() })\nfield.x = 1 // 直接属性读写，不经过 .value"
+                  "code": "const store = createStore({ field: record({ x: number(), y: number() }) })\nstore.field.x = 1 // 直接属性读写，不经过 .value"
                 },
                 {
                   "type": "paragraph",
@@ -31544,7 +31550,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",
@@ -31699,7 +31705,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "字段构造器实现的是 `@migaia/store-light` 的 `SyncFieldBuilder` 协议（`mode: 'sync'`），可以直接放进 `createStore()` 的字段声明："
+                  "text": "字段构造器实现的是 `@migaia/store-light` 的 `ISyncFieldBuilder` 协议（`mode: 'sync'`），可以直接放进 `createStore()` 的字段声明："
                 },
                 {
                   "type": "code",
@@ -31716,7 +31722,7 @@
                     "`createStore()` 只接受 `mode: 'sync'` 的字段构造器，`store-wasm` 的全部构造器都满足这一点，可以直接用 `createStore()`，不需要 `createAsyncStore()`。真正的\"异步\"部分（WASM 加载）必须在调用 `createStore()` 之前用 `await ensureWasm()` 完成。",
                     "字段本身就是 `store.<key>` 的值，不是被拆包的原始类型——`number()`/`boolean()`/`string()` 产出的字段要通过 `.value` 读写（`store.hp.value`），`record()` 产出的字段直接把每个 key 暴露成可读写属性（`store.pos.x`），`array()` 产出的字段要用 `at()`/`setAt()`/`setRange()`/`view()`。",
                     "Store 拥有字段的生命周期：`createStore()` 内部会把每个 wasm 字段登记进 Store 自己的 disposal scope，`store.$dispose()` 时自动调用每个字段的 `dispose()`。业务代码不需要、也不应该在 Store 存活期间手动 `dispose()` 单个 wasm 字段。",
-                    "如果不经过 `createStore()`，而是直接拿字段构造器手写 `builder.create(context)`（比如写测试、写自定义 runtime 集成），字段的生命周期完全由调用方负责，`context` 需要自己提供符合 `FieldContext`（`runtime`、`signal`、`createSource`）形状的对象，这是 `@migaia/store-light` 定义的协议，详见该包文档。"
+                    "如果不经过 `createStore()`，而是直接拿字段构造器手写 `builder.create(context)`（比如写测试、写自定义 runtime 集成），字段的生命周期完全由调用方负责，`context` 需要自己提供符合 `IFieldContext`（`runtime`、`signal`、`createSource`）形状的对象，这是 `@migaia/store-light` 定义的协议，详见该包文档。"
                   ]
                 }
               ]
@@ -32022,12 +32028,12 @@
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`",
                       "`Error`",
-                      "`[store] cannot read a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`",
                       "`Error`",
-                      "`[store] cannot write a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`array()` 字段 dispose 后调用任意方法",
@@ -32109,7 +32115,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -32134,6 +32140,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -32321,7 +32331,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "依赖 `@migaia/reactive`、`@migaia/resource`、`@migaia/serialize`、`@migaia/rpc`、`@migaia/utils`(均为 workspace 依赖，随包一起装好)。"
+                  "text": "依赖 `@migaia/reactive`、`@migaia/resource`、`@migaia/serialize`、`@migaia/rpc-core`、`@migaia/rpc-contract`、`@migaia/utils`(均为 workspace 依赖，随包一起装好)。"
                 }
               ]
             },
@@ -32404,7 +32414,7 @@
                 {
                   "type": "list",
                   "items": [
-                    "`request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回",
+                    "`request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回",
                     "`disposed`(只读 getter)—— 是否已 `close()`/`dispose()`",
                     "`close(): void` —— 同步标记不可用(幂等)，此后 `request()` 立即拒绝，但不释放底层 endpoint",
                     "`dispose(): Promise<void>` —— 唯一异步释放入口：先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`；失败会 reject，重复调用复用同一个 Promise"
@@ -32485,7 +32495,7 @@
                   "type": "list",
                   "items": [
                     "`runtime?: IRuntime` —— 默认 `defaultRuntime`",
-                    "`transfer?: (input: Input) => readonly Transferable[]` —— 给定 `input`，返回这次调用要零拷贝转移的列表；只在确认 `input` 转移后不会再被主线程使用时才该提供",
+                    "`transfer?: (input: Input) => readonly unknown[]` —— 给定 `input`，返回这次调用要零拷贝转移的列表；只在确认 `input` 转移后不会再被主线程使用时才该提供",
                     "`debugName?`、`ttl?`、`autoStart?`、`staleWhileRevalidate?`、`retry?`、`retryDelay?`、`keepAlive?`、`initialSnapshot?`、`scheduler?` —— 原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致"
                   ]
                 },
@@ -32560,7 +32570,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "签名：`(parser: ISerializeParser, post: (message: unknown, transfer?: readonly Transferable[]) => void) => IManagedRpcHandler`。两个参数均必填，非对象/非函数同步抛 `INVALID_OPTION`。`parser`/`post` 的解码/编码结果、多段流式输出的本地拼装规则见 USEGUIDE §6.5。"
+                  "text": "签名：`(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void) => IManagedRpcHandler`。两个参数均必填，非对象/非函数同步抛 `INVALID_OPTION`。`parser`/`post` 的解码/编码结果、多段流式输出的本地拼装规则见 USEGUIDE §6.5。"
                 }
               ]
             },
@@ -32588,7 +32598,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`WorkerDiagnosticType`｜3 秒上手 —— 序列化 Worker 集成的诊断来源标签，出现在 `SerializeCodecError`/`SerializeError` 的 `type` 字段默认值里："
+                  "text": "`WorkerDiagnosticType`｜3 秒上手 —— 序列化 Worker 集成的诊断来源标签，出现在 `SerializeCodecError` 的 `type` 字段默认值里："
                 },
                 {
                   "type": "code",
@@ -32621,7 +32631,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`cleanupFailed`(`CLEANUP_FAILED`)。"
+                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`cleanupFailed`(`CLEANUP_FAILED`)、`chunkMergeFailed`(`CHUNK_MERGE_FAILED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -32692,7 +32702,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// aggregate.worker.ts\nimport { createWorkerHandler } from '@migaia/store-worker';\n\ndeclare const self: DedicatedWorkerGlobalScope;\n\ntype Row = { readonly category: string; readonly amount: number };\n\nconst handler = createWorkerHandler<readonly Row[], Record<string, number>>(\n  (rows, { signal }) => {\n    const totals: Record<string, number> = {};\n    for (const row of rows) {\n      signal.throwIfAborted?.();\n      totals[row.category] = (totals[row.category] ?? 0) + row.amount;\n    }\n    return totals;\n  },\n  (message) => self.postMessage(message)\n);\nself.onmessage = (event) => {\n  void handler(event.data);\n};"
+                  "code": "// aggregate.worker.ts\nimport { createWorkerHandler } from '@migaia/store-worker';\n\ndeclare const self: DedicatedWorkerGlobalScope;\n\ntype Row = { readonly category: string; readonly amount: number };\n\nconst handler = createWorkerHandler<readonly Row[], Record<string, number>>(\n  (rows, { signal }) => {\n    const totals: Record<string, number> = {};\n    for (const row of rows) {\n      if (signal.aborted) throw signal.reason;\n      totals[row.category] = (totals[row.category] ?? 0) + row.amount;\n    }\n    return totals;\n  },\n  (message) => self.postMessage(message)\n);\nself.onmessage = (event) => {\n  void handler(event.data);\n};"
                 },
                 {
                   "type": "code",
@@ -32771,7 +32781,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "1. 核心概念详解 2. `WorkerAdapter` 完整参考 3. `createWorkerHandler` 完整参考 4. `ManagedRpcHandler` 生命周期细节 5. `workerComputed` 完整参考 6. 序列化 Worker 集成完整参考 7. 常量与错误码完整参考 8. 字节转移语义（`IByteOwnership`） 9. 错误处理 10. 性能特征 11. 完整场景示例 12. 常见问题排查 13. 构建、格式化与测试"
+                  "text": "1. 核心概念详解 2. `WorkerAdapter` 完整参考 3. `createWorkerHandler` 完整参考 4. `IManagedRpcHandler` 生命周期细节 5. `workerComputed` 完整参考 6. 序列化 Worker 集成完整参考 7. 常量与错误码完整参考 8. 字节转移语义（`IByteOwnership`） 9. 错误处理 10. 性能特征 11. 完整场景示例 12. 常见问题排查 13. 构建、格式化与测试"
                 }
               ]
             },
@@ -32824,17 +32834,17 @@
               ]
             },
             {
-              "id": "1-3-managedrpchandler-worker-侧的统一外壳",
-              "heading": "1.3 ManagedRpcHandler：Worker 侧的统一外壳",
+              "id": "1-3-imanagedrpchandler-worker-侧的统一外壳",
+              "heading": "1.3 IManagedRpcHandler：Worker 侧的统一外壳",
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`createWorkerHandler` 和 `createSerializeWorkerHandler` 都返回一个 `ManagedRpcHandler`："
+                  "text": "`createWorkerHandler` 和 `createSerializeWorkerHandler` 都返回一个 `IManagedRpcHandler`："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "export type ManagedRpcHandler = {\n  (message: unknown): Promise<void>;\n  dispose(): Promise<void>;\n  close(): void;\n  readonly pendingCount: number;\n  readonly disposed: boolean;\n};"
+                  "code": "export type IManagedRpcHandler = {\n  (message: unknown): Promise<void>;\n  dispose(): Promise<void>;\n  close(): void;\n  readonly pendingCount: number;\n  readonly disposed: boolean;\n};"
                 },
                 {
                   "type": "paragraph",
@@ -32853,7 +32863,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IWebWorkerLikePort = {\n  postMessage(message: unknown, transfer?: readonly Transferable[]): void;\n  addEventListener(\n    type: 'message' | 'error' | 'messageerror',\n    listener: (event: MessageEvent<unknown> | Event) => void\n  ): void;\n  removeEventListener(\n    type: 'message' | 'error' | 'messageerror',\n    listener: (event: MessageEvent<unknown> | Event) => void\n  ): void;\n};"
+                  "code": "type IWebWorkerLikePort = {\n  postMessage(message: unknown, transfer?: readonly unknown[]): void;\n  addEventListener(\n    type: 'message' | 'error' | 'messageerror',\n    listener: (event: MessageEvent<unknown> | Event) => void\n  ): void;\n  removeEventListener(\n    type: 'message' | 'error' | 'messageerror',\n    listener: (event: MessageEvent<unknown> | Event) => void\n  ): void;\n};"
                 },
                 {
                   "type": "paragraph",
@@ -32868,7 +32878,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class WorkerAdapter {\n  constructor(\n    port: IWorkerPort,\n    options?: { readonly clientId?: string; readonly timeoutMs?: number }\n  );\n  readonly disposed: boolean;\n  request<Input, Output>(\n    payload: Input,\n    options?: { signal?: AbortSignal; transfer?: readonly Transferable[] }\n  ): Promise<Output>;\n  close(): void;\n  dispose(): Promise<void>;\n}"
+                  "code": "class WorkerAdapter {\n  constructor(\n    port: IWorkerPort,\n    options?: { readonly clientId?: string; readonly timeoutMs?: number }\n  );\n  readonly disposed: boolean;\n  request<Input, Output>(\n    payload: Input,\n    options?: { signal?: IAbortSignal; transfer?: readonly unknown[] }\n  ): Promise<Output>;\n  close(): void;\n  dispose(): Promise<void>;\n}"
                 },
                 {
                   "type": "list",
@@ -32895,7 +32905,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createWorkerHandler<Input, Output>(\n  compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,\n  postMessage: (message: unknown) => void,\n  options?: { readonly timeoutMs?: number }\n): ManagedRpcHandler;"
+                  "code": "function createWorkerHandler<Input, Output>(\n  compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,\n  postMessage: (message: unknown) => void,\n  options?: { readonly timeoutMs?: number }\n): IManagedRpcHandler;"
                 },
                 {
                   "type": "list",
@@ -32903,7 +32913,7 @@
                     "`compute`：真正干活的函数，接收主线程传来的 `payload` 和一个 `{ signal }` 上下文——`signal` 在调用方取消/超时时触发，`compute` 内部如果是可中断的长任务，应该监听它并尽早退出（框架不会强行中断正在跑的同步/异步代码，只是让最终结果被丢弃、返回给一个已经不再等待的调用方）。",
                     "`postMessage`：Worker 侧真正发消息出去的函数，通常传 `(message) => self.postMessage(message)`。之所以是参数而不是包内部写死 `self.postMessage`，是为了同一份实现能在真正的 Worker、`SharedWorker` 的某个 `port`、甚至单元测试的内存桩上复用。",
                     "`options.timeoutMs`：Worker 侧对每次请求处理设的超时（一般主线程侧的 `timeoutMs` 已经够用，Worker 侧这个是双保险）。",
-                    "返回值：一个 `ManagedRpcHandler`，需要手动接上 `self.onmessage = (event) => { void handler(event.data); }`（返回的 Promise 通常不需要显式处理——错误会被 RPC core 转成 RPC 失败响应发回主线程，不会变成 unhandled rejection）。"
+                    "返回值：一个 `IManagedRpcHandler`，需要手动接上 `self.onmessage = (event) => { void handler(event.data); }`（返回的 Promise 通常不需要显式处理——错误会被 RPC core 转成 RPC 失败响应发回主线程，不会变成 unhandled rejection）。"
                   ]
                 },
                 {
@@ -32913,8 +32923,8 @@
               ]
             },
             {
-              "id": "4-managedrpchandler-生命周期细节",
-              "heading": "4. ManagedRpcHandler 生命周期细节",
+              "id": "4-imanagedrpchandler-生命周期细节",
+              "heading": "4. IManagedRpcHandler 生命周期细节",
               "blocks": [
                 {
                   "type": "code",
@@ -32938,7 +32948,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {\n  readonly runtime?: IRuntime;\n  readonly transfer?: (input: Input) => readonly Transferable[];\n};\n\nfunction workerComputed<Input, Output>(\n  adapter: WorkerAdapter,\n  selectInput: () => Input,\n  options?: IWorkerComputedOptions<Input, Output>\n): Resource<Output>;"
+                  "code": "type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {\n  readonly runtime?: IRuntime;\n  readonly transfer?: (input: Input) => readonly unknown[];\n};\n\nfunction workerComputed<Input, Output>(\n  adapter: WorkerAdapter,\n  selectInput: () => Input,\n  options?: IWorkerComputedOptions<Input, Output>\n): Resource<Output>;"
                 },
                 {
                   "type": "paragraph",
@@ -33035,7 +33045,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`context.signal` 会作为这次 RPC 调用的取消信号透传；调用被取消时，`request` 内部会把泛化的 `AbortError` 重新包装成 `SerializeError`（见 §9），带上 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 这些定位信息，而不是让调用方拿到一个语义模糊的通用 abort 错误。"
+                  "text": "`context.signal` 会作为这次 RPC 调用的取消信号透传；调用被取消时，`request` 内部会把泛化的 `AbortError` 重新包装成 `SerializeCodecError`（见 §9），带上 `type`/`phase`/`source`/`chunkIndex`/`bytesConsumed` 这些定位信息，而不是让调用方拿到一个语义模糊的通用 abort 错误。"
                 }
               ]
             },
@@ -33055,13 +33065,13 @@
               ]
             },
             {
-              "id": "6-4-createserializeworkerhandler-parser-post-managedrpchandler",
-              "heading": "6.4 createSerializeWorkerHandler(parser, post): ManagedRpcHandler",
+              "id": "6-4-createserializeworkerhandler-parser-post-imanagedrpchandler",
+              "heading": "6.4 createSerializeWorkerHandler(parser, post): IManagedRpcHandler",
               "blocks": [
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSerializeWorkerHandler(\n  parser: ISerializeParser,\n  post: (message: unknown, transfer?: readonly Transferable[]) => void\n): ManagedRpcHandler;"
+                  "code": "function createSerializeWorkerHandler(\n  parser: ISerializeParser,\n  post: (message: unknown, transfer?: readonly unknown[]) => void\n): IManagedRpcHandler;"
                 },
                 {
                   "type": "paragraph",
@@ -33131,7 +33141,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "无调用参数，常量对象；`WorkerDiagnosticType.worker`（即字符串 `'worker'`）是 `workerParser`/`createSerializeWorkerHandler` 产出的 `SerializeError`/`SerializeCodecError` 的 `type` 字段默认值（未显式传 `type`/`options.type` 时使用）。"
+                  "text": "无调用参数，常量对象；`WorkerDiagnosticType.worker`（即字符串 `'worker'`）是 `workerParser`/`createSerializeWorkerHandler` 产出的 `SerializeCodecError` 的 `type` 字段默认值（未显式传 `type`/`options.type` 时使用）。"
                 }
               ]
             },
@@ -33280,12 +33290,12 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "`workerParser` 请求被 `AbortSignal` 取消时,底层 `endpoint.send()` 会 reject 一个 `name === 'AbortError'` 的错误——`workerParser` 会拦下这个泛化错误,重新包装成 `SerializeError`（来自 `@migaia/serialize`）："
+                  "text": "`workerParser` 请求被 `AbortSignal` 取消时,底层 `endpoint.send()` 会 reject 一个 `name === 'AbortError'` 的错误——`workerParser` 会拦下这个泛化错误,重新包装成 `SerializeCodecError`（来自 `@migaia/serialize`，`code: 'REQUEST_ABORTED'`，原始 abort 错误在 `cause` 上）："
                 },
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "class SerializeError extends Error {\n  readonly type: string; // 插件的 type 标签\n  readonly phase: 'encode' | 'decode';\n  readonly source: string; // 出错时定位是哪个 store/key 的辅助字段\n  readonly chunkIndex: number; // 恒为 0（这一层不涉及分片索引）\n  readonly bytesConsumed: number; // 输入是 bytes 段时为其字节长度，否则 0\n}"
+                  "code": "class SerializeCodecError<TCode> extends Error {\n  readonly source: string; // 恒为 '@migaia/store-worker'\n  readonly code: TCode; // 'REQUEST_ABORTED'\n  readonly context?: string; // 出错时定位是哪个 store/key 的辅助字段\n  readonly type: string; // 插件的 type 标签，缺省 WorkerDiagnosticType.worker\n  readonly phase: 'encode' | 'decode';\n  readonly chunkIndex: number; // 恒为 0（这一层不涉及分片索引）\n  readonly bytesConsumed: number; // 输入是 bytes 段时为其字节长度，否则 0\n}"
                 },
                 {
                   "type": "paragraph",
@@ -33340,7 +33350,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "// aggregate.worker.ts\nimport { createWorkerHandler } from '@migaia/store-worker';\n\ndeclare const self: DedicatedWorkerGlobalScope;\n\ntype Row = { readonly category: string; readonly amount: number };\n\nconst handler = createWorkerHandler<readonly Row[], Record<string, number>>(\n  (rows, { signal }) => {\n    const totals: Record<string, number> = {};\n    for (const row of rows) {\n      signal.throwIfAborted?.();\n      totals[row.category] = (totals[row.category] ?? 0) + row.amount;\n    }\n    return totals;\n  },\n  (message) => self.postMessage(message)\n);\nself.onmessage = (event) => {\n  void handler(event.data);\n};"
+                  "code": "// aggregate.worker.ts\nimport { createWorkerHandler } from '@migaia/store-worker';\n\ndeclare const self: DedicatedWorkerGlobalScope;\n\ntype Row = { readonly category: string; readonly amount: number };\n\nconst handler = createWorkerHandler<readonly Row[], Record<string, number>>(\n  (rows, { signal }) => {\n    const totals: Record<string, number> = {};\n    for (const row of rows) {\n      if (signal.aborted) throw signal.reason;\n      totals[row.category] = (totals[row.category] ?? 0) + row.amount;\n    }\n    return totals;\n  },\n  (message) => self.postMessage(message)\n);\nself.onmessage = (event) => {\n  void handler(event.data);\n};"
                 },
                 {
                   "type": "code",
@@ -33371,7 +33381,7 @@
               "blocks": [
                 {
                   "type": "paragraph",
-                  "text": "Q:`request()`/`refetch()` 一直不 resolve 也不 reject。 确认 Worker 侧确实调用了 `self.onmessage = (event) => handler(event.data)`——`ManagedRpcHandler` 不会自己挂监听,忘记接线是最常见的原因。其次检查 `WorkerAdapter`/`workerParser` 的 `timeoutMs` 是否设置了合理值,默认不限时意味着 Worker 真的没有响应时会一直挂起。"
+                  "text": "Q:`request()`/`refetch()` 一直不 resolve 也不 reject。 确认 Worker 侧确实调用了 `self.onmessage = (event) => handler(event.data)`——`IManagedRpcHandler` 不会自己挂监听,忘记接线是最常见的原因。其次检查 `WorkerAdapter`/`workerParser` 的 `timeoutMs` 是否设置了合理值,默认不限时意味着 Worker 真的没有响应时会一直挂起。"
                 },
                 {
                   "type": "paragraph",
@@ -33379,11 +33389,11 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q:取消请求后想重试,但 `SerializeError` 提示\"transferred input is detached and cannot be retried\"。 这不是可重试的错误——`ownership: 'transfer'` 场景下,一旦请求被送出、随即又被取消,原始 `ArrayBuffer` 已经在传输过程中被 detach,数据回不来了。需要重试的调用点应该改用 `ownership: 'copy'`,或者在业务层保留一份数据副本用于重试。"
+                  "text": "Q:取消请求后想重试,但 `SerializeCodecError` 提示\"transferred input is detached and cannot be retried\"。 这不是可重试的错误——`ownership: 'transfer'` 场景下,一旦请求被送出、随即又被取消,原始 `ArrayBuffer` 已经在传输过程中被 detach,数据回不来了。需要重试的调用点应该改用 `ownership: 'copy'`,或者在业务层保留一份数据副本用于重试。"
                 },
                 {
                   "type": "paragraph",
-                  "text": "Q:Worker 里的 `parser.encode()` 返回了多段(可迭代对象),主线程收到的结果不对。 多段拼装只发生在 Worker 内部(`createSerializeWorkerHandler` 就地拼装后才回包给主线程,见 §6.5),主线程收到的应该始终是拼装后的单个 `ISerializeChunk`。如果结果不对,先确认 `parser.encode()` 各段的形态是否一致(全 `'text'` 才会走字符串拼接,否则统一按字节拼接)。`'value'` 是已经物化的对象图，不能与 text/bytes 混合拼装；混合时会直接抛出 `SerializeError`，不会隐式转成 `\"[object Object]\"`。"
+                  "text": "Q:Worker 里的 `parser.encode()` 返回了多段(可迭代对象),主线程收到的结果不对。 多段拼装只发生在 Worker 内部(`createSerializeWorkerHandler` 就地拼装后才回包给主线程,见 §6.5),主线程收到的应该始终是拼装后的单个 `ISerializeChunk`。如果结果不对,先确认 `parser.encode()` 各段的形态是否一致(全 `'text'` 才会走字符串拼接,否则统一按字节拼接)。`'value'` 是已经物化的对象图，不能与 text/bytes 混合拼装；混合时会直接抛出 `SerializeCodecError`，不会隐式转成 `\"[object Object]\"`。"
                 },
                 {
                   "type": "paragraph",
@@ -33531,7 +33541,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createUnitBudget } from '@migaia/supervision'\nimport { createCoroutineSupervisor } from '@migaia/supervision/coroutine'\n\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 2 })\ntype IEchoPort = { call(value: unknown): Promise<unknown> }\nconst supervisor = createCoroutineSupervisor<IEchoPort>({\n  id: 'echo',\n  budget,\n  spec: {\n    task: async ({ signal, expose, heartbeat }) => {\n      const port = { call: async (value: unknown) => value }\n      expose(port)\n      heartbeat()\n      await new Promise<void>((resolve) =>\n        signal.addEventListener('abort', resolve, { once: true })\n      )\n      // Close resources owned by this task before returning.\n    }\n  },\n  ready: (unit) => unit.exposed.then(() => undefined),\n  report: (error) => {\n    console.error(error)\n  }\n})\n\nconst ready = await supervisor.start()\nif (ready.state === 'ready') {\n  const port = await ready.unit.exposed\n  await port.call({ message: 'hello' })\n}\nawait supervisor.dispose()"
+                  "code": "import { createUnitBudget } from '@migaia/supervision'\nimport { createCoroutineSupervisor } from '@migaia/supervision/coroutine'\n\nconst budget = createUnitBudget({ kind: 'coroutine', maxUnits: 2 })\ntype IEchoPort = { call(value: unknown): Promise<unknown> }\nconst supervisor = createCoroutineSupervisor<IEchoPort>({\n  id: 'echo',\n  budget,\n  spec: {\n    task: async ({ signal, expose, heartbeat }) => {\n      const port = { call: async (value: unknown) => value }\n      expose(port)\n      heartbeat()\n      await new Promise<void>((resolve) =>\n        signal.addEventListener('abort', () => resolve(), { once: true })\n      )\n      // Close resources owned by this task before returning.\n    }\n  },\n  ready: (unit) => unit.exposed.then(() => undefined),\n  report: (error) => {\n    console.error(error)\n  }\n})\n\nconst ready = await supervisor.start()\nif (ready.state === 'ready') {\n  const port = await ready.unit.exposed\n  await port.call({ message: 'hello' })\n}\nawait supervisor.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -33858,6 +33868,14 @@
                 {
                   "type": "paragraph",
                   "text": "Loader 只负责 `source → { value, release }`，Adapter 只负责 artifact 到插件描述子的转换； `loadIntoHost()` 才拥有 `load → adapt → use/replace` 事务。提交前失败回滚临时 scope，提交后 artifact 由对应 definition generation 清理。Runtime 从托管 Host 取得 exact generation lease， 只向 callback 发布目标插件的 extensions；callback settle 前不会释放 lease。`dispose()` 停止 新 run、abort active signal，并按 `bounded` 或 `strict-drain` 策略观察真实完成，不宣称终止 不合作的 same-realm callback。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createHost({ create })` 接受 PluginHost class 实例或 `defineHost()` 返回的 handle，并保留 具体 Host 的 domain core、pipeline 和初始插件类型。插件的 `install(core)` 接收 domain core 与 PluginHost lifecycle core；它不接收 Host handle 本身。`plugins`、`use()`、`replace()`、 `loadIntoHost()` 和 Runtime 的 `self.replace()` 都按该 Host 的能力检查插件准入。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "安装后的精确能力位于成功结果的 `view`：检查 `result.ok` 后，将 `result.view` 传给 `createRuntime()`，`run('插件名', .)` 的 callback 即可获得对应插件的 extensions 类型。 `loadIntoHost()` 同样保留原 Host、目标插件及 `use`/`replace` 的结果类型。原 Host 变量不会 因一次安装调用自动改变静态类型；动态插件名称仍按既有规则返回保守视图。"
                 },
                 {
                   "type": "paragraph",
@@ -34441,6 +34459,14 @@
                   "type": "code",
                   "language": "ts",
                   "code": "import { defineLoader, loadIntoHost } from '@migaia/tray/loader'\nimport { defineAdapter } from '@migaia/tray/adapter'\nimport { createRuntime } from '@migaia/tray/runtime'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "托管 Host 的类型保留具体 source Host、已登记插件和 ready 插件；`createRuntime(host)` 直接沿用这些类型，不需要把装有扩展的 Host 转成 `any`。`createHost` 的工厂同时支持 PluginHost class 与 `defineHost()` handle。插件 hook 使用 source Host 声明的 domain core 和 lifecycle core，安装入口会检查插件所需的能力。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`use()`、`replace()` 和 `loadIntoHost()` 成功后，从 `result.view` 继续操作，才能保留新安装 插件的静态能力。Loader 的返回值可通过 `ok`、`committed` 区分成功和失败，并读取对应 `view`；传给 `createRuntime(result.view)` 后，字面量插件名会决定 callback 的 extensions 类型。blocked 插件不贡献 ready 能力，动态名称沿用保守推导。"
                 },
                 {
                   "type": "paragraph",
@@ -35218,7 +35244,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "parseObjectPath('user.tags.[0]'); // ['user', 'tags', 0]\nprobeObjectPath(data, 'user.x.y'); // { kind: 'missing' | 'blocked' | 'failed' | 'value', ... }"
+                  "code": "parseObjectPath('user.tags.[0]'); // ['user', 'tags', 0]\nprobeObjectPath(data, 'user.name'); // { kind: 'value' | 'missing' | 'blocked' | 'failed', ... }"
                 },
                 {
                   "type": "paragraph",
@@ -35260,7 +35286,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred\n} from '@migaia/utils/typing';"
+                  "code": "import type {\n  IDiscriminatedByField,\n  IDiscriminatedByPath,\n  IObjectPath,\n  IObjectPathInput,\n  IObjectPathSegment,\n  IObjectPathTuple,\n  IObjectPathTupleFor,\n  IObjectPathValue,\n  IObjectPathWriteValue,\n  IProbePropertyResult,\n  IAbortSignal,\n  IDeferred,\n  INativeAbortSignal\n} from '@migaia/utils/typing';"
                 },
                 {
                   "type": "paragraph",
@@ -35268,7 +35294,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "它做两件事：把散落在 `/object`（`IObjectPath`/`IObjectPathInput`/`IObjectPathSegment`/`IObjectPathTuple`/`IObjectPathTupleFor`/`IObjectPathValue`/`IObjectPathWriteValue`/`IProbePropertyResult`）与 `/promise`（`IAbortSignal`/`IDeferred`）里的类型汇总到一个跨项目复用的稳定入口；再提供两个 `/object` 里没有的全新类型工具，用来把带判别字段的联合类型（discriminated union）转成按判别值分组的映射类型。"
+                  "text": "它做两件事：把散落在 `/object`（`IObjectPath`/`IObjectPathInput`/`IObjectPathSegment`/`IObjectPathTuple`/`IObjectPathTupleFor`/`IObjectPathValue`/`IObjectPathWriteValue`/`IProbePropertyResult`）与 `/promise`（`IAbortSignal`/`IDeferred`/`INativeAbortSignal`）里的类型汇总到一个跨项目复用的稳定入口；再提供两个 `/object` 里没有的全新类型工具，用来把带判别字段的联合类型（discriminated union）转成按判别值分组的映射类型。"
                 },
                 {
                   "type": "paragraph",
@@ -35509,7 +35535,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { collect } from '@migaia/utils';\n\nconst collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' world ')\n  .where((user) => user.active)\n  .take(20);\n\nconst result = collector.result;"
+                  "code": "import { collect } from '@migaia/utils';\n\ntype IUser = { active: boolean; profile: { 'name-zh': string; 'name-en': string } };\nconst users: readonly IUser[] = [{ active: true, profile: { 'name-zh': '你好 world', 'name-en': 'hello world' } }];\nconst collector = collect(users)\n  .fieldBy('profile.name-zh', 'profile.name-en')\n  .like(' world ')\n  .where((user) => user.active)\n  .take(20);\n\nconst result = collector.result;"
                 },
                 {
                   "type": "paragraph",
@@ -35532,7 +35558,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);"
+                  "code": "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst config = readonlyConfig(\n  patchConfig(ownConfig({ endpoint: '/v1', retries: 2, debug: true }), { debug: CONFIG_DELETE })\n);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return config.endpoint;\n      },\n      { maxAttempts: config.retries, shouldRetry: () => true, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\nscheduler.advance(100);\nawait request.catch(() => undefined);"
                 }
               ]
             },
@@ -35675,7 +35701,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import {\n  createManualScheduler,\n  systemScheduler,\n  systemWallClock,\n  type IManualScheduler,\n  type IScheduledTask,\n  type IScheduler,\n  type IWallClock\n} from '@migaia/utils/scheduler';\n\ntype IScheduledTask = { cancel(): void; unref?(): void };\ntype IScheduler = {\n  now(): number;\n  schedule(callback: () => void, delayMs: number): IScheduledTask;\n};\ntype IManualScheduler = IScheduler & {\n  advance(ms: number): void;\n  readonly pendingCount: number;\n};\ntype IWallClock = { timestamp(): number };"
+                  "code": "import { createManualScheduler, systemScheduler, systemWallClock } from '@migaia/utils/scheduler';\n// 同一子路径还导出下列类型：IManualScheduler、IScheduledTask、IScheduler、IWallClock\n\ntype IScheduledTask = { cancel(): void; unref?(): void };\ntype IScheduler = {\n  now(): number;\n  schedule(callback: () => void, delayMs: number): IScheduledTask;\n  defer?(callback: () => void): void;\n};\ntype IManualScheduler = IScheduler & {\n  advance(ms: number): void;\n  readonly pendingCount: number;\n};\ntype IWallClock = { timestamp(): number };"
                 },
                 {
                   "type": "list",
@@ -35851,7 +35877,11 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type ITimeoutOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>;\n\nfunction withTimeout<T>(\n  operation: ITimeoutOperation<T>,\n  options: IAsyncControls & {\n    readonly timeoutMs: number;\n    readonly report?: IUtilsReporter;\n    readonly zeroTimeoutBehavior?: 'skip' | 'start';\n    readonly cooperativeCancellation?: boolean;\n  }\n): Promise<T>;"
+                  "code": "type ITimeoutOperation<T> = (context: { readonly signal: INativeAbortSignal }) => T | PromiseLike<T>;\ntype IDeadlineOnlyOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>;\n\ntype IWithTimeoutOptions = IAsyncControls & {\n  readonly timeoutMs: number;\n  readonly report?: IUtilsReporter;\n  readonly zeroTimeoutBehavior?: 'skip' | 'start';\n  readonly cooperativeCancellation?: boolean;\n};\n\nfunction withTimeout<T>(\n  operation: ITimeoutOperation<T>,\n  options: IWithTimeoutOptions & { readonly cooperativeCancellation?: true }\n): Promise<T>;\nfunction withTimeout<T>(operation: IDeadlineOnlyOperation<T>, options: IWithTimeoutOptions): Promise<T>;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`INativeAbortSignal` 是本包内部用原生 `AbortController` 生成、再交给操作的 signal 类型。它按消费方自己的全局类型解析：项目带 `lib.dom`、`@types/node`、Deno 或 Bun 类型时，它就是宿主 `AbortSignal`，可以直接写 `fetch(url, { signal })`；没有宿主类型时退回结构化的 `IAbortSignal`，所以发布的声明不依赖任何宿主库。所有入参仍接受结构化的 `IAbortSignal`。"
                 },
                 {
                   "type": "paragraph",
@@ -35861,7 +35891,7 @@
                   "type": "list",
                   "items": [
                     "`timeoutMs`：必须是有限非负数；`timeoutMs === 0` 时默认立即以 `UtilsTimeoutError('operation', 0)` reject（除非 `zeroTimeoutBehavior: 'start'`，此时改为立刻启动操作、不设超时）。",
-                    "`cooperativeCancellation`（默认 `true`）：为 `false` 时不分配内部 `AbortController`，操作函数只会拿到一个惰性的、恒不中止的信号——用于纯粹的\"限时等待结果，但不需要通知操作提前退出\"的场景。",
+                    "`cooperativeCancellation`（默认 `true`）：为 `false` 时不分配内部 `AbortController`，操作函数只会拿到一个惰性的、恒不中止的结构化信号（类型是 `IAbortSignal`，不能传给 `fetch`）——用于纯粹的\"限时等待结果，但不需要通知操作提前退出\"的场景。",
                     "`report`：当操作在已经结算（超时/被外部中止）之后才 resolve/reject，这个迟到的结果不会再影响最终返回值，但会经由 `report`（默认 `hostRethrowReporter`）上报，避免静默丢弃未处理的错误。",
                     "清理阶段（取消定时器、移除监听器）失败时，会把清理错误与原始错误一起包装成 `AggregateError` 一并 reject。"
                   ]
@@ -35900,7 +35930,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IRetryContext = {\n  readonly attempt: number;\n  readonly signal: IAbortSignal;\n  readonly remainingMs?: number;\n};\ntype IRetryFailureContext = IRetryContext & { readonly maxAttempts: number };\n\nfunction retry<T>(\n  operation: (context: IRetryContext) => T | PromiseLike<T>,\n  options: {\n    readonly maxAttempts: number;\n    readonly shouldRetry: (\n      error: unknown,\n      context: IRetryFailureContext\n    ) => boolean | PromiseLike<boolean>;\n    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number);\n    readonly totalTimeoutMs?: number;\n    readonly attemptTimeoutMs?: number;\n    readonly signal?: IAbortSignal;\n    readonly signals?: readonly IAbortSignal[];\n    readonly zeroTimeoutBehavior?: 'skip' | 'start';\n    readonly report?: IUtilsReporter;\n    readonly unref?: boolean;\n    readonly scheduler?: IScheduler;\n  }\n): Promise<T>;"
+                  "code": "type IRetryContext = {\n  readonly attempt: number;\n  readonly signal: INativeAbortSignal;\n  readonly remainingMs?: number;\n};\ntype IRetryFailureContext = IRetryContext & { readonly maxAttempts: number };\n\nfunction retry<T>(\n  operation: (context: IRetryContext) => T | PromiseLike<T>,\n  options: {\n    readonly maxAttempts: number;\n    readonly shouldRetry: (\n      error: unknown,\n      context: IRetryFailureContext\n    ) => boolean | PromiseLike<boolean>;\n    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number);\n    readonly totalTimeoutMs?: number;\n    readonly attemptTimeoutMs?: number;\n    readonly signal?: IAbortSignal;\n    readonly signals?: readonly IAbortSignal[];\n    readonly zeroTimeoutBehavior?: 'skip' | 'start';\n    readonly report?: IUtilsReporter;\n    readonly unref?: boolean;\n    readonly scheduler?: IScheduler;\n  }\n): Promise<T>;"
                 },
                 {
                   "type": "paragraph",
@@ -36015,7 +36045,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function attachErrorIdentity<T extends Error>(\n  error: T,\n  identity: {\n    readonly source: string;\n    readonly code: string;\n    readonly phase?: string;\n    readonly detail?: Readonly<Record<string, unknown>>;\n  }\n): T;"
+                  "code": "function attachErrorIdentity<T extends object>(\n  error: T,\n  identity: {\n    readonly source: string;\n    readonly code: string;\n    readonly phase?: string;\n    readonly detail?: Readonly<Record<string, unknown>>;\n  },\n  hooks?: {\n    // 字段冲突时由调用方选择替代对象；不提供时冲突抛 TypeError\n    readonly onConflict?: (context: { target: T; key: string; existing: unknown; incoming: unknown }) => T;\n    // 定义字段失败（如对象被冻结）时由调用方选择替代对象；不提供时原样抛出\n    readonly onFailure?: (context: { target: T; key: string; incoming: unknown; cause: unknown }) => T;\n  }\n): T;"
                 },
                 {
                   "type": "paragraph",
@@ -36024,7 +36054,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const error = new Error('boom');\nattachErrorIdentity(error, { source: 'my-module', code: 'FETCH_FAILED' });\nerror.code; // 'FETCH_FAILED'"
+                  "code": "const error = new Error('boom');\nattachErrorIdentity(error, { source: 'my-module', code: 'FETCH_FAILED' });\n(error as Error & { readonly code?: string }).code; // 'FETCH_FAILED'（返回类型仍是 T，不扩展 code 字段）"
                 },
                 {
                   "type": "code",
@@ -36076,7 +36106,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const UtilsErrorCode = {\n  invalidArgument: 'INVALID_ARGUMENT',\n  nonErrorValue: 'NON_ERROR_VALUE',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  aborted: 'ABORTED',\n  deadlineExceeded: 'DEADLINE_EXCEEDED',\n  schedulerRunaway: 'SCHEDULER_RUNAWAY',\n  errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT',\n  cloneUnsupported: 'CLONE_UNSUPPORTED',\n  invalidEncoding: 'INVALID_ENCODING',\n  limiterClosed: 'LIMITER_CLOSED',\n  reentrantCall: 'REENTRANT_CALL',\n  configUnsupported: 'CONFIG_UNSUPPORTED',\n  configReadonly: 'CONFIG_READONLY',\n  configConflict: 'CONFIG_CONFLICT',\n  configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED',\n  configPathInvalid: 'CONFIG_PATH_INVALID',\n  objectPathInvalid: 'OBJECT_PATH_INVALID',\n  formatInvalid: 'FORMAT_INVALID',\n  formatValueMissing: 'FORMAT_VALUE_MISSING',\n  numberFormatInvalid: 'NUMBER_FORMAT_INVALID'\n} as const;"
+                  "code": "const UtilsErrorCode = {\n  invalidArgument: 'INVALID_ARGUMENT',\n  nonErrorValue: 'NON_ERROR_VALUE',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  aborted: 'ABORTED',\n  deadlineExceeded: 'DEADLINE_EXCEEDED',\n  schedulerRunaway: 'SCHEDULER_RUNAWAY',\n  errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT',\n  errorChainInvalid: 'ERROR_CHAIN_INVALID',\n  cloneUnsupported: 'CLONE_UNSUPPORTED',\n  invalidEncoding: 'INVALID_ENCODING',\n  limiterClosed: 'LIMITER_CLOSED',\n  reentrantCall: 'REENTRANT_CALL',\n  configUnsupported: 'CONFIG_UNSUPPORTED',\n  configReadonly: 'CONFIG_READONLY',\n  configConflict: 'CONFIG_CONFLICT',\n  configLimitExceeded: 'CONFIG_LIMIT_EXCEEDED',\n  configPathInvalid: 'CONFIG_PATH_INVALID',\n  objectPathInvalid: 'OBJECT_PATH_INVALID',\n  formatInvalid: 'FORMAT_INVALID',\n  formatValueMissing: 'FORMAT_VALUE_MISSING',\n  numberFormatInvalid: 'NUMBER_FORMAT_INVALID'\n} as const;"
                 },
                 {
                   "type": "paragraph",
@@ -36096,6 +36126,7 @@
                     "`DEADLINE_EXCEEDED`：操作、尝试或总流程超时；结合 `scope`、`timeoutMs` 选择重试或降级。",
                     "`SCHEDULER_RUNAWAY`：虚拟时钟一次推进超过 10000 个任务；排查同刻递归调度。",
                     "`ERROR_IDENTITY_CONFLICT`：已有错误身份与新 `source`/`code` 冲突；保留原身份。",
+                    "`ERROR_CHAIN_INVALID`：收到的序列化错误树或其 plain data 违反字段、标量、深度、数量或文本字节约束；修正输入或使用边界自己的处理策略。",
                     "`CLONE_UNSUPPORTED`：值不能被 `structuredClone` 复制；先转换为可克隆数据。",
                     "`INVALID_ENCODING`：编码输入不是规范形式；按错误偏移修正输入。",
                     "`LIMITER_CLOSED`：并发限制器已关闭；停止提交或创建新实例。",
@@ -36161,7 +36192,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function base64ToBytes(value: string): Uint8Array;"
+                  "code": "function base64ToBytes(value: string, target?: Uint8Array): Uint8Array; // target 长度须等于解码字节数，复用而不分配"
                 },
                 {
                   "type": "paragraph",
@@ -36742,7 +36773,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(initial, { debug: CONFIG_DELETE });\nconst publicConfig = readonlyConfig(next);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return publicConfig.endpoint;\n      },\n      { maxAttempts: publicConfig.retries, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\n\nscheduler.advance(100);\nawait request.catch(() => undefined);"
+                  "code": "import { retry, withTimeout } from '@migaia/utils/promise';\nimport { createManualScheduler } from '@migaia/utils/scheduler';\nimport { CONFIG_DELETE, ownConfig, patchConfig, readonlyConfig } from '@migaia/utils/config';\n\nconst scheduler = createManualScheduler();\nconst initial = ownConfig({ endpoint: '/v1', retries: 2, debug: true });\nconst next = patchConfig(initial, { debug: CONFIG_DELETE });\nconst publicConfig = readonlyConfig(next);\n\nconst request = withTimeout(\n  ({ signal }) =>\n    retry(\n      async () => {\n        if (signal.aborted) throw signal.reason;\n        return publicConfig.endpoint;\n      },\n      { maxAttempts: publicConfig.retries, shouldRetry: () => true, scheduler }\n    ),\n  { timeoutMs: 100, scheduler }\n);\n\nscheduler.advance(100);\nawait request.catch(() => undefined);"
                 },
                 {
                   "type": "paragraph",

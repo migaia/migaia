@@ -421,7 +421,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStore } from '@migaia/store-light'\nimport { createObjectLeaseRegistry } from '@migaia/lifecycle'\n\nconst store = createStore({ items: [] as string[] })\nconst registry = store.$own(createObjectLeaseRegistry())\n// registry 会在 store.$dispose() 时一并释放，无需单独管理"
+                "code": "import { createStore } from '@migaia/store-light'\n\nconst store = createStore({ items: [] as string[] })\nconst timer = setInterval(() => console.log('poll'), 1_000)\nlet disposed = false\n// $own 接收 IDisposable（dispose() + disposed），典型资源是 collection 等外部结构\nconst poller = store.$own({\n  get disposed() {\n    return disposed\n  },\n  dispose() {\n    if (disposed) return\n    disposed = true\n    clearInterval(timer)\n  }\n})\n// poller 会在 store.$dispose() 时一并释放，无需单独管理"
               }
             ]
           },
@@ -432,7 +432,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
+                "code": "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
               }
             ]
           },
@@ -799,7 +799,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "同步 vs 异步字段：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `LegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve。"
+                "text": "同步 vs 异步字段：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `ILegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve。"
               },
               {
                 "type": "paragraph",
@@ -808,7 +808,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}"
+                "code": "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}"
               }
             ]
           },
@@ -922,9 +922,9 @@
                   [
                     "`retainVersion(version)`",
                     "`(number \\",
-                    "VersionToken) => () => void`",
+                    "IVersionToken) => () => void`",
                     "`version: number \\",
-                    "VersionToken`",
+                    "IVersionToken`",
                     "同步",
                     "锁定某个具体版本不被回收（即使后续 `retry()` 产生了新版本），常用于\"后台刷新但保留当前渲染值\""
                   ],
@@ -932,7 +932,7 @@
                     "`retain(version?)`",
                     "`(version?) => () => void`",
                     "`version?: number \\",
-                    "VersionToken`",
+                    "IVersionToken`",
                     "同步",
                     "`retainResource`/`retainVersion` 的兼容合并入口，已废弃，新代码请直接用上面两个"
                   ],
@@ -990,7 +990,7 @@
                     "`() => { value, version, token }`",
                     "无",
                     "同步",
-                    "同 `read()`，但额外带上版本号和 `VersionToken`，供需要精确版本信息的调用方使用"
+                    "同 `read()`，但额外带上版本号和 `IVersionToken`，供需要精确版本信息的调用方使用"
                   ],
                   [
                     "`captureSnapshot(existingLease?)`",
@@ -1004,8 +1004,8 @@
             ]
           },
           {
-            "id": "8-3-storeresourceoptions",
-            "heading": "8.3 StoreResourceOptions",
+            "id": "8-3-istoreresourceoptions",
+            "heading": "8.3 IStoreResourceOptions",
             "blocks": [
               {
                 "type": "table",
@@ -1054,7 +1054,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
+                "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`IStoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
               },
               {
                 "type": "paragraph",
@@ -1225,7 +1225,7 @@
                     "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
                   ],
                   [
-                    "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
+                    "`this node is already owned by another Runtime` / `${what} belongs to a different Runtime than this scope` / `${what} is not a Runtime-owned reactive node` / `${what} belongs to another Runtime`",
                     "`$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）"
                   ],
                   [
@@ -1250,7 +1250,7 @@
                   ],
                   [
                     "`[store] keepAliveMs must be a finite non-negative number`（`RangeError`）",
-                    "`StoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
+                    "`IStoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
                   ]
                 ]
               }
@@ -1307,7 +1307,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Q：`createStore()` 报 \"only accepts synchronous fields\"，但我看代码是同步的。 检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `LegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()` 接受。"
+                "text": "Q：`createStore()` 报 \"only accepts synchronous fields\"，但我看代码是同步的。 检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `ILegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()` 接受。"
               },
               {
                 "type": "paragraph",
@@ -1584,7 +1584,7 @@
                       "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
                     ],
                     [
-                      "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
+                      "`this node is already owned by another Runtime` / `${what} belongs to a different Runtime than this scope` / `${what} is not a Runtime-owned reactive node` / `${what} belongs to another Runtime`",
                       "`$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）"
                     ],
                     [
@@ -1609,7 +1609,7 @@
                     ],
                     [
                       "`[store] keepAliveMs must be a finite non-negative number`（`RangeError`）",
-                      "`StoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
+                      "`IStoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
                     ]
                   ]
                 }
@@ -1656,8 +1656,8 @@
             "const store = createStore({\n  onSubmit: raw((data: FormData) => console.log(data))\n})\nstore.onSubmit = (data) => save(data) // 可读可写可整体替换",
             "import { createStore, createStoreResourceScope } from '@migaia/store-light'\nimport { createMutationPolicy } from '@migaia/store-middleware'\n\nconst settingsStore = createStore(\n  {\n    theme: 'light' as 'light' | 'dark',\n    setTheme(theme: 'light' | 'dark') {\n      this.theme = theme\n    }\n  },\n  { debugName: 'settings', mutationPolicy: createMutationPolicy('actions-only') }\n)\n\nconst scope = createStoreResourceScope()\nconst profileResource = scope.resource(\n  async ({ signal }) => (await fetch('/api/profile', { signal })).json(),\n  { keepAliveMs: 30_000, onError: (error, phase) => console.error(`[profile] ${phase}`, error) }\n)\n\nfunction teardown() {\n  scope.dispose()\n  void settingsStore.$dispose()\n}",
             "const store = createStore({ count: 0, name: 'guest' })\nconst snapshot = store.$plain() // { count: 0, name: 'guest' }\nlocalStorage.setItem('state', JSON.stringify(snapshot))\n\nconst restored = JSON.parse(localStorage.getItem('state') ?? '{}')\nstore.$hydrate(restored, {\n  unknown: 'report',\n  onUnknown: (key) => console.warn('unknown field', key)\n})",
-            "import { createStore } from '@migaia/store-light'\nimport { createObjectLeaseRegistry } from '@migaia/lifecycle'\n\nconst store = createStore({ items: [] as string[] })\nconst registry = store.$own(createObjectLeaseRegistry())\n// registry 会在 store.$dispose() 时一并释放，无需单独管理",
-            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
+            "import { createStore } from '@migaia/store-light'\n\nconst store = createStore({ items: [] as string[] })\nconst timer = setInterval(() => console.log('poll'), 1_000)\nlet disposed = false\n// $own 接收 IDisposable（dispose() + disposed），典型资源是 collection 等外部结构\nconst poller = store.$own({\n  get disposed() {\n    return disposed\n  },\n  dispose() {\n    if (disposed) return\n    disposed = true\n    clearInterval(timer)\n  }\n})\n// poller 会在 store.$dispose() 时一并释放，无需单独管理",
+            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
           "exportPath": ".",
@@ -1905,7 +1905,7 @@
                       "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
                     ],
                     [
-                      "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
+                      "`this node is already owned by another Runtime` / `${what} belongs to a different Runtime than this scope` / `${what} is not a Runtime-owned reactive node` / `${what} belongs to another Runtime`",
                       "`$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）"
                     ],
                     [
@@ -1930,7 +1930,7 @@
                     ],
                     [
                       "`[store] keepAliveMs must be a finite non-negative number`（`RangeError`）",
-                      "`StoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
+                      "`IStoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
                     ]
                   ]
                 }
@@ -1943,7 +1943,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createStore } from '@migaia/store-light'\nimport { createObjectLeaseRegistry } from '@migaia/lifecycle'\n\nconst store = createStore({ items: [] as string[] })\nconst registry = store.$own(createObjectLeaseRegistry())\n// registry 会在 store.$dispose() 时一并释放，无需单独管理"
+                  "code": "import { createStore } from '@migaia/store-light'\n\nconst store = createStore({ items: [] as string[] })\nconst timer = setInterval(() => console.log('poll'), 1_000)\nlet disposed = false\n// $own 接收 IDisposable（dispose() + disposed），典型资源是 collection 等外部结构\nconst poller = store.$own({\n  get disposed() {\n    return disposed\n  },\n  dispose() {\n    if (disposed) return\n    disposed = true\n    clearInterval(timer)\n  }\n})\n// poller 会在 store.$dispose() 时一并释放，无需单独管理"
                 }
               ]
             }
@@ -2685,10 +2685,10 @@
           "examples": [
             "import {\n  createStore,\n  createAsyncStore,\n  storeReady,\n  raw,\n  isRaw,\n  isFieldBuilder,\n  FIELD_BUILDER,\n  createStoreResource,\n  createStoreResourceScope\n} from '@migaia/store-light'",
             "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}",
-            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}",
+            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'",
             "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n}",
-            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
+            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
           "exportPath": ".",
@@ -2925,11 +2925,11 @@
           "errors": ["No documented errors are declared for IFieldBuilder."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFieldBuilder.",
           "examples": [
-            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}",
+            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'",
             "isFieldBuilder(someValue) // 是否为 IFieldBuilder（sync/async/legacy 任一形态）",
             "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n}",
-            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
+            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
           "exportPath": ".",
@@ -2982,7 +2982,7 @@
         {
           "name": "IFieldContext",
           "kind": "type",
-          "signature": "export type IFieldContext = { runtime: IRuntime; signal: IAbortSignal; createSource(debugName?: string): IFieldSource; };",
+          "signature": "export type IFieldContext = { runtime: IRuntime; signal: INativeAbortSignal; createSource(debugName?: string): IFieldSource; };",
           "declarationLine": 33,
           "source": "packages/store-light/dist/store-protocol.d.ts",
           "purpose": "Provides `runtime` for ordinary nodes and `createSource` for custom storage in the same graph. `signal` aborts in-flight initialization when the store is disposed. The store owns resource registration, so this context does not expose its scope. Delegating registration to builders could leak resources when a third-party builder omits registration.",
@@ -2995,15 +2995,15 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFieldContext.",
           "examples": [
             "export type IFieldContext = {\n  runtime: IRuntime\n  signal: AbortSignal // Store dispose 时中止在途初始化\n  createSource(debugName?: string): IFieldSource\n}\n\nexport type ISyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'sync'\n  create(context: IFieldContext): F\n}\n\nexport type IAsyncFieldBuilder<F extends IDisposable> = {\n  readonly [FIELD_BUILDER]: true\n  readonly mode: 'async'\n  create(context: IFieldContext): Promise<F>\n}",
-            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}",
+            "import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}",
             "import { FIELD_BUILDER, isFieldBuilder } from '@migaia/store-light'\nimport type {\n  IFieldBuilder,\n  IFieldContext,\n  IFieldSource,\n  IMutationGuard,\n  IMutationPolicy\n} from '@migaia/store-light'",
             "const myBuilder: IFieldBuilder<MyField> = {\n  [FIELD_BUILDER]: true,\n  mode: 'sync',\n  create(context: IFieldContext) {\n    /* ... */\n  }\n}",
-            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        dispose() {\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
+            "import {\n  createStore,\n  FIELD_BUILDER,\n  type IFieldBuilder,\n  type IFieldContext\n} from '@migaia/store-light'\nimport type { IDisposable } from '@migaia/reactive'\n\ntype ICounterField = IDisposable & { value: number }\n\nfunction counterField(initial: number): IFieldBuilder<ICounterField> {\n  return {\n    [FIELD_BUILDER]: true,\n    mode: 'sync',\n    create({ createSource }: IFieldContext): ICounterField {\n      const source = createSource('CounterField')\n      let value = initial\n      let disposed = false\n      return {\n        get value() {\n          source.track()\n          return value\n        },\n        set value(v) {\n          source.commit(() => {\n            value = v\n          })\n        },\n        get disposed() {\n          return disposed\n        },\n        dispose() {\n          if (disposed) return\n          disposed = true\n          source.dispose()\n        }\n      }\n    }\n  }\n}\n\nconst store = createStore({ counter: counterField(0) })\nstore.counter.value // 0"
           ],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IFieldContext = { runtime: IRuntime; signal: IAbortSignal; createSource(debugName?: string): IFieldSource; };"
+            "export type IFieldContext = { runtime: IRuntime; signal: INativeAbortSignal; createSource(debugName?: string): IFieldSource; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -3042,7 +3042,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/store-light/dist/store-protocol.d.ts:IFieldContext:export type IFieldContext = { runtime: IRuntime; signal: IAbortSignal; createSource(debugName?: string): IFieldSource; };",
+          "identity": "packages/store-light/dist/store-protocol.d.ts:IFieldContext:export type IFieldContext = { runtime: IRuntime; signal: INativeAbortSignal; createSource(debugName?: string): IFieldSource; };",
           "guidance": [],
           "usageScore": 56,
           "configuration": [],
@@ -3236,7 +3236,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/store-protocol.d.ts:ILegacyFieldBuilder:export type ILegacyFieldBuilder<F extends IDisposable> = { readonly [FIELD_BUILDER]: true; create(context: IFieldContext): Promise<F>; };",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 8,
           "configuration": [],
           "fragment": "store-light-index--ILegacyFieldBuilder"
         },
@@ -4057,6 +4057,69 @@
           "identity": "packages/store-light/dist/store-resource.d.ts:IStoreResource:export type IStoreResource<T> = { read(): T; preload(): void; retry(): void; /** @deprecated Use retainResource() or retainVersion(). */ retain(version?: number | IVersionToken): () => void; retainResource(): () => void; retainVersion(version: number | IVersionToken): () => void; /** Internal React bridge: protect version during render, then commit in layout. */ captureVersion(version: number): IResourceCapture; commitCapture(capture: IResourceCapture): () => void; dispose(): void; forceDispose(): void; /** Resolves once this resource reaches its terminal state. Never depends on GC. */ whenTerminal(): Promise<void>; subscribe(listener: () => void): () => void; getSnapshot(): number; readSnapshot(): IStoreResourceSnapshot<T>; captureSnapshot(existingLease?: object): { snapshot: IStoreResourceSnapshot<T>; capture?: IResourceCapture; }; };",
           "guidance": [
             {
+              "id": "8-3-istoreresourceoptions",
+              "heading": "8.3 IStoreResourceOptions",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["字段", "类型", "必填性", "默认值", "说明"],
+                  "rows": [
+                    [
+                      "`runtime`",
+                      "`IRuntime`",
+                      "optional",
+                      "shared Runtime",
+                      "Owns deferred idle cleanup and diagnostics."
+                    ],
+                    [
+                      "`scheduler`",
+                      "`IScheduler`",
+                      "optional",
+                      "`systemScheduler`",
+                      "Captured once for cache TTL and provisional expiry; task cancellation and unref are preserved."
+                    ],
+                    [
+                      "`keepAliveMs`",
+                      "`number`",
+                      "可选",
+                      "`1000`",
+                      "无任何持有者（resource lease + version lease + 挂起的 capture）之后，缓存值继续存活的毫秒数；必须是有限非负数，否则构造时抛 `RangeError`"
+                    ],
+                    [
+                      "`dispose`",
+                      "`(value: T) => void \\",
+                      "Promise<void>`",
+                      "可选",
+                      "无",
+                      "自定义清理函数；提供后，值必须是引用类型（对象/函数），否则抛 `TypeError`；不提供时，若值本身带 `$dispose` 方法（例如另一个 Store），会自动调用"
+                    ],
+                    [
+                      "`onError`",
+                      "`(error, phase: StoreResourceErrorPhase) => void`",
+                      "可选",
+                      "无",
+                      "观察 `'load' \\",
+                      "'dispose' \\",
+                      "'listener'` 三个阶段的失败；reporter 自身抛错或拒绝时，原失败与 reporter 失败均由所属 Runtime 报告，资源状态不变"
+                    ],
+                    ["`onTerminal`", "`() => void`", "可选", "无", "资源到达终态时调用一次"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`IStoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造时只读取上述已知字段并形成稳定快照：`load` 与每个已知 accessor 最多读取一次，不枚举或执行未知字段 getter；显式 `options` 的 own-enumerable 字段覆盖 factory 对象上的同名字段。`dispose`、`onError`、`onTerminal` 若存在必须是函数，否则在任何请求或 Resource 状态建立前同步抛出 tagged `INVALID_OPTION`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "自动 `$dispose` 与自定义 disposer 的返回值遵循 lifecycle 的统一接纳语义：disposer getter、then getter 均只读取一次，捕获函数分别以原资源、原 thenable 作为 receiver 调用。getter、调用或异步 rejection 的原始异常通过 `onError(error, 'dispose')` 可达；重复 `forceDispose()` 不会重复清理同一值。"
+                }
+              ]
+            },
+            {
               "id": "9-状态常量与错误构造工具",
               "heading": "9. 状态常量与错误构造工具",
               "blocks": [
@@ -4094,6 +4157,140 @@
                 {
                   "type": "paragraph",
                   "text": "这四个工厂函数是本包内部构造所有错误时使用的同一套工具，导出给需要\"以 `@migaia/store-light` 身份抛出自定义诊断错误\"的高级集成方（例如自定义 `FieldBuilder` 实现想复用同一套错误身份约定）；日常业务代码通常不需要直接调用它们，直接 `catch` 本包抛出的错误、按 `error.code` 分支即可（见下表）。"
+                }
+              ]
+            },
+            {
+              "id": "10-错误信息全表",
+              "heading": "10. 错误信息全表",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "每个离开本包边界的错误都保留原生类型，并带 `source: '@migaia/store-light'` 与稳定 `code`。例如已释放 Store 为 `STORE_DISPOSED`，未就绪异步字段为 `STORE_NOT_READY`；初始化与 cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["`StoreLightErrorCode`", "码值", "触发条件 / 处理"],
+                  "rows": [
+                    [
+                      "`storeDisposed`",
+                      "`STORE_DISPOSED`",
+                      "Store 终结后继续访问；创建新 Store，不复活旧实例"
+                    ],
+                    [
+                      "`resourceDisposed`",
+                      "`RESOURCE_DISPOSED`",
+                      "Resource closing/disposed 后读取或保留；停止使用并创建新资源"
+                    ],
+                    [
+                      "`captureInvalid`",
+                      "`CAPTURE_INVALID`",
+                      "capture token 无效或已消费；重新捕获，token 只能提交一次"
+                    ],
+                    [
+                      "`unknownVersion`",
+                      "`UNKNOWN_VERSION`",
+                      "保留/捕获不可见版本；从当前 snapshot 重新取得版本"
+                    ],
+                    [
+                      "`identityRequired`",
+                      "`IDENTITY_REQUIRED`",
+                      "带 dispose 的 factory 返回原始值；返回可追踪身份的对象或函数"
+                    ],
+                    [
+                      "`noAsyncInit`",
+                      "`NO_ASYNC_INIT`",
+                      "对同步 Store 调 `storeReady()`；改用 `createAsyncStore()` 或移除等待"
+                    ],
+                    [
+                      "`storeNotReady`",
+                      "`STORE_NOT_READY`",
+                      "异步字段 pending/failed 时访问；先等待 `storeReady()`"
+                    ],
+                    [
+                      "`initAndCleanupFailed`",
+                      "`INIT_AND_CLEANUP_FAILED`",
+                      "初始化与回滚同时失败；展开 `AggregateError.errors`"
+                    ],
+                    [
+                      "`syncFieldRequired`",
+                      "`SYNC_FIELD_REQUIRED`",
+                      "`createStore()` 收到异步 FieldBuilder；改用 `createAsyncStore()`"
+                    ],
+                    [
+                      "`actionBatchBoundary`",
+                      "`ACTION_BATCH_BOUNDARY`",
+                      "异步 action 首次 await 后继续写的诊断；把后续写显式放入 `$batch()`"
+                    ],
+                    [
+                      "`envUnsupported`",
+                      "`ENV_UNSUPPORTED`",
+                      "缺少 `WeakRef`/`FinalizationRegistry`；修复部署环境"
+                    ],
+                    [
+                      "`invalidOption`",
+                      "`INVALID_OPTION`",
+                      "keepAlive、写目标或 hydrate 选项非法；按 message 修正输入"
+                    ]
+                  ]
+                },
+                {
+                  "type": "table",
+                  "headers": ["错误信息", "触发条件"],
+                  "rows": [
+                    [
+                      "`[store] store is disposed`",
+                      "`$dispose()` 之后读写任意字段/调用任意 `$`-方法（`$own` 除外，它先校验其他条件）"
+                    ],
+                    [
+                      "`[store] store is ${status}; use createAsyncStore() before accessing async fields`",
+                      "读取尚未就绪（`pending`）或已失败（`failed`）的异步字段"
+                    ],
+                    [
+                      "`[store] createStore() only accepts synchronous fields; \"${key}\" is a FieldBuilder. Use createAsyncStore().`",
+                      "`createStore()`（非 `createAsyncStore`）的 shape 里含非 `mode: 'sync'` 的 `FieldBuilder`"
+                    ],
+                    [
+                      "`[store] field is not settable: ${key}`",
+                      "`$set()` 传入的 key 不对应任何 signal（computed/wasm/方法字段，或压根不存在的 key）"
+                    ],
+                    [
+                      "`[store] unknown hydration field: ${key}`",
+                      "`$hydrate(partial, { unknown: 'strict' })` 遇到未知 key"
+                    ],
+                    [
+                      "`[store] store has no asynchronous initialization`",
+                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
+                    ],
+                    [
+                      "`this node is already owned by another Runtime` / `${what} belongs to a different Runtime than this scope` / `${what} is not a Runtime-owned reactive node` / `${what} belongs to another Runtime`",
+                      "`$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）"
+                    ],
+                    [
+                      "`[store] resource is disposed`",
+                      "对已 `disposed`/`closing` 的 `StoreResource` 调用 `preload`/`retry`/`retain*`/`captureVersion`/`commitCapture` 等操作"
+                    ],
+                    [
+                      "`[store] unknown resource version`",
+                      "`retainVersion(version)`/`captureVersion(id)`/`commitCapture(capture)` 传入的版本号既不是当前版本，也不在 retired/stale/closing 列表里"
+                    ],
+                    [
+                      "`[store] resource factory returned a disposed value`",
+                      "`factory` 返回了一个已经被标记为 disposed 的值（复用了已释放的引用）"
+                    ],
+                    [
+                      "`[store] disposable resource values must use reference identity`（`TypeError`）",
+                      "配置了 `dispose` 但 `factory` 产出的是原始类型（非对象/函数），无法用引用去重和追踪生命周期"
+                    ],
+                    [
+                      "`[store] invalid or consumed resource capture`",
+                      "`commitCapture()`/`captures.inspect()` 收到的 capture 已提交过、已失效，或不是本资源签发的"
+                    ],
+                    [
+                      "`[store] keepAliveMs must be a finite non-negative number`（`RangeError`）",
+                      "`IStoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
+                    ]
+                  ]
                 }
               ]
             }
@@ -4457,8 +4654,72 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/store-resource-request.d.ts:IStoreResourceLoadContext:export type IStoreResourceLoadContext = IResourceFetchContext;",
-          "guidance": [],
-          "usageScore": 0,
+          "guidance": [
+            {
+              "id": "8-3-istoreresourceoptions",
+              "heading": "8.3 IStoreResourceOptions",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["字段", "类型", "必填性", "默认值", "说明"],
+                  "rows": [
+                    [
+                      "`runtime`",
+                      "`IRuntime`",
+                      "optional",
+                      "shared Runtime",
+                      "Owns deferred idle cleanup and diagnostics."
+                    ],
+                    [
+                      "`scheduler`",
+                      "`IScheduler`",
+                      "optional",
+                      "`systemScheduler`",
+                      "Captured once for cache TTL and provisional expiry; task cancellation and unref are preserved."
+                    ],
+                    [
+                      "`keepAliveMs`",
+                      "`number`",
+                      "可选",
+                      "`1000`",
+                      "无任何持有者（resource lease + version lease + 挂起的 capture）之后，缓存值继续存活的毫秒数；必须是有限非负数，否则构造时抛 `RangeError`"
+                    ],
+                    [
+                      "`dispose`",
+                      "`(value: T) => void \\",
+                      "Promise<void>`",
+                      "可选",
+                      "无",
+                      "自定义清理函数；提供后，值必须是引用类型（对象/函数），否则抛 `TypeError`；不提供时，若值本身带 `$dispose` 方法（例如另一个 Store），会自动调用"
+                    ],
+                    [
+                      "`onError`",
+                      "`(error, phase: StoreResourceErrorPhase) => void`",
+                      "可选",
+                      "无",
+                      "观察 `'load' \\",
+                      "'dispose' \\",
+                      "'listener'` 三个阶段的失败；reporter 自身抛错或拒绝时，原失败与 reporter 失败均由所属 Runtime 报告，资源状态不变"
+                    ],
+                    ["`onTerminal`", "`() => void`", "可选", "无", "资源到达终态时调用一次"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`IStoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造时只读取上述已知字段并形成稳定快照：`load` 与每个已知 accessor 最多读取一次，不枚举或执行未知字段 getter；显式 `options` 的 own-enumerable 字段覆盖 factory 对象上的同名字段。`dispose`、`onError`、`onTerminal` 若存在必须是函数，否则在任何请求或 Resource 状态建立前同步抛出 tagged `INVALID_OPTION`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "自动 `$dispose` 与自定义 disposer 的返回值遵循 lifecycle 的统一接纳语义：disposer getter、then getter 均只读取一次，捕获函数分别以原资源、原 thenable 作为 receiver 调用。getter、调用或异步 rejection 的原始异常通过 `onError(error, 'dispose')` 可达；重复 `forceDispose()` 不会重复清理同一值。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 4,
           "configuration": [],
           "fragment": "store-light-index--IStoreResourceLoadContext"
         },
@@ -4521,8 +4782,206 @@
           ],
           "declaredConfiguration": [],
           "identity": "packages/store-light/dist/store-resource.d.ts:IStoreResourceOptions:export type IStoreResourceOptions<T> = { /** Owns deferred cleanup and diagnostic reporting; defaults to the lazy shared Runtime. */ runtime?: IRuntime; /** Owns cache TTL and provisional capture expiry, captured once at creation. */ scheduler?: IScheduler; /** Cache TTL only; React render safety comes from capture/commit leases. */ keepAliveMs?: number; dispose?: (value: T) => void | PromiseLike<void>; onError?: (error: unknown, phase: IStoreResourceErrorPhase) => void; onTerminal?: () => void; };",
-          "guidance": [],
-          "usageScore": 2,
+          "guidance": [
+            {
+              "id": "8-3-istoreresourceoptions",
+              "heading": "8.3 IStoreResourceOptions",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["字段", "类型", "必填性", "默认值", "说明"],
+                  "rows": [
+                    [
+                      "`runtime`",
+                      "`IRuntime`",
+                      "optional",
+                      "shared Runtime",
+                      "Owns deferred idle cleanup and diagnostics."
+                    ],
+                    [
+                      "`scheduler`",
+                      "`IScheduler`",
+                      "optional",
+                      "`systemScheduler`",
+                      "Captured once for cache TTL and provisional expiry; task cancellation and unref are preserved."
+                    ],
+                    [
+                      "`keepAliveMs`",
+                      "`number`",
+                      "可选",
+                      "`1000`",
+                      "无任何持有者（resource lease + version lease + 挂起的 capture）之后，缓存值继续存活的毫秒数；必须是有限非负数，否则构造时抛 `RangeError`"
+                    ],
+                    [
+                      "`dispose`",
+                      "`(value: T) => void \\",
+                      "Promise<void>`",
+                      "可选",
+                      "无",
+                      "自定义清理函数；提供后，值必须是引用类型（对象/函数），否则抛 `TypeError`；不提供时，若值本身带 `$dispose` 方法（例如另一个 Store），会自动调用"
+                    ],
+                    [
+                      "`onError`",
+                      "`(error, phase: StoreResourceErrorPhase) => void`",
+                      "可选",
+                      "无",
+                      "观察 `'load' \\",
+                      "'dispose' \\",
+                      "'listener'` 三个阶段的失败；reporter 自身抛错或拒绝时，原失败与 reporter 失败均由所属 Runtime 报告，资源状态不变"
+                    ],
+                    ["`onTerminal`", "`() => void`", "可选", "无", "资源到达终态时调用一次"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`factory` 既可以是函数 `(context) => T \\| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`IStoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造时只读取上述已知字段并形成稳定快照：`load` 与每个已知 accessor 最多读取一次，不枚举或执行未知字段 getter；显式 `options` 的 own-enumerable 字段覆盖 factory 对象上的同名字段。`dispose`、`onError`、`onTerminal` 若存在必须是函数，否则在任何请求或 Resource 状态建立前同步抛出 tagged `INVALID_OPTION`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "自动 `$dispose` 与自定义 disposer 的返回值遵循 lifecycle 的统一接纳语义：disposer getter、then getter 均只读取一次，捕获函数分别以原资源、原 thenable 作为 receiver 调用。getter、调用或异步 rejection 的原始异常通过 `onError(error, 'dispose')` 可达；重复 `forceDispose()` 不会重复清理同一值。"
+                }
+              ]
+            },
+            {
+              "id": "10-错误信息全表",
+              "heading": "10. 错误信息全表",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "每个离开本包边界的错误都保留原生类型，并带 `source: '@migaia/store-light'` 与稳定 `code`。例如已释放 Store 为 `STORE_DISPOSED`，未就绪异步字段为 `STORE_NOT_READY`；初始化与 cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["`StoreLightErrorCode`", "码值", "触发条件 / 处理"],
+                  "rows": [
+                    [
+                      "`storeDisposed`",
+                      "`STORE_DISPOSED`",
+                      "Store 终结后继续访问；创建新 Store，不复活旧实例"
+                    ],
+                    [
+                      "`resourceDisposed`",
+                      "`RESOURCE_DISPOSED`",
+                      "Resource closing/disposed 后读取或保留；停止使用并创建新资源"
+                    ],
+                    [
+                      "`captureInvalid`",
+                      "`CAPTURE_INVALID`",
+                      "capture token 无效或已消费；重新捕获，token 只能提交一次"
+                    ],
+                    [
+                      "`unknownVersion`",
+                      "`UNKNOWN_VERSION`",
+                      "保留/捕获不可见版本；从当前 snapshot 重新取得版本"
+                    ],
+                    [
+                      "`identityRequired`",
+                      "`IDENTITY_REQUIRED`",
+                      "带 dispose 的 factory 返回原始值；返回可追踪身份的对象或函数"
+                    ],
+                    [
+                      "`noAsyncInit`",
+                      "`NO_ASYNC_INIT`",
+                      "对同步 Store 调 `storeReady()`；改用 `createAsyncStore()` 或移除等待"
+                    ],
+                    [
+                      "`storeNotReady`",
+                      "`STORE_NOT_READY`",
+                      "异步字段 pending/failed 时访问；先等待 `storeReady()`"
+                    ],
+                    [
+                      "`initAndCleanupFailed`",
+                      "`INIT_AND_CLEANUP_FAILED`",
+                      "初始化与回滚同时失败；展开 `AggregateError.errors`"
+                    ],
+                    [
+                      "`syncFieldRequired`",
+                      "`SYNC_FIELD_REQUIRED`",
+                      "`createStore()` 收到异步 FieldBuilder；改用 `createAsyncStore()`"
+                    ],
+                    [
+                      "`actionBatchBoundary`",
+                      "`ACTION_BATCH_BOUNDARY`",
+                      "异步 action 首次 await 后继续写的诊断；把后续写显式放入 `$batch()`"
+                    ],
+                    [
+                      "`envUnsupported`",
+                      "`ENV_UNSUPPORTED`",
+                      "缺少 `WeakRef`/`FinalizationRegistry`；修复部署环境"
+                    ],
+                    [
+                      "`invalidOption`",
+                      "`INVALID_OPTION`",
+                      "keepAlive、写目标或 hydrate 选项非法；按 message 修正输入"
+                    ]
+                  ]
+                },
+                {
+                  "type": "table",
+                  "headers": ["错误信息", "触发条件"],
+                  "rows": [
+                    [
+                      "`[store] store is disposed`",
+                      "`$dispose()` 之后读写任意字段/调用任意 `$`-方法（`$own` 除外，它先校验其他条件）"
+                    ],
+                    [
+                      "`[store] store is ${status}; use createAsyncStore() before accessing async fields`",
+                      "读取尚未就绪（`pending`）或已失败（`failed`）的异步字段"
+                    ],
+                    [
+                      "`[store] createStore() only accepts synchronous fields; \"${key}\" is a FieldBuilder. Use createAsyncStore().`",
+                      "`createStore()`（非 `createAsyncStore`）的 shape 里含非 `mode: 'sync'` 的 `FieldBuilder`"
+                    ],
+                    [
+                      "`[store] field is not settable: ${key}`",
+                      "`$set()` 传入的 key 不对应任何 signal（computed/wasm/方法字段，或压根不存在的 key）"
+                    ],
+                    [
+                      "`[store] unknown hydration field: ${key}`",
+                      "`$hydrate(partial, { unknown: 'strict' })` 遇到未知 key"
+                    ],
+                    [
+                      "`[store] store has no asynchronous initialization`",
+                      "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
+                    ],
+                    [
+                      "`this node is already owned by another Runtime` / `${what} belongs to a different Runtime than this scope` / `${what} is not a Runtime-owned reactive node` / `${what} belongs to another Runtime`",
+                      "`$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）"
+                    ],
+                    [
+                      "`[store] resource is disposed`",
+                      "对已 `disposed`/`closing` 的 `StoreResource` 调用 `preload`/`retry`/`retain*`/`captureVersion`/`commitCapture` 等操作"
+                    ],
+                    [
+                      "`[store] unknown resource version`",
+                      "`retainVersion(version)`/`captureVersion(id)`/`commitCapture(capture)` 传入的版本号既不是当前版本，也不在 retired/stale/closing 列表里"
+                    ],
+                    [
+                      "`[store] resource factory returned a disposed value`",
+                      "`factory` 返回了一个已经被标记为 disposed 的值（复用了已释放的引用）"
+                    ],
+                    [
+                      "`[store] disposable resource values must use reference identity`（`TypeError`）",
+                      "配置了 `dispose` 但 `factory` 产出的是原始类型（非对象/函数），无法用引用去重和追踪生命周期"
+                    ],
+                    [
+                      "`[store] invalid or consumed resource capture`",
+                      "`commitCapture()`/`captures.inspect()` 收到的 capture 已提交过、已失效，或不是本资源签发的"
+                    ],
+                    [
+                      "`[store] keepAliveMs must be a finite non-negative number`（`RangeError`）",
+                      "`IStoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "usageScore": 18,
           "configuration": [],
           "fragment": "store-light-index--IStoreResourceOptions"
         },
@@ -5311,7 +5770,7 @@
                       "对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`"
                     ],
                     [
-                      "`[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime`",
+                      "`this node is already owned by another Runtime` / `${what} belongs to a different Runtime than this scope` / `${what} is not a Runtime-owned reactive node` / `${what} belongs to another Runtime`",
                       "`$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）"
                     ],
                     [
@@ -5336,7 +5795,7 @@
                     ],
                     [
                       "`[store] keepAliveMs must be a finite non-negative number`（`RangeError`）",
-                      "`StoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
+                      "`IStoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`"
                     ]
                   ]
                 }
