@@ -1,5 +1,6 @@
 /** CI package scheduling; one preparation build feeds read-only release checks and custody. */
 import { execFileSync, spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import {
   existsSync,
   mkdirSync,
@@ -71,8 +72,33 @@ const familyOwners = Object.freeze([
 /** The six package configs exclude these family-only suites; their failures belong to root gates. */
 const familyOnlyTestFile =
   /\/test\/(?:process\/conformance[^/]*\.test\.ts|bridge\/conformance-faults\.test\.ts|merge\/suite-parity\.test\.ts)$/
-/** Timing ratios and CPU-bound string checks retain the quiet execution of the former serial CI. */
-const exclusivePackages = Object.freeze(['utils', 'plugin-host'])
+/**
+ * Timing ratios, real timeouts and CPU-bound string checks run serially on a quiet machine before
+ * the ordinary pool starts.
+ */
+const exclusivePackages = Object.freeze(['lifecycle', 'utils', 'plugin-host'])
+/** Number of unfinished ordinary chains that may still overlap the single RPC family capture. */
+const familyOverlapChains = 2
+/**
+ * Conformance runs as two concurrent serial lanes split by whole file: the long resource suite
+ * alone, and every other conformance file. Each lane keeps the original false/1 config.
+ */
+const conformanceLanes = Object.freeze([
+  Object.freeze({ id: 'r', args: Object.freeze(['test/process/conformance-resources.test.ts']) }),
+  Object.freeze({
+    id: 'o',
+    args: Object.freeze(['--exclude', 'test/process/conformance-resources.test.ts'])
+  })
+])
+/**
+ * Short per-checkout prefix for lane-private TMPDIR roots. Lanes must not share Go/Rust peer build
+ * output; /tmp keeps Unix socket paths under the macOS length limit; the stable name lets later
+ * runs reuse native build caches.
+ */
+const conformanceTemporaryPrefix = join(
+  '/tmp',
+  'ci-' + createHash('sha256').update(repositoryRoot).digest('hex').slice(0, 8)
+)
 /** Shared inputs invalidate every package gate; pnpm still owns all package dependency selection. */
 const sharedInputPaths = new Set([
   'package.json',
@@ -447,7 +473,7 @@ const captureFamily = async (packages, runtime) => {
   console.log(text.family)
   /** JSON test results supply evidence for owner-specific failures without guessing from stderr. */
   const resultsPath = join(runtime.reportRoot, 'rpc-family-tests.json')
-  /** The family config retains its existing maxWorkers=2 and large-frame serialization. */
+  /** The family config owns its shared worker budget and large-frame serialization. */
   const args = [
     ...coverageArguments(RPC_COVERAGE_FAMILY.unit, runtime.reportRoot),
     '--reporter=default',
@@ -495,32 +521,92 @@ const captureFamily = async (packages, runtime) => {
 }
 
 /**
- * Schedule ordinary packages first, then known timing-sensitive work and one RPC family capture.
+ * Run timing-sensitive package chains serially first, then the ordinary pool. The one RPC family
+ * capture starts once every family owner prefix is done and at most two ordinary chains remain.
  *
  * @param {string[]} names Existing package declaration order.
  * @param {ICiRuntime} runtime Global job budget.
+ * @param {() => Promise<void>} [onPoolDrained] Root work started once the ordinary pool drains; it
+ *   may overlap the family capture and its package tails.
  * @returns {Promise<IPackageResult[]>} Complete ordered package results; summaries never precede
- *   deferred tests.
+ *   deferred tests or the drained-pool callback.
  */
-export const runPackages = async (names, runtime) => {
+export const runPackages = async (names, runtime, onPoolDrained = undefined) => {
   /** Package maps prevent duplicate selected owners from running a second capture. */
   const results = [...new Set(names)].map((name) => {
     if (!existsSync(join(repositoryRoot, 'packages', name, 'package.json')))
       throw new Error(text.missingPackage(name))
     return { name, gates: [], started: 0, finished: 0 }
   })
-  await runPool(
-    results.filter(({ name }) => !exclusivePackages.includes(name)),
-    runtime.jobs,
-    (result) => beginPackage(result, runtime)
-  )
   for (const result of results.filter(({ name }) => exclusivePackages.includes(name)))
     await beginPackage(result, runtime)
+  /** Every remaining package chain keeps the original ordinary pool budget. */
+  const ordinary = results.filter(({ name }) => !exclusivePackages.includes(name))
   /** The integration owner participates through the family config even when not publishable. */
   const family = results.filter(({ name }) => familyOwners.includes(name))
-  if (family.length) await captureFamily(family, runtime)
+  /** Queued and running non-family chains; capture may overlap only the last few of them. */
+  let ordinaryRemaining = ordinary.length - family.length
+  /** Family owners whose format/lint/typecheck prefix has not finished yet. */
+  let familyPrefixesRemaining = family.length
+  /** Resolved by the first pool completion that satisfies the overlap rule; later resolves no-op. */
+  const familyReady = Promise.withResolvers()
+  /** Capture keeps the original coverage unit, failure ownership and post-capture package tails. */
+  const familyCapture = family.length
+    ? familyReady.promise.then(() => captureFamily(family, runtime))
+    : Promise.resolve()
+  /** Root work waits for the whole ordinary pool, never for the family capture. */
+  const pool = runPool(ordinary, runtime.jobs, async (result) => {
+    await beginPackage(result, runtime)
+    if (familyOwners.includes(result.name)) familyPrefixesRemaining -= 1
+    else ordinaryRemaining -= 1
+    if (familyPrefixesRemaining === 0 && ordinaryRemaining <= familyOverlapChains)
+      familyReady.resolve()
+  }).then(() => onPoolDrained?.())
+  await Promise.all([pool, familyCapture])
   for (const result of results) printSummary(result.gates)
   return results
+}
+
+/**
+ * Run the conformance suite as concurrent whole-file lanes behind one required summary row. Each
+ * lane runs the package's original `test:conformance` script (serial files, one worker) with a
+ * private TMPDIR and RPC_H_EVIDENCE, so native peer builds and evidence files never collide. Both
+ * lanes always settle; the first nonzero lane exit becomes the row's exit code.
+ *
+ * @param {ICiRuntime} runtime Child environment.
+ * @returns {Promise<IGateResult>} One `rpc/test:conformance` result.
+ */
+const runConformance = async (runtime) => {
+  console.log(text.gate(GateName.conformance))
+  /** Match Makefile's integer elapsed-second result format. */
+  const started = Math.floor(Date.now() / 1000)
+  /** Native lane exits in declaration order, independent of completion order. */
+  const codes = await Promise.all(
+    conformanceLanes.map(({ id, args }) => {
+      /** Persistent lane root; the native wrappers still decide freshness and rebuilds. */
+      const temporaryDirectory = `${conformanceTemporaryPrefix}-${id}`
+      mkdirSync(temporaryDirectory, { recursive: true })
+      return runCommand(
+        'pnpm',
+        ['--filter', './packages/rpc-integration', 'run', 'test:conformance', ...args],
+        {
+          env: {
+            ...runtime.env,
+            TMPDIR: temporaryDirectory,
+            RPC_H_EVIDENCE: join(temporaryDirectory, 'h-evidence')
+          }
+        }
+      )
+    })
+  )
+  /** Any failing lane fails the single required row with its own native code. */
+  const code = codes.find((value) => value !== 0) ?? 0
+  return {
+    name: GateName.conformance,
+    code,
+    state: code === 0 ? GateState.pass : GateState.fail,
+    seconds: Math.floor(Date.now() / 1000) - started
+  }
 }
 
 /**
@@ -593,36 +679,33 @@ export const runCi = async (
     results.push(
       await runGate(name, 'required', 'make', ['--no-print-directory', name], { env: runtime.env })
     )
+  /** Root rows execute early but keep their original summary position after the groups. */
+  const rootResults = []
+  /** Conformance runs inside the root callback but keeps its post-custody summary position. */
+  const conformanceResults = []
   /** All readers begin only after the one topological workspace build has finished. */
-  const packages = await runPackages([...releasePackages, ...storePackages], runtime)
-  if (releasePackages.length) results.push(groupSummary(GateName.ship, releasePackages, packages))
-  if (storePackages.length) results.push(groupSummary(GateName.store, storePackages, packages))
-  for (const name of [GateName.registry, GateName.consumers])
-    results.push(await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env }))
-  results.push(
-    await runGate(GateName.docs, 'required', 'node', ['scripts/check-docs-independence.mjs'], {
-      env: runtime.env
-    })
-  )
-  results.push(
-    await runGate(
-      GateName.docsExamples,
-      'required',
-      'make',
-      ['--no-print-directory', 'docs-examples'],
-      {
+  const packages = await runPackages([...releasePackages, ...storePackages], runtime, async () => {
+    for (const name of [GateName.registry, GateName.consumers])
+      rootResults.push(await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env }))
+    rootResults.push(
+      await runGate(GateName.docs, 'required', 'node', ['scripts/check-docs-independence.mjs'], {
         env: runtime.env
-      }
+      })
     )
-  )
-  for (const name of rootTestGates)
-    results.push(await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env }))
-  results.push(
-    await runGate(GateName.custody, 'required', 'node', ['scripts/coverage-custody.mjs'], {
-      env: runtime.env
-    })
-  )
-  if (scope.rpc) {
+    rootResults.push(
+      await runGate(
+        GateName.docsExamples,
+        'required',
+        'make',
+        ['--no-print-directory', 'docs-examples'],
+        {
+          env: runtime.env
+        }
+      )
+    )
+    for (const name of rootTestGates)
+      rootResults.push(await runGate(name, 'required', 'pnpm', ['run', name], { env: runtime.env }))
+    if (!scope.rpc) return
     /** Missing toolchains retain the original explicit blocking/warning skip policy. */
     const missing = []
     for (const tool of conformanceTools)
@@ -635,26 +718,31 @@ export const runCi = async (
         ])) !== 0
       )
         missing.push(tool)
-    if (missing.length)
-      results.push({
-        name: text.missingTools(missing),
-        code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
-        state:
-          process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
-            ? GateState.skipWarning
-            : GateState.skipBlocking,
-        seconds: 0
-      })
-    else
-      results.push(
-        await runGate(
-          GateName.conformance,
-          'required',
-          'pnpm',
-          ['--filter', './packages/rpc-integration', 'run', 'test:conformance'],
-          { env: runtime.env }
-        )
-      )
+    conformanceResults.push(
+      missing.length
+        ? {
+            name: text.missingTools(missing),
+            code: process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1' ? 0 : 1,
+            state:
+              process.env.CI_ALLOW_MISSING_TOOLCHAINS === '1'
+                ? GateState.skipWarning
+                : GateState.skipBlocking,
+            seconds: 0
+          }
+        : await runConformance(runtime)
+    )
+  })
+  if (releasePackages.length) results.push(groupSummary(GateName.ship, releasePackages, packages))
+  if (storePackages.length) results.push(groupSummary(GateName.store, storePackages, packages))
+  results.push(...rootResults)
+  /** Custody starts only after every capture, exit marker and family tail has completed. */
+  results.push(
+    await runGate(GateName.custody, 'required', 'node', ['scripts/coverage-custody.mjs'], {
+      env: runtime.env
+    })
+  )
+  if (scope.rpc) {
+    results.push(...conformanceResults)
     results.push(
       await runGate(
         GateName.parity,

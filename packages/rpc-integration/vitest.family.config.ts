@@ -28,7 +28,8 @@ const excluded = [
 export default defineConfig(
   withDistFreshness({
     test: {
-      maxWorkers: 2,
+      // Shared budget of the six unit projects in sequence group 0; large frames stay serial.
+      maxWorkers: 3,
       exclude: excluded,
       projects: [
         ...testOwners.map((owner) => ({
