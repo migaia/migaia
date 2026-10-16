@@ -24,6 +24,22 @@
       "dependsOn": ["build"],
       "outputs": []
     },
+    "typecheck:contract": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "typecheck:core": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "typecheck:browser": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "typecheck:e2e": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
     "@migaia/rpc-core#typecheck:test": {
       "dependsOn": ["build", "@migaia/rpc-process#build", "@migaia/rpc-threads#build"],
       "outputs": []
