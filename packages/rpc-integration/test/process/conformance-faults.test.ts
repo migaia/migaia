@@ -219,6 +219,7 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
           await registration.close()
           await resilience.close()
           await local.dispose()
+          if (options.scheduler) await settleFaultTurn(options.scheduler)
         }
       }
     } catch (error) {
@@ -256,6 +257,7 @@ async function faultClient(peer: IPeer, options: IFaultOptions = {}) {
       close: async () => {
         await local.dispose()
         await resilience.close()
+        if (options.scheduler) await settleFaultTurn(options.scheduler)
       }
     }
   } catch (error) {
@@ -412,9 +414,9 @@ describe('[A4] borrowed hang retains external process ownership', () => {
         const origin = scheduler.now()
         for (let check = 0; check < 3; check++) {
           scheduler.advance(origin + (check + 1) * 5000 - scheduler.now())
-          await settleFaultTurn()
+          await settleFaultTurn(scheduler)
           scheduler.advance(2000)
-          await settleFaultTurn()
+          await settleFaultTurn(scheduler)
           if (check < 2) expect(closed).toBe(false)
         }
         expect(scheduler.now() - origin).toBe(17000)
@@ -428,9 +430,10 @@ describe('[A4] borrowed hang retains external process ownership', () => {
           expect(active!.resilience.inspect('p')).toMatchObject({ state: 'backoff' })
         )
         scheduler.advance(1)
-        await vi.waitFor(async () =>
+        await vi.waitFor(async () => {
+          await settleFaultTurn(scheduler)
           expect(await active!.feature.request(['after-redial'])).toBe('after-redial')
-        )
+        })
         expect(active.physical).toHaveLength(2)
         await active.close()
         process.kill(child.pid!, 0)
@@ -713,10 +716,13 @@ describe('[A4] physical departure before sendOnce admission', () => {
     }, 15000)
 })
 
-/** Allow real I/O callbacks and the bounded production promise continuations to settle. */
-async function settleFaultTurn() {
+/** Settle real I/O, explicitly run manual deferred jobs, and join bounded Promise continuations. */
+async function settleFaultTurn(scheduler?: ReturnType<typeof createManualScheduler>) {
   await new Promise<void>((resolve) => setImmediate(resolve))
-  for (let turn = 0; turn < 32; turn++) await Promise.resolve()
+  for (let turn = 0; turn < 32; turn++) {
+    scheduler?.advance(0)
+    await Promise.resolve()
+  }
 }
 
 describe('[A4] default native health detects real CPU loops', () => {
@@ -738,13 +744,13 @@ describe('[A4] default native health detects real CPU loops', () => {
         const origin = scheduler.now()
         for (let check = 0; check < 3; check++) {
           scheduler.advance(origin + (check + 1) * 5000 - scheduler.now())
-          await settleFaultTurn()
+          await settleFaultTurn(scheduler)
           expect(exited).toBe(false)
           scheduler.advance(1999)
-          await settleFaultTurn()
+          await settleFaultTurn(scheduler)
           expect(exited).toBe(false)
           scheduler.advance(1)
-          await settleFaultTurn()
+          await settleFaultTurn(scheduler)
           if (check < 2) expect(exited).toBe(false)
         }
         expect(scheduler.now() - origin).toBe(17000)
@@ -754,9 +760,10 @@ describe('[A4] default native health detects real CPU loops', () => {
         )
         scheduler.advance(1)
         await vi.waitFor(() => expect(active.handles).toHaveLength(2))
-        await vi.waitFor(async () =>
+        await vi.waitFor(async () => {
+          await settleFaultTurn(scheduler)
           expect(await active.feature.request(['after-busy'])).toBe('after-busy')
-        )
+        })
         expect(active.handles[1]!.identity.pid).not.toBe(current.identity.pid)
         expect(
           wireFrames(active.sent).filter(
@@ -878,16 +885,17 @@ describe('[A4] real owned crash retry eligibility', () => {
           )
           process.kill(active.handles[0]!.identity.pid!, 'SIGKILL')
           await active.handles[0]!.exited
-          await settleFaultTurn()
+          await settleFaultTurn(scheduler)
           if (disposition === 'cancel') controller.abort('hf-cancelled')
           if (disposition === 'deadline') scheduler.advance(500)
           if (disposition === 'release') await active.close()
           if (disposition === 'ready' || disposition === 'cancel') {
             scheduler.advance(100)
             await vi.waitFor(() => expect(active.handles).toHaveLength(2))
-            await vi.waitFor(() =>
+            await vi.waitFor(async () => {
+              await settleFaultTurn(scheduler)
               expect(active.resilience.inspect('p')).toMatchObject({ state: 'ready' })
-            )
+            })
           }
           const result = await observed
           const requests = wireFrames(active.sent).filter(
@@ -946,9 +954,10 @@ describe('[A4] real started streams do not resume after crash', () => {
         )
         scheduler.advance(1)
         await vi.waitFor(() => expect(active.handles).toHaveLength(2))
-        await vi.waitFor(async () =>
+        await vi.waitFor(async () => {
+          await settleFaultTurn(scheduler)
           expect(await active.feature.request(['after-stream-crash'])).toBe('after-stream-crash')
-        )
+        })
         expect(await next).toHaveProperty('error')
         expect(
           wireFrames(active.sent).filter(
@@ -981,12 +990,12 @@ describe('[A4] owned bridge hang has no default health detector', () => {
           (value) => ({ value }),
           (error) => ({ error })
         )
-        await settleFaultTurn()
+        await settleFaultTurn(scheduler)
         scheduler.advance(100)
-        await settleFaultTurn()
+        await settleFaultTurn(scheduler)
         expect(await call).toHaveProperty('error')
         scheduler.advance(20000)
-        await settleFaultTurn()
+        await settleFaultTurn(scheduler)
         expect(active.resilience.inspect('p')).toMatchObject({ health: 'none', state: 'ready' })
         expect(active.handles).toHaveLength(1)
         process.kill(active.handles[0]!.identity.pid!, 0)
@@ -1092,9 +1101,10 @@ describe('[A4] real non-idempotent request crash', () => {
         expect(requests).toHaveLength(1)
         expect(requests[0].data.route).not.toHaveProperty('idempotencyKey')
         /** Supervisor ready precedes remote describe publication; join the actual business gate. */
-        await vi.waitFor(async () =>
+        await vi.waitFor(async () => {
+          await settleFaultTurn(scheduler)
           expect(await active!.feature.request(['after-unknown'])).toBe('after-unknown')
-        )
+        })
       } finally {
         await active?.close()
         await call
