@@ -28,20 +28,14 @@
 调度器契约与实现只由 `@migaia/utils/scheduler`（及根入口 `@migaia/utils`）导出；本模块的 `sleep`、`withTimeout`、`retry`、`createAbortTimeoutSignal` 以它为 `scheduler` 选项类型与默认值。
 
 ```ts
-import {
-  createManualScheduler,
-  systemScheduler,
-  systemWallClock,
-  type IManualScheduler,
-  type IScheduledTask,
-  type IScheduler,
-  type IWallClock
-} from '@migaia/utils/scheduler';
+import { createManualScheduler, systemScheduler, systemWallClock } from '@migaia/utils/scheduler';
+// 同一子路径还导出下列类型：IManualScheduler、IScheduledTask、IScheduler、IWallClock
 
 type IScheduledTask = { cancel(): void; unref?(): void };
 type IScheduler = {
   now(): number;
   schedule(callback: () => void, delayMs: number): IScheduledTask;
+  defer?(callback: () => void): void;
 };
 type IManualScheduler = IScheduler & {
   advance(ms: number): void;
@@ -193,23 +187,29 @@ try {
 ### `withTimeout`
 
 ```ts
-type ITimeoutOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>;
+type ITimeoutOperation<T> = (context: { readonly signal: INativeAbortSignal }) => T | PromiseLike<T>;
+type IDeadlineOnlyOperation<T> = (context: { readonly signal: IAbortSignal }) => T | PromiseLike<T>;
+
+type IWithTimeoutOptions = IAsyncControls & {
+  readonly timeoutMs: number;
+  readonly report?: IUtilsReporter;
+  readonly zeroTimeoutBehavior?: 'skip' | 'start';
+  readonly cooperativeCancellation?: boolean;
+};
 
 function withTimeout<T>(
   operation: ITimeoutOperation<T>,
-  options: IAsyncControls & {
-    readonly timeoutMs: number;
-    readonly report?: IUtilsReporter;
-    readonly zeroTimeoutBehavior?: 'skip' | 'start';
-    readonly cooperativeCancellation?: boolean;
-  }
+  options: IWithTimeoutOptions & { readonly cooperativeCancellation?: true }
 ): Promise<T>;
+function withTimeout<T>(operation: IDeadlineOnlyOperation<T>, options: IWithTimeoutOptions): Promise<T>;
 ```
+
+`INativeAbortSignal` 是本包内部用原生 `AbortController` 生成、再交给操作的 signal 类型。它按消费方自己的全局类型解析：项目带 `lib.dom`、`@types/node`、Deno 或 Bun 类型时，它就是宿主 `AbortSignal`，可以直接写 `fetch(url, { signal })`；没有宿主类型时退回结构化的 `IAbortSignal`，所以发布的声明不依赖任何宿主库。所有入参仍接受结构化的 `IAbortSignal`。
 
 用截止时间包裹一个惰性操作。`operation` 收到的 `signal` 是**内部生成的合并信号**：外部 `signal(s)` 中止、或截止时间到达，都会让这个 `signal` 变为 `aborted`；操作函数必须自行检查它才能提前退出。
 
 - `timeoutMs`：必须是有限非负数；`timeoutMs === 0` 时默认立即以 `UtilsTimeoutError('operation', 0)` reject（除非 `zeroTimeoutBehavior: 'start'`，此时改为立刻启动操作、不设超时）。
-- `cooperativeCancellation`（默认 `true`）：为 `false` 时不分配内部 `AbortController`，操作函数只会拿到一个惰性的、恒不中止的信号——用于纯粹的"限时等待结果，但不需要通知操作提前退出"的场景。
+- `cooperativeCancellation`（默认 `true`）：为 `false` 时不分配内部 `AbortController`，操作函数只会拿到一个惰性的、恒不中止的结构化信号（类型是 `IAbortSignal`，不能传给 `fetch`）——用于纯粹的"限时等待结果，但不需要通知操作提前退出"的场景。
 - `report`：当操作在已经结算（超时/被外部中止）之后才 resolve/reject，这个迟到的结果不会再影响最终返回值，但会经由 `report`（默认 `hostRethrowReporter`）上报，避免静默丢弃未处理的错误。
 - 清理阶段（取消定时器、移除监听器）失败时，会把清理错误与原始错误一起包装成 `AggregateError` 一并 reject。
 
@@ -253,7 +253,7 @@ const result = raceWithAbort(({ signal }) => fetchSomething({ signal }), {
 ```ts
 type IRetryContext = {
   readonly attempt: number;
-  readonly signal: IAbortSignal;
+  readonly signal: INativeAbortSignal;
   readonly remainingMs?: number;
 };
 type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number };
@@ -397,13 +397,19 @@ class UtilsTimeoutError extends UtilsError {
 `UtilsError` 是抽象基类，所有本包抛出的语义化错误都携带 `source: '@migaia/utils'` 与稳定的 `code`。`UtilsAbortError` 通过 `cause` 保留原始中止原因；`UtilsTimeoutError` 额外携带 `scope`（超时发生在单次操作 / 单次尝试 / 总截止时间的哪一层）与 `timeoutMs`。
 
 ```ts
-function attachErrorIdentity<T extends Error>(
+function attachErrorIdentity<T extends object>(
   error: T,
   identity: {
     readonly source: string;
     readonly code: string;
     readonly phase?: string;
     readonly detail?: Readonly<Record<string, unknown>>;
+  },
+  hooks?: {
+    // 字段冲突时由调用方选择替代对象；不提供时冲突抛 TypeError
+    readonly onConflict?: (context: { target: T; key: string; existing: unknown; incoming: unknown }) => T;
+    // 定义字段失败（如对象被冻结）时由调用方选择替代对象；不提供时原样抛出
+    readonly onFailure?: (context: { target: T; key: string; incoming: unknown; cause: unknown }) => T;
   }
 ): T;
 ```
@@ -413,7 +419,7 @@ function attachErrorIdentity<T extends Error>(
 ```ts
 const error = new Error('boom');
 attachErrorIdentity(error, { source: 'my-package', code: 'FETCH_FAILED' });
-error.code; // 'FETCH_FAILED'
+(error as Error & { readonly code?: string }).code; // 'FETCH_FAILED'（返回类型仍是 T，不扩展 code 字段）
 ```
 
 ```ts
@@ -464,6 +470,7 @@ const UtilsErrorCode = {
   deadlineExceeded: 'DEADLINE_EXCEEDED',
   schedulerRunaway: 'SCHEDULER_RUNAWAY',
   errorIdentityConflict: 'ERROR_IDENTITY_CONFLICT',
+  errorChainInvalid: 'ERROR_CHAIN_INVALID',
   cloneUnsupported: 'CLONE_UNSUPPORTED',
   invalidEncoding: 'INVALID_ENCODING',
   limiterClosed: 'LIMITER_CLOSED',
@@ -491,6 +498,7 @@ const UtilsErrorCode = {
 - `DEADLINE_EXCEEDED`：操作、尝试或总流程超时；结合 `scope`、`timeoutMs` 选择重试或降级。
 - `SCHEDULER_RUNAWAY`：虚拟时钟一次推进超过 10000 个任务；排查同刻递归调度。
 - `ERROR_IDENTITY_CONFLICT`：已有错误身份与新 `source`/`code` 冲突；保留原身份。
+- `ERROR_CHAIN_INVALID`：收到的序列化错误树或其 plain data 违反字段、标量、深度、数量或文本字节约束；修正输入或使用边界自己的处理策略。
 - `CLONE_UNSUPPORTED`：值不能被 `structuredClone` 复制；先转换为可克隆数据。
 - `INVALID_ENCODING`：编码输入不是规范形式；按错误偏移修正输入。
 - `LIMITER_CLOSED`：并发限制器已关闭；停止提交或创建新实例。
@@ -536,7 +544,7 @@ function bytesToBase64(value: Uint8Array): string;
 按 RFC 4648 规范字母表编码为标准（非 URL-safe）、带 `=` 补齐的 Base64 字符串。
 
 ```ts
-function base64ToBytes(value: string): Uint8Array;
+function base64ToBytes(value: string, target?: Uint8Array): Uint8Array; // target 长度须等于解码字节数，复用而不分配
 ```
 
 **只接受规范形式**：标准字母表、必须 4 的倍数长度、正确的 `=` 补齐。非规范输入（URL-safe 变体、无补齐、多余空白等）一律拒绝，抛出携带 `code: 'INVALID_ENCODING'` 的 `TypeError`。解码后会反向编码校验往返一致性，进一步拒绝虽然长度/字符集正确但数值不对齐的输入。
@@ -1245,7 +1253,7 @@ const request = withTimeout(
         if (signal.aborted) throw signal.reason;
         return publicConfig.endpoint;
       },
-      { maxAttempts: publicConfig.retries, scheduler }
+      { maxAttempts: publicConfig.retries, shouldRetry: () => true, scheduler }
     ),
   { timeoutMs: 100, scheduler }
 );

@@ -193,7 +193,8 @@ type IPersistKeyedOptions<T> = {
   merge?: (persisted: Partial<T>, current: T) => T;
 };
 
-type IPersistKeyedHandle<T> = { readonly value: T; dispose(): void };
+// 与 persist()/persistCollection() 相同的 IPersistHandle（status、ready、flush、clear、dispose 等），外加当前值
+type IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T };
 ```
 
 ### 为什么持久化单位是"一个 key"，不是"整个 family"

@@ -278,7 +278,7 @@ type ISyncCookieStore = {
 **5 秒可运行示例**：
 
 ```ts
-import { cookiesHost } from '@migaia/storage-web/cookiesHost'
+import { cookiesHost } from '@migaia/storage-web/cookies'
 
 const jar = cookiesHost({ namespace: 'app', scope: { path: '/', secure: true, sameSite: 'lax' } })
 await jar.set('session', 'abc123', { maxAge: 3600 })
@@ -600,6 +600,7 @@ type IRecordStore<TValue = unknown> = IKeyValueStore & {
   putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>
   deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>
   clearRecords(ctx?: IOperationContext): Promise<void>
+  clearAll(ctx?: IOperationContext): Promise<void>
   readonly metadata?: {
     get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>
     set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>
@@ -879,6 +880,7 @@ type IEntityOptions<TDomain, TStored = TDomain> = {
   readonly validateOnRead?: boolean
   readonly onDiagnostic?: (message: string) => void
   readonly defaultOrderBy?: (left: TDomain, right: TDomain) => number
+  readonly indexes?: Readonly<Record<string, IEntityIndex<TDomain>>> // 二级索引定义，见 findBy/findManyBy/streamBy
 }
 ```
 
@@ -921,6 +923,19 @@ type IRepository<TDomain> = {
   remove(id: IStorageKey, ctx?: IOperationContext): Promise<void>
   list(options?: IListOptions<TDomain>, ctx?: IOperationContext): Promise<TDomain[]>
   stream(options?: IListOptions<TDomain>, ctx?: IOperationContext): AsyncIterableIterator<TDomain>
+  findBy(index: string, key: IStorageKey, ctx?: IOperationContext): Promise<TDomain | undefined>
+  findManyBy(
+    index: string,
+    range?: IKeyRange,
+    options?: Omit<IListOptions<TDomain>, 'range'>,
+    ctx?: IOperationContext
+  ): Promise<TDomain[]>
+  streamBy(
+    index: string,
+    range?: IKeyRange,
+    options?: Omit<IListOptions<TDomain>, 'range'>,
+    ctx?: IOperationContext
+  ): AsyncIterableIterator<TDomain>
   migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext): Promise<IMigrateResult>
   batch<T>(
     run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>,
@@ -950,8 +965,10 @@ type IRepository<TDomain> = {
 ```ts
 type IListOptions<TRecord = unknown> = {
   readonly range?: IKeyRange
+  readonly index?: never // 按索引查询时改用带 index 名的选项（IIndexedListOptions）
   readonly limit?: number
   readonly orderBy?: (left: TRecord, right: TRecord) => number
+  readonly direction?: 'next' | 'prev'
   readonly onInvalid?:
     'skip' | 'throw' | ((issue: IInvalidRecordIssue<TRecord>) => 'skip' | 'throw')
 }
@@ -1111,7 +1128,7 @@ host.backends() // mutation-incapable snapshot
 | `plugins/memory`          | `memoryBackendPlugin`         | `memory`     |
 | `plugins/local-storage`   | `localStorageBackendPlugin`   | `local`      |
 | `plugins/session-storage` | `sessionStorageBackendPlugin` | `session`    |
-| `plugins/cookiesHost`         | `cookieBackendPlugin`         | `cookiesHost`    |
+| `plugins/cookies`         | `cookieBackendPlugin`         | `cookies`    |
 | `plugins/indexed-db`      | `indexedDbBackendPlugin`      | `indexed-db` |
 
 `createStorageHost({ plugins })` 是首次安装入口且始终异步；后续才用 `await host.use(...)`。literal plugin tuple 会把 ID 精确映射到 store 类型，并在编译期拒绝重复 ID；运行时仍会对伪造 handle、重复 provider、错误 feature 拓扑和失效 store 做 fail-closed 校验。一个 batch 只有全部 create/prepare/plugin install 成功后才原子发布 registry；失败会 rollback 已接纳资源，不暴露半安装 backend。
@@ -1385,7 +1402,7 @@ try {
 
 ```ts
 import { asRecordStore, isRecordStore } from '@migaia/storage-contract'
-import { cookiesHost } from '@migaia/storage-web/cookiesHost'
+import { cookiesHost } from '@migaia/storage-web/cookies'
 import { memoryStorageHost } from '@migaia/storage-web/memory'
 
 const primary = cookiesHost({ scope: { path: '/', secure: true, sameSite: 'lax' } })

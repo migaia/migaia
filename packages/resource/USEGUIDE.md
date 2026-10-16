@@ -311,7 +311,7 @@ function UserProfile({ resource }: { resource: Resource<User> }) {
 
 ```ts
 // 服务端：
-const snapshot = userResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }
+const snapshot = serverUserResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }
 // 序列化 snapshot 注入 HTML
 
 // 客户端：

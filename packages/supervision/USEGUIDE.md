@@ -17,7 +17,7 @@ const supervisor = createCoroutineSupervisor<IEchoPort>({
       expose(port)
       heartbeat()
       await new Promise<void>((resolve) =>
-        signal.addEventListener('abort', resolve, { once: true })
+        signal.addEventListener('abort', () => resolve(), { once: true })
       )
       // Close resources owned by this task before returning.
     }

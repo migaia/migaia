@@ -128,6 +128,7 @@ type ILifecycleScope = ILifecycleOwner & {
   release(resource: unknown): boolean
   close(): void
   dispose(): Promise<readonly ICollectedError[]>
+  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果
 }
 ```
 
@@ -151,7 +152,7 @@ const failures = await scope.dispose() // 逆序释放，'throw' 策略下失败
 - `release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。
 - `close()`：同步、幂等；`open → closing`。
 - `dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。
-- 环境支持时自动挂载 `[Symbol.asyncDispose]`。
+- 提供 `[Symbol.asyncDispose](): Promise<void>`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。
 
 ### `createSyncLifecycleScope`
 
@@ -171,6 +172,7 @@ type ISyncLifecycleScope = {
   release(resource: unknown): boolean
   close(): void
   dispose(): readonly ICollectedError[] // 永远同步
+  [Symbol.dispose](): void // using；丢弃收集到的错误结果
 }
 ```
 
@@ -191,7 +193,7 @@ const failures = scope.dispose() // 同步返回
 - 某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。
 - 降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。
 - `release()`/`close()` 语义与异步版本一致；`dispose()` 幂等，二次调用返回 `[]`；在 disposer 内部重入抛 `SCOPE_REENTRANT_DISPOSE`。
-- 环境支持时挂载 `[Symbol.dispose]`，可配合 `using` 语法。
+- 提供 `[Symbol.dispose](): void`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。
 
 ### `executeReleaseDescriptor`
 
@@ -230,6 +232,7 @@ type IDisposeTransactionOptions = {
   readonly deadlineAt?: number
   readonly scheduler?: IScheduler // 默认 systemScheduler
   readonly signal?: IAbortSignal
+  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()
   readonly pending?: { drain(): Promise<void> }
 }
 
@@ -372,6 +375,7 @@ type IGenerationControllerOptions = {
   readonly parentSignal?: IAbortSignal
   readonly onSuperseded?: (info: ILifecycleError) => void
   readonly scheduler?: IScheduler // 默认 systemScheduler
+  readonly report?: (error: unknown) => void
 }
 
 type IGenerationToken = object
@@ -627,10 +631,10 @@ import {
   createAbortController,
   boundedWait,
   createTerminalController,
-  type IAbortSignal,
   type IAbortController,
   type ITerminalController
 } from '@migaia/lifecycle'
+import type { IAbortSignal } from '@migaia/utils/promise'
 
 // 仅 leaf entry 导出的 scheduler 组合工具：
 import {
@@ -1101,17 +1105,16 @@ scheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force
 const failures = await runPromise
 ```
 
-### 5. 同步作用域：可暴露 `using` 语法的纯同步资源
+### 5. 同步作用域：用 `using` 确定性释放纯同步资源
 
 ```ts
 import { createSyncLifecycleScope } from '@migaia/lifecycle'
 
 function withListeners() {
-  using scope = createSyncLifecycleScope() // 环境支持 `[Symbol.dispose]` 时可用 `using`
+  using scope = createSyncLifecycleScope() // 离开作用域时自动调用 [Symbol.dispose]()，同步释放
   const handler = () => console.log('tick')
   window.addEventListener('tick', handler)
   scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })
-  // 作用域结束时自动 dispose()，移除监听器
 }
 ```
 
@@ -1155,7 +1158,7 @@ async function shutdown() {
 }
 ```
 
-这里 `PendingTracker` 只负责“还有多少工作”，`LifecycleScope` 只负责“资源由谁释放”；职责不互相替代。
+这里 `createPendingTracker()` 产出的 tracker 只负责“还有多少工作”，`LifecycleScope` 只负责“资源由谁释放”；职责不互相替代。
 
 ---
 

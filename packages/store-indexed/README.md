@@ -142,6 +142,9 @@ import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'
 **`IndexedOperation`｜3 秒上手** —— 稳定的操作名常量，供诊断/日志/中间件按操作类型分支，本包自身的方法不直接引用它（它是给消费方分类用的公共词表）：
 
 ```ts
+// event 是消费方自己的诊断事件；operation 字段用 IndexedOperation 词表取值
+const reportMutation = (event: { operation: IIndexedOperation }) => console.log('mutation', event)
+const event: { operation: IIndexedOperation } = { operation: IndexedOperation.write }
 if (event.operation === IndexedOperation.write) reportMutation(event)
 ```
 

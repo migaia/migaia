@@ -131,6 +131,8 @@ type IStorageCapabilities = {
   readonly records: boolean;
   readonly transactions: boolean;
   readonly iteration: boolean;
+  readonly secondaryIndexes: boolean;
+  readonly changeFeed: boolean;
   readonly maxValueBytes: number | undefined;
   readonly opaqueEntries: boolean;
 };

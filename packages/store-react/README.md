@@ -215,7 +215,7 @@ import {
 const sessionToken = createStoreToken<IReactiveStore<ISession>>('session');
 ```
 
-单参数 `debugName: string`（必填，非空——空字符串抛 `[store] StoreToken requires a debug name`），同时作为报错信息里的可读定位名。
+单参数 `debugName: string`（必填，非空——空字符串抛 `[store] IStoreToken requires a debug name`），同时作为报错信息里的可读定位名。
 
 **`useStoreFromProvider(token)` / `useProvidedStore(token, selector, isEqual?)`｜10 秒上手** —— 按 token 从当前 Provider 的 Registry 取回注册实例；后者额外做一次 `useStore` 订阅：
 
@@ -304,10 +304,10 @@ import {
   useStoreRegistry,
   useStoreRuntime
 } from '@migaia/store-react';
-import { createStore } from '@migaia/store-light';
+import { createStore, type IReactiveStore } from '@migaia/store-light';
 import { Resource } from '@migaia/resource';
 
-const sessionToken = createStoreToken('session');
+const sessionToken = createStoreToken<IReactiveStore<{ userId: string }>>('session');
 
 function App() {
   const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定

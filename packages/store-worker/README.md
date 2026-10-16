@@ -8,7 +8,7 @@
 
 **不适用**：计算量小、同步就能算完的派生逻辑——引入 Worker 通信本身有固定的序列化和消息往返成本，小任务过 Worker 反而更慢；对象图(非纯字节)走 Worker 编解码同样不划算，实测比主线程直接做还慢一倍(见[性能特征](#性能特征))。
 
-依赖 `@migaia/reactive`、`@migaia/resource`、`@migaia/serialize`、`@migaia/rpc`、`@migaia/utils`(均为 workspace 依赖，随包一起装好)。
+依赖 `@migaia/reactive`、`@migaia/resource`、`@migaia/serialize`、`@migaia/rpc-core`、`@migaia/rpc-contract`、`@migaia/utils`(均为 workspace 依赖，随包一起装好)。
 
 ## 安装
 
@@ -61,7 +61,7 @@ adapter.dispose();
 
 实例方法：
 
-- `request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly Transferable[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回
+- `request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[] }): Promise<Output>` —— 发起一次 RPC 调用；`signal` 用于取消，`transfer` 指定零拷贝转移列表；非法 `options` 或 hostile getter 以带 `INVALID_OPTION` 的 rejected Promise 返回
 - `disposed`(只读 getter)—— 是否已 `close()`/`dispose()`
 - `close(): void` —— 同步标记不可用(幂等)，此后 `request()` 立即拒绝，但不释放底层 endpoint
 - `dispose(): Promise<void>` —— 唯一异步释放入口：先 `close()`，再等待底层 endpoint 初始化并执行 `endpoint.dispose()`；失败会 reject，重复调用复用同一个 Promise
@@ -96,7 +96,7 @@ self.onmessage = (event) => {
 - `postMessage: (message: unknown) => void`（必填）—— Worker 侧发消息回主线程的函数，通常传 `(message) => self.postMessage(message)`
 - `options.timeoutMs?: number` —— Worker 侧对每次请求处理设的超时，默认不设
 
-返回值 `IManagedRpcHandler` 是一个函数(需要手动接上 `self.onmessage`)，额外带 `dispose()`/`close()`/`pendingCount`/`disposed`，见 [USEGUIDE §4](./USEGUIDE.md#4-managedrpchandler-生命周期细节)。
+返回值 `IManagedRpcHandler` 是一个函数(需要手动接上 `self.onmessage`)，额外带 `dispose()`/`close()`/`pendingCount`/`disposed`，见 [USEGUIDE §4](./USEGUIDE.md#4-imanagedrpchandler-生命周期细节)。
 
 ---
 
@@ -128,7 +128,7 @@ sum.dispose();
 `IWorkerComputedOptions<Input, Output>` 全部字段(是 `IResourceOptions<Output>` 的超集)：
 
 - `runtime?: IRuntime` —— 默认 `defaultRuntime`
-- `transfer?: (input: Input) => readonly Transferable[]` —— 给定 `input`，返回这次调用要零拷贝转移的列表；只在确认 `input` 转移后不会再被主线程使用时才该提供
+- `transfer?: (input: Input) => readonly unknown[]` —— 给定 `input`，返回这次调用要零拷贝转移的列表；只在确认 `input` 转移后不会再被主线程使用时才该提供
 - `debugName?`、`ttl?`、`autoStart?`、`staleWhileRevalidate?`、`retry?`、`retryDelay?`、`keepAlive?`、`initialSnapshot?`、`scheduler?` —— 原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致
 
 返回标准 `Resource<Output>` 实例，`refetch()`/`.state`/`dispose()` 等用法与直接 `new Resource(...)` 得到的对象没有区别。非法 `adapter`/`selectInput`/`transfer` 会同步抛出带 `INVALID_OPTION` 的错误。
@@ -203,7 +203,7 @@ const handler = createSerializeWorkerHandler(parser, (message, transfer) =>
 );
 ```
 
-签名：`(parser: ISerializeParser, post: (message: unknown, transfer?: readonly Transferable[]) => void) => IManagedRpcHandler`。两个参数均必填，非对象/非函数同步抛 `INVALID_OPTION`。`parser`/`post` 的解码/编码结果、多段流式输出的本地拼装规则见 [USEGUIDE §6.5](./USEGUIDE.md#65-多段结果的本地拼装)。
+签名：`(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void) => IManagedRpcHandler`。两个参数均必填，非对象/非函数同步抛 `INVALID_OPTION`。`parser`/`post` 的解码/编码结果、多段流式输出的本地拼装规则见 [USEGUIDE §6.5](./USEGUIDE.md#65-多段结果的本地拼装)。
 
 ---
 
@@ -224,7 +224,7 @@ WorkerByteOwnership.transfer; // 'transfer'
 
 无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型。
 
-**`WorkerDiagnosticType`｜3 秒上手** —— 序列化 Worker 集成的诊断来源标签，出现在 `SerializeCodecError`/`SerializeError` 的 `type` 字段默认值里：
+**`WorkerDiagnosticType`｜3 秒上手** —— 序列化 Worker 集成的诊断来源标签，出现在 `SerializeCodecError` 的 `type` 字段默认值里：
 
 ```ts
 WorkerDiagnosticType.worker; // 'worker'
@@ -254,7 +254,7 @@ if (error.code === StoreWorkerErrorCode.adapterDisposed) {
 }
 ```
 
-全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`cleanupFailed`(`CLEANUP_FAILED`)。
+全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`cleanupFailed`(`CLEANUP_FAILED`)、`chunkMergeFailed`(`CHUNK_MERGE_FAILED`)。
 
 **`createStoreWorkerError`｜5 秒上手**：
 
@@ -309,7 +309,7 @@ const handler = createWorkerHandler<readonly Row[], Record<string, number>>(
   (rows, { signal }) => {
     const totals: Record<string, number> = {};
     for (const row of rows) {
-      signal.throwIfAborted?.();
+      if (signal.aborted) throw signal.reason;
       totals[row.category] = (totals[row.category] ?? 0) + row.amount;
     }
     return totals;

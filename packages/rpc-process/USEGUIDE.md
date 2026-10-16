@@ -425,7 +425,7 @@ try {
       address,
       token,
       dial: (value, signal) =>
-        dialProcessByteChannel({ address: value, signal: signal as AbortSignal }),
+        dialProcessByteChannel({ address: value, signal }),
       establish: (raw, prepared) =>
         createProcessTransport(raw as import('@migaia/rpc-process').IProcessByteChannel, {
           role: 'initiator',
@@ -894,7 +894,7 @@ main()
 }
 ```
 
-拒绝时为 `{ "kind": "handshake", "step": "reject", "protocol": "migaia.rpc", "error": <wire error> }`，wire error 的结构见 5.6 节；凭据错误用 code `AUTH_REJECTED`。
+拒绝时为 `{ "kind": "handshake", "step": "reject", "protocol": "migaia.rpc", "error": <wire error> }`，wire error 的结构见 5.6 节；凭据错误用 source `@migaia/rpc/process`、code `PROCESS_CHANNEL_AUTH_REJECTED`。
 
 #### 5.3 `migaia.describe`：方法目录
 

@@ -88,6 +88,8 @@ stop.off()
 内置 preset：`subscribe-publish`（默认）、`on-emit`、`on-trigger`、`listen-fire`。自定义 style 使用语义到名称的对象映射；预声明变量可用 `defineEventApiStyle()` 保留字面量：
 
 ```ts
+import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'
+
 const style = defineEventApiStyle({
   subscribe: 'observe',
   publish: 'dispatch',
@@ -321,7 +323,7 @@ if (error.code === EventSubscriberErrorCode.publishFailed) {
 }
 ```
 
-全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。
+全部取值：`invalidListener`(`INVALID_LISTENER`)、`invalidReporter`(`INVALID_REPORTER`)、`invalidChannel`(`INVALID_CHANNEL`)、`invalidSignal`(`INVALID_SIGNAL`)、`invalidSubscriber`(`INVALID_SUBSCRIBER`)、`invalidEventKey`(`INVALID_EVENT_KEY`)、`taskNotFound`(`TASK_NOT_FOUND`)、`taskNotUnique`(`TASK_NOT_UNIQUE`)、`invalidTaskId`(`INVALID_TASK_ID`)、`invalidOptions`(`INVALID_OPTIONS`)、`aborted`(`ABORTED`)、`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。
 
 **`EVENT_SUBSCRIBER_SOURCE`｜3 秒上手** —— 常量字符串 `'@migaia/event-subscriber'`，等同任意包边界错误的 `source` 字段。
 

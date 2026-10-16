@@ -428,9 +428,7 @@ const STORE_KEYED_SOURCE = '@migaia/store-keyed'
 ```ts
 const StoreKeyedErrorCode = {
   atomStoreDisposed: 'ATOM_STORE_DISPOSED',
-  familyDisposed: 'FAMILY_DISPOSED',
   disposalFailed: 'DISPOSAL_FAILED',
-  evictionFailed: 'EVICTION_FAILED',
   circularPreview: 'CIRCULAR_PREVIEW',
   cyclicOverride: 'CYCLIC_OVERRIDE',
   overrideContract: 'OVERRIDE_CONTRACT',
@@ -463,8 +461,7 @@ type IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyed
 | `atomDef({...})` 初值克隆（宿主不支持 `structuredClone`） | `Error`          | `ENV_UNSUPPORTED`     | `primitive initial values require structuredClone support`                                                                 | 宿主缺少 `structuredClone`。                                                                                                          |
 | `atomDef({...})` 初值克隆失败（`structuredClone` 抛错）   | `Error`          | `INVALID_OPTION`      | `primitive initial value cannot be cloned independently`                                                                   | 值本身不可结构化克隆，原异常在 `cause`。                                                                                              |
 | `atomGetter(runtime)` / `atomSetter(runtime)`             | `Error`          | `CROSS_RUNTIME`       | `cross-runtime atom access is not allowed`                                                                                 | 实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。                                                                              |
-| `AtomStore.dispose()` / `family.dispose()`（多项失败）    | `AggregateError` | `DISPOSAL_FAILED`     | `atom store disposal failed` / `family disposal failed for multiple entries`                                               | 释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。                                                                          |
-| 家族容量淘汰（多项失败）                                  | `AggregateError` | `EVICTION_FAILED`     | `family capacity eviction failed for multiple entries`                                                                     | 容量淘汰时多个条目淘汰失败。                                                                                                          |
+| `AtomStore.dispose()`（多项失败）                         | `AggregateError` | `DISPOSAL_FAILED`     | `atom store disposal failed` / `family disposal failed for multiple entries`                                               | 释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。                                                                          |
 | `AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）   | `Error`          | —                     | `this node is already owned by another Runtime`                                                                            | 同一个 store 对象被 `claimOwnership` 到两个不同的 Runtime——正常使用路径下不会触发，出现即说明把同一个 store 错误地跨 Runtime 复用了。 |
 
 ---

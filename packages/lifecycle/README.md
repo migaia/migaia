@@ -93,7 +93,7 @@ const failures = await scope.dispose() // 逆序释放，'throw' 策略下失败
 - `deadlineAt?: number` —— 本次 `dispose()` 内所有资源共享的绝对释放截止时间
 - `scheduler?: IScheduler` —— 默认 `systemScheduler`；决定 `deadlineAt`/`gracefulTimeoutMs` 的时间域
 
-`own(resource, descriptor)` 返回的方法：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`；descriptor 形状非法时 `own()` 在注册时抛 `INVALID_OPTION`。环境支持时自动挂载 `[Symbol.asyncDispose]`。
+`own(resource, descriptor)` 返回的方法：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`；descriptor 形状非法时 `own()` 在注册时抛 `INVALID_OPTION`。提供 `[Symbol.asyncDispose]()`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。
 
 **`createSyncLifecycleScope`｜10 秒上手** —— 纯同步容器，`dispose()` 不返回 Promise：
 
@@ -104,7 +104,7 @@ scope.close()
 const failures = scope.dispose() // 同步返回，不可能有异步资源
 ```
 
-全部选项（`ISyncLifecycleScopeOptions`）：`errorPolicy?`（同上，默认 `'throw'`）、`report?`（同上）。**约束**：每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`；descriptor 形状非法（如 `order` 非有限数、缺 `force`）在 `own()` 时抛 `INVALID_OPTION`，与异步 scope 一致；某个 callback 若返回 thenable，同样在释放时抛 `SCOPE_SYNC_VIOLATION`。不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例。环境支持时挂载 `[Symbol.dispose]`。
+全部选项（`ISyncLifecycleScopeOptions`）：`errorPolicy?`（同上，默认 `'throw'`）、`report?`（同上）。**约束**：每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`；descriptor 形状非法（如 `order` 非有限数、缺 `force`）在 `own()` 时抛 `INVALID_OPTION`，与异步 scope 一致；某个 callback 若返回 thenable，同样在释放时抛 `SCOPE_SYNC_VIOLATION`。不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例。提供 `[Symbol.dispose]()`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。
 
 **`IReleaseDescriptor`｜10 秒上手** —— 领域表达释放意图的唯一词汇（类型，非函数，随 `own()` 一起使用）：
 
@@ -606,11 +606,10 @@ const failures = await runPromise
 import { createSyncLifecycleScope } from '@migaia/lifecycle'
 
 function withListeners() {
-  using scope = createSyncLifecycleScope() // 环境支持 `[Symbol.dispose]` 时可用 `using`
+  using scope = createSyncLifecycleScope() // 离开作用域时自动调用 [Symbol.dispose]()，同步释放
   const handler = () => console.log('tick')
   window.addEventListener('tick', handler)
   scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })
-  // 作用域结束时自动 dispose()，移除监听器
 }
 ```
 

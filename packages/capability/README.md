@@ -229,7 +229,7 @@ type ICapabilityHandle = { dispose(): void | PromiseLike<void> }
 capabilities.register({
   name: 'greeting',
   activate(ctx) {
-    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)
+    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)
     return { dispose: () => clearInterval(timer) }
   }
 })
@@ -424,7 +424,7 @@ const capabilities = createCapabilityHost(
   { store },
   {
     flags: { persistence: true },
-    onError: (name, error) => reportError(name, error)
+    onError: (name, error) => console.error('capability failed:', name, error)
   }
 )
 
@@ -432,8 +432,11 @@ capabilities.register({
   name: 'persistence',
   async activate({ store }) {
     // 只有开关打开、真正 enable() 时才会下载这个 chunk
-    const { persist, memoryStorage } = await import('@migaia/store-persist')
-    const handle = persist(store, { key: 'settings', storage: memoryStorage() })
+    const [{ persist }, { memoryStorageHost }] = await Promise.all([
+      import('@migaia/store-persist/light'),
+      import('@migaia/storage-web/memory')
+    ])
+    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })
     return { dispose: () => handle.dispose() }
   }
 })

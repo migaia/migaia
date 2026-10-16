@@ -115,7 +115,7 @@ pnpm add cbor-x
 
 缺少该 peer 时，导入此子路径抛 `ERR_MODULE_NOT_FOUND`，消息包含 `cbor-x`。
 
-运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `IAbortSignal` 是包内独立定义的结构化类型（`{ aborted, reason?, addEventListener, removeEventListener }`），不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。
+运行时依赖 `@migaia/lifecycle` 的按需子路径（`/scheduler`、`/abort`、`/scope`、`/quiescence`）与 `@migaia/utils`（Base64/UTF-8 底层算法、`attachErrorIdentity` 错误身份标注）。registry 的 pending/drain、closing controller 与 parser scope 直接复用 lifecycle leaf；Serialize 仍只拥有 codec registry、stream、context 与自身错误投影。协作式取消信号类型 `IAbortSignal` 来自 `@migaia/utils/promise` 的结构化类型（`{ aborted, reason?, addEventListener, removeEventListener }`），本包不重新导出，不依赖 DOM `AbortSignal`，但原生 `AbortSignal` 满足这个结构，可以直接传入。
 
 ---
 
@@ -620,7 +620,12 @@ function decodeStream(
 ```ts
 function collectStream(
   chunks: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>,
-  encoder?: ITextEncoder
+  encoder?: ITextEncoder,
+  options?: {
+    readonly signal?: IAbortSignal;
+    readonly empty?: 'text' | 'reject'; // 空流返回空文本（默认）或拒绝
+    readonly context?: string;
+  }
 ): Promise<ISerializeChunk>;
 ```
 
@@ -755,7 +760,6 @@ import {
   decodeStream,
   encodeStream,
   sliceByFrameBudget,
-  type IAbortSignal,
   type ISerializeChunk,
   type ISerializeChunkType,
   type ISerializeContext,
@@ -774,6 +778,7 @@ import {
   type IEncodeStreamOptions,
   type IFrameBudgetOptions
 } from '@migaia/serialize/core';
+import type { IAbortSignal } from '@migaia/utils/promise';
 ```
 
 Core 静态复用 `@migaia/lifecycle/abort` 作为唯一取消 owner；packed consumer 可保留 abort leaf 的必要闭包，但必须排除 lifecycle root、scope、scheduler、generation、quiescence 与 disposal。Core 不假定宿主全局 timer，timer 一律经 `scheduler` 注入、Encoding 一律经 `ITextEncoder`/`ITextDecoder` 注入（这也是为什么 `sliceByFrameBudget`/`encodeStream` 的 `options.scheduler`、`collectStream` 需要 `bytes` 段合并时的 `encoder` 都是必填/条件必填的）。**不包含**：
@@ -800,7 +805,6 @@ import {
   createSerializeRegistry,
   chunkToText,
   chunkToBytes,
-  type IAbortSignal,
   type ISerializeChunk,
   type ISerializeCleanupError,
   type ISerializeContext,
@@ -813,6 +817,7 @@ import {
   type ITextDecoder,
   type ITextEncoder
 } from '@migaia/serialize/registry';
+import type { IAbortSignal } from '@migaia/utils/promise';
 ```
 
 只导出 registry 实现面（`createSerializeRegistry`、`chunkToText`、`chunkToBytes`）与相关类型，**不含** chunk 协议基础设施（`isChunkShape`/`SerializeCodecError` 构造工具等）、Base64、流式切片或 JSON 插件——需要那些能力时从主入口或 `/core` 导入。完整参数见 [§3](#3-registry-api-完整参考) 与 [§5](#5-chunktotext--chunktobytes)。

@@ -78,11 +78,13 @@ store.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配
 import { number, boolean, string, array, record } from '@migaia/store-wasm'
 ```
 
+构造器本身返回 `FieldBuilder`（不是字段）；下面的示例都假设已 `await ensureWasm()`，并通过 `createStore()` 产出字段。
+
 **`number`｜3 秒上手** —— 单个 `f64`，8 字节：
 
 ```ts
-const field = number()
-field.value = 1.5
+const store = createStore({ field: number() })
+store.field.value = 1.5
 ```
 
 无参数。产出字段：`value: number`（读写访问器，`Object.is` 无变化时跳过提交）、`observed: boolean`（只读，是否有订阅者）、`disposed: boolean`（只读）、`dispose(): void`（幂等）。
@@ -90,8 +92,8 @@ field.value = 1.5
 **`boolean`｜3 秒上手** —— 与 `number()` 完全对称，底层 1 字节：
 
 ```ts
-const field = boolean()
-field.value = true
+const store = createStore({ field: boolean() })
+store.field.value = true
 ```
 
 无参数。产出字段形状同 `number()`（`value: boolean`/`observed`/`disposed`/`dispose()`）。
@@ -99,8 +101,8 @@ field.value = true
 **`string`｜5 秒上手** —— 定长字节缓冲区，超容量直接报错、不截断：
 
 ```ts
-const field = string(64) // 最多 64 字节
-field.value = 'hello'
+const store = createStore({ field: string(64) }) // 最多 64 字节
+store.field.value = 'hello'
 ```
 
 参数：`maxBytes?: number` —— 默认 `256`，必须是 `[0, 0xffff_ffff - 4]` 内的安全整数，否则构造时抛 `RangeError`。产出字段形状同 `number()`（`value: string`），额外行为：写入用 `TextEncoder` 编码为 UTF-8，字节数超过 `maxBytes` 抛错（不截断）；多字节字符按字节数而非字符数计算容量。
@@ -108,9 +110,9 @@ field.value = 'hello'
 **`array`｜10 秒上手** —— 定长 `Float64Array`，索引按 `granularity` 分桶追踪：
 
 ```ts
-const field = array(number(), 1000) // length=1000, granularity 默认 64
-field.setAt(0, 1)
-field.setRange(1, 3, [2, 3])
+const store = createStore({ field: array(number(), 1000) }) // length=1000, granularity 默认 64
+store.field.setAt(0, 1)
+store.field.setRange(1, 3, [2, 3])
 ```
 
 参数：
@@ -126,8 +128,8 @@ field.setRange(1, 3, [2, 3])
 **`record`｜10 秒上手** —— 固定命名字段打包进一块连续内存，逐字段独立响应式：
 
 ```ts
-const field = record({ x: number(), y: number() })
-field.x = 1 // 直接属性读写，不经过 .value
+const store = createStore({ field: record({ x: number(), y: number() }) })
+store.field.x = 1 // 直接属性读写，不经过 .value
 ```
 
 参数：`shape: Record<string, ReturnType<typeof number>>`（必填）—— 每个 key 必须是 `number()` 构造器；key 不能是 `'dispose'` 或 `'disposed'`（撞名抛 `TypeError`）。产出字段：`shape` 每个 key 映射为可读写 `number` 属性（getter/setter 即读写入口，不需要 `.value`），外加不可枚举的 `disposed`/`dispose()`。不支持嵌套 `record()`/`array()`。
@@ -159,7 +161,7 @@ if (error.code === StoreWasmErrorCode.fieldDisposed) {
 }
 ```
 
-全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。
+全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。
 
 **`createStoreWasmError` / `createStoreWasmRangeError` / `createStoreWasmTypeError` / `createStoreWasmAggregateError`｜5 秒上手** —— 一般由包内部使用，扩展自定义字段类型时可复用：
 

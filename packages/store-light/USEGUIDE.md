@@ -152,7 +152,7 @@ export type IAsyncFieldBuilder<F extends IDisposable> = {
 
 **所有权规则**：`IFieldContext` 刻意不传 `scope`——所有权登记是 Store 的职责，不是 Builder 的职责。Builder 只管"造出字段"，Store 在拿到字段后统一 `claimOwnership` + `scope.own`；这样第三方 Builder 实现"创建了资源却忘了登记"时，`$dispose()` 也不会漏释放，因为登记这一步根本不由 Builder 完成。
 
-**同步 vs 异步字段**：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `LegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve。
+**同步 vs 异步字段**：`mode: 'sync'` 的字段在 `createStore()`/`createAsyncStore()` 构造期间同步创建，构造完成即可用；`mode: 'async'`（或历史无 `mode` 字段的 `ILegacyFieldBuilder`）的字段异步创建，读取会先 `assertReady()`——Store 未就绪时抛错，必须走 `createAsyncStore()` 并等待其 Promise resolve。
 
 一个最小的自定义同步字段实现（改编自 `@migaia/store-wasm` 的 `number()`）：
 
@@ -179,6 +179,9 @@ function counterField(initial: number): IFieldBuilder<ICounterField> {
           source.commit(() => {
             value = v
           })
+        },
+        get disposed() {
+          return disposed
         },
         dispose() {
           if (disposed) return
@@ -260,8 +263,8 @@ ready/loading --dispose()（有持有者）--> closing --最后一个持有者�
 | `preload()`                       | `() => void`                             | 无                                 | 同步      | 如果还没开始加载就触发 `start()`；不建立任何持有租约                                                                                                                                                 |
 | `retry()`                         | `() => void`                             | 无                                 | 同步      | 把当前值标记为 stale 后重新加载；重新加载完成前旧值仍可读                                                                                                                                            |
 | `retainResource()`                | `() => () => void`                       | 无                                 | 同步      | 获取一个"资源级"持有租约（不锁定具体版本），返回释放函数；有此类租约时资源不会因超时被回收                                                                                                           |
-| `retainVersion(version)`          | `(number \| VersionToken) => () => void` | `version: number \| VersionToken`  | 同步      | 锁定某个具体版本不被回收（即使后续 `retry()` 产生了新版本），常用于"后台刷新但保留当前渲染值"                                                                                                        |
-| `retain(version?)`                | `(version?) => () => void`               | `version?: number \| VersionToken` | 同步      | `retainResource`/`retainVersion` 的兼容合并入口，**已废弃**，新代码请直接用上面两个                                                                                                                  |
+| `retainVersion(version)`          | `(number \| IVersionToken) => () => void` | `version: number \| IVersionToken`  | 同步      | 锁定某个具体版本不被回收（即使后续 `retry()` 产生了新版本），常用于"后台刷新但保留当前渲染值"                                                                                                        |
+| `retain(version?)`                | `(version?) => () => void`               | `version?: number \| IVersionToken` | 同步      | `retainResource`/`retainVersion` 的兼容合并入口，**已废弃**，新代码请直接用上面两个                                                                                                                  |
 | `captureVersion(id)`              | `(number) => IResourceCapture`           | `id: number`                       | 同步      | 渲染期的临时保护：先拿到一个 capture token，不立即计入正式持有者                                                                                                                                     |
 | `commitCapture(capture)`          | `(IResourceCapture) => () => void`       | `capture: IResourceCapture`        | 同步      | 提交期把 capture 转成正式的版本持有租约；`captureVersion`/`commitCapture` 这一对是给 React"渲染可能被丢弃、提交才算数"的两阶段场景设计的（`@migaia/store-react` 的 `useStoreResource` 就是这样用的） |
 | `dispose()`                       | `() => void`                             | 无                                 | 同步      | 优雅释放：仍有持有者时转入 `closing`，等最后一个持有者释放后才真正清理                                                                                                                               |
@@ -269,10 +272,10 @@ ready/loading --dispose()（有持有者）--> closing --最后一个持有者�
 | `whenTerminal()`                  | `() => Promise<void>`                    | 无                                 | 异步      | 到达 `disposed` 时 resolve；不依赖 GC，任何时候调用都能正确等到                                                                                                                                      |
 | `subscribe(listener)`             | `(() => void) => () => void`             | `listener: () => void`             | 同步      | 注册变更监听（配合 `getSnapshot()` 可直接喂给 `useSyncExternalStore`）                                                                                                                               |
 | `getSnapshot()`                   | `() => number`                           | 无                                 | 同步      | 单调递增的 revision 号，每次状态变化都会自增                                                                                                                                                         |
-| `readSnapshot()`                  | `() => { value, version, token }`        | 无                                 | 同步      | 同 `read()`，但额外带上版本号和 `VersionToken`，供需要精确版本信息的调用方使用                                                                                                                       |
+| `readSnapshot()`                  | `() => { value, version, token }`        | 无                                 | 同步      | 同 `read()`，但额外带上版本号和 `IVersionToken`，供需要精确版本信息的调用方使用                                                                                                                       |
 | `captureSnapshot(existingLease?)` | 见 `useStoreResource` 用法               | `existingLease?: object`           | 同步      | 组合了读取快照与 `captureVersion` 的便捷方法，`existingLease` 传入上一次已提交的 release 函数用于跳过重复 capture                                                                                    |
 
-### 8.3 StoreResourceOptions
+### 8.3 IStoreResourceOptions
 
 | 字段          | 类型                                              | 必填性   | 默认值            | 说明                                                                                                                                            |
 | ------------- | ------------------------------------------------- | -------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -283,7 +286,7 @@ ready/loading --dispose()（有持有者）--> closing --最后一个持有者�
 | `onError`     | `(error, phase: StoreResourceErrorPhase) => void` | 可选     | 无                | 观察 `'load' \| 'dispose' \| 'listener'` 三个阶段的失败；reporter 自身抛错或拒绝时，原失败与 reporter 失败均由所属 Runtime 报告，资源状态不变   |
 | `onTerminal`  | `() => void`                                      | 可选     | 无                | 资源到达终态时调用一次                                                                                                                          |
 
-`factory` 既可以是函数 `(context) => T \| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`StoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。
+`factory` 既可以是函数 `(context) => T \| Promise<T>`，也可以是 `{ load, runtime?, scheduler?, dispose?, keepAliveMs?, onError?, onTerminal? }` 对象形式（等价于把这些字段和 `options` 合并）。`IStoreResourceLoadContext` 提供 `{ signal, generation, token }`，`signal` 在该次加载被取代/资源关闭时中止。
 
 构造时只读取上述已知字段并形成稳定快照：`load` 与每个已知 accessor 最多读取一次，不枚举或执行未知字段 getter；显式 `options` 的 own-enumerable 字段覆盖 factory 对象上的同名字段。`dispose`、`onError`、`onTerminal` 若存在必须是函数，否则在任何请求或 Resource 状态建立前同步抛出 tagged `INVALID_OPTION`。
 
@@ -386,13 +389,13 @@ cleanup 同时失败时，主错误仍可经 `cause`/`errors` 访问。
 | `[store] field is not settable: ${key}`                                                                                                                                                                                            | `$set()` 传入的 key 不对应任何 signal（computed/wasm/方法字段，或压根不存在的 key）                                                    |
 | `[store] unknown hydration field: ${key}`                                                                                                                                                                                          | `$hydrate(partial, { unknown: 'strict' })` 遇到未知 key                                                                                |
 | `[store] store has no asynchronous initialization`                                                                                                                                                                                 | 对非 Store 对象（或未经 `createStore`/`createAsyncStore` 创建的对象）调用 `storeReady()`                                               |
-| `[store] this node is already owned by another Runtime` / `[store] ${what} belongs to a different Runtime than this scope` / `[store] ${what} is not a Runtime-owned reactive node` / `[store] ${what} belongs to another Runtime` | `$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）          |
+| `this node is already owned by another Runtime` / `${what} belongs to a different Runtime than this scope` / `${what} is not a Runtime-owned reactive node` / `${what} belongs to another Runtime`                                         | `$own(resource)` 传入已属于其他 Runtime 的资源，或资源不是本 Runtime 登记的响应式节点（来自 `@migaia/reactive` 的所有权校验）          |
 | `[store] resource is disposed`                                                                                                                                                                                                     | 对已 `disposed`/`closing` 的 `StoreResource` 调用 `preload`/`retry`/`retain*`/`captureVersion`/`commitCapture` 等操作                  |
 | `[store] unknown resource version`                                                                                                                                                                                                 | `retainVersion(version)`/`captureVersion(id)`/`commitCapture(capture)` 传入的版本号既不是当前版本，也不在 retired/stale/closing 列表里 |
 | `[store] resource factory returned a disposed value`                                                                                                                                                                               | `factory` 返回了一个已经被标记为 disposed 的值（复用了已释放的引用）                                                                   |
 | `[store] disposable resource values must use reference identity`（`TypeError`）                                                                                                                                                    | 配置了 `dispose` 但 `factory` 产出的是原始类型（非对象/函数），无法用引用去重和追踪生命周期                                            |
 | `[store] invalid or consumed resource capture`                                                                                                                                                                                     | `commitCapture()`/`captures.inspect()` 收到的 capture 已提交过、已失效，或不是本资源签发的                                             |
-| `[store] keepAliveMs must be a finite non-negative number`（`RangeError`）                                                                                                                                                         | `StoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`                                                                       |
+| `[store] keepAliveMs must be a finite non-negative number`（`RangeError`）                                                                                                                                                         | `IStoreResourceOptions.keepAliveMs` 传了负数、`NaN` 或 `Infinity`                                                                       |
 
 ---
 
@@ -467,7 +470,7 @@ Computed 只有 getter、没有 setter，属性描述符层面就不可写；ESM
 检查是不是走了 `$batch`/`$set`/`$hydrate` 或方法（Action）内部——这几条路径会先 `runInAction()` 再执行，动作深度 > 0 时 `assertMutationAllowed` 自然放行。只有"在这些路径之外直接赋值"才会被拦截。
 
 **Q：`createStore()` 报 "only accepts synchronous fields"，但我看代码是同步的。**
-检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `LegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()` 接受。
+检查 `FieldBuilder` 的 `mode` 字段是不是显式写了 `'sync'`——没有 `mode` 字段的历史 `ILegacyFieldBuilder` 会被当成非同步处理，`createStore()` 一律拒绝，只有 `createAsyncStore()` 接受。
 
 **Q：`StoreResource.read()` 一直抛同一个 Promise，界面卡在 loading。**
 确认调用方确实在 Suspense 边界内 `await`/处理了这个抛出的 Promise；`read()` 抛 Promise 是设计如此（React Suspense 协议），不是错误——真正的问题通常是外层没有 `<Suspense>` 或没有等待 Promise settle 就再次同步渲染。
