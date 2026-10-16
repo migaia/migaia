@@ -78,6 +78,14 @@ function storedTheme(): IThemeChoice {
  */
 const TRAILING_SLASH_BOOT_SCRIPT = `(()=>{const p=location.pathname;if(p!==${JSON.stringify(import.meta.env.BASE_URL)}&&p.endsWith('/'))history.replaceState(history.state,'',p.replace(/\\/+$/,'')+location.search+location.hash)})()`
 
+/**
+ * Production network policy: the page may only fetch from its own origin (route data, the search
+ * index). Fonts, the hero shader, and motion ship inside the build, so no request, telemetry
+ * beacon, or socket can leave for another host. Dev builds skip it so Vite's HMR socket still
+ * works.
+ */
+const CONNECT_POLICY = "connect-src 'self'"
+
 /** Supplies the shared static document shell and its keyboard-first orientation controls. */
 export function Layout({ children }: { children: React.ReactNode }) {
   const locale = localeFromPath(useLocation().pathname)
@@ -86,6 +94,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {import.meta.env.PROD ? (
+          <meta httpEquiv="Content-Security-Policy" content={CONNECT_POLICY} />
+        ) : null}
         <Meta />
         <script dangerouslySetInnerHTML={{ __html: TRAILING_SLASH_BOOT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
