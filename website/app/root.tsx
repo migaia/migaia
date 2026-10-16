@@ -141,16 +141,23 @@ function ThemeIcon({ choice }: { readonly choice: IThemeChoice }) {
 }
 
 /**
- * Brand mark: three nodes joined into one composition, the shape of composable libraries. Drawn
- * with `currentColor` plus the accent so it follows both themes.
+ * Brand mark: a Kotoamatsukami eye (Shisui's Mangekyō) — four curved blades turning like a pinwheel
+ * out of an inner ring, around an accent pupil. One blade is drawn and rotated by quarter turns so
+ * all four stay identical. Uses theme tokens plus the accent so it follows both themes.
  */
 function BrandMark() {
   return (
     <svg aria-hidden="true" className="brand-mark" viewBox="0 0 20 20">
-      <path className="brand-mark-edge" d="M5 14.5 10 5.5l5 9Z" />
-      <circle className="brand-mark-node" cx="10" cy="5.5" r="2.6" />
-      <circle className="brand-mark-node" cx="5" cy="14.5" r="2.6" />
-      <circle className="brand-mark-node accent" cx="15" cy="14.5" r="2.6" />
+      <circle className="brand-mark-ring" cx="10" cy="10" r="4.4" />
+      {[0, 90, 180, 270].map((angle) => (
+        <path
+          className="brand-mark-node"
+          d="M10 10C9.4 6.2 11.8 3.2 15.6 3.4 13 4.6 12.2 7.6 10 10Z"
+          key={angle}
+          transform={`rotate(${angle} 10 10)`}
+        />
+      ))}
+      <circle className="brand-mark-node accent" cx="10" cy="10" r="2.2" />
     </svg>
   )
 }
