@@ -16,3 +16,4 @@ docs/
 **/test-results/
 packages/plugin-host/.pack/
 /src/generated/signatures/
+.turbo/
