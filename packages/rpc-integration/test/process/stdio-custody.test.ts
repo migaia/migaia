@@ -7,6 +7,17 @@ describe('canonical child stdio replay registration', () => {
     const readable = new PassThrough()
     /** Owns isolated outbound bytes instead of the test runner's stdout. */
     const writable = new PassThrough()
+    /** The public write must reject with this exact native callback failure, without replacement. */
+    const writeFailure = new Error('fixture native writer failed')
+    /** Isolates error-driven retirement from the original channel's explicit-close assertions. */
+    const failingReadable = new PassThrough()
+    /** Fails through the native stream callback while retaining the original byte-channel adapter. */
+    const failingWritable = new PassThrough({
+      /** Deterministically exercise callback failure without relying on an operating-system race. */
+      transform(_chunk, _encoding, callback) {
+        callback(writeFailure)
+      }
+    })
     /** Observe supplied host handles while leaving the actual byte-channel implementation intact. */
     const byteStreams = await import('../../../rpc-process/dist/process/node-byte-stream.js')
     /** Substitutes isolated streams while observing the canonical stdio constructor arguments. */
@@ -57,10 +68,22 @@ describe('canonical child stdio replay registration', () => {
       await channel.close()
       receipt.observeOwner()
       expect(receipt.active).toBe(false)
+      construct.mockImplementationOnce(() =>
+        byteStreams.nodeByteStream(failingReadable, failingWritable, () => {
+          failingReadable.destroy()
+          failingWritable.destroy()
+        })
+      )
+      /** A separate public channel preserves the first channel's successful close contract. */
+      const { channel: failingChannel } = await openProcessStdioChannel({ bootstrap: 'none' })
+      await expect(failingChannel.write(new Uint8Array([6]))).rejects.toBe(writeFailure)
+      await failingChannel.close()
     } finally {
       vi.doUnmock('../../../rpc-process/dist/process/node-byte-stream.js')
       readable.destroy()
       writable.destroy()
+      failingReadable.destroy()
+      failingWritable.destroy()
     }
   })
 })
