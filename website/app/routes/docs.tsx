@@ -24,13 +24,15 @@ import {
   type IGuideApiLink,
   type ILibraryRouteContent
 } from '../content-loader.js'
-import { copyFor, domainDescription, domainTitle } from '../copy.js'
+import { apiKindLabel, copyFor, domainDescription, domainTitle, interfaceCopyFor } from '../copy.js'
+import { libraryReferenceDescription } from '../library-descriptions.js'
 import type { IApiGuide } from '../api-guides.js'
 import type { IGuideJourney } from '../guide-journeys.js'
 import { ScrollArea } from '../components/ui/scroll-area.js'
 import { Separator } from '../components/ui/separator.js'
 import { Button } from '../components/ui/button.js'
 import { usePageNavigation } from '../components/page-navigation.js'
+import { requestSearch } from '../search.js'
 import { normalizeExampleImports } from '../example-imports.js'
 import { commentExample, type IExampleCommentaryContext } from '../example-commentary.js'
 
@@ -258,8 +260,9 @@ export const meta: IMetaFunction<typeof loader> = ({ loaderData: data, params })
   const library = data?.library
   if (!library)
     return [
-      { title: `${domainTitle(locale, domain)} · migaia` },
-      { name: 'description', content: domainDescription(locale, domain) }
+      // The library-less route is the docs home, whatever the path classifier says.
+      { title: `${domainTitle(locale, 'docs')} · migaia` },
+      { name: 'description', content: domainDescription(locale, 'docs') }
     ]
   /** Resolve nested modules before interpreting the final segment as an API name. */
   const selection = resolveDocsSelection(parts.slice(2), data.apis)
@@ -495,10 +498,14 @@ const ARCHITECTURE_FAMILIES = [
 ] as const
 
 /**
- * Renders the single docs home: outcome-first starters, then every library grouped by architectural
- * role. Each card opens that library's learning path.
+ * Renders the single docs home. The hero (shader field, title, search entry) is the site's visual
+ * centre; below it come outcome-first starters, then every library grouped by architectural role.
+ * Each card opens that library's learning path.
  */
 function DocsIndex({ locale }: { locale: ILocale }) {
+  const ui = interfaceCopyFor(locale)
+  /** Public entry-point count shown beside the library count. */
+  const entryPoints = librarySummaries.reduce((total, library) => total + library.exports.length, 0)
   return (
     <main
       id="main-content"
@@ -506,9 +513,38 @@ function DocsIndex({ locale }: { locale: ILocale }) {
       lang={locale}
       data-pagefind-body
     >
-      <p className="eyebrow">docs</p>
-      <h1>{domainTitle(locale, 'docs')}</h1>
-      <p className="lede">{domainDescription(locale, 'docs')}</p>
+      <section className="docs-hero" aria-labelledby="docs-hero-title">
+        <div className="docs-hero-field" aria-hidden="true" />
+        <p className="eyebrow" data-reveal="0">
+          {ui.heroEyebrow}
+        </p>
+        <h1 id="docs-hero-title" data-reveal="1">
+          {domainTitle(locale, 'docs')}
+        </h1>
+        <p className="lede" data-reveal="2">
+          {domainDescription(locale, 'docs')}
+        </p>
+        <div className="docs-hero-actions" data-reveal="3">
+          <button className="docs-hero-search" onClick={requestSearch} type="button">
+            <svg aria-hidden="true" viewBox="0 0 16 16">
+              <circle cx="7" cy="7" r="4.75" />
+              <path d="m10.5 10.5 3 3" />
+            </svg>
+            <span>{ui.heroSearch}</span>
+            <kbd>⌘K</kbd>
+          </button>
+        </div>
+        <dl className="docs-hero-stats" data-reveal="4">
+          <div>
+            <dt>{librarySummaries.length}</dt>
+            <dd>{ui.heroLibraries}</dd>
+          </div>
+          <div>
+            <dt>{entryPoints}</dt>
+            <dd>{ui.heroModules}</dd>
+          </div>
+        </dl>
+      </section>
       <section className="section-block" aria-labelledby="task-index">
         <h2 id="task-index">
           {locale === 'zh' ? '你现在想完成什么？' : 'What do you need to accomplish?'}
@@ -523,7 +559,7 @@ function DocsIndex({ locale }: { locale: ILocale }) {
               <small>{guide.library}</small>
               <strong>{locale === 'zh' ? guide.titleZh : guide.titleEn}</strong>
               <span>{locale === 'zh' ? guide.bodyZh : guide.bodyEn}</span>
-              <b>{locale === 'zh' ? '开始 →' : 'Start →'}</b>
+              <b aria-hidden="true">→</b>
             </Link>
           ))}
         </div>
@@ -533,23 +569,26 @@ function DocsIndex({ locale }: { locale: ILocale }) {
         <div className="architecture-stack">
           {ARCHITECTURE_FAMILIES.map((family, index) => (
             <article className="architecture-layer" key={family.titleEn}>
-              <span className="architecture-layer-number">0{index + 1}</span>
-              <div>
+              <header className="architecture-layer-header">
+                <span className="architecture-layer-number">0{index + 1}</span>
                 <h3>{locale === 'zh' ? family.titleZh : family.titleEn}</h3>
                 <p>{locale === 'zh' ? family.bodyZh : family.bodyEn}</p>
-                <nav
-                  aria-label={
-                    locale === 'zh' ? `${family.titleZh}类库` : `${family.titleEn} libraries`
-                  }
-                >
-                  {family.libraries.map((library) => (
-                    <Link className="library-item" key={library} to={domainPath(locale, library)}>
-                      <strong>{library}</strong>
-                      <span>{libraryReferenceDescription(locale, library)}</span>
-                    </Link>
-                  ))}
-                </nav>
-              </div>
+              </header>
+              <nav
+                aria-label={
+                  locale === 'zh' ? `${family.titleZh}类库` : `${family.titleEn} libraries`
+                }
+              >
+                {family.libraries.map((library) => (
+                  <Link className="library-item" key={library} to={domainPath(locale, library)}>
+                    <strong>{library}</strong>
+                    <span>{libraryReferenceDescription(locale, library)}</span>
+                    <small>
+                      v{librarySummaries.find((entry) => entry.slug === library)?.version ?? '—'}
+                    </small>
+                  </Link>
+                ))}
+              </nav>
             </article>
           ))}
         </div>
@@ -626,9 +665,9 @@ function DocsLibrary({
   if (!moduleName || moduleName === 'overview')
     return (
       <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
-        <Breadcrumb locale={locale} domain="docs" library={library.slug} />
         <div className="reading-layout">
           <article className="article-column">
+            <Breadcrumb locale={locale} domain="docs" library={library.slug} />
             <p className="eyebrow">
               {locale === 'zh' ? '类库' : 'Library'} · {library.slug}
             </p>
@@ -650,6 +689,7 @@ function DocsLibrary({
                 ))}
               </div>
             </section>
+            <NextActions locale={locale} domain="docs" library={library.slug} />
           </article>
           <div className="left-rail-sticky">
             <ScrollArea className="left-rail">
@@ -659,7 +699,6 @@ function DocsLibrary({
             </ScrollArea>
           </div>
         </div>
-        <NextActions locale={locale} domain="docs" library={library.slug} />
       </main>
     )
   const selectedGuide = selectedSymbol ? guide : undefined
@@ -680,18 +719,30 @@ function DocsLibrary({
       : []
   return (
     <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
-      <Breadcrumb
-        locale={locale}
-        domain="docs"
-        library={library.slug}
-        moduleName={selectedSymbol?.name ?? (moduleName === 'index' ? undefined : moduleName)}
-      />
       <div className="reading-layout">
         <article className="article-column">
-          <p className="eyebrow">
-            {locale === 'zh' ? '模块' : 'Module'} · {library.slug}
-          </p>
-          <h1>
+          <Breadcrumb
+            locale={locale}
+            domain="docs"
+            library={library.slug}
+            moduleName={selectedSymbol?.name ?? (moduleName === 'index' ? undefined : moduleName)}
+          />
+          {selectedSymbol ? (
+            <p className="eyebrow api-eyebrow">
+              <span className="kind-badge" data-kind={selectedSymbol.kind}>
+                {apiKindLabel(locale, selectedSymbol.kind)}
+              </span>
+              <span>
+                {library.slug}
+                {moduleName === 'index' ? '' : ` / ${moduleName}`}
+              </span>
+            </p>
+          ) : (
+            <p className="eyebrow">
+              {locale === 'zh' ? '模块' : 'Module'} · {library.slug}
+            </p>
+          )}
+          <h1 className={selectedSymbol ? 'api-title' : undefined}>
             {selectedSymbol?.name ??
               api?.symbols.find((symbol) => symbol.fragment === selectedTypeFragment)?.name ??
               (moduleName === 'index'
@@ -727,6 +778,7 @@ function DocsLibrary({
           ) : (
             <EmptyState locale={locale} library={library.slug} />
           )}
+          <NextActions locale={locale} domain="docs" library={library.slug} />
         </article>
         <div className="left-rail-sticky">
           <ScrollArea className="left-rail">
@@ -742,7 +794,6 @@ function DocsLibrary({
           </details>
         ) : null}
       </div>
-      <NextActions locale={locale} domain="docs" library={library.slug} />
     </main>
   )
 }
@@ -913,6 +964,7 @@ function LibraryModuleLinks({
             {group.links.map((link) => (
               <Link
                 className={link.name === selectedSymbol?.name ? 'active' : ''}
+                data-kind={link.kind}
                 key={link.symbolPath}
                 to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
               >
@@ -945,7 +997,11 @@ function LibraryModuleLinks({
           <span>{locale === 'zh' ? '常用 Endpoint' : 'Primary endpoints'}</span>
           <div className="left-rail-children">
             {primaryEntries.map(([label, moduleName, symbol]) => (
-              <Link key={label} to={docsModulePath(locale, librarySlug, moduleName, symbol)}>
+              <Link
+                data-kind={apiLinks.find((link) => link.name === symbol)?.kind}
+                key={label}
+                to={docsModulePath(locale, librarySlug, moduleName, symbol)}
+              >
                 {label}
               </Link>
             ))}
@@ -981,6 +1037,7 @@ function LibraryModuleLinks({
                 .map((link) => (
                   <Link
                     className={link.name === selectedSymbol?.name ? 'active' : ''}
+                    data-kind={link.kind}
                     key={link.symbolPath}
                     to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
                   >
@@ -1002,6 +1059,7 @@ function LibraryModuleLinks({
             {middlewarePluginLinks.map((link) => (
               <Link
                 className={link.name === selectedSymbol?.name ? 'active' : ''}
+                data-kind={link.kind}
                 key={link.symbolPath}
                 to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
               >
@@ -1040,6 +1098,7 @@ function LibraryModuleLinks({
                     {candidateLinks.map((link) => (
                       <Link
                         className={link.name === selectedSymbol?.name ? 'active' : ''}
+                        data-kind={link.kind}
                         key={link.symbolPath}
                         to={docsModulePath(locale, librarySlug, link.module, link.symbolPath)}
                       >
@@ -1056,6 +1115,66 @@ function LibraryModuleLinks({
   )
 }
 
+/** Viewport width (px) from which the section outline sits beside the article, always open. */
+const WIDE_OUTLINE_QUERY = '(min-width: 1280px)'
+
+/**
+ * Keeps an outline in sync with reading position: the link whose section most recently crossed the
+ * upper reading line gets `.active` / `aria-current`, and URL fragments still win on direct loads.
+ * On wide screens it also opens the enclosing `details.page-toc`, which is server-rendered closed
+ * so narrow layouts keep it compact below the article.
+ */
+function useScrollSpy(railRef: React.RefObject<HTMLElement | null>, resetKey?: string) {
+  useEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+    const disclosure = rail.closest('details')
+    const wide = window.matchMedia(WIDE_OUTLINE_QUERY)
+    /** Opens the outline beside the article; narrow layouts keep the reader's own toggle state. */
+    const syncDisclosure = () => {
+      if (disclosure && wide.matches) disclosure.open = true
+    }
+    syncDisclosure()
+    wide.addEventListener('change', syncDisclosure)
+    const anchors = Array.from(rail.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'))
+    /** Marks exactly one outline entry as the current location. */
+    const mark = (href: string | undefined) => {
+      for (const anchor of anchors) {
+        const current = anchor.getAttribute('href') === href
+        anchor.classList.toggle('active', current)
+        if (current) anchor.setAttribute('aria-current', 'location')
+        else anchor.removeAttribute('aria-current')
+      }
+    }
+    const targets = anchors.flatMap((anchor) => {
+      const id = decodeURIComponent(anchor.getAttribute('href')!.slice(1))
+      const element = document.getElementById(id)
+      return element ? [{ element, href: `#${id}` }] : []
+    })
+    /** Section tops above this line count as "read"; matches the sticky header plus breathing room. */
+    const observer = new IntersectionObserver(
+      () => {
+        const line = 120
+        let current: string | undefined = targets[0]?.href
+        for (const target of targets)
+          if (target.element.getBoundingClientRect().top <= line) current = target.href
+        mark(current)
+      },
+      { rootMargin: '-96px 0px -55% 0px', threshold: [0, 1] }
+    )
+    for (const target of targets) observer.observe(target.element)
+    /** Fragment navigation marks its own entry immediately. */
+    const onHash = () => mark(window.location.hash || targets[0]?.href)
+    onHash()
+    window.addEventListener('hashchange', onHash)
+    return () => {
+      observer.disconnect()
+      wide.removeEventListener('change', syncDisclosure)
+      window.removeEventListener('hashchange', onHash)
+    }
+  }, [railRef, resetKey])
+}
+
 /** Tracks the URL fragment so the visible right-rail anchor follows direct loads and history. */
 function RightRail({
   locale,
@@ -1068,20 +1187,7 @@ function RightRail({
 }) {
   const copy = copyFor(locale)
   const railRef = useRef<HTMLElement>(null)
-  useEffect(() => {
-    const updateHash = () => {
-      const currentHash = window.location.hash
-      railRef.current?.querySelectorAll('a').forEach((anchor) => {
-        anchor.classList.toggle('active', anchor.getAttribute('href') === currentHash)
-        if (anchor.getAttribute('href') === currentHash)
-          anchor.setAttribute('aria-current', 'location')
-        else anchor.removeAttribute('aria-current')
-      })
-    }
-    updateHash()
-    window.addEventListener('hashchange', updateHash)
-    return () => window.removeEventListener('hashchange', updateHash)
-  }, [symbol])
+  useScrollSpy(railRef, symbol?.fragment)
   return (
     <aside className="right-rail" aria-label={copy.onPage} ref={railRef}>
       <strong>{copy.onPage}</strong>
@@ -1149,6 +1255,7 @@ function referenceSections(
   return [
     'overview',
     ...(hasQuickExample ? ['quick-start'] : []),
+    ...(constantMembers(symbol).length > 0 ? ['values'] : []),
     ...(symbol.configuration.length > 0 || hasGuideOptions ? ['configuration'] : []),
     ...(symbol.errors.some(
       (error) => error.trim() && !error.startsWith('No documented errors are declared for ')
@@ -1577,6 +1684,245 @@ function ClassMemberReference({
   )
 }
 
+/** Maximum declaration headlines shown in the API hero before collapsing into an overload count. */
+const MAX_HERO_DECLARATIONS = 3
+
+/**
+ * Reduces a generated declaration to the one-line shape a reader scans first: functions keep their
+ * full call signature, classes keep their heading, and object-typed constants collapse the literal
+ * body to `{ … }`. The complete text stays in the "Full type signature" disclosure.
+ */
+function signatureHeadlines(signature: string): readonly string[] {
+  return signature
+    .split(/(?=export declare )/)
+    .map((declaration) =>
+      declaration
+        .replace(/^export declare /, '')
+        .replace(/\/\*\*[\s\S]*?\*\//g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    )
+    .filter(Boolean)
+    .map((declaration) => {
+      if (/^(?:abstract )?class /.test(declaration))
+        return `${declaration.split('{')[0]!.trim()} { … }`
+      if (/^const [\w$]+: \{/.test(declaration))
+        return `${declaration.slice(0, declaration.indexOf('{'))}{ … }`
+      return declaration.replace(/;$/, '')
+    })
+}
+
+/** One literal member of an enum-like constant object, read from its generated declaration. */
+type IConstantMember = {
+  readonly key: string
+  readonly value: string
+  readonly description?: string
+}
+
+/**
+ * Extracts the literal members of an enum-like `const` (error codes, kinds, policies) so the page
+ * can list each key and value instead of collapsing the object to `{ … }`. Returns an empty list
+ * unless every top-level member is a string, number, or boolean literal; nested shapes keep the
+ * collapsed headline and the full signature disclosure.
+ */
+function constantMembers(symbol: IApiSymbol): readonly IConstantMember[] {
+  if (symbol.kind !== 'const') return []
+  /** Object body of the single declaration, with surrounding `{ }` removed. */
+  const body = symbol.signature.match(/^\s*export declare const [\w$]+: \{([\s\S]*)\};?\s*$/)?.[1]
+  if (!body) return []
+  /** Body without comments; any remaining brace means a nested shape this list cannot show. */
+  const bare = body.replace(/\/\*\*[\s\S]*?\*\//g, '')
+  if (/[{}]/.test(bare)) return []
+  /** One member: optional JSDoc, a readonly key, and its literal value. */
+  const pattern =
+    /(?:\/\*\*([\s\S]*?)\*\/\s*)?readonly ([\w$]+|"[^"]*"|'[^']*'): ("[^"]*"|'[^']*'|-?\d+(?:\.\d+)?|true|false);/g
+  const members = [...body.matchAll(pattern)].map((match) => ({
+    key: match[2]!.replace(/^["']|["']$/g, ''),
+    value: match[3]!,
+    // Generated signatures are whitespace-collapsed, so JSDoc line stars sit inline: drop any
+    // standalone `*` run, then normalize spacing.
+    description: match[1]
+      ?.replace(/(?:^|\s)\*+(?=\s|$)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }))
+  return members.length === (bare.match(/\breadonly\b/g) ?? []).length ? members : []
+}
+
+/**
+ * Returns the first sentence of `text` that `shown` does not contain yet, and records it. Codes of
+ * one family often open with the same classifier ("Diagnostic code that is reported, never
+ * thrown."), so each row shows the sentence that tells it apart instead of repeating the opener.
+ * Returns `undefined` when every sentence was already shown on the page.
+ */
+function freshSentence(text: string | undefined, shown: Set<string>): string | undefined {
+  /** Unread tail of the description, consumed one sentence at a time. */
+  let rest = text?.trim() ?? ''
+  while (rest) {
+    const sentence = openingSentence(rest)
+    rest = rest.slice(sentence.length).trim()
+    if (!shown.has(sentence)) {
+      shown.add(sentence)
+      return sentence
+    }
+  }
+  return undefined
+}
+
+/** Public npm specifier of one module, e.g. `@migaia/rpc-core/client`. */
+function publicPackagePath(api: IApi): string {
+  return api.exportPath === '.'
+    ? `@migaia/${api.library}`
+    : `@migaia/${api.library}/${api.exportPath.replace(/^\.\//u, '')}`
+}
+
+/** Declarations longer than this many characters put each parameter on its own line. */
+const HEADLINE_WRAP_LENGTH = 72
+
+/**
+ * Lays out one declaration headline for the API hero. Short declarations stay on one line; long
+ * callables break at top-level parameter commas so each parameter reads as one row, the way an
+ * editor's formatter would print it. Generic, object, and tuple brackets are respected.
+ */
+function layoutHeadline(headline: string): string {
+  if (headline.length <= HEADLINE_WRAP_LENGTH) return headline
+  /** Bracket depth while scanning; parameters split only at depth 1 of the call parentheses. */
+  let depth = 0
+  /** Index of the call's opening parenthesis, found at generic depth 0. */
+  let open = -1
+  for (let index = 0; index < headline.length; index++) {
+    const character = headline[index]
+    if (character === '<' || character === '[' || character === '{') depth++
+    else if (character === '>' && headline[index - 1] !== '=') depth--
+    else if (character === ']' || character === '}') depth--
+    else if (character === '(' && depth === 0) {
+      open = index
+      break
+    }
+  }
+  if (open < 0) return headline
+  /** Top-level parameter texts and the index of the matching close parenthesis. */
+  const parameters: string[] = []
+  let start = open + 1
+  let close = -1
+  depth = 0
+  for (let index = open + 1; index < headline.length; index++) {
+    const character = headline[index]
+    if ('<([{'.includes(character!)) depth++
+    else if (character === '>' && headline[index - 1] !== '=') depth--
+    else if (')]}'.includes(character!)) {
+      if (character === ')' && depth === 0) {
+        close = index
+        break
+      }
+      depth--
+    } else if (character === ',' && depth === 0) {
+      parameters.push(headline.slice(start, index).trim())
+      start = index + 1
+    }
+  }
+  if (close < 0) return headline
+  parameters.push(headline.slice(start, close).trim())
+  const visible = parameters.filter(Boolean)
+  if (visible.length === 0) return headline
+  return `${headline.slice(0, open + 1)}\n${visible.map((parameter) => `  ${parameter}`).join(',\n')}\n${headline.slice(close)}`
+}
+
+/** Builds the narrowest public import statement for one runtime symbol. */
+function importStatement(api: IApi, symbol: IApiSymbol): string {
+  return `import { ${symbol.name} } from '${publicPackagePath(api)}'`
+}
+
+/** Small clipboard control shared by the API hero; reports failures instead of hiding them. */
+function CopyText({ locale, text }: { readonly locale: ILocale; readonly text: string }) {
+  /** Clipboard result for this control only. */
+  const [state, setState] = useState<'ready' | 'copied' | 'failed'>('ready')
+  /** Copies the exact text and returns to the ready label after a short confirmation. */
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setState('copied')
+    } catch (error) {
+      console.error(error)
+      setState('failed')
+    }
+    window.setTimeout(() => setState('ready'), 1600)
+  }
+  return (
+    <button className="copy-text" data-state={state} onClick={copy} type="button">
+      <span aria-live="polite">{CODE_COPY_LABELS[locale][state]}</span>
+    </button>
+  )
+}
+
+/**
+ * Visual centre of every API detail page: the kind, the copyable import, and the declaration
+ * headline(s) on one ink surface, so a reader sees how to import and call the API before reading
+ * any prose.
+ */
+function ApiHero({
+  api,
+  library,
+  locale,
+  symbol
+}: {
+  readonly api: IApi
+  readonly library: ILibrary
+  readonly locale: ILocale
+  readonly symbol: IApiSymbol
+}) {
+  const ui = interfaceCopyFor(locale)
+  /** One-line declarations; overloads beyond the visible limit become a count. */
+  const headlines = signatureHeadlines(symbol.signature)
+  const importLine = importStatement(api, symbol)
+  return (
+    <section className="api-hero" data-kind={symbol.kind} aria-label={symbol.name}>
+      <div className="api-hero-row">
+        <span className="api-hero-label">{ui.importLabel}</span>
+        <code className="api-hero-import">{highlightTypeScript(importLine)}</code>
+        <CopyText locale={locale} text={importLine} />
+      </div>
+      {headlines.length ? (
+        <pre className="api-hero-signature">
+          <code>
+            {headlines.slice(0, MAX_HERO_DECLARATIONS).map((headline, index) => (
+              <span className="api-hero-line" key={`${index}:${headline}`}>
+                {highlightTypeScript(layoutHeadline(headline))}
+              </span>
+            ))}
+          </code>
+        </pre>
+      ) : null}
+      <p className="api-hero-meta">
+        {headlines.length > MAX_HERO_DECLARATIONS ? (
+          <span>
+            +{headlines.length - MAX_HERO_DECLARATIONS} {ui.overloads}
+          </span>
+        ) : null}
+        {library.version ? <span>v{library.version}</span> : null}
+        <span>{publicPackagePath(api)}</span>
+      </p>
+    </section>
+  )
+}
+
+/**
+ * Drops a leading "`name`: optional," preamble from a field description. The option row already
+ * shows the name and its optional/required pill, so repeating them in the prose costs a line and
+ * reads as noise. Text without that exact preamble is returned unchanged.
+ */
+function withoutFieldPreamble(name: string, text: string): string {
+  /** Escaped field name, so names such as `$schema` match literally. */
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return text.replace(
+    new RegExp(
+      `^\`(?:options\\.)?${escaped}\`\\s*[:：]\\s*(?:(?:可选|必填|optional|required)\\s*[,，;；]\\s*)?`,
+      'i'
+    ),
+    ''
+  )
+}
+
 /** Renders one runtime API as a focused reference article with subordinate typing. */
 function SingleApiReference({
   guide,
@@ -1659,8 +2005,9 @@ function SingleApiReference({
      * A language fallback preserves the contract and stays visible for the content owner to
      * translate.
      */
-    const behavior = openingSentence(
-      needsFallback ? (optionFallbacks?.[field.name] ?? rawBehavior) : rawBehavior
+    const behavior = withoutFieldPreamble(
+      fieldIdentity(field.name),
+      openingSentence(needsFallback ? (optionFallbacks?.[field.name] ?? rawBehavior) : rawBehavior)
     )
     /** Reused function JSDoc is not an independent explanation of a second field. */
     const description = described.has(behavior) ? '' : behavior
@@ -1682,6 +2029,21 @@ function SingleApiReference({
       )
     )
   ]
+  /** Shell labels for field flags and defaults. */
+  const ui = interfaceCopyFor(locale)
+  /** Literal members of an enum-like constant; empty for every other kind. */
+  const constants = constantMembers(symbol)
+  /** Opening sentences shared by several members classify a family; they never identify a row. */
+  const sharedOpeners = constants
+    .map((member) => (member.description ? openingSentence(member.description) : ''))
+    .filter((opener, index, all) => opener && all.indexOf(opener) !== index)
+  /** Sentences already on the page (the lede included) or shared openers that rows must skip. */
+  const valueShown = new Set<string>([purpose, ...sharedOpeners])
+  /** Each member with one sentence that identifies it and is not repeated on the page. */
+  const values = constants.map((member) => ({
+    ...member,
+    description: freshSentence(member.description, valueShown)
+  }))
   /** The owning module supplies concrete next API choices without repeating every signature. */
   const relatedApis = api.symbols
     .filter((candidate) => candidate.fragment !== symbol.fragment && isCallableApiSymbol(candidate))
@@ -1693,6 +2055,7 @@ function SingleApiReference({
       data-api-name={symbol.name}
       id={symbol.fragment}
     >
+      <ApiHero api={api} library={library} locale={locale} symbol={symbol} />
       {purpose ? (
         <section className="api-overview" id={`${symbol.fragment}--overview`}>
           <p className="lede">
@@ -1708,6 +2071,52 @@ function SingleApiReference({
         >
           <h2>{locale === 'zh' ? '最小示例' : 'Minimal example'}</h2>
           <CodeBlock code={quickExample} label={symbol.name} locale={locale} />
+        </section>
+      ) : null}
+      {values.length ? (
+        <section
+          className="section-block compact api-configuration"
+          id={`${symbol.fragment}--values`}
+        >
+          <h2>{ui.valuesTitle}</h2>
+          <div className="table-scroll">
+            <table className="option-reference constant-values">
+              <thead>
+                <tr>
+                  <th>{locale === 'zh' ? '名称' : 'Name'}</th>
+                  <th>{ui.valueLabel}</th>
+                  <th>{locale === 'zh' ? '说明' : 'Description'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {values.map((member) => (
+                  <tr
+                    className="option-entry"
+                    id={`${symbol.fragment}--value-${optionAnchor(member.key)}`}
+                    key={member.key}
+                  >
+                    <th scope="row">
+                      <code>{member.key}</code>
+                    </th>
+                    <td className="option-type">
+                      <code className="constant-literal">{member.value}</code>
+                    </td>
+                    <td className="option-behavior">
+                      {member.description ? (
+                        <p>
+                          <InlineText
+                            library={library.slug}
+                            locale={locale}
+                            text={member.description}
+                          />
+                        </p>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       ) : null}
       {options.length ? (
@@ -1734,12 +2143,15 @@ function SingleApiReference({
                     key={field.name}
                   >
                     <th scope="row">
-                      <code>
-                        {field.name}
-                        {field.optional ? '?' : ''}
-                      </code>
+                      <code>{field.name}</code>
+                      <span
+                        className="field-flag"
+                        data-optional={field.optional ? 'true' : 'false'}
+                      >
+                        {field.optional ? ui.optional : ui.required}
+                      </span>
                     </th>
-                    <td>
+                    <td className="option-type">
                       <TypeExpression
                         api={api}
                         libraryApis={libraryApis}
@@ -1748,9 +2160,15 @@ function SingleApiReference({
                       />
                     </td>
                     {hasDefaults ? (
-                      <td>{field.defaultValue ? <code>{field.defaultValue}</code> : '—'}</td>
+                      <td
+                        className="option-default"
+                        data-empty={field.defaultValue ? undefined : 'true'}
+                        data-label={ui.defaultLabel}
+                      >
+                        {field.defaultValue ? <code>{field.defaultValue}</code> : '—'}
+                      </td>
                     ) : null}
-                    <td>
+                    <td className="option-behavior">
                       {field.description ? (
                         <p>
                           <InlineText
@@ -1870,10 +2288,7 @@ function exampleWithPrimaryImport(code: string, api: IApi, symbol: IApiSymbol): 
     (match) => match[1].split(',').map((binding) => binding.trim().replace(/^type\s+/u, ''))
   )
   if (importedBindings.some((binding) => binding.split(/\s+as\s+/u)[0] === symbol.name)) return code
-  const packagePath =
-    api.exportPath === '.'
-      ? `@migaia/${api.library}`
-      : `@migaia/${api.library}/${api.exportPath.replace(/^\.\//u, '')}`
+  const packagePath = publicPackagePath(api)
   const typeOnly = symbol.kind === 'type' || symbol.kind === 'interface' ? 'type ' : ''
   return `import ${typeOnly}{ ${symbol.name} } from '${packagePath}'\n\n${code}`
 }
@@ -2392,6 +2807,8 @@ function MaintainedBlock({
         </div>
       )
     }
+    if (/^(?:输出|输出结果|运行输出|运行结果|Output)\s*[:：]?$/i.test(normalizedText))
+      return <p className="output-caption">{block.text.replace(/[:：]\s*$/, '')}</p>
     if (/(?:全部字段|All fields)/i.test(normalizedText))
       return (
         <p className="contract-fields-heading">
@@ -2497,44 +2914,6 @@ function errorReferencePath(locale: ILocale, library: string | undefined): strin
   return undefined
 }
 
-/** README-backed Chinese summaries explain what each library helps readers accomplish. */
-const LIBRARY_REFERENCE_DESCRIPTIONS_ZH = {
-  capability: '按开关启停可选功能，为不同租户隔离功能开关，并按依赖启动和释放功能。',
-  'event-subscriber': '在本地模块间订阅和广播事件，并协调同步或异步监听器的执行。',
-  lifecycle: '将多项资源交给同一作用域管理，并在退出时等待任务结束和释放资源。',
-  logger: '将日志输出到控制台或服务，按需要过滤和格式化，并等待异步输出完成。',
-  'middleware-pipeline':
-    '把处理步骤组合为同步、异步或生成器中间件管线，并在需要时提前结束或取消处理。',
-  'plugin-host': '为库或应用安装和卸载插件，配置共享能力与处理步骤，并在安装失败时回滚。',
-  reactive: '让状态变化自动更新派生值和副作用，并为不同使用场景隔离状态。',
-  resource: '随输入变化加载异步数据，取消过期请求、重试失败请求并刷新缓存。',
-  'rpc-browser': '在浏览器窗口、iframe、SharedWorker 与可靠有序的 WebRTC 通道之间调用函数。',
-  'rpc-contract': '为自定义 RPC 实现校验和编解码消息，让不同对端按同一协议通信。',
-  'rpc-core': '跨运行时调用远程函数，并为调用设置超时、取消和流式结果处理。',
-  'rpc-devtools': '采集、查询和录制 RPC 元数据，并查看多个宿主的时间线与调用统计。',
-  'rpc-pool': '将 RPC 调用分配到线程池或进程池，并用有限队列承接繁忙时的请求。',
-  'rpc-process': '在子进程或本机服务中运行隔离任务，并通过 RPC 调用和管理它们。',
-  'rpc-threads': '把重计算移到 Worker，并通过 RPC 调用、管理和重启线程。',
-  serialize: '把应用数据编码为可存储或传输的格式，并在读取时解码。',
-  'storage-contract': '为键值和记录存储定义统一接口，让应用可以接入不同存储后端。',
-  'storage-web': '通过统一接口读写 Web Storage、cookie、IndexedDB 和内存中的数据。',
-  'store-devtools': '查看 Store 的状态与 action 历史，通过时间旅行和依赖树定位状态变化。',
-  'store-indexed': '在对象、数组、Map 和 Set 中按键或索引订阅变化，让相关计算随集合更新。',
-  'store-keyed': '在独立作用域中按业务 key 管理状态，并只订阅需要的部分。',
-  'store-light': '管理对象状态、异步数据和更新操作，让相关计算随字段变化自动更新。',
-  'store-middleware': '跟踪 Store 的状态与 action、约束写入规则，并接入 Redux DevTools。',
-  'store-persist': '自动保存和恢复对象、按键管理的状态与集合，并在版本变化时迁移已保存数据。',
-  'store-react': '在 React 组件中使用 Store、Atom 与异步资源，并管理订阅和退出时的清理。',
-  'store-shared': '让主线程与 Worker 共同读写同一组响应式 32 位整数状态。',
-  'store-ssr': '隔离每个 SSR 请求的 Store 与 Resource，并将服务端初始状态恢复到浏览器。',
-  'store-wasm': '在 WASM 中管理可订阅的数值、字符串、数组和记录状态。',
-  'store-worker': '把耗时计算和数据编解码移到 Worker，并为请求使用取消、去重和缓存功能。',
-  supervision: '限制执行单元数量，检查健康状态，重启故障单元，并按时限管理关闭过程。',
-  tray: '启动、查找、调用和重启一组插件宿主，包括 Node Worker 与子进程，并在退出时释放它们。',
-  utils: '为代码添加超时、取消与错误追踪，并处理常见的数据转换和对象更新。',
-  wasm: '分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。'
-} as const satisfies Readonly<Record<string, string>>
-
 /** Architecture-page summaries explain the pain, core capability, and governing design up front. */
 const LIBRARY_ARCHITECTURE_LEDES_ZH = {
   supervision:
@@ -2605,72 +2984,6 @@ const LIBRARY_ARCHITECTURE_LEDES_ZH = {
     '当应用需要追踪 RPC 失败、调用耗时或跨宿主事件时使用。createRpcDevtools 作为 Probe 接入已有宿主，按有界事件环提供查询、统计、录制、暂停与 service；createRpcDevtoolsHub 聚合已有 service client 和离线录制，对齐时钟并关联 timeline 与 interactions。默认只采集元数据，内容捕获必须显式启用；录制使用版本 1 的 NDJSON，错误链复用 RPC Contract，连接与持久化由调用方管理。'
 } as const satisfies Readonly<Record<string, string>>
 
-/** README-backed English summaries mirror the same user-facing responsibilities. */
-const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
-  capability:
-    'Enable or disable optional features, keep tenant feature settings separate, and start and release features in dependency order.',
-  'event-subscriber':
-    'Subscribe to and broadcast events between local modules and coordinate synchronous or asynchronous listeners.',
-  lifecycle:
-    'Manage resources within a shared scope and wait for ongoing work and cleanup when shutting down.',
-  logger:
-    'Send logs to a console or service, filter and format them as needed, and wait for asynchronous output to finish.',
-  'middleware-pipeline':
-    'Combine processing steps into synchronous, asynchronous, or generator middleware pipelines and stop or cancel processing when needed.',
-  'plugin-host':
-    'Install and remove plugins for libraries or applications, configure shared features and processing steps, and roll back failed installations.',
-  reactive:
-    'Update derived values and effects when state changes and keep state separate across contexts.',
-  resource:
-    'Load asynchronous data as inputs change, cancel stale requests, retry failures, and refresh cached results.',
-  'rpc-browser':
-    'Call functions across browser windows, iframes, SharedWorkers, and reliable ordered WebRTC channels.',
-  'rpc-contract':
-    'Validate, encode, and decode messages for custom RPC implementations so peers can communicate through the same protocol.',
-  'rpc-core':
-    'Call remote functions across runtimes with timeouts, cancellation, and streaming results.',
-  'rpc-devtools':
-    'Collect, query, and record RPC metadata and inspect timelines and call statistics across hosts.',
-  'rpc-pool':
-    'Distribute RPC calls across thread or process pools and queue requests within bounded limits when busy.',
-  'rpc-process':
-    'Run isolated work in child processes or local services and call and manage them through RPC.',
-  'rpc-threads':
-    'Move heavy computation into Workers and call, manage, and restart threads through RPC.',
-  serialize: 'Encode application data for storage or transmission and decode it when reading.',
-  'storage-contract':
-    'Define common interfaces for key-value and record storage so applications can use different backends.',
-  'storage-web':
-    'Read and write data in Web Storage, cookies, IndexedDB, and memory through a common interface.',
-  'store-devtools':
-    'Inspect Store state and action history and use time travel and dependency trees to investigate changes.',
-  'store-indexed':
-    'Subscribe to keys or indices in objects, arrays, Maps, and Sets so related computations respond to collection updates.',
-  'store-keyed':
-    'Manage state by business key in separate scopes and subscribe only to the parts you need.',
-  'store-light':
-    'Manage object state, asynchronous data, and updates so related computations respond to field changes.',
-  'store-middleware':
-    'Trace Store state and actions, enforce write rules, and connect to Redux DevTools.',
-  'store-persist':
-    'Automatically save and restore object, keyed, and collection state and migrate saved data when versions change.',
-  'store-react':
-    'Use Stores, Atoms, and asynchronous resources in React components and manage subscriptions and cleanup.',
-  'store-shared':
-    'Read and write the same reactive 32-bit integer state from the main thread and Workers.',
-  'store-ssr':
-    "Keep Stores and Resources separate for each SSR request and restore the server's initial state in the browser.",
-  'store-wasm': 'Manage observable numbers, strings, arrays, and records in WASM.',
-  'store-worker':
-    'Move expensive computation and data encoding and decoding into Workers and use cancellation, deduplication, and caching for requests.',
-  supervision:
-    'Limit execution units, check their health, restart failures, and manage shutdown within a time budget.',
-  tray: 'Start, find, call, and restart plugin hosts, including Node Workers and child processes, and release them on shutdown.',
-  utils:
-    'Add deadlines, cancellation, and error tracing to code and handle common data conversions and object updates.',
-  wasm: 'Allocate reusable byte buffers and transcode between JSON and MessagePack.'
-} as const satisfies Readonly<Record<string, string>>
-
 /** Unambiguous public product names that may appear without an npm package path. */
 const LIBRARY_REFERENCE_ALIASES = {
   'Capability Graph': 'capability',
@@ -2694,16 +3007,6 @@ function crossLibraryReference(value: string, library: string | undefined) {
   return slug
 }
 
-/** Returns reader-facing ownership context for a linked library reference. */
-function libraryReferenceDescription(locale: ILocale, slug: string): string {
-  if (locale === 'zh')
-    return LIBRARY_REFERENCE_DESCRIPTIONS_ZH[slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_ZH]
-  return (
-    LIBRARY_REFERENCE_DESCRIPTIONS_EN[slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_EN] ??
-    librarySummaries.find((entry) => entry.slug === slug)?.description
-  )
-}
-
 /** Highlights inline code and links public errors and explicit cross-library references. */
 function InlineText({
   // Cross-library links open the target library's learning path, whatever the page kind.
@@ -2725,17 +3028,24 @@ function InlineText({
       .replace(/(?<!GitHub |[\w.:/-])packages(?![\w.:/-])/gi, 'libraries')
       .replace(/(?<![\w.:/-])package(?![\w.:/-])/gi, 'library')
       .split(
-        /(\[[^\]\n]+\]\(\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+\)|`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
+        /(\[[^\]\n]+\]\((?:\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+|#[A-Za-z0-9_-]+)\)|`[^`]+`|@migai(?:a)?\/[a-z0-9-]+(?:\/[a-z0-9-]+)*|\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b|\b(?:Capability Graph|Lifecycle|PluginHost|Reactive|Resource|Storage Host|Tray|WASM|RPC)\b)/g
       )
       .map((part, index) => {
         /** Maintained API tables link to existing local guides without accepting external URLs. */
         const maintainedLink = part.match(
-          /^\[([^\]\n]+)\]\((\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+)\)$/
+          /^\[([^\]\n]+)\]\((\/(?:zh|en)\/docs\/[A-Za-z0-9_./#-]+|#[A-Za-z0-9_-]+)\)$/
         )
         if (maintainedLink) {
           const [, label, target] = maintainedLink
+          /** In-page anchors stay plain fragment links so the browser scrolls without routing. */
+          if (target!.startsWith('#'))
+            return (
+              <a className="text-link" href={target} key={index}>
+                {label}
+              </a>
+            )
           return (
-            <Link className="text-link" key={index} to={target}>
+            <Link className="text-link" key={index} to={target!}>
               {label}
             </Link>
           )
@@ -2894,20 +3204,20 @@ function DomainLibrary({
   usePageNavigation(pageNavigation)
   return (
     <main id="main-content" className="page-shell content-page" lang={locale} data-pagefind-body>
-      <Breadcrumb
-        locale={locale}
-        domain="guides"
-        library={library.slug}
-        moduleName={
-          topic === 'index'
-            ? undefined
-            : topic === README_SEGMENT
-              ? readmeTitle(locale)
-              : (journey?.title ?? topic)
-        }
-      />
       <div className="reading-layout">
         <article className="article-column">
+          <Breadcrumb
+            locale={locale}
+            domain="guides"
+            library={library.slug}
+            moduleName={
+              topic === 'index'
+                ? undefined
+                : topic === README_SEGMENT
+                  ? readmeTitle(locale)
+                  : (journey?.title ?? topic)
+            }
+          />
           <p className="eyebrow">
             {locale === 'zh' ? '指南' : 'Guide'} · {library.slug}
           </p>
@@ -2933,6 +3243,7 @@ function DomainLibrary({
               }
             />
           </p>
+          {topic === 'index' ? <LibraryBand library={library} locale={locale} /> : null}
           {journey ? (
             <GuideJourneyContent journey={journey} library={library.slug} locale={locale} />
           ) : locale === 'zh' && document ? (
@@ -2965,6 +3276,7 @@ function DomainLibrary({
                 : `${library.slug} API reference →`}
             </Link>
           </p>
+          <NextActions locale={locale} domain="guides" library={library.slug} />
         </article>
         <div className="left-rail-sticky">
           <ScrollArea className="left-rail">
@@ -2976,18 +3288,35 @@ function DomainLibrary({
         {guideSections.length ? (
           <details className="page-toc">
             <summary>{copyFor(locale).onPage}</summary>
-            <nav aria-label={copyFor(locale).onPage}>
-              {guideSections.map((section) => (
-                <a href={`#${section.id}`} key={section.id}>
-                  {section.heading}
-                </a>
-              ))}
-            </nav>
+            <GuideOutline locale={locale} sections={guideSections} topic={topic} />
           </details>
         ) : null}
       </div>
-      <NextActions locale={locale} domain="guides" library={library.slug} />
     </main>
+  )
+}
+
+/** Section outline for guide pages; shares scroll tracking with the API outline. */
+function GuideOutline({
+  locale,
+  sections,
+  topic
+}: {
+  readonly locale: ILocale
+  readonly sections: readonly { readonly id: string; readonly heading: string }[]
+  readonly topic: string
+}) {
+  /** Outline root observed by the shared scroll tracker. */
+  const navRef = useRef<HTMLElement>(null)
+  useScrollSpy(navRef, topic)
+  return (
+    <nav aria-label={copyFor(locale).onPage} ref={navRef}>
+      {sections.map((section) => (
+        <a href={`#${section.id}`} key={section.id}>
+          {section.heading.replaceAll('`', '')}
+        </a>
+      ))}
+    </nav>
   )
 }
 
@@ -3262,7 +3591,6 @@ function formatTypeSignature(code: string): string {
   return lines.join('\n')
 }
 
-/** Presents source text as a labelled, horizontally scrollable Dracula code surface. */
 /** Stable code toolbar labels report clipboard outcomes without changing authored examples. */
 const CODE_COPY_LABELS = {
   zh: { ready: '复制', copied: '已复制', failed: '复制失败' },
@@ -3291,6 +3619,8 @@ function CodeBlock({
   const [copyState, setCopyState] = useState<'ready' | 'copied' | 'failed'>('ready')
   const normalizedLanguage = language.toLowerCase()
   const isTypeScript = ['ts', 'tsx', 'typescript'].includes(normalizedLanguage)
+  /** Plain-text blocks in maintained docs are program output, styled as a terminal pane. */
+  const isOutput = normalizedLanguage === 'text'
   /** Reader-facing source with each public symbol imported from its narrowest owner. */
   const normalizedCode = isTypeScript ? normalizeExampleImports(code) : code
   /** Type layout changes whitespace only; examples keep their authored comments. */
@@ -3324,19 +3654,30 @@ function CodeBlock({
     <div
       className={explain ? 'explained-code annotated' : 'explained-code'}
       data-comment-count={explain ? commentary.notes.length : undefined}
+      data-output={isOutput ? 'true' : undefined}
     >
       <figure className="code-frame">
         <figcaption className="code-toolbar">
-          <span>{isTypeScript ? 'TypeScript' : language}</span>
-          <span>
-            {fileLabel} · {label}
+          <span className="code-language">
+            {isOutput
+              ? interfaceCopyFor(locale).outputLabel
+              : isTypeScript
+                ? 'TypeScript'
+                : language}
           </span>
+          {isOutput ? null : <span className="code-file">{`${fileLabel} · ${label}`}</span>}
           <Button type="button" variant="quiet" className="code-copy-button" onClick={copyCode}>
             <span aria-live="polite">{CODE_COPY_LABELS[locale][copyState]}</span>
           </Button>
         </figcaption>
         <pre className="code-block">
-          <code>{isTypeScript ? highlightTypeScript(commentary.code) : commentary.code}</code>
+          <code>
+            {isTypeScript
+              ? highlightTypeScript(commentary.code)
+              : isOutput
+                ? highlightOutputComments(commentary.code)
+                : commentary.code}
+          </code>
         </pre>
       </figure>
       {commentary.notes.length > 0 ? (
@@ -3363,7 +3704,30 @@ function CodeBlock({
   )
 }
 
-/** Tokenizes formatted TypeScript into safe React spans using the Dracula palette. */
+/**
+ * Output blocks print real values plainly and explain them in trailing `//` comments; only those
+ * comments are tinted so the printed values stay the strongest text.
+ */
+function highlightOutputComments(code: string) {
+  return code.split(/(\/\/[^\n]*)/g).map((part, index) =>
+    part.startsWith('//') ? (
+      <span className="syntax-comment" key={index}>
+        {part}
+      </span>
+    ) : (
+      part
+    )
+  )
+}
+
+/** Returns the next non-whitespace token after `index`, scanning only as far as needed. */
+function nextSignificantToken(tokens: readonly string[], index: number): string | undefined {
+  for (let next = index + 1; next < tokens.length; next++)
+    if (tokens[next]?.trim()) return tokens[next]
+  return undefined
+}
+
+/** Tokenizes formatted TypeScript into safe React spans using the brand code palette. */
 function highlightTypeScript(code: string) {
   const keywords = new Set([
     'async',
@@ -3398,7 +3762,7 @@ function highlightTypeScript(code: string) {
   )
   /** Adjacent plain tokens share one text node, avoiding SSR separators between every character. */
   const highlighted: { readonly text: string; readonly className?: string }[] = []
-  for (const token of tokens) {
+  for (const [index, token] of tokens.entries()) {
     if (!token) continue
     /** Only semantic tokens need wrappers; punctuation remains readable as ordinary text. */
     let tokenClass: string | undefined
@@ -3407,6 +3771,8 @@ function highlightTypeScript(code: string) {
     else if (/^\d/.test(token)) tokenClass = 'syntax-number'
     else if (keywords.has(token)) tokenClass = 'syntax-keyword'
     else if (/^[A-Z]/.test(token)) tokenClass = 'syntax-type'
+    else if (/^[a-z_$][\w$]*$/.test(token) && nextSignificantToken(tokens, index)?.startsWith('('))
+      tokenClass = 'syntax-function'
     /** Plain runs are coalesced without changing the code or highlighted token boundaries. */
     const previous = highlighted.at(-1)
     if (!tokenClass && previous && !previous.className)
@@ -3421,6 +3787,35 @@ function highlightTypeScript(code: string) {
     ) : (
       token.text
     )
+  )
+}
+
+/**
+ * Library home strip: the npm name, current version, and a copyable install command, so a reader
+ * landing on the learning path can install the package before the first example.
+ */
+function LibraryBand({
+  library,
+  locale
+}: {
+  readonly library: ILibrary
+  readonly locale: ILocale
+}) {
+  const ui = interfaceCopyFor(locale)
+  /** Published package name; every library ships under the `@migaia` scope. */
+  const packageName = `@migaia/${library.slug}`
+  /** Install command in the package manager the maintained examples use. */
+  const install = `pnpm add ${packageName}`
+  return (
+    <div className="library-band">
+      <span className="library-band-name">{packageName}</span>
+      {library.version ? <span className="library-band-version">v{library.version}</span> : null}
+      <span className="library-band-install">
+        <span className="api-hero-label">{ui.installLabel}</span>
+        <code>{install}</code>
+        <CopyText locale={locale} text={install} />
+      </span>
+    </div>
   )
 }
 
@@ -3556,6 +3951,7 @@ function referenceSectionLabel(locale: ILocale, section: string): string {
     overview: ['Purpose', '作用'],
     'quick-start': ['Minimal example', '最小示例'],
     examples: ['Production scenarios', '场景实战'],
+    values: ['Values', '取值'],
     configuration: ['Configuration', '配置参考'],
     errors: ['Errors', '错误'],
     'related-apis': ['Related APIs', '相关 API'],

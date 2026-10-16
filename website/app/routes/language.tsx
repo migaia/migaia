@@ -1,4 +1,5 @@
 import { Link, type MetaFunction as IMetaFunction } from 'react-router'
+import { HeroShader } from '../components/hero-shader.js'
 import { copyFor } from '../copy.js'
 import { domainPath, type ILocale } from '../route-contract.js'
 
@@ -26,14 +27,28 @@ function Language({ params }: ILanguageRouteProps) {
   const copy = copyFor(locale)
   return (
     <main id="main-content" className="page-shell language-home" lang={locale} data-pagefind-body>
-      <p className="eyebrow">{copy.homeEyebrow}</p>
-      <h1>{copy.homeTitle}</h1>
-      <p className="lede">{copy.homeDescription}</p>
-      <div className="actions">
-        <Link className="button button-primary" to={domainPath(locale)}>
-          {chinese ? '开始查文档' : 'Start with Docs'}
-        </Link>
-      </div>
+      <section className="brand-hero docs-hero" aria-labelledby="brand-hero-title">
+        <div className="brand-hero-field" aria-hidden="true">
+          <HeroShader />
+        </div>
+        <p className="eyebrow" data-reveal="0">
+          {copy.homeEyebrow}
+        </p>
+        <h1 id="brand-hero-title" data-reveal="1">
+          {copy.homeTitle}
+        </h1>
+        <p className="lede" data-reveal="2">
+          {copy.homeDescription}
+        </p>
+        <div className="actions" data-reveal="3">
+          <Link className="button button-primary" to={domainPath(locale)}>
+            {chinese ? '开始查文档' : 'Start with Docs'}
+          </Link>
+          <Link className="button button-secondary" to={domainPath(locale, STARTER_LIBRARY)}>
+            {copy.readQuickstart}
+          </Link>
+        </div>
+      </section>
       <section className="section-block" aria-labelledby="capabilities">
         <p className="eyebrow">{copy.scenarios}</p>
         <h2 id="capabilities">{copy.scenarioTitle}</h2>

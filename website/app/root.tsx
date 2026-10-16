@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Link,
   Links,
@@ -11,25 +11,25 @@ import {
   useNavigation,
   useNavigationType
 } from 'react-router'
+// Self-hosted variable fonts are bundled with the site; no font request leaves its origin.
+import '@fontsource-variable/inter/wght.css'
+import '@fontsource-variable/jetbrains-mono/wght.css'
 import './app.css'
 import { DOMAINS, LOCALES, type ILocale } from './route-contract.js'
-import { copyFor } from './copy.js'
-import { loadSearchIndex } from './search.js'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle
-} from './components/ui/dialog.js'
-import { Input } from './components/ui/input.js'
+import { copyFor, interfaceCopyFor } from './copy.js'
+import { revealRouteContent } from './motion.js'
+import { OPEN_SEARCH_EVENT } from './search.js'
 import { Button } from './components/ui/button.js'
 import type { IPageNavigationContext } from './components/page-navigation.js'
 
-type IThemeMode = 'light' | 'dark' | 'time'
-type ITimePhase = 'sunrise' | 'sunset' | 'night' | 'midnight'
-type IThemeChoice = IThemeMode | ITimePhase
+/**
+ * Reader-selected color mode. `system` follows `prefers-color-scheme`; the document root always
+ * carries the resolved `light` or `dark` value in `data-theme`.
+ */
+type IThemeChoice = 'light' | 'dark' | 'system'
+
+/** Order the header toggle cycles through. */
+const THEME_CYCLE: readonly IThemeChoice[] = ['light', 'dark', 'system']
 
 /** Existing recovery-page purpose used when no page route supplies more specific metadata. */
 const ROOT_DESCRIPTION = 'The path does not map to a current library or documented topic.'
@@ -43,45 +43,31 @@ export const meta: IMetaFunction = () => [
 /** Persistent browser key for the reader-selected color mode. */
 const THEME_STORAGE_KEY = 'migaia-theme'
 
-/** Applies the saved theme before styles paint so hydration never exposes the light fallback. */
-const THEME_BOOT_SCRIPT = `(()=>{try{const r=document.documentElement;const t=localStorage.getItem('migaia-theme');const a=['light','dark','time','sunrise','sunset','night','midnight'];const c=a.includes(t)?t:'light';const f=['sunrise','sunset','night','midnight'].includes(c)?c:null;const h=new Date().getHours();const p=h>=5&&h<12?'sunrise':h>=12&&h<19?'sunset':h>=19&&h<23?'night':'midnight';r.dataset.theme=c==='time'||f?'time':c;if(c==='time'||f)r.dataset.timePhase=f||p;else delete r.dataset.timePhase;r.style.colorScheme=c==='dark'||(r.dataset.theme==='time'&&(r.dataset.timePhase==='night'||r.dataset.timePhase==='midnight'))?'dark':'light'}catch{}})()`
+/**
+ * Applies the saved theme before styles paint so hydration never flashes the wrong palette. Legacy
+ * stored values from the retired time theme fall back to `system`.
+ */
+const THEME_BOOT_SCRIPT = `(()=>{try{const r=document.documentElement;let c=localStorage.getItem('migaia-theme');if(c!=='light'&&c!=='dark')c='system';const d=c==='dark'||(c==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);r.dataset.theme=d?'dark':'light';r.dataset.themeChoice=c;r.style.colorScheme=d?'dark':'light'}catch{}})()`
 
-/** Resolves the local-clock phase used by the time-gradient theme. */
-function timePhase(date: Date): ITimePhase {
-  const hour = date.getHours()
-  if (hour >= 5 && hour < 12) return 'sunrise'
-  if (hour >= 12 && hour < 19) return 'sunset'
-  if (hour >= 19 && hour < 23) return 'night'
-  return 'midnight'
-}
-
-/** Returns the reader-facing label for one fixed local-clock phase. */
-function timePhaseLabel(locale: ILocale, phase: ITimePhase): string {
-  if (locale === 'en') return phase
-  return {
-    sunrise: '日出',
-    sunset: '日落',
-    night: '夜晚',
-    midnight: '午夜'
-  }[phase]
-}
-
-/** Applies one theme contract and its current local-clock phase to the document root. */
-function applyTheme(choice: IThemeChoice, date = new Date()) {
+/** Resolves a choice against the platform preference and applies it to the document root. */
+function applyTheme(choice: IThemeChoice) {
   const root = document.documentElement
-  const fixedPhase =
-    choice === 'sunrise' || choice === 'sunset' || choice === 'night' || choice === 'midnight'
-      ? choice
-      : undefined
-  root.dataset.theme = choice === 'time' || fixedPhase ? 'time' : choice
-  if (choice === 'time' || fixedPhase) root.dataset.timePhase = fixedPhase ?? timePhase(date)
-  else delete root.dataset.timePhase
-  /** Native-control palette that matches the resolved canvas rather than the stored mode name. */
-  const darkCanvas =
-    root.dataset.theme === 'dark' ||
-    (root.dataset.theme === 'time' &&
-      (root.dataset.timePhase === 'night' || root.dataset.timePhase === 'midnight'))
-  root.style.colorScheme = darkCanvas ? 'dark' : 'light'
+  const dark =
+    choice === 'dark' ||
+    (choice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  root.dataset.theme = dark ? 'dark' : 'light'
+  root.dataset.themeChoice = choice
+  root.style.colorScheme = dark ? 'dark' : 'light'
+}
+
+/** Reads the stored choice; anything unknown (including retired time-theme values) is `system`. */
+function storedTheme(): IThemeChoice {
+  try {
+    const value = window.localStorage.getItem(THEME_STORAGE_KEY)
+    return value === 'light' || value === 'dark' ? value : 'system'
+  } catch {
+    return 'system'
+  }
 }
 
 /**
@@ -120,18 +106,58 @@ function localeFromPath(pathname: string): ILocale {
   return LOCALES.includes(segment as ILocale) ? (segment as ILocale) : 'en'
 }
 
-/** Renders global navigation, demand-loaded search, language selection, and theme control. */
+/** Theme toggle glyphs: sun for light, moon for dark, half-filled display for system. */
+function ThemeIcon({ choice }: { readonly choice: IThemeChoice }) {
+  if (choice === 'light')
+    return (
+      <svg aria-hidden="true" viewBox="0 0 16 16">
+        <circle cx="8" cy="8" r="3" />
+        <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" />
+      </svg>
+    )
+  if (choice === 'dark')
+    return (
+      <svg aria-hidden="true" viewBox="0 0 16 16">
+        <path d="M13.2 9.6A5.5 5.5 0 0 1 6.4 2.8a5.5 5.5 0 1 0 6.8 6.8Z" />
+      </svg>
+    )
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16">
+      <rect height="9" rx="1.5" width="12" x="2" y="2.5" />
+      <path d="M6 14h4M8 11.5V14" />
+    </svg>
+  )
+}
+
+/**
+ * Brand mark: three nodes joined into one composition, the shape of composable libraries. Drawn
+ * with `currentColor` plus the accent so it follows both themes.
+ */
+function BrandMark() {
+  return (
+    <svg aria-hidden="true" className="brand-mark" viewBox="0 0 20 20">
+      <path className="brand-mark-edge" d="M5 14.5 10 5.5l5 9Z" />
+      <circle className="brand-mark-node" cx="10" cy="5.5" r="2.6" />
+      <circle className="brand-mark-node" cx="5" cy="14.5" r="2.6" />
+      <circle className="brand-mark-node accent" cx="15" cy="14.5" r="2.6" />
+    </svg>
+  )
+}
+
+/** Command palette chunk; downloaded the first time the reader opens search. */
+const CommandPalette = lazy(() => import('./components/command-palette.js'))
+
+/** Renders the sticky header: brand, library context, ⌘K search, language, and theme. */
 function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactNode }) {
+  /** Palette visibility. */
   const [searchOpen, setSearchOpen] = useState(false)
+  /** Mounts the lazy palette only after the first open so the shell ships without it. */
+  const [searchMounted, setSearchMounted] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [searchLoaded, setSearchLoaded] = useState(false)
-  const [theme, setTheme] = useState<IThemeChoice>('light')
-  /**
-   * Time-theme phase shown in the theme label. Starts fixed so prerendered HTML matches the first
-   * client render; the mount effect replaces it with the reader's local-clock phase.
-   */
-  const [phase, setPhase] = useState<ITimePhase>('sunrise')
+  /** Choice starts as `system` so prerendered markup matches; mount reads the stored value. */
+  const [theme, setTheme] = useState<IThemeChoice>('system')
+  /** Header shows its hairline only after the page scrolls under it. */
+  const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
   const locale = localeFromPath(location.pathname)
   /** Opposite locale exposed as the header's single language-switch destination. */
@@ -144,73 +170,72 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
       ? canonicalPathname.replace(/^\/(?:en|zh)(?=\/|$)/, `/${alternateLocale}`)
       : `/${alternateLocale}${canonicalPathname}`
   }${location.search}${location.hash}`
+  /** Library slug of the current docs page, shown as the header context crumb. */
+  const currentLibrary = canonicalPathname.match(/^\/(?:en|zh)\/docs\/([^/]+)/)?.[1]
   const copy = copyFor(locale)
+  const ui = interfaceCopyFor(locale)
+  /** Visible name of the current theme choice for the toggle's accessible label. */
+  const themeName =
+    theme === 'light' ? ui.themeLight : theme === 'dark' ? ui.themeDark : ui.themeSystem
 
   /** Page navigation links close the existing menu after React Router changes the route. */
   useEffect(() => setMobileNavOpen(false), [location.pathname])
 
-  /** Loads Pagefind only after the user opens search. */
-  async function openSearch() {
+  /** Opens the palette, mounting its lazy chunk on first use. */
+  const openSearch = () => {
+    setSearchMounted(true)
     setSearchOpen(true)
-    if (!searchLoaded) {
-      try {
-        await loadSearchIndex()
-      } catch {
-        // The static Pagefind index is optional during local development; keep the
-        // demand-loaded panel usable with its deterministic empty state.
-      }
-      setSearchLoaded(true)
-    }
   }
 
   useEffect(() => {
-    /** Opens search from the Quip-style Option+J shortcut without inserting the Option glyph. */
+    /** ⌘K / Ctrl+K open search everywhere; the older ⌥J shortcut keeps working. */
     const handleSearchShortcut = (event: KeyboardEvent) => {
-      if (!event.altKey || event.metaKey || event.ctrlKey || event.code !== 'KeyJ') return
+      const commandK = (event.metaKey || event.ctrlKey) && event.code === 'KeyK'
+      const optionJ = event.altKey && !event.metaKey && !event.ctrlKey && event.code === 'KeyJ'
+      if (!commandK && !optionJ) return
       event.preventDefault()
-      void openSearch()
+      openSearch()
     }
     window.addEventListener('keydown', handleSearchShortcut)
-    return () => window.removeEventListener('keydown', handleSearchShortcut)
-  }, [searchLoaded])
-
-  useEffect(() => {
-    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
-    const availableThemes: readonly IThemeChoice[] = [
-      'light',
-      'dark',
-      'time',
-      'sunrise',
-      'sunset',
-      'night',
-      'midnight'
-    ]
-    const initialTheme: IThemeChoice = availableThemes.includes(storedTheme as IThemeChoice)
-      ? (storedTheme as IThemeChoice)
-      : 'light'
-    setTheme(initialTheme)
-    setPhase(timePhase(new Date()))
-    applyTheme(initialTheme)
+    window.addEventListener(OPEN_SEARCH_EVENT, openSearch)
+    return () => {
+      window.removeEventListener('keydown', handleSearchShortcut)
+      window.removeEventListener(OPEN_SEARCH_EVENT, openSearch)
+    }
   }, [])
 
   useEffect(() => {
-    if (theme !== 'time') return
-    /** Refreshes the phase after local-clock boundaries without reloading the page. */
-    const refreshPhase = () => {
-      const nextPhase = timePhase(new Date())
-      setPhase(nextPhase)
-      applyTheme('time')
+    const initial = storedTheme()
+    setTheme(initial)
+    applyTheme(initial)
+    /** A `system` choice follows live platform changes without a reload. */
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const follow = () => {
+      if (document.documentElement.dataset.themeChoice === 'system') applyTheme('system')
     }
-    refreshPhase()
-    const timer = window.setInterval(refreshPhase, 60_000)
-    return () => window.clearInterval(timer)
-  }, [theme])
+    media.addEventListener('change', follow)
+    return () => media.removeEventListener('change', follow)
+  }, [])
 
-  /** Applies and persists an explicit reader choice, including fixed phase previews. */
-  function selectTheme(nextTheme: IThemeChoice) {
-    setTheme(nextTheme)
-    applyTheme(nextTheme)
-    window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme)
+  useEffect(() => {
+    /** Passive scroll probe; only the boolean crossing re-renders. */
+    const update = () => setScrolled(window.scrollY > 8)
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
+  }, [])
+
+  /** Advances light → dark → system and persists the explicit reader choice. */
+  function cycleTheme() {
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length]!
+    setTheme(next)
+    applyTheme(next)
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, next)
+    } catch (error) {
+      // Storage can be unavailable (private mode); the choice still applies to this page.
+      console.error(error)
+    }
   }
 
   return (
@@ -218,60 +243,83 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
       <a className="skip-link" href="#main-content">
         {copy.skip}
       </a>
-      <header className="site-header">
-        <Link
-          className="brand"
-          to={`/${locale}`}
-          aria-label={locale === 'zh' ? 'Migaia 文档首页' : 'Migaia library home'}
-        >
-          migaia
-        </Link>
-        <nav className="global-nav" aria-label={copy.primaryNavigation}>
-          {DOMAINS.map((domain) => (
-            <Link key={domain} to={`/${locale}/${domain}`}>
-              {copy.docs}
-            </Link>
-          ))}
-        </nav>
-        <div className="header-actions">
-          <Button
-            type="button"
-            variant="quiet"
-            className="mobile-nav-trigger"
-            aria-expanded={mobileNavOpen}
-            aria-controls="mobile-navigation"
-            onClick={() => setMobileNavOpen((open) => !open)}
-          >
-            {copy.menu}
-          </Button>
-          <Button type="button" variant="quiet" aria-keyshortcuts="Alt+J" onClick={openSearch}>
-            {copy.search} <kbd>⌥J</kbd>
-          </Button>
-          <Link
-            className="language-link"
-            to={alternateLocalePath}
-            aria-label={locale === 'zh' ? '切换至英文' : 'Switch to Chinese'}
-          >
-            {locale === 'zh' ? 'En' : '中文'}
+      <header className="site-header" data-scrolled={scrolled ? 'true' : 'false'}>
+        <div className="site-header-inner">
+          <Link className="brand" to={`/${locale}`} aria-label={ui.brandHome}>
+            <BrandMark />
+            <span>migaia</span>
           </Link>
-          <select
-            className="theme-select"
-            value={theme}
-            onChange={(event) => selectTheme(event.target.value as IThemeChoice)}
-            aria-label={copy.theme}
-          >
-            <option value="light">{locale === 'zh' ? '日间' : 'Light'}</option>
-            <option value="dark">{locale === 'zh' ? '夜间' : 'Dark'}</option>
-            <option value="time">
-              {locale === 'zh'
-                ? `跟随时间 · ${timePhaseLabel(locale, phase)}`
-                : `Auto · ${timePhaseLabel(locale, phase)}`}
-            </option>
-            <option value="sunrise">{locale === 'zh' ? '日出' : 'Sunrise'}</option>
-            <option value="sunset">{locale === 'zh' ? '日落' : 'Sunset'}</option>
-            <option value="night">{locale === 'zh' ? '夜晚' : 'Night'}</option>
-            <option value="midnight">{locale === 'zh' ? '午夜' : 'Midnight'}</option>
-          </select>
+          <nav className="global-nav" aria-label={copy.primaryNavigation}>
+            {DOMAINS.map((domain) => (
+              <Link
+                aria-current={canonicalPathname === `/${locale}/${domain}` ? 'page' : undefined}
+                key={domain}
+                to={`/${locale}/${domain}`}
+              >
+                {copy.docs}
+              </Link>
+            ))}
+            {currentLibrary ? (
+              <>
+                <span aria-hidden="true" className="global-nav-separator">
+                  /
+                </span>
+                <button
+                  aria-label={`${ui.switchLibrary}: ${currentLibrary}`}
+                  className="library-switcher"
+                  onClick={openSearch}
+                  type="button"
+                >
+                  <span>{currentLibrary}</span>
+                  <svg aria-hidden="true" viewBox="0 0 16 16">
+                    <path d="m5 6.5 3 3 3-3" />
+                  </svg>
+                </button>
+              </>
+            ) : null}
+          </nav>
+          <div className="header-actions">
+            <button
+              aria-keyshortcuts="Meta+K Control+K Alt+J"
+              className="search-trigger"
+              onClick={openSearch}
+              type="button"
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <circle cx="7" cy="7" r="4.75" />
+                <path d="m10.5 10.5 3 3" />
+              </svg>
+              <span>{ui.searchTrigger}</span>
+              <kbd>⌘K</kbd>
+            </button>
+            <Button
+              type="button"
+              variant="quiet"
+              className="mobile-nav-trigger"
+              aria-expanded={mobileNavOpen}
+              aria-controls="mobile-navigation"
+              onClick={() => setMobileNavOpen((open) => !open)}
+            >
+              {copy.menu}
+            </Button>
+            <Link
+              className="language-link"
+              to={alternateLocalePath}
+              aria-label={locale === 'zh' ? '切换至英文' : 'Switch to Chinese'}
+            >
+              {locale === 'zh' ? 'EN' : '中'}
+            </Link>
+            <button
+              aria-label={`${ui.themeCurrent}: ${themeName}`}
+              className="theme-toggle"
+              data-choice={theme}
+              onClick={cycleTheme}
+              title={`${ui.themeCurrent}: ${themeName}`}
+              type="button"
+            >
+              <ThemeIcon choice={theme} />
+            </button>
+          </div>
         </div>
       </header>
       {mobileNavOpen ? (
@@ -301,36 +349,16 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
               </Link>
             ))}
           </nav>
-          {pageNavigation ? <div className="mobile-page-navigation">{pageNavigation}</div> : null}
+          {pageNavigation ? (
+            <div className="mobile-page-navigation left-rail-content">{pageNavigation}</div>
+          ) : null}
         </dialog>
       ) : null}
-      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-        <DialogPortal>
-          <DialogOverlay />
-          <DialogContent
-            aria-describedby="site-search-description"
-            onEscapeKeyDown={() => setSearchOpen(false)}
-            onPointerDownOutside={() => setSearchOpen(false)}
-          >
-            <div className="search-panel-header">
-              <DialogTitle>{copy.searchLabel}</DialogTitle>
-            </div>
-            <div className="search-field">
-              <Input
-                id="site-search"
-                autoFocus
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder=" "
-              />
-              <label htmlFor="site-search">{copy.searchPlaceholder}</label>
-            </div>
-            <DialogDescription id="site-search-description" className="search-state">
-              {query.trim() ? copy.searchUnknown : copy.searchEmpty}
-            </DialogDescription>
-          </DialogContent>
-        </DialogPortal>
-      </Dialog>
+      {searchMounted ? (
+        <Suspense fallback={null}>
+          <CommandPalette locale={locale} onOpenChange={setSearchOpen} open={searchOpen} />
+        </Suspense>
+      ) : null}
     </>
   )
 }
@@ -344,42 +372,41 @@ function App() {
   return (
     <>
       <ShellHeader pageNavigation={pageNavigation} />
-      <RouteTransition />
+      <RouteProgress />
       <RouteScrollReset />
       <Outlet context={navigationContext} />
     </>
   )
 }
 
-/** Keeps the previous page visually covered by a theme-aware particle veil while data routes load. */
-function RouteTransition() {
+/**
+ * Thin accent bar under the header while a route's data loads, then a short fade-and-rise of the
+ * new article after push/replace navigations. History (POP) and in-page anchors stay still.
+ */
+function RouteProgress() {
   const navigation = useNavigation()
   const { hash, pathname } = useLocation()
   const navigationType = useNavigationType()
-  const [routeAnimation, setRouteAnimation] = useState(0)
-  const [routeAnimationActive, setRouteAnimationActive] = useState(false)
+  /** Skips the first effect run so the initial server-rendered page is never re-animated. */
+  const firstRender = useRef(true)
 
-  /** Replays the particle veil after push/replace even when the next route is already cached. */
   useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
     if (navigationType === 'POP' || hash) return
-    setRouteAnimation((current) => current + 1)
-    setRouteAnimationActive(true)
-    const timeout = window.setTimeout(() => setRouteAnimationActive(false), 780)
-    return () => window.clearTimeout(timeout)
+    void revealRouteContent(
+      document.querySelector('.article-column') ?? document.querySelector('#main-content')
+    )
   }, [hash, navigationType, pathname])
 
-  const isActive = navigation.state !== 'idle' || routeAnimationActive
   return (
     <div
-      key={routeAnimation}
-      className="route-transition"
-      data-active={isActive ? 'true' : 'false'}
       aria-hidden="true"
-    >
-      <i />
-      <i />
-      <i />
-    </div>
+      className="route-progress"
+      data-active={navigation.state !== 'idle' ? 'true' : 'false'}
+    />
   )
 }
 
