@@ -18,9 +18,12 @@ export type ILocale = (typeof LOCALES)[number]
  */
 export type IDomain = 'docs' | 'guides'
 
-/** Builds a locale-preserving docs URL; a library link opens that library's learning path. */
+/**
+ * Builds a locale-preserving docs URL. A library link opens that library's learning path; without a
+ * library it is the language home, which is also the docs home.
+ */
 export function domainPath(locale: ILocale, library?: string): string {
-  return `/${locale}/docs${library ? `/${library}` : ''}`
+  return library ? `/${locale}/docs/${library}` : `/${locale}`
 }
 
 /** Builds the URL of one guide topic; `index` is the library learning path itself. */
