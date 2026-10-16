@@ -126,7 +126,7 @@ test('SITE-T-HOME uses the header language control and explains the documentatio
   assert.match(styleSource, /\.button:not\(\.button-primary\):hover/)
   assert.match(
     styleSource,
-    /\.button\.button-primary:hover[\s\S]*?background:[\s\S]*?color:\s*var\(--canvas\)/
+    /\.button\.button-primary:hover \{[\s\S]*?background: var\(--accent-strong\);[\s\S]*?color: var\(--accent-contrast\);/
   )
 })
 
@@ -254,11 +254,10 @@ test('SITE-T-STORAGE-WEB-NAV groups APIs by caller task instead of export module
 })
 
 test('SITE-T-DOCS-RAIL keeps the expanded API navigation visible below the sticky header', () => {
-  assert.match(styleSource, /\.left-rail-sticky\s*\{[\s\S]*?align-self: start;/)
-  assert.match(styleSource, /height: calc\(100dvh - 6\.5rem\);/)
-  assert.match(styleSource, /max-height: calc\(100dvh - 6\.5rem\);/)
-  assert.match(styleSource, /position: sticky;/)
-  assert.match(styleSource, /top: 6\.5rem;/)
+  assert.match(
+    styleSource,
+    /\.left-rail-sticky \{[\s\S]*?align-self: start;[\s\S]*?height: calc\(100dvh - var\(--header-height\) - var\(--space-8\)\);[\s\S]*?position: sticky;[\s\S]*?top: calc\(var\(--header-height\) \+ var\(--space-6\)\);/
+  )
   for (const locale of ['zh', 'en']) {
     for (const route of [
       'docs/tray',
@@ -485,7 +484,8 @@ test('SITE-T-LOCALE keeps Chinese navigation and introductions localized', () =>
   assert.match(chineseHome, /href="\/zh\/docs"/)
   assert.match(chineseHome, /href="\/zh\/docs"[^>]*>文档<\/a>/)
   assert.doesNotMatch(chineseHome, /href="\/zh\/(?:guides|architecture)/)
-  assert.match(chineseHome, /跟随时间 · (日出|日落|夜晚|午夜)/)
+  assert.match(chineseHome, /aria-label="配色: (浅色|深色|跟随系统)"/)
+  assert.doesNotMatch(chineseHome, /跟随时间/)
   assert.doesNotMatch(
     chineseHome,
     /Choose the shortest useful path|Make one small result|开始查 Docs|浏览 Guides|用清晰、可组合的 library|沿着真实的 library、module/
@@ -503,17 +503,15 @@ test('SITE-T-BRAND uses the canonical Migaia name on every rendered page', () =>
   }
 })
 
-test('SITE-T-THEME exposes persistent light, dark, and local-time gradient modes', () => {
-  assert.match(rootSource, /'light' \| 'dark' \| 'time'/)
-  for (const phase of ['sunrise', 'sunset', 'night', 'midnight']) {
-    assert.match(rootSource, new RegExp(`'${phase}'`))
-    assert.match(styleSource, new RegExp(`data-time-phase='${phase}'`))
-  }
+test('SITE-T-THEME exposes persistent light, dark, and system color modes', () => {
+  assert.match(rootSource, /type IThemeChoice = 'light' \| 'dark' \| 'system'/)
   assert.match(rootSource, /localStorage\.setItem\(THEME_STORAGE_KEY/)
-  assert.match(rootSource, /setInterval\(refreshPhase, 60_000\)/)
-  assert.match(rootSource, /<option value="time">/)
-  assert.match(rootSource, /<option value="sunrise">/)
-  assert.match(rootSource, /selectTheme\(event\.target\.value as IThemeChoice\)/)
+  /** The boot script resolves `system` before paint and maps retired time-theme values to it. */
+  assert.match(rootSource, /if\(c!=='light'&&c!=='dark'\)c='system'/)
+  assert.match(rootSource, /prefers-color-scheme: dark/)
+  assert.match(styleSource, /:root\[data-theme='dark'\] \{/)
+  for (const retired of ['sunrise', 'sunset', 'midnight', 'data-time-phase', 'refreshPhase'])
+    assert.doesNotMatch(rootSource + styleSource, new RegExp(retired))
 })
 
 test('SITE-T01 embeds route content before JavaScript', () => {
@@ -1051,9 +1049,20 @@ test('SITE-T-PLUGIN-HOST-GENERATOR-CONTINUE explains the control signal and tran
   assert.match(text, /GENERATOR_UNDEFINED.*?真正的 undefined.*?继续向下传/s)
 })
 
-test('SITE-T-HEADER-RADIUS softens both lower navigation corners', () => {
-  assert.match(styleSource, /border-radius: 1rem 1rem 1\.5rem 1\.5rem/)
-  assert.match(styleSource, /border-radius: 0 0 1\.25rem 1\.25rem/)
+/**
+ * SITE-T-HEADER-SHELL replaces SITE-T-HEADER-RADIUS, retired on 2026-10-16 when the visual system
+ * dropped the rounded floating header for a full-width sticky bar.
+ */
+test('SITE-T-HEADER-SHELL keeps a sticky translucent header that draws its rule only after scroll', () => {
+  assert.match(
+    styleSource,
+    /\.site-header \{[\s\S]*?backdrop-filter:[\s\S]*?border-bottom: 1px solid transparent;[\s\S]*?height: var\(--header-height\);[\s\S]*?position: sticky;/
+  )
+  assert.match(
+    styleSource,
+    /\.site-header\[data-scrolled='true'\] \{[\s\S]*?border-bottom-color: var\(--border-default\);/
+  )
+  assert.match(rootSource, /className="site-header" data-scrolled=/)
 })
 
 test('SITE-T-ROOT-LANGUAGE-SWITCH sends the unprefixed landing page to Chinese', () => {
@@ -1291,10 +1300,10 @@ test('SITE-T-CODE-SURFACES gives inline and block code a consistent themed hiera
   assert.match(styleSource, /--inline-code-text:/)
   assert.match(
     styleSource,
-    /:not\(pre\) > code \{[\s\S]*?background: var\(--inline-code-background\);[\s\S]*?border-radius: 0\.42rem;[\s\S]*?font-weight: 600;/
+    /:not\(pre\) > code \{[\s\S]*?background: var\(--inline-code-background\);[\s\S]*?border: 1px solid var\(--inline-code-border\);[\s\S]*?color: var\(--inline-code-text\);/
   )
   assert.match(styleSource, /:not\(pre\) > code::selection/)
-  assert.match(styleSource, /\.code-frame \{[\s\S]*?border-radius: 0\.78rem;/)
+  assert.match(styleSource, /\.code-frame \{[\s\S]*?border-radius: var\(--radius-md\);/)
   assert.match(styleSource, /\.code-block \{[\s\S]*?scrollbar-color: var\(--code-border\)/)
   assert.match(
     styleSource,
@@ -1303,13 +1312,21 @@ test('SITE-T-CODE-SURFACES gives inline and block code a consistent themed hiera
 })
 
 test('SITE-T-GUIDE-API-NAV renders symbols as plain navigation text', () => {
+  /** The unified left rail replaced the guide API menu; a guide page exercises it. */
+  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/lifecycle')), 'utf8')
+  const rail = html.match(/<aside class="left-rail-content"[\s\S]*?<\/aside>/)?.[0]
+  assert.ok(rail, 'missing left rail')
+  /** Symbol links carry their declaration kind; their label must be bare text, not a code chip. */
+  const symbolLinks = [...rail.matchAll(/<a[^>]*data-kind="[a-z]+"[^>]*>([\s\S]*?)<\/a>/g)]
+  assert.ok(symbolLinks.length > 0, 'missing symbol links')
+  for (const [, label] of symbolLinks) assert.doesNotMatch(label!, /<code/)
   assert.match(
     styleSource,
-    /\.guide-api-menu \.guide-api-group code \{[\s\S]*?background: transparent;[\s\S]*?border: 0;[\s\S]*?box-shadow: none;[\s\S]*?padding: 0;/
+    /\.left-rail-content a\[data-kind\] \{[\s\S]*?font-family: var\(--font-mono\);/
   )
   assert.match(
     styleSource,
-    /\.guide-api-menu \.guide-api-group nav a:hover > code,[\s\S]*?color: var\(--accent-default\);/
+    /\.left-rail-content a\[data-kind\]::before \{[\s\S]*?background: var\(--marker-color/
   )
 })
 
@@ -1320,7 +1337,7 @@ test('SITE-T-CONTENT-LISTS renders API and re-export entries as responsive cards
   )
   assert.match(
     styleSource,
-    /\.api-reference-list li,[\s\S]*?\.reexport-list li \{[\s\S]*?border-radius: 0\.72rem;[\s\S]*?transition:/
+    /\.api-reference-list li,[\s\S]*?\.reexport-list li \{[\s\S]*?border-radius: var\(--radius-md\);[\s\S]*?transition:/
   )
   assert.match(styleSource, /\.reexport-list li:hover \{[\s\S]*?transform: translateY\(-1px\);/)
 })
@@ -1329,11 +1346,11 @@ test('SITE-T-DOMAIN-INDEX-SPACING keeps catalogue introductions compact', () => 
   assert.match(docsSource, /className="page-shell content-page domain-index-page"/)
   assert.match(
     styleSource,
-    /\.domain-index-page \{[\s\S]*?padding-block: clamp\(2rem, 4vw, 4rem\);/
+    /\.domain-index-page \{[\s\S]*?padding-block: var\(--space-6\) var\(--space-16\);/
   )
   assert.match(
     styleSource,
-    /\.domain-index-page > \.section-block \{[\s\S]*?margin-top: clamp\(2\.75rem, 4vw, 3\.5rem\);/
+    /\.domain-index-page > \.section-block \{[\s\S]*?margin-top: var\(--space-12\);/
   )
 })
 
