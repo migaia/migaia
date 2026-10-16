@@ -15,7 +15,7 @@ import {
 import '@fontsource-variable/inter/wght.css'
 import '@fontsource-variable/jetbrains-mono/wght.css'
 import './app.css'
-import { DOMAINS, LOCALES, type ILocale } from './route-contract.js'
+import { LOCALES, type ILocale } from './route-contract.js'
 import { copyFor, interfaceCopyFor } from './copy.js'
 import { revealRouteContent } from './motion.js'
 import { OPEN_SEARCH_EVENT } from './search.js'
@@ -267,15 +267,6 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
             <span>migaia</span>
           </Link>
           <nav className="global-nav" aria-label={copy.primaryNavigation}>
-            {DOMAINS.map((domain) => (
-              <Link
-                aria-current={canonicalPathname === `/${locale}/${domain}` ? 'page' : undefined}
-                key={domain}
-                to={`/${locale}/${domain}`}
-              >
-                {copy.docs}
-              </Link>
-            ))}
             {currentLibrary ? (
               <>
                 <span aria-hidden="true" className="global-nav-separator">
@@ -355,17 +346,6 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
               {copy.close}
             </Button>
           </div>
-          <nav aria-label={copy.mobileNavigation}>
-            {DOMAINS.map((domain) => (
-              <Link
-                key={domain}
-                onClick={() => setMobileNavOpen(false)}
-                to={`/${locale}/${domain}`}
-              >
-                {copy.docs}
-              </Link>
-            ))}
-          </nav>
           {pageNavigation ? (
             <div className="mobile-page-navigation left-rail-content">{pageNavigation}</div>
           ) : null}
