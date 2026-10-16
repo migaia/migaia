@@ -7,15 +7,13 @@ import { prefersReducedMotion } from '../motion.js'
  * indigo/teal pair) sits under a sparse field of drifting particles. Motion comes from accumulated
  * offsets (`flow` for the aurora, `drift` for the particles) that the host advances faster while a
  * route transition runs, so speed changes never make the field jump. `level` (0..1) is the eased
- * transition strength: particles stretch along the travel direction and lose some contrast. Off the
- * docs home, `contours` (0..1) adds the home hero's topographic contour lines across the whole
- * viewport at a much lower strength, so they stay texture behind the text. Output is premultiplied
- * alpha so the page `--canvas` color shows through.
+ * transition strength: particles stretch along the travel direction and lose some contrast. Faint
+ * topographic contour lines cover the whole viewport as texture behind the text. Output is
+ * premultiplied alpha so the page `--canvas` color shows through.
  */
 const AMBIENT_SHADER = /* wgsl */ `
 struct Uniforms {
-  res: vec2f, time: f32, dark: f32, level: f32, flow: f32, drift: vec2f,
-  contours: f32, pad0: f32, pad1: vec2f
+  res: vec2f, time: f32, dark: f32, level: f32, flow: f32, drift: vec2f
 };
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
@@ -65,20 +63,16 @@ fn fbm(p0: vec2f) -> f32 {
   let particles = dotMask * mix(0.14, 0.2, u.dark) * twinkle * (1.0 - u.level * 0.35);
   let particleColor = mix(indigo, teal, h);
 
-  // Full-viewport contours: the home hero's warped topographic lines, kept faint behind the text.
-  var contour = 0.0;
-  var contourColor = indigo;
-  if (u.contours > 0.001) {
-    let c = (pos.xy - 0.5 * u.res) / u.res.y;
-    let ct = u.flow * 1.9;
-    let w = vec2f(fbm(c * 1.5 + ct), fbm(c * 1.5 - ct + 3.1));
-    let f = fbm(c * 1.3 + w * 1.7 + vec2f(ct * 0.6, -ct * 0.4));
-    let band = abs(fract(f * 9.0) - 0.5);
-    let line = smoothstep(0.035, 0.0, band) * (0.55 + 0.45 * smoothstep(0.3, 0.8, f));
-    let glow = smoothstep(0.25, 0.95, f);
-    contour = (glow * 0.008 + line * mix(0.065, 0.05, u.dark)) * u.contours * (1.0 - 0.3 * uv.y);
-    contourColor = mix(indigo, teal, smoothstep(0.35, 0.75, w.x));
-  }
+  // Full-viewport contours: warped topographic lines, kept faint behind the text.
+  let c = (pos.xy - 0.5 * u.res) / u.res.y;
+  let ct = u.flow * 1.9;
+  let w = vec2f(fbm(c * 1.5 + ct), fbm(c * 1.5 - ct + 3.1));
+  let f = fbm(c * 1.3 + w * 1.7 + vec2f(ct * 0.6, -ct * 0.4));
+  let band = abs(fract(f * 9.0) - 0.5);
+  let line = smoothstep(0.035, 0.0, band) * (0.55 + 0.45 * smoothstep(0.3, 0.8, f));
+  let glow = smoothstep(0.25, 0.95, f);
+  let contour = (glow * 0.008 + line * mix(0.065, 0.05, u.dark)) * (1.0 - 0.3 * uv.y);
+  let contourColor = mix(indigo, teal, smoothstep(0.35, 0.75, w.x));
 
   let a = clamp(aurora + particles + contour, 0.0, 1.0);
   let color =
@@ -126,17 +120,8 @@ const BUFFER_SCALE = 0.75
 /** `GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST`; the DOM lib in use lacks the namespace. */
 const UNIFORM_COPY_DST_USAGE = 0x40 | 0x08
 
-/** Uniform block size in bytes: res, time, dark, level, flow, drift, contours, pad (12 × f32). */
-const UNIFORM_BYTES = 48
-
-/** Time constant (seconds) for fading the contours in or out when entering or leaving home. */
-const CONTOURS_EASE_SECONDS = 0.5
-
-/**
- * Docs home routes (`/`, `/en`, `/zh`). The home hero already draws these contours with its own
- * shader, so the ambient field leaves them out there.
- */
-const HOME_PATH = /^\/(?:(?:en|zh)\/?)?$/
+/** Uniform block size in bytes: res, time, dark, level, flow, drift (8 × f32). */
+const UNIFORM_BYTES = 32
 
 /**
  * Reads React Router's history index for the current entry; Back lowers it, Forward raises it.
@@ -167,8 +152,6 @@ export default function AmbientField() {
   const { pathname } = useLocation()
   const navigationType = useNavigationType()
   const navigation = useNavigation()
-  /** Whether the contours should show on the current route (everywhere except docs home). */
-  const contoursRef = useRef(!HOME_PATH.test(pathname))
   /** Previous pathname and history index, used to skip the first render and infer direction. */
   const previousRef = useRef<{ pathname: string; idx: number | null } | null>(null)
 
@@ -178,11 +161,6 @@ export default function AmbientField() {
     transitionRef.current.loading = loading
     if (loading && !prefersReducedMotion()) wakeRef.current()
   }, [navigation.state, navigation.location?.pathname, pathname])
-
-  useEffect(() => {
-    contoursRef.current = !HOME_PATH.test(pathname)
-    wakeRef.current()
-  }, [pathname])
 
   useEffect(() => {
     const idx = historyIndex()
@@ -256,8 +234,6 @@ export default function AmbientField() {
       let driftX = 0
       /** Accumulated upward particle drift. */
       let driftY = 0
-      /** Eased contour strength; starts at its target so the first frame does not fade. */
-      let contours = contoursRef.current ? 1 : 0
 
       /** Matches the drawing buffer to the viewport at the reduced buffer scale. */
       const resize = () => {
@@ -285,14 +261,11 @@ export default function AmbientField() {
         flow += dt * (IDLE_SPEED.flow + level * TRANSITION_SPEED.flow)
         driftX += dt * (IDLE_SPEED.driftX + level * TRANSITION_SPEED.driftX * transition.dir)
         driftY += dt * (IDLE_SPEED.driftY + level * TRANSITION_SPEED.driftY)
-        const contoursTarget = contoursRef.current ? 1 : 0
-        contours += (contoursTarget - contours) * (1 - Math.exp(-dt / CONTOURS_EASE_SECONDS))
-        if (Math.abs(contoursTarget - contours) < TRANSITION_EPSILON) contours = contoursTarget
         canvas.style.filter =
           level > 0
             ? `blur(${(level * TRANSITION_BLUR_PX).toFixed(2)}px) opacity(${(1 - level * (1 - TRANSITION_OPACITY)).toFixed(3)})`
             : ''
-        return target === 1 || level > 0 || contours !== contoursTarget
+        return target === 1 || level > 0
       }
       /** Draws one frame at the current motion state. */
       const draw = (now: number) => {
@@ -305,7 +278,6 @@ export default function AmbientField() {
         uniforms[5] = flow
         uniforms[6] = driftX
         uniforms[7] = driftY
-        uniforms[8] = contours
         gpuDevice.queue.writeBuffer(uniformBuffer, 0, uniforms)
         const encoder = gpuDevice.createCommandEncoder()
         const pass = encoder.beginRenderPass({
@@ -342,8 +314,6 @@ export default function AmbientField() {
       const resume = () => {
         if (disposed) return
         if (still) {
-          // No easing under reduced motion: route changes swap the contours immediately.
-          contours = contoursRef.current ? 1 : 0
           draw(performance.now())
           return
         }

@@ -42,6 +42,22 @@ function artifactPath(path: string): string {
   return path === '/' ? 'index.html' : `${path.slice(1)}/index.html`
 }
 
+/**
+ * Retired docs-index URLs and their targets. The docs index merged into the language home on
+ * 2026-10-16; these paths stay prerendered only as redirects so old links keep working.
+ */
+const LEGACY_DOCS_INDEX_REDIRECTS = new Map([
+  ['/en/docs', '/en'],
+  ['/zh/docs', '/zh']
+])
+
+/** True when an emitted HTML file is one of the legacy docs-index redirect pages. */
+function isLegacyRedirectArtifact(file: string): boolean {
+  return [...LEGACY_DOCS_INDEX_REDIRECTS.keys()].some((path) =>
+    file.endsWith(`/${artifactPath(path)}`)
+  )
+}
+
 /** Builds the public module URL while hiding the repository root export name. */
 function publicModulePath(locale: string, library: string, moduleName: string): string {
   return `/${locale}/docs/${library}/api${moduleName === 'index' ? '' : `/${moduleName}`}`
@@ -130,71 +146,37 @@ test('SITE-T-HOME uses the header language control and explains the documentatio
   )
 })
 
-test('SITE-T-LANGUAGE-HOME renders task scenarios and concrete production library combinations', () => {
-  assert.doesNotMatch(languageSource, /copy\.chooseGoal|copy\.architecturePreview/)
-  for (const field of [
-    'homeEyebrow',
-    'homeTitle',
-    'homeDescription',
-    'scenarios',
-    'scenarioTitle',
-    'homeScenarios'
-  ])
-    assert.ok(languageSource.includes(`copy.${field}`), `home does not read ${field}`)
-  assert.match(languageSource, /copy\.reactiveResource/)
-  assert.match(languageSource, /copy\.capabilityPluginHost/)
-  assert.match(languageSource, /copy\.rpcPeerSerialize/)
-  assert.match(languageSource, /copy\.traySupervision/)
-  assert.doesNotMatch(
-    languageSource,
-    /copy\.(?:capabilityMap|shortestPath|foundation\w*|runtime\w*|stateStorage\w*|integration\w*|webRpcSerialize)/
-  )
+// SITE-T-LANGUAGE-HOME retired 2026-10-16: the scenario and combination landing page merged into
+// the docs home. SITE-T-DOCS-HOME-MERGED replaces it; the old ID is not reused.
+test('SITE-T-DOCS-HOME-MERGED serves the docs home at the language root and redirects the old index', () => {
+  assert.match(languageSource, /function DocsIndex\(/)
+  assert.doesNotMatch(languageSource, /HeroShader|homeScenarios/)
   assert.doesNotMatch(
     copySource,
-    /^\s+(?:capabilityMap|shortestPath|foundation\w*|runtime\w*|stateStorage\w*|integration\w*|webRpcSerialize\w*):/m,
-    'reviewed home copy retains a retired field'
+    /^\s+(?:homeEyebrow|homeTitle|homeScenarios|readQuickstart|traySupervision):/m,
+    'retired landing-page copy remains'
   )
-  assert.match(copySource, /跟踪变化的输入，取消过期请求/)
-  assert.match(copySource, /按策略启用可选能力/)
-  assert.match(copySource, /定义类型安全的远程调用/)
   for (const locale of ['en', 'zh'] as const) {
-    /** The built home must consume the reviewed localized data, including each task's library links. */
-    const copy = copyFor(locale)
-    /** Reader-visible text avoids coupling the oracle to syntax or inline markup. */
+    /** The language root is now the single docs home. */
     const html = readFileSync(join(buildRoot, artifactPath(`/${locale}`)), 'utf8')
-    /** One localized landing page owns its hero, task scenarios, and common combinations. */
-    const text = renderedText(html)
-    for (const value of [
-      copy.homeEyebrow,
-      copy.homeTitle,
-      copy.homeDescription,
-      copy.scenarios,
-      copy.scenarioTitle
-    ])
-      assert.ok(text.includes(value), `/${locale} misses reviewed home text: ${value}`)
-    for (const scenario of copy.homeScenarios) {
-      assert.ok(text.includes(scenario.title), `/${locale} misses scenario: ${scenario.title}`)
-      assert.ok(
-        text.includes(scenario.body),
-        `/${locale} misses scenario explanation: ${scenario.title}`
-      )
-      for (const library of scenario.libraries)
-        assert.ok(
-          html.includes(`href="/${locale}/docs/${library}"`),
-          `/${locale} misses ${library} scenario link`
-        )
-    }
-    for (const combination of [
-      copy.reactiveResource,
-      copy.capabilityPluginHost,
-      copy.rpcPeerSerialize,
-      copy.traySupervision
-    ])
-      assert.ok(text.includes(combination), `/${locale} misses combination: ${combination}`)
     assert.ok(
-      html.includes(`href="/${locale}/docs/tray"`),
-      `/${locale} misses Tray combination link`
+      renderedText(html).includes(copyFor(locale).domainTitle.docs),
+      `/${locale} misses the docs home title`
     )
+    assert.match(html, /class="docs-hero-search"/)
+    assert.match(html, /class="journey-grid"/)
+    assert.match(html, /class="architecture-stack"/)
+    for (const library of ['utils', 'lifecycle', 'rpc-core', 'tray'])
+      assert.ok(
+        html.includes(`href="/${locale}/docs/${library}"`),
+        `/${locale} misses ${library} link`
+      )
+    /** The header no longer carries a separate docs link; this is a docs site. */
+    assert.doesNotMatch(html, new RegExp(`href="/${locale}/docs"[^>]*>(?:Docs|文档)</a>`))
+    /** The retired index URL is a static redirect back to the language root. */
+    const redirect = readFileSync(join(buildRoot, artifactPath(`/${locale}/docs`)), 'utf8')
+    assert.match(redirect, new RegExp(`http-equiv="refresh" content="\\d+;url=/${locale}"`))
+    assert.match(redirect, /name="robots" content="noindex"/)
   }
 })
 
@@ -475,14 +457,12 @@ test('SITE-T-LEFT-RAIL-INVARIANT keeps every module tree stable across all API r
 
 test('SITE-T-LOCALE keeps Chinese navigation and introductions localized', () => {
   const chineseHome = readFileSync(join(buildRoot, 'zh/index.html'), 'utf8')
-  const chineseDocs = readFileSync(join(buildRoot, 'zh/docs/index.html'), 'utf8')
 
   assert.match(chineseHome, /<html[^>]+lang="zh"/)
-  assert.match(chineseHome, /管理应用状态、后台任务与插件进程。/)
-  assert.match(chineseHome, /你的应用现在需要做什么？/)
-  assert.match(chineseHome, /开始查文档/)
-  assert.match(chineseHome, /href="\/zh\/docs"/)
-  assert.match(chineseHome, /href="\/zh\/docs"[^>]*>文档<\/a>/)
+  assert.match(chineseHome, /找到你需要的 API。/)
+  assert.match(chineseHome, /你现在想完成什么？/)
+  assert.match(chineseHome, /类库索引/)
+  assert.doesNotMatch(chineseHome, /href="\/zh\/docs"[^>]*>文档<\/a>/)
   assert.doesNotMatch(chineseHome, /href="\/zh\/(?:guides|architecture)/)
   assert.match(chineseHome, /aria-label="配色: (浅色|深色|跟随系统)"/)
   assert.doesNotMatch(chineseHome, /跟随时间/)
@@ -490,9 +470,7 @@ test('SITE-T-LOCALE keeps Chinese navigation and introductions localized', () =>
     chineseHome,
     /Choose the shortest useful path|Make one small result|开始查 Docs|浏览 Guides|用清晰、可组合的 library|沿着真实的 library、module/
   )
-  assert.match(chineseDocs, /找到你需要的 API。/)
-  assert.match(chineseDocs, /类库索引/)
-  assert.doesNotMatch(chineseDocs, /Find the API you need|Library index/)
+  assert.doesNotMatch(chineseHome, /Find the API you need|Library index/)
 })
 
 test('SITE-T-BRAND uses the canonical Migaia name on every rendered page', () => {
@@ -1090,6 +1068,11 @@ test('SITE-T-A05/A10 closes every generated route and API body artifact', () => 
     seen.add(entry.path)
     const output = join(buildRoot, artifactPath(entry.path))
     assert.ok(existsSync(output), `missing static artifact: ${entry.path}`)
+    /** Retired docs-index URLs are redirect pages, not content pages. */
+    if (LEGACY_DOCS_INDEX_REDIRECTS.has(entry.path)) {
+      assert.match(readFileSync(output, 'utf8'), /http-equiv="refresh"/)
+      continue
+    }
     assert.match(readFileSync(output, 'utf8'), /<main(?:\s|>)/)
   }
   for (const api of apiManifest.apis) {
@@ -1203,6 +1186,7 @@ test('SITE-T-PERF keeps route code separate from generated library data', () => 
 
 test('SITE-T-A34/A35 closes API ordering and exposes a meaningful next action for every page', () => {
   for (const entry of routeManifest.entries) {
+    if (LEGACY_DOCS_INDEX_REDIRECTS.has(entry.path)) continue
     const html = readFileSync(join(buildRoot, artifactPath(entry.path)), 'utf8')
     assert.match(html, /class="next-actions"|class="actions"|class="architecture-stack"/)
   }
@@ -1212,20 +1196,20 @@ test('SITE-T-A34/A35 closes API ordering and exposes a meaningful next action fo
 })
 
 test('SITE-T-ARCHITECTURE-INDEX groups every library by family on the docs home', () => {
-  const html = readFileSync(join(buildRoot, artifactPath('/zh/docs')), 'utf8')
+  const html = readFileSync(join(buildRoot, artifactPath('/zh')), 'utf8')
 
   assert.match(html, /class="architecture-stack"/)
   assert.doesNotMatch(html, /阅读架构时先回答三个问题/)
 })
 
 test('SITE-T-LIBRARY-DESCRIPTIONS uses concrete responsibilities instead of slogans', () => {
-  const docsIndex = readFileSync(join(buildRoot, artifactPath('/zh/docs')), 'utf8')
+  const docsIndex = readFileSync(join(buildRoot, artifactPath('/zh')), 'utf8')
   const utilsArchitecture = readFileSync(
     join(buildRoot, artifactPath('/zh/docs/utils/readme')),
     'utf8'
   )
   /** English library descriptions appear on the docs home library index. */
-  const loggerEnglish = readFileSync(join(buildRoot, artifactPath('/en/docs')), 'utf8')
+  const loggerEnglish = readFileSync(join(buildRoot, artifactPath('/en')), 'utf8')
 
   assert.match(renderedText(docsIndex), /utils.*添加超时、取消与错误追踪.*数据转换和对象更新/s)
   assert.match(utilsArchitecture, /多个包共同需要、且不应绑定 Store、DOM 或具体运行时/)
@@ -1343,7 +1327,7 @@ test('SITE-T-CONTENT-LISTS renders API and re-export entries as responsive cards
 })
 
 test('SITE-T-DOMAIN-INDEX-SPACING keeps catalogue introductions compact', () => {
-  assert.match(docsSource, /className="page-shell content-page domain-index-page"/)
+  assert.match(languageSource, /className="page-shell content-page domain-index-page"/)
   assert.match(
     styleSource,
     /\.domain-index-page \{[\s\S]*?padding-block: var\(--space-6\) var\(--space-16\);/
@@ -1409,6 +1393,7 @@ test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler and repeated pros
   assert.ok(htmlFiles.length > 0, 'expected prerendered pages')
 
   for (const path of htmlFiles) {
+    if (isLegacyRedirectArtifact(path)) continue
     /** Prerendered document is the evidence for reader-facing output. */
     const html = readFileSync(path, 'utf8')
     /** Decode syntax spans so prose and authored comments remain searchable. */
@@ -1443,6 +1428,7 @@ test('SITE-T-CODE-EXPLANATION-QUALITY rejects generated filler and repeated pros
 
 test('SITE-T-PAGE-META gives every rendered page a nonempty title and purpose description', () => {
   for (const path of emittedFiles(buildRoot).filter((entry) => entry.endsWith('.html'))) {
+    if (isLegacyRedirectArtifact(path)) continue
     /** Metadata must exist in static HTML before the client starts. */
     const html = readFileSync(path, 'utf8')
     /** Title names the current page rather than relying on browser navigation state. */
