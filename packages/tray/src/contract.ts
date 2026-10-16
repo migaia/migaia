@@ -3,10 +3,10 @@ import type {
   IGraphNodeState,
   IGraphReleaseContext,
   IGraphReadinessSnapshot,
-  IAbortSignal,
   IReleaseDescriptor
 } from './types.js'
 import type { ICapabilityGraphState } from '@migaia/capability/graph'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 
 export type ITrayKey = string & { readonly __trayKey: unique symbol }
 export type ITrayEntryKind = TrayEntryKind
@@ -15,7 +15,7 @@ export type ITrayEntryInstance<T> = {
   readonly release: (context: IGraphReleaseContext) => void | PromiseLike<void>
 }
 export type ITrayEntryContext = {
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   get<T>(key: ITrayKey): T
   own<T>(resource: T, descriptor: IReleaseDescriptor): T
 }

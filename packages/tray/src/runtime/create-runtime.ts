@@ -5,8 +5,12 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { TrayErrorCode } from '../error-code.js'
 import { attachTrayError, createTrayError } from '../errors.js'
 import { readRuntimeBridge } from '../host/internal-capability.js'
-import type { ITrayHost, ITrayPluginConstraint } from '../host/typing.js'
-import type { PluginHost } from '@migaia/plugin-host'
+import type {
+  ITrayHost,
+  ITrayHostTypeInfo,
+  ITrayHostReadyPlugins,
+  ITrayHostSourceOf
+} from '../host/typing.js'
 import type {
   IRuntime,
   IRuntimeDisposalResult,
@@ -90,16 +94,14 @@ function createSelfMutationCapability(
 
 /** Creates an exact-generation Runtime that never owns or disposes the managed Host. */
 export function createRuntime<
-  THost extends PluginHost<any, any, any>,
-  TDefinitions extends readonly ITrayPluginConstraint<THost>[],
-  TReady extends readonly ITrayPluginConstraint<THost>[]
+  THost extends ITrayHostTypeInfo & Pick<ITrayHost<any, any, any>, 'on'>
 >(
-  host: ITrayHost<THost, TDefinitions, TReady>,
+  host: THost,
   options: Readonly<{
     readonly shutdown?: IRuntimeShutdownOptions
     readonly report?: (error: unknown) => void
   }> = {}
-): IRuntime<TReady> {
+): IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>> {
   if (!host || typeof host !== 'object') throw createTrayError(TrayErrorCode.runtimeContractInvalid)
   const bridge = readRuntimeBridge(host as object)
   if (!bridge) throw createTrayError(TrayErrorCode.runtimeContractInvalid)
@@ -261,5 +263,5 @@ export function createRuntime<
       return runtime.dispose().then(() => undefined)
     }
   }
-  return runtime as unknown as IRuntime<TReady>
+  return runtime as unknown as IRuntime<ITrayHostReadyPlugins<THost>, ITrayHostSourceOf<THost>>
 }

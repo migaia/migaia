@@ -5,15 +5,37 @@ import { attachTrayError, createTrayError } from '../errors.js'
 import { registerArtifactCustody } from '../host/internal-capability.js'
 import { defineAdapter } from '../adapter/define-adapter.js'
 import { defineLoader } from './define-loader.js'
-import type { ILoadIntoHostOptions, ILoadedArtifact, ILoaderContext } from './typing.js'
+import type {
+  ILoadIntoHostOptions,
+  ILoadIntoHostResult,
+  ILoadedArtifact,
+  ILoaderContext
+} from './typing.js'
+import type {
+  ITrayHostTypeInfo,
+  ITrayHostSourceOf,
+  ITrayHostReadyPlugins,
+  ITrayPluginAdmission,
+  ITrayPluginConstraint
+} from '../host/typing.js'
 
 /** Executes one atomic load/adapt/managed-mutation transaction with exact artifact custody. */
 export async function loadIntoHost<
   TSource,
   TArtifact,
-  THost extends import('@migaia/plugin-host').PluginHost<any, any, any>,
-  TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>
->(options: ILoadIntoHostOptions<TSource, TArtifact, THost, TPlugin>): Promise<unknown> {
+  THost extends ITrayHostTypeInfo,
+  const TPlugin extends ITrayPluginConstraint<ITrayHostSourceOf<THost>>,
+  TMutation extends 'use' | 'replace'
+>(
+  options: ILoadIntoHostOptions<
+    TSource,
+    TArtifact,
+    ITrayHostSourceOf<THost>,
+    TPlugin,
+    THost,
+    TMutation
+  >
+): Promise<ILoadIntoHostResult<THost, TPlugin, TMutation>> {
   if (!options || typeof options !== 'object')
     throw createTrayError(TrayErrorCode.loaderContractInvalid)
   const timeoutMs = options.timeoutMs
@@ -57,13 +79,19 @@ export async function loadIntoHost<
     artifact = Object.freeze({ value, release })
     scope.own(artifact.value, artifact.release)
     phase = 'adapter'
-    const plugin = await defineAdapter<TArtifact, THost, TPlugin>(options.adapter).adapt(
-      artifact.value,
-      {
-        signal: controller.signal,
-        deadlineAt
-      }
-    )
+    const plugin = await defineAdapter<
+      TArtifact,
+      ITrayHostSourceOf<THost>,
+      TPlugin &
+        ITrayPluginAdmission<
+          ITrayHostSourceOf<THost>,
+          readonly [TPlugin],
+          ITrayHostReadyPlugins<THost>
+        >[0]
+    >(options.adapter).adapt(artifact.value, {
+      signal: controller.signal,
+      deadlineAt
+    })
     if (!plugin || typeof plugin !== 'object')
       throw createTrayError(TrayErrorCode.adapterContractInvalid)
     registerArtifactCustody(plugin as object, {
@@ -73,14 +101,14 @@ export async function loadIntoHost<
     phase = 'mutation'
     const result =
       options.mutation === 'replace'
-        ? await options.host.replace(plugin)
-        : await options.host.use(plugin)
+        ? await options.host.replace<TPlugin>(plugin)
+        : await options.host.use<TPlugin>(plugin)
     if (!(result && typeof result === 'object' && 'committed' in result)) {
       await scope.rollback()
       throw createTrayError(TrayErrorCode.loaderContractInvalid)
     }
     if (!(result as { readonly committed: boolean }).committed) await scope.rollback()
-    return result
+    return result as ILoadIntoHostResult<THost, TPlugin, TMutation>
   } catch (error) {
     timeoutTask?.cancel()
     try {

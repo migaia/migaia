@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { asyncDisposeKey } from './symbols.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { ICleanupResult } from '@migaia/lifecycle'
@@ -44,6 +44,19 @@ export type IPluginInstallFailureDetail = {
 
 export type IPluginConfig = Record<string, unknown>
 
+/** Compile-time Host core identity; no property or capability is installed at runtime. */
+export declare const pluginHostCoreTypes: unique symbol
+
+/** Keeps the domain and pipeline axes explicit for both class and functional Host entries. */
+export type IPluginHostCoreTypeInfo<TCore extends object, TValue> = Readonly<{
+  readonly [pluginHostCoreTypes]: Readonly<{ readonly core: TCore; readonly value: TValue }>
+}>
+
+/** Canonical plugin-facing capability contract supplied by one concrete Host. */
+export type IPluginHostCoreFor<THost extends IPluginHostCoreTypeInfo<any, any>> =
+  THost[typeof pluginHostCoreTypes]['core'] &
+    IPluginHostCore<THost[typeof pluginHostCoreTypes]['value']>
+
 /** Functional installer signature carrying the Host pipeline payload axis. */
 export type IPluginInstaller<
   TCore extends object,
@@ -67,18 +80,18 @@ export type IPluginLifecycleConfig<TConfig extends IPluginConfig = IPluginConfig
 
 /** Operation-scoped cancellation and deadline exposed to one plugin hook invocation. */
 export type IPluginOperationContext = {
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   readonly deadlineAt: number | undefined
 }
 
 /** Registration-scoped lifetime signal that remains valid until logical revocation. */
 export type IPluginRegistrationContext = {
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
 }
 
 /** Disposal context passed to a V2 plugin dispose hook. */
 export type IPluginDisposalContext = Readonly<{
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   readonly deadlineAt: number | undefined
 }>
 
@@ -98,7 +111,7 @@ export type IPluginLifecycleCore<TConfig extends IPluginConfig = IPluginConfig> 
 
 /** Attempt-scoped cancellation and deadline for setup, independent of later Host mutations. */
 export type IPluginSetupOperation = Readonly<{
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   /** Absolute deadline in the Host scheduler clock, or undefined without a mutation timeout. */
   readonly deadlineAt: number | undefined
   /** Reads the Host scheduler clock used for the deadline. */

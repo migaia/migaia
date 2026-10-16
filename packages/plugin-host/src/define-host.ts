@@ -14,6 +14,7 @@ import type {
   IPluginConstraint,
   IPluginConstraintTuple,
   IPluginHostCore,
+  IPluginHostCoreTypeInfo,
   IPluginHandle,
   IPluginHandleTuple,
   IPluginRemoval,
@@ -125,7 +126,8 @@ export type IHostHandle<
   runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>
   dispose(): Promise<IPluginHostDisposalResult>
 }> &
-  IPluginHostRuntimeExtensions<TInstalled>
+  IPluginHostRuntimeExtensions<TInstalled> &
+  IPluginHostCoreTypeInfo<TDomainCore, TValue>
 
 /**
  * A host as a value instead of a base class.

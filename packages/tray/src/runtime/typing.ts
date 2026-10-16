@@ -1,6 +1,11 @@
 import type { TrayShutdownMode } from '../state-constants.js'
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IExtractPluginExt, IPluginConstraint } from '@migaia/plugin-host'
+import type {
+  ITrayHostSource,
+  ITrayPluginAdmission,
+  ITrayPluginConstraint
+} from '../host/typing.js'
 
 /** Resolves exact extension types for literal ready plugin names and stays unknown when widened. */
 export type IRuntimeExtensionsFor<
@@ -13,13 +18,17 @@ export type IRuntimeExtensionsFor<
     : IExtractPluginExt<Extract<TReady[number], { readonly name: TName }>>
 
 /** Context exposed to one callback with an exact plugin-generation extension snapshot. */
-export type IRuntimeRunContext<TExtensions = Readonly<Record<PropertyKey, unknown>>> = Readonly<{
+export type IRuntimeRunContext<
+  TExtensions = Readonly<Record<PropertyKey, unknown>>,
+  THost extends ITrayHostSource = ITrayHostSource,
+  TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]
+> = Readonly<{
   readonly runId: number
   readonly plugin: string
   readonly extensions: TExtensions
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   readonly deadlineAt: number | undefined
-  readonly self: IRuntimeSelfMutation
+  readonly self: IRuntimeSelfMutation<THost, TReady>
 }>
 
 /** Deferred exact-generation mutation result exposed by a Runtime callback. */
@@ -29,11 +38,16 @@ export type IRuntimeSelfMutationTicket<TResult = unknown> = Readonly<{
 }>
 
 /** Runtime-neutral self-mutation capability bound to the current callback generation. */
-export type IRuntimeSelfMutation = Readonly<{
+export type IRuntimeSelfMutation<
+  THost extends ITrayHostSource = ITrayHostSource,
+  TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]
+> = Readonly<{
   /** Schedules removal of the callback's exact plugin generation after settlement. */
   readonly unUse: () => IRuntimeSelfMutationTicket
   /** Schedules replacement of the callback's exact plugin generation after settlement. */
-  readonly replace: (plugin: IPluginConstraint<any>) => IRuntimeSelfMutationTicket
+  replace<const TPlugin extends ITrayPluginConstraint<THost>>(
+    plugin: TPlugin & ITrayPluginAdmission<THost, readonly [TPlugin], TReady>[0]
+  ): IRuntimeSelfMutationTicket
 }>
 
 /** Caller cancellation and callback admission deadline. */
@@ -56,7 +70,8 @@ export type IRuntimeDisposalResult = Readonly<{
 
 /** Public Runtime lifecycle and exact-generation execution surface. */
 export type IRuntime<
-  TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[]
+  TReady extends readonly IPluginConstraint<any>[] = readonly IPluginConstraint<any>[],
+  THost extends ITrayHostSource = ITrayHostSource
 > = Readonly<{
   readonly state: 'active' | 'closing' | 'terminal'
   readonly activeRuns: number
@@ -64,7 +79,7 @@ export type IRuntime<
     name: TName,
     options: IRuntimeRunOptions,
     execute: (
-      context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>>
+      context: IRuntimeRunContext<IRuntimeExtensionsFor<TReady, TName>, THost, TReady>
     ) => TResult | PromiseLike<TResult>
   ): Promise<TResult>
   dispose(): Promise<IRuntimeDisposalResult>
