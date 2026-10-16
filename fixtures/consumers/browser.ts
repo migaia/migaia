@@ -7,6 +7,7 @@ import { indexedDbHost } from '@migaia/storage-web/indexed-db'
 import { StoreProvider } from '@migaia/store-react'
 import { number as wasmNumber } from '@migaia/store-wasm'
 import { createEventChannel } from '@migaia/event-subscriber'
+import { subscribeUntil } from '@migaia/event-subscriber/subscriber'
 
 const runtime = createRuntime()
 const state = createStore({ count: 0 }, { runtime })
@@ -23,6 +24,6 @@ void wasmNumber
 
 const eventChannel = createEventChannel<number>()
 const browserSignal: IAbortSignal = new AbortController().signal
-eventChannel.subscribeUntil(browserSignal, (event) => {
+subscribeUntil(eventChannel, browserSignal, (event) => {
   void event.value
 })

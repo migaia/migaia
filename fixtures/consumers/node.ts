@@ -18,6 +18,7 @@ import { createSSRRequestScope } from '@migaia/store-ssr'
 import { createMutationPolicy } from '@migaia/store-middleware'
 import { getDependencyTree } from '@migaia/store-devtools'
 import { createEventChannel } from '@migaia/event-subscriber'
+import { subscribeUntil } from '@migaia/event-subscriber/subscriber'
 import { createAbortController } from '@migaia/lifecycle'
 import type { IAbortSignal } from '@migaia/utils/promise'
 
@@ -39,7 +40,7 @@ void getDependencyTree
 const eventChannel = createEventChannel<number>()
 const lifecycleSignal: IAbortSignal = createAbortController().signal
 const eventSignal: IAbortSignal = lifecycleSignal
-eventChannel.subscribeUntil(eventSignal, (event) => {
+subscribeUntil(eventChannel, eventSignal, (event) => {
   void event.value
 })
 
