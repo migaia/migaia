@@ -33,6 +33,8 @@ export type ISyncLifecycleScope = {
   close(): void
   /** Always synchronous — this is the whole reason this type exists (D-6). */
   dispose(): readonly ICollectedError[]
+  /** Releases the scope synchronously for `using`, discarding the collected-error result. */
+  [Symbol.dispose](): void
 }
 
 /**
@@ -149,7 +151,7 @@ export function createSyncLifecycleScope(
     }
   }
 
-  const scope: ISyncLifecycleScope = {
+  const scope: Omit<ISyncLifecycleScope, typeof Symbol.dispose> = {
     get lifecycle() {
       return terminal.lifecycle
     },
@@ -168,5 +170,6 @@ export function createSyncLifecycleScope(
     })
   }
 
-  return scope
+  // The supported host's symbol hook is installed above without making it enumerable.
+  return scope as ISyncLifecycleScope
 }

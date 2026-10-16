@@ -66,6 +66,8 @@ export type ILifecycleScope = ILifecycleOwner & {
    * that callback from self-awaiting the Promise it is currently helping to settle.
    */
   dispose(): Promise<readonly ICollectedError[]>
+  /** Awaits scope release for `await using`, discarding the collected-error result. */
+  [Symbol.asyncDispose](): Promise<void>
 }
 
 /**
@@ -294,16 +296,17 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
     return disposePromise
   }
 
-  const scope: ILifecycleScope & { [ASYNC_OWNER_BRAND]?: true } = {
-    [ASYNC_OWNER_BRAND]: true,
-    get lifecycle() {
-      return terminal.lifecycle
-    },
-    own,
-    release,
-    close,
-    dispose
-  }
+  const scope: Omit<ILifecycleScope, typeof Symbol.asyncDispose> & { [ASYNC_OWNER_BRAND]?: true } =
+    {
+      [ASYNC_OWNER_BRAND]: true,
+      get lifecycle() {
+        return terminal.lifecycle
+      },
+      own,
+      release,
+      close,
+      dispose
+    }
 
   if (asyncDisposeKey) {
     Object.defineProperty(scope, asyncDisposeKey, {
@@ -314,5 +317,6 @@ export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILif
     })
   }
 
-  return scope
+  // The supported host's symbol hook is installed above without making it enumerable.
+  return scope as ILifecycleScope
 }
