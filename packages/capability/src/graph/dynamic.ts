@@ -436,15 +436,15 @@ export function createDynamicCapabilityGraph<TBinding = unknown>(
   /** Starts only blocked/registered/failed nodes in deterministic dependency order. */
   const start = async (entries: readonly IStoredNode<TBinding>[]): Promise<void> => {
     const startable: IStoredNode<TBinding>[] = []
-    const available = new Set(
-      [...definitions.values()]
-        .filter((entry) => entry.state === CapabilityGraphNodeState.ready)
-        .map((entry) => entry.definition.id)
-    )
+    /** Earlier frontier providers can satisfy later nodes before batch startup commits. */
+    const available = new Set<string>()
     for (const entry of entries) {
       if (entry.state === CapabilityGraphNodeState.ready) continue
       const unavailable = entry.definition.dependencies.find(
-        (edge) => edge.required && !available.has(edge.provider)
+        (edge) =>
+          edge.required &&
+          !available.has(edge.provider) &&
+          definitions.get(edge.provider)?.state !== CapabilityGraphNodeState.ready
       )
       if (unavailable) {
         entry.state = CapabilityGraphNodeState.blocked
