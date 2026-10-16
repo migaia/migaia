@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/turbo/schema.json",
+  "concurrency": "4",
+  "envMode": "loose",
+  "globalDependencies": ["tsconfig.base.json", "scripts/dist-stamp.mjs"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@migaia/wasm#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "src/wasm_provider*"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@migaia/wasm#typecheck": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "typecheck:test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "@migaia/rpc-core#typecheck:test": {
+      "dependsOn": ["build", "@migaia/rpc-process#build", "@migaia/rpc-threads#build"],
+      "outputs": []
+    },
+    "lint": {
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "@migaia/rpc-core#test": {
+      "dependsOn": ["build", "@migaia/rpc-process#build", "@migaia/rpc-threads#build"],
+      "cache": false
+    }
+  }
+}
