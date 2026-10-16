@@ -155,6 +155,12 @@ function BrandMark() {
   )
 }
 
+/**
+ * Site-wide WebGPU background chunk; requested after hydration so it never weighs on the first page
+ * payload, and rendered client-only so prerendered markup stays unchanged.
+ */
+const AmbientField = lazy(() => import('./components/ambient-field.js'))
+
 /** Command palette chunk; downloaded the first time the reader opens search. */
 const CommandPalette = lazy(() => import('./components/command-palette.js'))
 
@@ -380,8 +386,16 @@ function App() {
   const [pageNavigation, setPageNavigation] = useState<React.ReactNode>(null)
   /** A stable registration boundary keeps route updates from repeatedly installing the same menu. */
   const navigationContext = useMemo<IPageNavigationContext>(() => ({ setPageNavigation }), [])
+  /** Turns true after hydration; gates the client-only ambient background. */
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
   return (
     <>
+      {hydrated ? (
+        <Suspense fallback={null}>
+          <AmbientField />
+        </Suspense>
+      ) : null}
       <ShellHeader pageNavigation={pageNavigation} />
       <RouteProgress />
       <RouteScrollReset />
