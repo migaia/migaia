@@ -167,6 +167,49 @@ describe('conformance toolchain and platform evidence boundaries', () => {
       .trim()
       .split('\n')
       .filter((path) => /^packages\/[^/]+\/package\.json$/.test(path))
+    /** Exact workspace migrations since the frozen inventory; null removes an obsolete edge. */
+    const dependencyMigrations: Record<string, Record<string, Record<string, string | null>>> = {
+      'packages/logger/package.json': {
+        dependencies: { '@migaia/middleware-pipeline': 'workspace:^' }
+      },
+      'packages/rpc-process/package.json': {
+        dependencies: { '@migaia/lifecycle': null }
+      },
+      'packages/storage-contract/package.json': {
+        dependencies: { '@migaia/lifecycle': null }
+      },
+      'packages/storage-web/package.json': {
+        devDependencies: { '@migaia/rpc': null, '@migaia/rpc-contract': 'workspace:*' }
+      },
+      'packages/store-light/package.json': {
+        dependencies: { '@migaia/resource': 'workspace:^' }
+      },
+      'packages/store-middleware/package.json': {
+        dependencies: { '@migaia/middleware-pipeline': 'workspace:^' }
+      },
+      'packages/store-persist/package.json': {
+        dependencies: { '@migaia/lifecycle': 'workspace:^' }
+      },
+      'packages/store-shared/package.json': {
+        dependencies: { '@migaia/lifecycle': 'workspace:^' }
+      },
+      'packages/store-worker/package.json': {
+        dependencies: {
+          '@migaia/rpc': null,
+          '@migaia/rpc-contract': 'workspace:*',
+          '@migaia/rpc-core': 'workspace:*'
+        }
+      },
+      'packages/tray/package.json': {
+        dependencies: {
+          '@migaia/rpc-contract': 'workspace:^',
+          '@migaia/rpc-core': 'workspace:^',
+          '@migaia/rpc-process': 'workspace:^',
+          '@migaia/rpc-threads': 'workspace:^',
+          '@migaia/supervision': 'workspace:^'
+        }
+      }
+    }
     for (const path of packages) {
       if (path === 'packages/rpc/package.json') {
         expect(existsSync(new URL(path, `file://${repository}`))).toBe(false)
@@ -225,35 +268,14 @@ describe('conformance toolchain and platform evidence boundaries', () => {
         'peerDependencies',
         'optionalDependencies'
       ]) {
-        /** C3 reroutes two consumers; Tray hosts add only their declared RPC runtime edges. */
-        const expected =
-          (path === 'packages/storage-web/package.json' && key === 'devDependencies') ||
-          (path === 'packages/store-worker/package.json' && key === 'dependencies')
-            ? Object.fromEntries(
-                Object.entries(before[key]).filter(([name]) => name !== '@migaia/rpc')
-              )
-            : before[key]
-        if (path === 'packages/storage-web/package.json' && key === 'devDependencies')
-          expected['@migaia/rpc-contract'] = 'workspace:*'
-        if (path === 'packages/store-worker/package.json' && key === 'dependencies') {
-          expected['@migaia/rpc-contract'] = 'workspace:*'
-          expected['@migaia/rpc-core'] = 'workspace:*'
+        /** Only individually verified workspace edges may differ from the original inventory. */
+        const migrations = dependencyMigrations[path]?.[key]
+        /** Unchanged sections retain their original absence rather than becoming empty tables. */
+        const expected = migrations ? { ...before[key] } : before[key]
+        for (const [name, version] of Object.entries(migrations ?? {})) {
+          if (version === null) delete expected[name]
+          else expected[name] = version
         }
-        if (path === 'packages/tray/package.json' && key === 'dependencies') {
-          expected['@migaia/rpc-contract'] = 'workspace:^'
-          expected['@migaia/rpc-core'] = 'workspace:^'
-          expected['@migaia/rpc-process'] = 'workspace:^'
-          expected['@migaia/rpc-threads'] = 'workspace:^'
-        }
-        if (path === 'packages/tray/package.json' && key === 'devDependencies')
-          expected['@migaia/supervision'] = 'workspace:^'
-        /** IAbortSignal moved to @migaia/utils; these packages no longer use lifecycle at all. */
-        if (
-          (path === 'packages/storage-contract/package.json' ||
-            path === 'packages/rpc-process/package.json') &&
-          key === 'dependencies'
-        )
-          delete expected['@migaia/lifecycle']
         expect(after[key], `${path} ${key}`).toEqual(expected)
       }
     }
