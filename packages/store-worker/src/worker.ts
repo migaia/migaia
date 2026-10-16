@@ -1,5 +1,5 @@
 import type { IWorkerMessageEvent } from './worker-message-event.js'
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IRuntime } from '@migaia/reactive'
 import { defaultRuntime } from '@migaia/reactive'
 import { Resource, type IResourceOptions } from '@migaia/resource'
@@ -152,7 +152,7 @@ export class WorkerAdapter {
 }
 
 export function createWorkerHandler<Input, Output>(
-  compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,
+  compute: (payload: Input, context: { signal: INativeAbortSignal }) => Output | Promise<Output>,
   postMessage: (message: unknown) => void,
   options: { readonly timeoutMs?: number } = {}
 ): IManagedRpcHandler {
@@ -189,7 +189,7 @@ export function createWorkerHandler<Input, Output>(
   )
   const endpointPromise = endpoint.then((readyEndpoint) => {
     const unsubscribe = readyEndpoint.onRequest(WorkerRpcIdentity.call, (payload, signal) =>
-      compute(payload as Input, { signal: signal as IAbortSignal })
+      compute(payload as Input, { signal })
     )
     return {
       dispose: async () => {

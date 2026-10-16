@@ -787,7 +787,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           started()
           await new Promise<void>((resolve) => {
             release = resolve
-            context.signal.addEventListener('abort', resolve, { once: true })
+            context.signal.addEventListener('abort', () => resolve(), { once: true })
           })
           return context.success('late')
         }
@@ -2882,7 +2882,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
           started()
           await new Promise<void>((resolve) => {
             release = resolve
-            context.signal.addEventListener('abort', resolve, { once: true })
+            context.signal.addEventListener('abort', () => resolve(), { once: true })
           })
           return context.success('late')
         }
@@ -3296,7 +3296,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         wait: async (context) => {
           started()
           await new Promise<void>((resolve) => {
-            context.signal.addEventListener('abort', resolve, { once: true })
+            context.signal.addEventListener('abort', () => resolve(), { once: true })
           })
           await releasePromise
           return context.success('late-success')
@@ -3380,7 +3380,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         wait: async (context) => {
           started()
           await new Promise<void>((resolve) => {
-            context.signal.addEventListener('abort', resolve, { once: true })
+            context.signal.addEventListener('abort', () => resolve(), { once: true })
           })
           await lateResult
           return context.success('unreachable')
@@ -3465,7 +3465,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         wait: async (context) => {
           started()
           await new Promise<void>((resolve) => {
-            context.signal.addEventListener('abort', resolve, { once: true })
+            context.signal.addEventListener('abort', () => resolve(), { once: true })
           })
           return context.success('late')
         }
@@ -3583,7 +3583,7 @@ describe('Cycle H B12c02 provider production-seam RED matrix', () => {
         wait: async (context) => {
           started()
           await new Promise<void>((resolve) => {
-            context.signal.addEventListener('abort', resolve, { once: true })
+            context.signal.addEventListener('abort', () => resolve(), { once: true })
           })
           await releasePromise
           return context.success('late-identity')

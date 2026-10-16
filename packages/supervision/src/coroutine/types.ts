@@ -1,9 +1,9 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { ISupervisor, ISupervisorBaseOptions, IUnitBudget, IUnitHandle } from '../types.js'
 
 /** Cooperative task context; the exposed port may be published once. */
 export type ICoroutineRunContext<TPort> = {
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   expose(port: TPort): void
   heartbeat(): void
 }

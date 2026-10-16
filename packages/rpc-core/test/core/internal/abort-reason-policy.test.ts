@@ -101,7 +101,7 @@ describe('guarded abort reason policy', () => {
         wait: async (context) => {
           started()
           await new Promise<void>((resolve) =>
-            context.signal.addEventListener('abort', resolve, { once: true })
+            context.signal.addEventListener('abort', () => resolve(), { once: true })
           )
           return context.success('late')
         }

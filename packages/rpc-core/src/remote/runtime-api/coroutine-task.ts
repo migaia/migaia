@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { ICoroutineTask } from '@migaia/supervision/coroutine'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { createRpcError, RpcCoreErrorCode } from '../../core/errors.js'
@@ -10,7 +10,7 @@ export type ICoroutineConnect = Readonly<{ readonly __coroutineConnect: unique s
 
 /** Cooperative task work shares the supervisor's original signal and heartbeat owner. */
 export type ICoroutineTaskContext = Readonly<{
-  signal: IAbortSignal
+  signal: INativeAbortSignal
   heartbeat(): void
   connect: ICoroutineConnect
 }>

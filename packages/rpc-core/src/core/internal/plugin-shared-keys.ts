@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type {
   IRpcAuthenticationCapability,
   IRpcConnectCapability,
@@ -74,7 +74,7 @@ export type IRpcPortName = (typeof RpcPortName)[keyof typeof RpcPortName]
 
 /** Native or lazily materialized provider signal; variation owns only its cancellation command. */
 export type IRpcProviderController = {
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   /** Only opted-in controllers carry their original complete mode/method/generation association. */
   readonly runtimeTask?: IRpcRuntimeTask
   /** Only a runtime task distinguishes caller start intent from resource/lifetime revocation. */
@@ -155,7 +155,7 @@ export type IRpcStreamOpenCommand = Readonly<{
   readonly data: unknown
   readonly timeoutMs?: number
   readonly operation: {
-    readonly signal: IAbortSignal
+    readonly signal: INativeAbortSignal
     readonly remaining: () => number | false | undefined
   }
 }>

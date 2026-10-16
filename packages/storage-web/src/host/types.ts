@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IReactiveComputed, IRuntime } from '@migaia/reactive'
 import type { IKeyValueStore, IStorageChange } from '@migaia/storage-contract'
@@ -29,7 +29,7 @@ export type IStorageReactiveSubscribeContext<TStore extends IKeyValueStore = IKe
   readonly store: TStore
   /** Host-snapshotted scheduler shared with source timing and installation deadlines. */
   readonly scheduler: IScheduler
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   readonly report: (error: unknown) => void
   /** Invalidates Resource-owned query generations after an admitted backend change. */
   readonly onChange: (change: IStorageChange) => void
@@ -259,7 +259,7 @@ export type ILiveQueryOptions<
   readonly runtime: IRuntime
   readonly query: (context: {
     readonly store: TStores[TBackendId]
-    readonly signal: IAbortSignal
+    readonly signal: INativeAbortSignal
     readonly scope?: string
   }) => T | PromiseLike<T>
   /** Optional entity scope used only to prove that an invalidation cannot be unrelated. */

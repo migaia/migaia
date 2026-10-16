@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { createRpcLifecycleError, createRpcTimeoutError } from '../errors.js'
 import { RpcCoreErrorText } from '../error-text.js'
 import {
@@ -27,7 +27,7 @@ export class OperationScope {
   /** Canonical closing state is readable without allocating a child native signal. */
   readonly #closingSignal: IAbortSignal
   /** Materialized native signal retains one stable identity even after the scope settles. */
-  #signal: IAbortSignal | undefined
+  #signal: INativeAbortSignal | undefined
   /** The first cancellation reason remains available when nobody read the signal before closure. */
   #closeReason: unknown
   /** Endpoint receive generation whose work this scope can still commit. */
@@ -58,7 +58,7 @@ export class OperationScope {
   }
 
   /** Materializes the original lifecycle-owned native signal only when a consumer actually reads it. */
-  get signal(): IAbortSignal {
+  get signal(): INativeAbortSignal {
     if (this.#signal === undefined) {
       this.#controller = createGenerationController(
         this.#closed ? {} : { parentSignal: this.#closingSignal }

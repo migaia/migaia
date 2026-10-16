@@ -18,6 +18,21 @@ export type IAbortSignal = {
 }
 
 /**
+ * The signal type for values this module creates with a real `AbortController` and hands to an
+ * operation, so callers can pass it to host APIs such as `fetch` without an assertion.
+ *
+ * It resolves against the consumer's own globals instead of naming `AbortSignal`: under `lib.dom`,
+ * `@types/node`, Deno or Bun it is the host `AbortSignal`, and without host types it falls back to
+ * the structural `IAbortSignal`, so the published declarations still require no host library.
+ * Inputs keep accepting the structural `IAbortSignal`; only produced signals use this type.
+ */
+export type INativeAbortSignal = typeof globalThis extends {
+  readonly AbortSignal: { readonly prototype: infer THostSignal }
+}
+  ? THostSignal
+  : IAbortSignal
+
+/**
  * The abort-controller members this module consumes, named locally so the published declarations
  * stay self-contained. A real `AbortController` satisfies it directly.
  *
@@ -92,7 +107,7 @@ export type IAsyncControls = {
 }
 export type IRetryContext = {
   readonly attempt: number
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   readonly remainingMs?: number
 }
 export type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number }
@@ -120,6 +135,14 @@ export const hostRethrowReporter: IUtilsReporter = (error) => {
   else throw error
 }
 export type ITimeoutOperation<T> = (context: {
+  readonly signal: INativeAbortSignal
+}) => T | PromiseLike<T>
+
+/**
+ * Deadline-only operation used when `cooperativeCancellation` may be `false`: the operation then
+ * receives a stable never-aborting structural signal, not a host `AbortSignal`.
+ */
+export type IDeadlineOnlyOperation<T> = (context: {
   readonly signal: IAbortSignal
 }) => T | PromiseLike<T>
 
@@ -389,7 +412,19 @@ type IWithTimeoutOptions = IAsyncControls & {
   readonly [retryAttemptController]?: IAbortControllerLike
 }
 
-/** Races a lazy operation against an abort-aware deadline. */
+/**
+ * Races a lazy operation against an abort-aware deadline. With cooperative cancellation on (the
+ * default) the operation receives the host `AbortSignal` of an internal controller; when it may be
+ * off, the operation receives a structural never-aborting signal instead.
+ */
+export function withTimeout<T>(
+  operation: ITimeoutOperation<T>,
+  options: IWithTimeoutOptions & { readonly cooperativeCancellation?: true }
+): Promise<T>
+export function withTimeout<T>(
+  operation: IDeadlineOnlyOperation<T>,
+  options: IWithTimeoutOptions
+): Promise<T>
 export function withTimeout<T>(
   operation: ITimeoutOperation<T>,
   options: IWithTimeoutOptions
@@ -498,7 +533,13 @@ export function withTimeout<T>(
     if (after.kind === 'aborted') return onAbort()
     if (settled) return
     try {
-      Promise.resolve(operation({ signal: operationSignal ?? inertTimeoutSignal })).then(
+      Promise.resolve(
+        operation({
+          // A controller signal is a host `AbortSignal`; the inert fallback is only reachable when
+          // the overloads promise the operation a structural signal instead.
+          signal: (operationSignal ?? inertTimeoutSignal) as INativeAbortSignal
+        })
+      ).then(
         (value) => {
           if (settled) return
           finish(() => resolve(value))
@@ -538,7 +579,7 @@ export function raceWithAbort<T>(
   const signals = snapshotSignals(signalsOption, signal)
   const report = reportOption ?? hostRethrowReporter
   const controller = new AbortController()
-  const operationSignal = controller.signal as unknown as IAbortSignal
+  const operationSignal = controller.signal as unknown as INativeAbortSignal
   return new Promise<T>((resolve, reject) => {
     let settled = false
     const admitted: IAbortSignal[] = []
@@ -661,7 +702,7 @@ async function retryCore<T>(
   const startedAt = options.scheduler?.now() ?? systemScheduler.now()
   for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
     const attemptController = new AbortController()
-    const signal = attemptController.signal as unknown as IAbortSignal
+    const signal = attemptController.signal as unknown as INativeAbortSignal
     const remainingMs =
       options.totalTimeoutMs === undefined
         ? undefined
@@ -669,7 +710,7 @@ async function retryCore<T>(
     try {
       if (remainingMs !== undefined && remainingMs <= 0)
         throw new UtilsTimeoutError('total', options.totalTimeoutMs!)
-      const operationCall = (context: { readonly signal: IAbortSignal }): T | PromiseLike<T> =>
+      const operationCall: ITimeoutOperation<T> = (context) =>
         operation({ attempt, signal: context.signal, remainingMs })
       if (options.attemptTimeoutMs !== undefined) {
         return await withTimeout(operationCall, {

@@ -12,7 +12,7 @@ import {
 } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { type IAbortController } from './abort.js'
 import { captureAbortControllerFactory, createLazyAbortController } from './abort-factory.js'
 import {
@@ -30,7 +30,7 @@ type IParentListenerRegistration = IObservedAbortSubscription
 export type IGenerationRequest = {
   readonly generation: number
   readonly token: IGenerationToken
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
 }
 
 export type IGenerationControllerOptions = {

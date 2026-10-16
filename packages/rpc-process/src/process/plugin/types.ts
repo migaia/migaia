@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { IProcessHandle, IProcessSupervisorOptions } from '@migaia/supervision/process'
 import type { IProcessSpec } from '@migaia/supervision/process'
 import type { ISupervisorBaseOptions } from '@migaia/supervision'
@@ -37,7 +37,7 @@ export type IProcessPluginSession = Readonly<{
 export type IProcessPluginEstablish = (
   raw: IProcessByteChannel | IProcessMessageChannel,
   options: Readonly<{
-    signal: IAbortSignal
+    signal: INativeAbortSignal
     role: 'initiator' | 'responder'
     session: IProcessPluginSession
     scheduler: IScheduler
@@ -56,7 +56,7 @@ export type ISpawnProcessPluginDeployment<THandle extends IProcessHandle = IProc
     supervision: IProcessSupervisorOptions<THandle>
     rawChannel(
       handle: THandle,
-      signal: IAbortSignal
+      signal: INativeAbortSignal
     ): Promise<IProcessByteChannel | IProcessMessageChannel>
     channelKind: ProcessPluginChannelKind
     wire?: ProcessPluginWire
@@ -75,7 +75,7 @@ export type IConnectProcessPluginDeployment = Readonly<{
   token: string
   /** An optional native proposal shared with every establish call for this deployment. */
   offer?: IRpcHandshakeOffer
-  dial(address: string, signal: IAbortSignal): Promise<IProcessByteChannel>
+  dial(address: string, signal: INativeAbortSignal): Promise<IProcessByteChannel>
   establish: IProcessPluginEstablish
   supervision?: Pick<
     ISupervisorBaseOptions<IProcessConnectionHandle>,
@@ -127,7 +127,7 @@ export type IProcessServeChildIngress = Readonly<{
   kind: 'child'
   channelKind: ProcessPluginChannelKind
   openRaw(
-    signal: IAbortSignal
+    signal: INativeAbortSignal
   ): Promise<IProcessMessageChannel | Readonly<{ raw: IProcessByteChannel; bootstrap: Uint8Array }>>
   createVerifier?(bootstrap: Uint8Array): (value: unknown) => void | Promise<void>
   establish: IProcessPluginEstablish
@@ -155,7 +155,7 @@ export type IProcessServeListenerIngress = Readonly<{
 /** Session configuration is supplied after authentication and before endpoint construction. */
 export type IProcessServeEndpointFactory = (
   channel: IRemoteChannel,
-  signal: IAbortSignal,
+  signal: INativeAbortSignal,
   session: Readonly<{
     identity: IProcessSessionIdentity
     idempotency: IRpcIdempotencyConfig

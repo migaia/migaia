@@ -5,7 +5,7 @@ import { createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { captureAbortControllerFactory } from './abort-factory.js'
 import {
   observeAbortSubscription,
@@ -23,7 +23,7 @@ export type IProvisionalScopeOptions = {
 }
 
 export type IProvisionalScope = {
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   own<T>(resource: T, descriptor: IReleaseDescriptor): T
   /**
    * Transfers every owned resource to `parent`, in registration order. If `parent.own()` rejects

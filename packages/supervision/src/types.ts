@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { ILifecycleScope } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type {
@@ -24,7 +24,7 @@ export type IUnitHandle<TExit> = {
 }
 /** Attempt-scoped cancellation; active units own a separate runtime signal. */
 export type ILaunchContext = {
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   /** Cold ordinal reserved by the original supervisor; only a ready promotion advances it. */
   readonly executionGeneration?: number
 }
@@ -48,7 +48,7 @@ export type IUnitRuntime = {
   readonly generation: number
   readonly scope: ILifecycleScope
   readonly monitors: ILifecycleScope
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
 }
 /** Contract for one kind of unit, independent of its execution mechanism. */
 export type IUnitProfile<
@@ -176,7 +176,7 @@ export type ISupervisorBaseOptions<THandle> = {
     /** Optional cancellable drain callback invoked before profile-specific termination. */
     readonly beforeTerminate?: (
       unit: THandle,
-      signal: IAbortSignal,
+      signal: INativeAbortSignal,
       remainingMs: () => number
     ) => PromiseLike<void>
     /** Maximum application drain time before termination proceeds; defaults to 5000 milliseconds. */

@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { IEndpointKernelHost } from '../endpoint-kernel.js'
 import type { IPreparedEndpoint } from './endpoint-bootstrap.js'
 import type { IRpcPluginInstallScope } from '../typing.js'
@@ -83,7 +83,7 @@ export type IProviderInstallation = Readonly<{
     method: string,
     handler: (
       message: unknown,
-      createContext: (signal: IAbortSignal) => IRpcContext
+      createContext: (signal: INativeAbortSignal) => IRpcContext
     ) => void | Promise<void>
   ) => () => void
 }>

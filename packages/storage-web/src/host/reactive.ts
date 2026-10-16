@@ -124,7 +124,7 @@ export type IStorageReactiveQueryInput<T> = {
   readonly runtime: IRuntime
   readonly query: (context: {
     readonly store: IKeyValueStore
-    readonly signal: import('@migaia/utils/promise').IAbortSignal
+    readonly signal: import('@migaia/utils/promise').INativeAbortSignal
     readonly scope?: string
   }) => T | PromiseLike<T>
   readonly scope?: string
@@ -731,7 +731,7 @@ export const createStorageReactiveService = (
             const operation = ({
               signal: operationSignal
             }: {
-              readonly signal: import('@migaia/utils/promise').IAbortSignal
+              readonly signal: import('@migaia/utils/promise').INativeAbortSignal
             }) => input.query({ store: adapter.store, signal: operationSignal, scope: input.scope })
             const request =
               input.timeoutMs === undefined

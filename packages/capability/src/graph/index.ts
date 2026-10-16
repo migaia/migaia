@@ -1,6 +1,6 @@
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import {
   createGenerationController,
   createLifecycleScope,
@@ -67,7 +67,7 @@ export type IGraphReleaseContext = {
 /** Startup context with direct-provider reads and provisional auxiliary ownership. */
 export type IGraphStartContext = {
   readonly nodeId: IGraphNodeId
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   readonly get: <T = unknown>(provider: IGraphNodeId) => T
   readonly own: <T>(resource: T, descriptor: IReleaseDescriptor) => T
 }
@@ -196,7 +196,7 @@ export function createCapabilityGraph(options: ICapabilityGraphOptions = {}): IC
     onSuperseded: reportError
   })
   let currentGraphToken!: IGenerationToken
-  let currentGraphSignal!: IAbortSignal
+  let currentGraphSignal!: INativeAbortSignal
 
   const fail = (
     code: ICapabilityGraphErrorCode,

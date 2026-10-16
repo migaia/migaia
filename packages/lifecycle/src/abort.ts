@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { instantiateCurrentAbortController } from './abort-factory.js'
 
 export {
@@ -9,7 +9,7 @@ export {
 
 /** Structural controller returned by the public factory. */
 export type IAbortController = {
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   abort(reason?: unknown): void
 }
 

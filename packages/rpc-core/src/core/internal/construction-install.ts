@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcAbortError,
   createRpcConfigurationError,
@@ -18,7 +18,7 @@ export type IRpcConstructionTime = IEndpointTimePort
 
 /** Immutable batch-entry construction signal and absolute deadline snapshot. */
 export type IRpcConstructionControl = {
-  readonly signal: IAbortSignal
+  readonly signal: INativeAbortSignal
   readonly time: IEndpointTimePort
   readonly deadlineAt: number | undefined
   remaining(): number | false | undefined
@@ -62,7 +62,7 @@ export function createConstructionControl(options: {
     controller.abort()
   }
   return Object.freeze({
-    signal: controller.signal as IAbortSignal,
+    signal: controller.signal as INativeAbortSignal,
     time,
     deadlineAt,
     remaining: (): number | false | undefined =>

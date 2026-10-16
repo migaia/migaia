@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { ERROR_SOURCE as RPC_PROCESS_ERROR_SOURCE } from '../error-code.js'
 import { RpcProcessErrorText } from '../error-text.js'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -217,7 +217,7 @@ async function establishGeneration(
   raw: IProcessByteChannel | IProcessMessageChannel,
   _wire: ProcessPluginWire | undefined,
   establish: IProcessPluginEstablish,
-  signal: IAbortSignal,
+  signal: INativeAbortSignal,
   scheduler: IScheduler,
   session: IProcessPluginSession,
   token: string | undefined,

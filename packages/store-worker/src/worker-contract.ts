@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { normalizePortable, type IRpcPortableValue } from '@migaia/rpc-contract'
 import { abort, connect, createFullOneWayEndpoint, timeout } from '@migaia/rpc-core'
 import {
@@ -10,7 +10,7 @@ import { WorkerRpcIdentity } from './worker-constants.js'
 
 type IWorkerHandler = (
   payload: unknown,
-  signal: IAbortSignal,
+  signal: INativeAbortSignal,
   context: IWorkerRequestContext
 ) => unknown | Promise<unknown>
 
@@ -39,7 +39,7 @@ export function createWorkerContractEndpoint(
     const invoke = async (
       method: string,
       payload: unknown,
-      signal: IAbortSignal
+      signal: INativeAbortSignal
     ): Promise<unknown> => {
       let result: unknown
       for (const handler of handlers.get(method) ?? [])
@@ -104,7 +104,7 @@ export type IWorkerContractEndpoint = Readonly<{
     method: string,
     handler?: (
       payload: unknown,
-      signal: IAbortSignal,
+      signal: INativeAbortSignal,
       context: Readonly<{ method: string }>
     ) => unknown | Promise<unknown>
   ): () => void

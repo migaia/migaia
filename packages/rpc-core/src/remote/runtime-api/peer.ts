@@ -1,4 +1,4 @@
-import type { IAbortSignal } from '@migaia/utils/promise'
+import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { createRpcError, createRpcSerializationError } from '../../core/errors.js'
 import { resolveAbortReason } from '../../core/internal/async-control.js'
 import type { IRpcProbe } from '../../core/probe/types.js'
@@ -149,7 +149,7 @@ export type IRuntimePeerOptions = Pick<
     /** A custom runtime assembly receives only the operations held by this channel view. */
     endpointFactory?(
       channel: IRemoteChannelResources,
-      signal: IAbortSignal
+      signal: INativeAbortSignal
     ): Promise<IRemoteServeEndpoint>
     self?: IRuntimePeerIdentity
     provide?: IRuntimePeerProvide
