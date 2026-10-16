@@ -508,131 +508,6 @@ function constantGuide(input: {
   })
 }
 
-/** Copyable chunk examples for the preset/composed distinction and browser host boundaries. */
-const chunkScenarioCode = {
-  preset: `import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
-import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
-
-const [clientTransport, serviceTransport] = createMemoryTransportPair()
-const policy = { chunkSize: 64 * 1024, maxMessageBytes: 8 * 1024 * 1024 }
-
-// createEndpoint 是完整 preset：自动拥有 send、provide、discovery、ping 与分片帧处理能力。
-const service = await createEndpoint({
-  id: 'storage',
-  transport: serviceTransport,
-  middlewares: [connect({ transport: serviceTransport }), chunk(policy)] as const
-})
-service.provide('save', ({ data, success }) => success(String(data).length))
-
-const client = await createEndpoint({
-  id: 'uploader',
-  targetIds: ['storage'],
-  transport: clientTransport,
-  middlewares: [connect({ transport: clientTransport }), chunk(policy)] as const
-})
-
-try {
-  const storedBytes = await client.send<number>('storage', 'save', 'x'.repeat(256_000))
-  console.log(storedBytes)
-} finally {
-  await Promise.all([client.dispose(), service.dispose()])
-}`,
-  iframe: `// parent.ts：父页面创建调用端，targetOrigin 必须固定为 iframe 的真实 origin。
-import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
-import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
-
-const frame = document.querySelector<HTMLIFrameElement>('#report-frame')
-if (!frame?.contentWindow) throw new Error('report iframe is unavailable')
-const parentTransport = createWindowMessageTransport({
-  target: frame.contentWindow,
-  receiver: window,
-  targetOrigin: location.origin
-})
-const parentEndpoint = await createEndpoint({
-  id: 'dashboard',
-  targetIds: ['report-frame'],
-  transport: parentTransport,
-  middlewares: [connect({ transport: parentTransport }), chunk({ chunkSize: 48 * 1024 })] as const
-})
-const reportModel = JSON.stringify({ sections: ['sales', 'inventory'], rows: 20_000 })
-const report = await parentEndpoint.send<string>('report-frame', 'renderReport', reportModel)
-console.log(report.length)
-window.addEventListener('pagehide', () => void parentEndpoint.dispose(), { once: true })
-
-// iframe.ts：iframe 内创建服务端；source proof 会拒绝其他 Window 冒充父页面。
-const iframeTransport = createWindowMessageTransport({
-  target: window.parent,
-  receiver: window,
-  targetOrigin: location.origin
-})
-const iframeEndpoint = await createEndpoint({
-  id: 'report-frame',
-  transport: iframeTransport,
-  middlewares: [connect({ transport: iframeTransport }), chunk({ chunkSize: 48 * 1024 })] as const
-})
-const render = (value: unknown) => '<main>' + String(value) + '</main>'
-iframeEndpoint.provide('renderReport', ({ data, success }) => success(render(data)))
-window.addEventListener('pagehide', () => void iframeEndpoint.dispose(), { once: true })`,
-  tabs: `// 两个同源 Tab 运行同一入口；URL 中的 role 决定当前 Tab 是服务端还是调用端。
-import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
-import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
-
-const role = new URL(location.href).searchParams.get('role')
-const endpointId = role === 'service' ? 'document-owner' : 'document-viewer'
-const channel = new BroadcastChannel('document-sync')
-const transport = createBroadcastChannelTransport(channel)
-const endpoint = await createEndpoint({
-  id: endpointId,
-  targetIds: ['document-owner'],
-  transport,
-  middlewares: [
-    connect({ transport }),
-    chunk({ chunkSize: 48 * 1024, maxBufferedBytes: 12 * 1024 * 1024 })
-  ] as const
-})
-const loadLargeDocument = () => JSON.stringify({ body: 'x'.repeat(256_000) })
-const renderDocument = (snapshot: string) => console.log(snapshot.length)
-
-if (role === 'service') {
-  endpoint.provide('readSnapshot', ({ success }) => success(loadLargeDocument()))
-} else {
-  const snapshot = await endpoint.send<string>('document-owner', 'readSnapshot', undefined)
-  renderDocument(snapshot)
-}
-
-window.addEventListener('pagehide', () => void endpoint.dispose(), { once: true })`,
-  worker: `// main.ts：页面端持有 Worker，并把大任务交给 Worker endpoint。
-import { chunk, connect, createEndpoint } from '@migaia/rpc-core'
-import { createWebWorkerTransport } from '@migaia/rpc-core/adapters/web-worker'
-
-const worker = new Worker(new URL('./image-worker.ts', import.meta.url), { type: 'module' })
-const pageTransport = createWebWorkerTransport(worker, { peerId: 'image-worker' })
-const pageEndpoint = await createEndpoint({
-  id: 'editor',
-  targetIds: ['image-worker'],
-  transport: pageTransport,
-  middlewares: [connect({ transport: pageTransport }), chunk({ chunkSize: 64 * 1024 })] as const
-})
-const sourceDocument = JSON.stringify({ body: 'x'.repeat(256_000) })
-const result = await pageEndpoint.send<string>('image-worker', 'buildPreview', sourceDocument)
-console.log(result)
-window.addEventListener('pagehide', () => {
-  void pageEndpoint.dispose().finally(() => worker.terminate())
-}, { once: true })
-
-// image-worker.ts：Worker 全局作用域是另一端的消息宿主。
-const workerTransport = createWebWorkerTransport(self, { peerId: 'editor' })
-const workerEndpoint = await createEndpoint({
-  id: 'image-worker',
-  transport: workerTransport,
-  middlewares: [connect({ transport: workerTransport }), chunk({ chunkSize: 64 * 1024 })] as const
-})
-const renderPreview = async (source: string) => 'preview:' + source.length
-workerEndpoint.provide('buildPreview', async ({ data, success }) => {
-  success(await renderPreview(String(data)))
-})`
-} as const
-
 /** Contract examples prove that the same middleware policy works across real host boundaries. */
 const contractTransportCode = {
   iframe: `// parent.ts：父页面通过 Window transport 调用 iframe。
@@ -991,7 +866,7 @@ try {
       'Negotiates an accepted protocol version and validates method parameters and results through small parse-compatible schemas at the network boundary.',
     purposeZh:
       '协商可接受的 protocol version，并通过 parse-compatible schema 在 network boundary 校验 method parameter 与 result。',
-    code: "import { connect, contract, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [clientTransport, serverTransport] = createMemoryTransportPair()\nconst productContract = contract({\n  version: '1',\n  schemas: {\n    findProduct: {\n      params: { parse: (value: unknown) => String(value) },\n      result: { parse: (value: unknown) => value }\n    }\n  }\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  transport: clientTransport,\n  middlewares: [productContract, connect({ transport: clientTransport })]\n})\nconst server = await createEndpoint({\n  id: 'server',\n  transport: serverTransport,\n  middlewares: [productContract, connect({ transport: serverTransport })]\n})\n\n// 两端共享同一个 contract；请求参数和返回值都会在 wire boundary 校验。\nconsole.log('contract ready:', client.id, server.id)\n\ntry {\n  console.log('业务调用应把 client 接到 outbound、server 接到 provider，双方都会经过上面的参数和返回值校验。')\n} finally {\n  await Promise.all([client.dispose(), server.dispose()])\n}",
+    code: "import { connect, contract, createEndpoint } from '@migaia/rpc-core'\nimport { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'\n\nconst [clientTransport, serverTransport] = createMemoryTransportPair()\nconst productContract = contract({\n  version: '1',\n  schemas: {\n    findProduct: {\n      params: { parse: (value: unknown) => String(value) },\n      result: { parse: (value: unknown) => value }\n    }\n  }\n})\n\nconst client = await createEndpoint({\n  id: 'client',\n  transport: clientTransport,\n  middlewares: [productContract, connect({ transport: clientTransport })]\n})\nconst server = await createEndpoint({\n  id: 'server',\n  transport: serverTransport,\n  middlewares: [productContract, connect({ transport: serverTransport })]\n})\n\n// 两端共享同一个 contract；请求参数和返回值都会在 wire boundary 校验。\nconsole.log('contract ready')\n\ntry {\n  console.log('业务调用应把 client 接到 outbound、server 接到 provider，双方都会经过上面的参数和返回值校验。')\n} finally {\n  await Promise.all([client.dispose(), server.dispose()])\n}",
     examplesEn: [
       {
         id: 'iframe-transport',
@@ -1063,7 +938,7 @@ try {
       'Defines the outbound encoder and inbound decoder for wire envelopes and declares the encoded representation expected by the transport.',
     purposeZh:
       '定义 wire envelope 的 outbound encoder 与 inbound decoder，并声明 transport 期望的 encoded representation。',
-    code: "import { protocol } from '@migaia/rpc-core'\n\n// protocol only encodes and decodes the wire envelope; endpoint code supplies business data.\nconst jsonProtocol = protocol({ encodedType: 'string', encode: JSON.stringify, decode: JSON.parse })\nconsole.log(jsonProtocol)",
+    code: "import { protocol } from '@migaia/rpc-core'\n\n// protocol() takes no options: it installs the canonical wire envelope; codec() chooses the encoding.\nconst canonicalProtocol = protocol()\nconsole.log(canonicalProtocol)",
     useEn:
       'The transport cannot carry structured objects directly or a stable wire codec is required.',
     useZh: 'transport 不能直接承载 structured object，或需要稳定 wire codec。',
@@ -1110,18 +985,6 @@ const decrypt = async (value: unknown) => {
     avoidEn:
       'Configuring only one half of an encryption or signature pair, or requiring transferable zero-copy buffers.',
     avoidZh: '只配置 encryption/signature pair 的一半，或仍要求 transferable zero-copy buffer。'
-  }),
-  'rpc-core:index:chunk': middlewareGuide({
-    name: 'chunk',
-    purposeEn:
-      'Configures bounded splitting and reassembly for large string envelopes, with limits for message size, peers, buffered bytes, chunk count, and assembly lifetime.',
-    purposeZh:
-      '配置大型 string envelope 的有界拆分与重组，并限制 message size、peer、buffered bytes、chunk count 与 assembly lifetime。',
-    code: 'chunk({ chunkSize: 64 * 1024, maxMessageBytes: 4 * 1024 * 1024 })',
-    useEn: 'Encoded string envelopes may exceed the underlying channel message budget.',
-    useZh: 'encoded string envelope 可能超过底层 channel message budget。',
-    avoidEn: 'Splitting Uint8Array payloads or disabling bounds on an untrusted channel.',
-    avoidZh: '拆分 Uint8Array payload，或在 untrusted channel 上关闭边界。'
   }),
   'rpc-core:index:timeout': middlewareGuide({
     name: 'timeout',
@@ -1202,8 +1065,9 @@ import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
 
 const [transport] = createMemoryTransportPair()
 const endpointCodec = codec({
-  name: 'json',
-  output: 'text',
+  id: 'json',
+  version: 1,
+  encodedType: 'string',
   encode: (value: unknown) => JSON.stringify(value),
   decode: (text: string) => JSON.parse(text) as unknown
 })
@@ -1286,192 +1150,6 @@ try {
           'Original outboundCapability Feature dependency shared by this composed endpoint; a copied structural object cannot replace it.',
         whenToUse:
           'Pass the previously created canonical Feature so both nodes share one owner and lifecycle.'
-      }
-    ]
-  }),
-  'rpc:core-features-chunk:chunk': guide({
-    purposeEn:
-      'Lets a composed endpoint receive, validate, and reassemble chunk frames. The feature token selects that runtime owner; the root chunk({...}) middleware separately defines how outgoing strings are split and how much incomplete data may be buffered. Real two-way use normally installs both on every peer.',
-    purposeZh:
-      '让组合式 endpoint 能接收、校验并重组分片消息。Feature token 负责安装分片帧处理器；根入口的 chunk({...}) middleware 负责配置发送端如何拆分字符串，以及接收端最多允许缓存多少未完成数据。真实双向通信通常要求两端都同时选择 Feature 并安装 middleware。',
-    quickStart: `import { chunk as configureChunk, connect } from '@migaia/rpc-core'
-import { createComposedEndpoint } from '@migaia/rpc-core/composed'
-import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
-import { chunk as selectChunkFrames } from '@migaia/rpc-core/features/chunk'
-import { outbound } from '@migaia/rpc-core/features/outbound'
-import { provider } from '@migaia/rpc-core/features/provider'
-
-const [clientTransport, serviceTransport] = createMemoryTransportPair()
-const chunkPolicy = {
-  chunkSize: 64 * 1024,
-  maxMessageBytes: 8 * 1024 * 1024,
-  maxConcurrentMessagesPerPeer: 4,
-  maxBufferedBytes: 16 * 1024 * 1024,
-  maxChunksPerMessage: 256,
-  assemblyTimeoutMs: 10_000
-}
-const service = await createComposedEndpoint(
-  { id: 'storage', transport: serviceTransport, middlewares: [connect({ transport: serviceTransport }), configureChunk(chunkPolicy)] },
-  [provider(), selectChunkFrames()] as const
-)
-service.provide('measure', ({ data, success }) => success(String(data).length))
-const client = await createComposedEndpoint(
-  { id: 'uploader', targetIds: ['storage'], transport: clientTransport, middlewares: [connect({ transport: clientTransport }), configureChunk(chunkPolicy)] },
-  [outbound(), selectChunkFrames()] as const
-)
-
-try {
-  const length = await client.send<number>('storage', 'measure', 'x'.repeat(256_000))
-  console.log(length)
-} finally {
-  await Promise.all([client.dispose(), service.dispose()])
-}`,
-    examplesEn: [
-      {
-        id: 'preset',
-        title: 'Use the complete createEndpoint preset',
-        description:
-          'createEndpoint selects the complete built-in Feature surface. Use it when one Host genuinely needs outbound calls, providers, discovery, control, and chunk handling; only middleware configuration remains explicit.',
-        code: chunkScenarioCode.preset
-      },
-      {
-        id: 'iframe',
-        title: 'Cross-iframe with verified origin and source',
-        description:
-          'The parent and iframe each own an endpoint. The Window adapter fixes targetOrigin and checks event.source before chunk frames reach the Host.',
-        code: chunkScenarioCode.iframe
-      },
-      {
-        id: 'tabs',
-        title: 'Cross-tab through BroadcastChannel',
-        description:
-          'Two same-origin tabs share a named channel while retaining distinct endpoint identities and bounded reassembly memory.',
-        code: chunkScenarioCode.tabs
-      },
-      {
-        id: 'worker',
-        title: 'Page-to-Worker processing',
-        description:
-          'The page calls a provider hosted in a dedicated Worker. Chunking is useful when encoded documents or generated previews exceed a practical single-message budget.',
-        code: chunkScenarioCode.worker
-      }
-    ],
-    examplesZh: [
-      {
-        id: 'preset',
-        title: '直接使用完整 createEndpoint preset',
-        description:
-          'createEndpoint 会选择内置的完整 Feature 集合，Host 直接获得远程调用、服务注册、发现、控制和分片帧处理能力；适合确实需要整套能力的端点。createComposedEndpoint 则要求显式列出 Feature，只安装当前角色需要的能力，产物和公开方法更窄。',
-        code: chunkScenarioCode.preset
-      },
-      {
-        id: 'iframe',
-        title: '跨 iframe：校验 origin 与窗口来源',
-        description:
-          '父页面和 iframe 各自拥有 endpoint。Window adapter 固定 targetOrigin，并在分片进入 Host 前检查 event.source，适合嵌入式报表、编辑器预览和受控微前端。',
-        code: chunkScenarioCode.iframe
-      },
-      {
-        id: 'tabs',
-        title: '跨 Tab：通过 BroadcastChannel 同步大快照',
-        description:
-          '两个同源 Tab 共用命名 channel，但保留独立 endpoint 身份和重组容量限制，适合文档快照、缓存预热结果或后台任务状态同步。',
-        code: chunkScenarioCode.tabs
-      },
-      {
-        id: 'worker',
-        title: '跨 Worker：把大任务交给后台线程',
-        description:
-          '页面调用 Worker 中注册的 provider。编码后的文档、图片描述或分析结果超过单条消息预算时，chunk middleware 自动完成拆分和重组。',
-        code: chunkScenarioCode.worker
-      }
-    ],
-    useEn: [
-      'Encoded string envelopes can exceed the message size accepted by the underlying channel.',
-      'Untrusted or bursty peers require hard limits for partial-message memory and assembly lifetime.'
-    ],
-    useZh: [
-      '编码后的字符串消息可能超过底层 MessagePort、Worker 或网络通道允许的单条消息大小。',
-      '对端不完全可信或流量有突发，需要限制未完成消息占用的内存和存活时间。'
-    ],
-    avoidEn: [
-      'Payloads are already small enough for the transport.',
-      'The payload is Uint8Array and the application expects this string splitter to segment it automatically.'
-    ],
-    avoidZh: [
-      '消息始终小于底层传输限制，分片只会增加协议成本。',
-      'payload 是 Uint8Array，却期望这个字符串分片器自动拆分二进制数据。'
-    ],
-    options: [
-      {
-        name: 'chunkSize',
-        type: 'number',
-        optional: true,
-        description: '每个字符串分片的目标字节数，必须是至少 4 的正安全整数。',
-        whenToUse: '按底层通道单条消息限制留出协议头余量后设置。'
-      },
-      {
-        name: 'maxMessageBytes',
-        type: 'number',
-        optional: true,
-        description: '允许拆分或重组的单条完整消息最大字节数。',
-        whenToUse: '按业务允许的最大上传或响应大小设置，防止超大消息耗尽内存。'
-      },
-      {
-        name: 'maxConcurrentMessages',
-        type: 'number',
-        optional: true,
-        description: '限制所有对端合计可同时重组的消息数量，超过上限的新消息会被拒绝。',
-        whenToUse: '宿主有明确总内存预算时设置。'
-      },
-      {
-        name: 'maxConcurrentMessagesPerPeer',
-        type: 'number',
-        optional: true,
-        description: '限制单个对端可同时占用的重组槽位，防止一个来源耗尽宿主容量。',
-        whenToUse: '多个对端共享一个宿主时限制单个来源。'
-      },
-      {
-        name: 'maxBufferedBytes',
-        type: 'number',
-        optional: true,
-        description: '限制全部未完成消息累计占用的缓存字节，超过预算时拒绝继续接收。',
-        whenToUse: '始终按宿主可承受的内存峰值设置。'
-      },
-      {
-        name: 'maxChunksPerMessage',
-        type: 'number',
-        optional: true,
-        description: '限制一条完整消息允许包含的分片数量，避免大量微小分片拖垮调度。',
-        whenToUse: '防止极小分片制造过多对象和调度开销。'
-      },
-      {
-        name: 'maxChunkBytes',
-        type: 'number',
-        optional: true,
-        description: '限制接收端接受的单个分片最大字节数，违规分片不会进入重组缓存。',
-        whenToUse: '需要拒绝不遵守本端容量约束的发送方时设置。'
-      },
-      {
-        name: 'assemblyTimeoutMs',
-        type: 'number',
-        optional: true,
-        description: '限制从首个分片到完整重组允许经过的时间，超时后释放对应缓存。',
-        whenToUse: '用于清理丢包、断连或恶意发送造成的半成品消息。'
-      },
-      {
-        name: 'byteLength',
-        type: '(value: string) => number',
-        optional: true,
-        description: '计算编码后字符串字节数的函数；默认按 UTF-8 计算。',
-        whenToUse: '自定义编码的字节计算规则不同于 UTF-8 时替换。'
-      },
-      {
-        name: 'split',
-        type: '(value: string, maxBytes: number) => readonly string[]',
-        optional: true,
-        description: '按最大字节数拆分字符串的函数；默认不会切断 UTF-8 码点。',
-        whenToUse: '协议使用特殊字符串编码或需要定制边界时替换。'
       }
     ]
   }),
@@ -1736,60 +1414,6 @@ try {
       '本地已经持有 Error；应保留原对象，而不是再次恢复。',
       '要把收到的 stack 或 data 当作可执行输入，而不是诊断内容。'
     ]
-  }),
-  'rpc-contract:index:serializeRpcError': guide({
-    purposeEn:
-      'Serializes an Error and its bounded cause or AggregateError graph into a cross-realm record containing name, message, stack, source, code, data, and nested failures.',
-    purposeZh:
-      '把 Error 及其有界 cause/AggregateError graph 序列化成跨 realm record，保留 name、message、stack、source、code、data 与 nested failure。',
-    quickStart:
-      "import { serializeRpcError } from '@migaia/rpc-contract'\n\nconst error = new Error('remote failure')\nconst payload = serializeRpcError(error, { report: console.error })\nconsole.log(payload)",
-    useEn: [
-      'An error must cross a Worker, window, or transport boundary without losing diagnostic identity.'
-    ],
-    useZh: [
-      'error 需要跨 Worker、window 或 transport boundary，同时不能丢失 diagnostic identity。'
-    ],
-    avoidEn: [
-      'Serializing arbitrary application data.',
-      'Replacing the original stack with a receiver-side stack.'
-    ],
-    avoidZh: ['序列化任意 application data。', '用 receiver-side stack 替换原始 stack。']
-  }),
-  'rpc-contract:index:deserializeRpcError': guide({
-    purposeEn:
-      'Reconstructs a received serialized failure into the closest supported Error class while retaining the transmitted stack, source/code identity, data, and cause graph.',
-    purposeZh:
-      '把收到的 serialized failure 重建为最接近的受支持 Error class，同时保留 transmitted stack、source/code identity、data 与 cause graph。',
-    quickStart:
-      "import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract'\n\nconst message = { error: serializeRpcError(new Error('remote failure'), { report: console.error }) }\nconst remoteError = deserializeRpcError(message.error)\nconsole.error(remoteError)",
-    useEn: [
-      'A serialized remote failure must become a throwable local value with inspectable provenance.'
-    ],
-    useZh: ['serialized remote failure 需要成为可抛出的 local value，并可检查 provenance。'],
-    avoidEn: [
-      'Trusting remote stack or data as executable input.',
-      'Regenerating a local error that discards transmitted identity.'
-    ],
-    avoidZh: [
-      '把 remote stack 或 data 当作 executable input。',
-      '重新生成 local error 并丢弃 transmitted identity。'
-    ]
-  }),
-  'rpc-contract:index:reachRpcError': guide({
-    purposeEn:
-      'Traverses an error, its cause chain, and AggregateError.errors in bounded identity order so reporting and contract checks can find every reachable original failure.',
-    purposeZh:
-      '按有界 identity order 遍历 error、cause chain 与 AggregateError.errors，让 reporting 与 contract check 能找到每个可达的原始 failure。',
-    quickStart:
-      "import { reachRpcError } from '@migaia/rpc-contract'\n\nconst originalError = new Error('database unavailable')\nconst error = new Error('request failed', { cause: originalError })\nfor (const cause of reachRpcError(error, { report: console.error })) {\n  if (cause === originalError) console.log('original reached')\n}",
-    useEn: ['Diagnostics or tests must prove that wrapping preserved original error identity.'],
-    useZh: ['diagnostics 或 test 必须证明 wrapping 保留了 original error identity。'],
-    avoidEn: [
-      'Mutating errors during traversal.',
-      'Assuming every yielded value is an Error instance.'
-    ],
-    avoidZh: ['遍历期间修改 error。', '假设每个 yielded value 都是 Error instance。']
   }),
   'rpc-core:index:isRpcError': guide({
     purposeEn:
@@ -2132,42 +1756,6 @@ const rpcErrorCatalogGuides = {
       '应用保留原采样 cause，同时显示测量 unavailable。'
     ]
   }),
-  processAdapter: errorIdentityGuide({
-    importPath: '@migaia/rpc-core/adapter/diagnostics',
-    source: 'RPC_PROCESS_ERROR_SOURCE',
-    codeTable: 'RpcProcessErrorCode',
-    member: 'usageSampleFailed',
-    purposeEn:
-      'Identifies actual Process launch, connection, lifecycle and sampling failures with the stable @migaia/rpc/process source. Native details remain reachable through the original cause.',
-    purposeZh:
-      '用稳定的 @migaia/rpc/process source 识别实际 Process 启动、连接、生命周期与采样失败。原生详情沿原 cause 保持可达。',
-    useEn: [
-      'A process adapter reports native launch or socket errors without depending on private display text.',
-      'A resource view reports sampling unavailable without fabricating CPU or RSS values.'
-    ],
-    useZh: [
-      '进程适配器不依赖私有展示文本地报告原生启动或 socket 错误。',
-      '资源视图报告采样 unavailable，不伪造 CPU 或 RSS 数值。'
-    ]
-  }),
-  threadsAdapter: errorIdentityGuide({
-    importPath: '@migaia/rpc-core/adapter/threads',
-    source: 'RPC_THREAD_ERROR_SOURCE',
-    codeTable: 'RpcThreadErrorCode',
-    member: 'usageSampleFailed',
-    purposeEn:
-      'Identifies the native Worker sampling failure with the stable @migaia/rpc/threads source and THREAD_USAGE_SAMPLE_FAILED code. This diagnostic grants no Worker stop or replacement authority.',
-    purposeZh:
-      '用稳定的 @migaia/rpc/threads source 与 THREAD_USAGE_SAMPLE_FAILED code 识别原生 Worker 采样失败。此诊断不授予 Worker stop 或 replacement 权限。',
-    useEn: [
-      'A thread adapter reports an unsupported or failed real Worker resource sample.',
-      'An application retains the original sampling cause while showing the measurement unavailable.'
-    ],
-    useZh: [
-      '线程适配器需要报告不支持或失败的真实 Worker 资源采样。',
-      '应用保留原采样 cause，同时显示测量 unavailable。'
-    ]
-  }),
   jsonrpcAdapter: errorIdentityGuide({
     importPath: '@migaia/rpc-contract/framing/jsonrpc',
     source: 'JSONRPC_BRIDGE_ERROR_SOURCE',
@@ -2244,10 +1832,6 @@ const rpcPublicErrorGuides = {
       '调用方诊断超时时，独立查询真实 execution/outcome 事实。'
     ]
   }),
-  'rpc-core:adapter-diagnostics:RPC_PROCESS_ERROR_SOURCE': rpcErrorCatalogGuides.processAdapter,
-  'rpc-core:adapter-diagnostics:RpcProcessErrorCode': rpcErrorCatalogGuides.processAdapter,
-  'rpc-core:adapter-threads:RPC_THREAD_ERROR_SOURCE': rpcErrorCatalogGuides.threadsAdapter,
-  'rpc-core:adapter-threads:RpcThreadErrorCode': rpcErrorCatalogGuides.threadsAdapter,
   'rpc-contract:framing-jsonrpc:JSONRPC_BRIDGE_ERROR_SOURCE': rpcErrorCatalogGuides.jsonrpcAdapter,
   'rpc-contract:framing-jsonrpc:JsonRpcBridgeErrorCode': rpcErrorCatalogGuides.jsonrpcAdapter
 }
@@ -2255,20 +1839,6 @@ const rpcPublicErrorGuides = {
 /** Stable protocol discriminants used by adapters, diagnostics, and tests. */
 const rpcConstantModuleGuides: Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>> =
   {
-    'rpc:protocol-constants:RpcMessageKind': constantGuide({
-      name: 'RpcMessageKind',
-      roleEn: 'wire-envelope kind set',
-      roleZh: 'wire-envelope kind 集合',
-      member: 'request',
-      value: 'request envelope'
-    }),
-    'rpc:protocol-constants:RpcVariation': constantGuide({
-      name: 'RpcVariation',
-      roleEn: 'control variation set',
-      roleZh: 'control variation 集合',
-      member: 'abort',
-      value: 'abort control frame'
-    }),
     'rpc-core:transport-constants:RpcPlatform': constantGuide({
       name: 'RpcPlatform',
       roleEn: 'transport platform labels',
@@ -2311,40 +1881,12 @@ const rpcConstantModuleGuides: Readonly<Record<string, Readonly<Record<IGuideLoc
       member: 'send',
       value: 'request and response operation'
     }),
-    'rpc:protocol-constants:RpcControlKind': constantGuide({
-      name: 'RpcControlKind',
-      roleEn: 'provider-control admission kinds',
-      roleZh: 'provider-control admission kind',
-      member: 'request',
-      value: 'provider request work'
-    }),
     'rpc-core:transport-constants:RpcCandidateStatus': constantGuide({
       name: 'RpcCandidateStatus',
       roleEn: 'discovery candidate states',
       roleZh: 'discovery candidate state',
       member: 'stale',
       value: 'candidate is known but not currently active'
-    }),
-    'rpc:protocol-constants:RpcContractFailureKind': constantGuide({
-      name: 'RpcContractFailureKind',
-      roleEn: 'structured contract failure kinds',
-      roleZh: 'structured contract failure kind',
-      member: 'schemaValidation',
-      value: 'schema rejected boundary data'
-    }),
-    'rpc:protocol-constants:RpcDebugPhase': constantGuide({
-      name: 'RpcDebugPhase',
-      roleEn: 'test-only endpoint lifecycle snapshot phases',
-      roleZh: 'test-only endpoint lifecycle snapshot phase',
-      member: 'disposed',
-      value: 'endpoint reached terminal disposal'
-    }),
-    'rpc:protocol-constants:RpcChunkEvent': constantGuide({
-      name: 'RpcChunkEvent',
-      roleEn: 'chunk admission and expiry hook names',
-      roleZh: 'chunk admission 与 expiry hook name',
-      member: 'rejected',
-      value: 'chunk admission was rejected'
     })
   }
 
@@ -3220,91 +2762,7 @@ export async function admitCallerObject(value: unknown) {
 
 /** Maintained examples use actual held resources and local proposals rather than trust DTOs. */
 const rpcAdapterGuideContexts = {
-  emitter: {
-    quickStart: `import { createEventEmitterMessageResource, prepareAdapterPeer, type IAdapterEventEmitterMessagePort } from '@migaia/rpc-core/adapter'
-import type { IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import { systemScheduler } from '@migaia/utils/scheduler'
-
-/** The adapter holds this actual port and preserves the original options identity. */
-export function openEmitterPeer(port: IAdapterEventEmitterMessagePort, parentId: string, options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>) {
-  const preparation = prepareAdapterPeer(options, 'custom-runtime')
-  const resource = createEventEmitterMessageResource(port)
-  const connect: IRuntimePeerSource = (context) => resource.open({
-    peerId: parentId, scheduler: systemScheduler,
-    offer: context.capabilities, control: rpcMessageCapabilityControl
-  })
-  return preparation.peer({ ...options, self: preparation.context.self, connect })
-}
-// Retain the returned Peer and await its close() when this connection ends.`,
-    useEn: [
-      'An adapter holds a real emitter message port and needs a callable Runtime Peer.',
-      'The original Host preparation must survive option copies during native acquisition.'
-    ],
-    useZh: [
-      'adapter 持有真实 emitter 消息端口，需要构造可调用 Runtime Peer。',
-      '原 Host preparation 需要在原生资源获取和 options 复制后继续保留。'
-    ],
-    avoidEn: [
-      'An existing Thread factory already owns this runtime and its supervision.',
-      'A copied transport or accepted-capability record cannot supply Core resource facts.'
-    ],
-    avoidZh: [
-      '已有 Thread 工厂已拥有该 runtime 及其 supervision 时直接使用原工厂。',
-      '复制的 transport 或已协商 capability 记录不能提供 Core 资源事实。'
-    ]
-  },
-  target: {
-    quickStart: `import { createEventTargetMessageResource, prepareAdapterPeer, type IAdapterEventTargetMessagePort } from '@migaia/rpc-core/adapter'
-import type { IRuntimePeerOptions, IRuntimePeerSource } from '@migaia/rpc-core/remote'
-import { rpcMessageCapabilityControl } from '@migaia/rpc-contract/runtime'
-import { systemScheduler } from '@migaia/utils/scheduler'
-
-/** The actual EventTarget port remains owned by the adapter's native runtime. */
-export function openEventTargetPeer(port: IAdapterEventTargetMessagePort, parentId: string, options: Omit<IRuntimePeerOptions, 'spawn' | 'connect' | 'listen'>) {
-  const preparation = prepareAdapterPeer(options, 'custom-runtime')
-  const resource = createEventTargetMessageResource(port)
-  const connect: IRuntimePeerSource = (context) => resource.open({
-    peerId: parentId, scheduler: systemScheduler,
-    offer: context.capabilities, control: rpcMessageCapabilityControl
-  })
-  return preparation.peer({ ...options, self: preparation.context.self, connect })
-}
-// Core observes raw ACKs; native termination stays with the actual launch owner.`,
-    useEn: [
-      'An adapter already holds the actual EventTarget messaging resource.',
-      'Message control must use the same physical receiver as the eventual endpoint.'
-    ],
-    useZh: [
-      'adapter 已持有实际 EventTarget 消息资源，需要接入规范 channel。',
-      '消息控制需要与最终 endpoint 使用同一真实接收端。'
-    ],
-    avoidEn: [
-      'Use the existing browser or Thread adapter when it already owns the native resource.',
-      'Do not pass decoded agreement, generation or native ownership claims into this constructor.'
-    ],
-    avoidZh: [
-      '已有 browser 或 Thread adapter 拥有原生资源时应直接复用。',
-      '不能向构造器传入解码后的 agreement、generation 或 native 所有权声明。'
-    ]
-  },
   object: {
-    quickStart: `import { holdAdapterObjectChannel, type IRuntimeObjectIO, type IRuntimeConnectionOptions } from '@migaia/rpc-core/adapter'
-import type { IRpcHandshakeOffer } from '@migaia/rpc-contract'
-
-/** Raw exchange resolves the actual correlated peer reply on this held connection. */
-export async function openObjectCarrier(io: IRuntimeObjectIO, offer: IRpcHandshakeOffer, options: IRuntimeConnectionOptions) {
-  const connection = holdAdapterObjectChannel(io)
-  connection.prepare(offer)
-  try {
-    await connection.negotiate()
-    return connection.open(options)
-  } catch (primary) {
-    try { await connection.close(primary) } catch (cleanup) { options.report(cleanup) }
-    throw primary
-  }
-}
-// The returned channel owns its exact object/text views and close operation.`,
     useEn: [
       'A carrier holds actual correlated object/text I/O and needs canonical negotiation.',
       'The same cold resource must preserve prepare, exchange, final construction and close order.'
@@ -3323,19 +2781,6 @@ export async function openObjectCarrier(io: IRuntimeObjectIO, offer: IRpcHandsha
     ]
   },
   byte: {
-    quickStart: `import { createRuntimeByteConnection, readRuntimeByteBootstrap, type IRuntimeByteIO, type IRuntimeByteOptions, type IRuntimeByteDiagnostics } from '@migaia/rpc-core/adapter'
-
-/** Establish ordinary held byte I/O from the actual local offer and verifier. */
-export function establishByteCarrier(io: IRuntimeByteIO, options: IRuntimeByteOptions, diagnostics: IRuntimeByteDiagnostics) {
-  return createRuntimeByteConnection(io, options, diagnostics)
-}
-
-/** A child with framed launch input continues on the same actual reader. */
-export async function establishBootstrappedCarrier(io: IRuntimeByteIO, options: IRuntimeByteOptions, diagnostics: IRuntimeByteDiagnostics) {
-  const received = await readRuntimeByteBootstrap(io, diagnostics, { timeoutMs: 5_000 })
-  return createRuntimeByteConnection(received.channel, options, diagnostics)
-}
-// The connection owner retains and later closes the exact returned channel.`,
     useEn: [
       'An adapter owns actual ordered byte I/O and a local handshake/authentication policy.',
       'Framed launch input must hand its original decoder and queued bytes to the handshake.'
@@ -3353,43 +2798,7 @@ export async function establishBootstrappedCarrier(io: IRuntimeByteIO, options: 
       '解码 bootstrap 或公开 peer metadata 不能代替 Core 的真实读取。'
     ]
   },
-  eventByte: {
-    quickStart: `import { Buffer } from 'node:buffer'
-import type { Readable, Writable } from 'node:stream'
-import { createRuntimeEventByteIO } from '@migaia/rpc-core/adapter'
-
-/** Reader, writer and physical close belong to this actual native connection. */
-export function holdNativeBytes(reader: Readable, writer: Writable, close: () => void, diagnostic: Parameters<typeof createRuntimeEventByteIO>[3]) {
-  return createRuntimeEventByteIO(reader, writer, { close }, diagnostic, Buffer)
-}
-// The optional resource is the actual Buffer constructor, not an encoder registrar.
-// Core constructs its own codec with one native encoding of each visible byte view.`,
-    useEn: [
-      'The adapter holds actual event-style readable/writable resources and physical close.',
-      'The host supplies a real byte-view constructor to preserve its native inline encoder.'
-    ],
-    useZh: [
-      'adapter 持有真实事件式 readable/writable 和物理关闭资源。',
-      '宿主提供实际字节视图构造对象，以保留原生 inline 编码器。'
-    ],
-    avoidEn: [
-      'Web streams should use the owning Process Web byte adapter instead of emitter assumptions.',
-      'Do not pass native flags, reader-count predicates or an existing codec target.'
-    ],
-    avoidZh: [
-      'Web streams 应使用原 Process Web byte adapter，不应假定 emitter 事件。',
-      '不能传入 native flags、reader-count 判断回调或既有 codec target。'
-    ]
-  },
   message: {
-    quickStart: `import { createRuntimeMessageConnection, type IRuntimeMessageIO, type IRuntimeMessageConnectionOptions, type IRuntimeMessageDiagnostics } from '@migaia/rpc-core/adapter'
-
-/** The adapter supplies actual whole-message I/O and only its local proposal. */
-export function establishMessageCarrier(io: IRuntimeMessageIO, options: IRuntimeMessageConnectionOptions, diagnostics: IRuntimeMessageDiagnostics) {
-  return createRuntimeMessageConnection(io, options, diagnostics)
-}
-// Fixed V1 capabilities need no hello; expansions require an actual raw capability ACK.
-// An absent ACK keeps only the local fixed subset and grants no clone/native ownership.`,
     useEn: [
       'The actual carrier already preserves complete message boundaries.',
       'A local extension proposal must be enabled only after a bounded peer ACK exchange.'
@@ -3407,114 +2816,7 @@ export function establishMessageCarrier(io: IRuntimeMessageIO, options: IRuntime
       '仅有一致的描述性提案不能自行启用 runtime/binary 扩展。'
     ]
   },
-  provider: {
-    quickStart: `import { createAdapterBindingDrain, createRuntimeProviderGovernor, createRuntimeProviderScope, type IRuntimeProviderPolicy } from '@migaia/rpc-core/adapter'
-import type { IRpcIdempotencyStore, IRpcProviderLimits } from '@migaia/rpc-core'
-import type { IRemoteChannel } from '@migaia/rpc-core/remote'
-
-/** Only the exact Core-created connection supplies its private session identity. */
-export function holdProviderResources(channel: IRemoteChannel, policy: IRuntimeProviderPolicy, limits: IRpcProviderLimits, closeSession: () => Promise<void>, report: (error: unknown) => void, store?: IRpcIdempotencyStore) {
-  const scope = createRuntimeProviderScope(store)
-  const governor = createRuntimeProviderGovernor(channel, policy, closeSession, report)
-  const drain = createAdapterBindingDrain(channel.scheduler, report)
-  return {
-    scope, governor, drain,
-    session: scope.session(channel, governor.limits(limits)),
-    close: () => { governor.close(); scope.close() }
-  }
-}
-// The existing session owner still closes the channel and its attached endpoint.`,
-    useEn: [
-      'An existing session owner holds the actual Core-created connection and local numeric limits.',
-      'Provider admission, draining and stable scope must reuse canonical resource owners.'
-    ],
-    useZh: [
-      '既有 session owner 持有实际 Core 连接，并选择本地数值限制。',
-      'provider admission、draining 和稳定 scope 需要复用规范资源 owner。'
-    ],
-    avoidEn: [
-      'Do not copy a channel or pass principal, reservation or preflight DTOs.',
-      'Use the existing Process resilience owner when its admission and session policy already suffice.'
-    ],
-    avoidZh: [
-      '不能复制 channel，或传入 principal、reservation、preflight DTO。',
-      '已有 Process resilience owner 满足准入与会话策略时直接复用。'
-    ]
-  },
-  binding: {
-    quickStart: `import { createAdapterPlugin, holdAdapterRegistration } from '@migaia/rpc-core/adapter'
-
-/** Options hold the actual binding; the application's Host owns installation and release. */
-export function createHostedAdapter(options: Parameters<typeof createAdapterPlugin>[0]) {
-  return createAdapterPlugin(options)
-}
-
-/** Preserve the same registration across prevalidation and later Plugin installation. */
-export async function prepareHostedAdapter(options: Parameters<typeof holdAdapterRegistration>[0], signal: AbortSignal) {
-  const registration = holdAdapterRegistration(options)
-  await registration.prepare(signal)
-  return { plugin: registration.plugin(), release: () => registration.release() }
-}
-// Pass the actual Plugin to the existing Host, and release its registration at owner shutdown.`,
-    useEn: [
-      'A real adapter binding must reuse Remote Plugin installation and teardown.',
-      'Prevalidation and installation need the same genuine registration and generation holder.'
-    ],
-    useZh: [
-      '真实 adapter binding 需要复用 Remote Plugin 安装与释放流程。',
-      '预验证与安装必须保留同一真实 registration 和 generation holder。'
-    ],
-    avoidEn: [
-      'Do not hand a prepared holder or copied Host context back to Core.',
-      'A direct Peer factory is clearer when no Plugin/Host registration is required.'
-    ],
-    avoidZh: [
-      '不能把 prepared holder 或复制的 Host context 回传 Core。',
-      '不需要 Plugin/Host registration 时应使用更直接的 Peer 工厂。'
-    ]
-  },
-  data: {
-    quickStart: `import { adapterContractRequiresStream, createAdapterId, materializeAdapterJson, normalizeAdapterDescription, readAdapterAbortReason, validateAdapterPeerMethods, validateAdapterPeerTimeout } from '@migaia/rpc-core/adapter'
-import type { IRuntimePeerOptions } from '@migaia/rpc-core/remote'
-
-/** Admit actual local declarations before acquiring native resources. */
-export function admitLocalConfiguration(options: IRuntimePeerOptions) {
-  validateAdapterPeerTimeout(options)
-  validateAdapterPeerMethods(options.provide, options.contract)
-  return createAdapterId()
-}
-/** These outputs remain ordinary data or the original cancellation reason. */
-export function readCancellation(signal: AbortSignal) { return readAdapterAbortReason(signal) }
-export function inspectDirectory(value: unknown) { return normalizeAdapterDescription(value) }
-export function needsStream(contract: Parameters<typeof adapterContractRequiresStream>[0]) { return adapterContractRequiresStream(contract) }
-export function materializeProtocolData(value: unknown) { return materializeAdapterJson(value) }
-// None of these operations registers a transport, snapshot, principal or agreement.`,
-    useEn: [
-      'An adapter needs the existing local admission or received-directory grammar.',
-      'Ordinary addresses, abort reasons or JSON data must retain their canonical owner.'
-    ],
-    useZh: [
-      'adapter 需要复用既有本地准入或收到目录的 grammar。',
-      '普通地址、abort reason 或 JSON 数据需要保留规范归属。'
-    ],
-    avoidEn: [
-      'Do not interpret returned data or labels as accepted channel capabilities.',
-      'Do not create a parallel validator or owned-snapshot registrar in the adapter.'
-    ],
-    avoidZh: [
-      '不能把返回数据或标签理解为已接受的 channel 能力。',
-      '不要在 adapter 中另建 validator 或 owned-snapshot registrar。'
-    ]
-  },
   errors: {
-    quickStart: `import { createAdapterConfigurationError, createAdapterConfigurationTypeError, createAdapterSourceConfigurationError, createAdapterTransportError } from '@migaia/rpc-core/adapter'
-
-/** Diagnostic wording belongs to this adapter; native failures remain on cause. */
-export function configurationDiagnostic(message: string) { return createAdapterConfigurationError(message) }
-export function nativeConfigurationDiagnostic(message: string, cause: unknown) { return createAdapterConfigurationTypeError(message, cause) }
-export function conflictingSourceDiagnostic() { return createAdapterSourceConfigurationError() }
-export function carrierFailureDiagnostic(message: string, cause: unknown) { return createAdapterTransportError(message, cause) }
-// Public source/code/message/cause presentation never grants Core live-control identity.`,
     useEn: [
       'A real adapter failure needs the established native error family and diagnostic code.',
       'The original native cause must remain reachable without copying private Core text catalogs.'
@@ -3531,211 +2833,11 @@ export function carrierFailureDiagnostic(message: string, cause: unknown) { retu
       '不能根据公开诊断字段推导取消、重试或关闭权限。',
       '失败属于 adapter 自身语义时应使用该 adapter 的规范错误。'
     ]
-  },
-  launch: {
-    quickStart: `import { holdAdapterLaunch } from '@migaia/rpc-core/adapter'
-
-/** The actual launcher receives this same request from Core preparation/supervision. */
-export function readLocalLaunchProposal(request: Parameters<typeof holdAdapterLaunch>[0]) {
-  return holdAdapterLaunch(request).proposal
-}
-// A copied request has no private preparation; the output is local launch metadata, not an ACK.`,
-    useEn: [
-      'A native launcher receives the actual request used by Core launch preparation.',
-      'Launch encoding needs the compiled local proposal without exposing the private Host context.'
-    ],
-    useZh: [
-      '原生 launcher 收到 Core launch preparation 使用的实际 request。',
-      '启动编码需要已编译本地提案，同时保持 Host context 私有。'
-    ],
-    avoidEn: [
-      'Do not pass the output back as an accepted agreement or generation claim.',
-      'Ordinary unmanaged launches with no Core proposal should keep their existing native bootstrap.'
-    ],
-    avoidZh: [
-      '不能把输出回传为已接受 agreement 或 generation 声明。',
-      '没有 Core 提案的普通 unmanaged launch 应保留原 native bootstrap。'
-    ]
   }
 }
 
 /** Each new generic operation has an explicit bilingual purpose and maintained resource example. */
 const rpcAdapterGuides = {
-  'rpc-core:adapter:createEventEmitterMessageResource': guide({
-    ...rpcAdapterGuideContexts.emitter,
-    purposeEn:
-      'Holds an actual emitter message port so Core can observe raw capability ACKs and construct its own exact channel. Fixed stream/batch construction stays synchronous; expanded opening waits for actual peer acceptance.',
-    purposeZh:
-      '持有实际 emitter 消息端口，让 Core 观察原始 capability ACK 并构造自己的精确 channel。固定 stream/batch 构造保持同步；扩展 opening 等待真实 peer 接受。'
-  }),
-  'rpc-core:adapter:createEventTargetMessageResource': guide({
-    ...rpcAdapterGuideContexts.target,
-    purposeEn:
-      'Holds an actual EventTarget message port with the same bounded control receiver. Core owns channel construction and ACK intersection while the native runtime retains Worker termination and supervision.',
-    purposeZh:
-      '用同一有界控制接收端持有实际 EventTarget 消息端口。Core 负责 channel 构造和 ACK 交集；原 runtime 继续拥有 Worker termination 与 supervision。'
-  }),
-  'rpc-core:adapter:prepareAdapterPeer': guide({
-    ...rpcAdapterGuideContexts.emitter,
-    purposeEn:
-      'Preserves the original options identity and genuine Host preparation across native acquisition. Its local context, launch, listener and Peer operations reuse Core owners without publishing a context or generation setter.',
-    purposeZh:
-      '在原生资源获取期间保留原 options 身份与真实 Host preparation。本地 context、launch、listener 和 Peer 操作复用 Core owner，不公开 context 或 generation setter。'
-  }),
-  'rpc-core:adapter:holdAdapterObjectChannel': guide({
-    ...rpcAdapterGuideContexts.object,
-    purposeEn:
-      'Keeps actual object/text I/O cold across local preparation and the real correlated handshake reply. It constructs its own final channel and object-port facts, then closes the same held physical resource.',
-    purposeZh:
-      '在本地准备与真实 correlated handshake reply 期间保留同一冷 object/text I/O。它构造自己的最终 channel 与 object-port 事实，并关闭同一物理资源。'
-  }),
-  'rpc-core:adapter:createRuntimeByteConnection': guide({
-    ...rpcAdapterGuideContexts.byte,
-    purposeEn:
-      'Exchanges framed hello/accept on actual ordered byte I/O, invokes the real authentication verifier and constructs the final gated channel. Accepted capabilities and principal identity stay private to that exact connection.',
-    purposeZh:
-      '在真实有序 byte I/O 上交换 framed hello/accept，调用实际认证 verifier 并构造最终 gated channel。已接受能力与 principal 身份保留在同一连接的私有记录。'
-  }),
-  'rpc-core:adapter:readRuntimeByteBootstrap': guide({
-    ...rpcAdapterGuideContexts.byte,
-    purposeEn:
-      'Reads the actual first framed launch message under the supplied deadline and keeps its private byte snapshot. The same decoder and queued following frame continue into handshake without a second physical reader.',
-    purposeZh:
-      '在给定截止时间内读取真实的首个 framed launch message，并保留其私有字节快照。同一 decoder 与后续排队 frame 移交 handshake，不另装第二个物理 reader。'
-  }),
-  'rpc-core:adapter:createRuntimeEventByteIO': guide({
-    ...rpcAdapterGuideContexts.eventByte,
-    purposeEn:
-      'Constructs raw byte I/O from held event reader, writer and physical-close operations. It observes their real lifetime and subscriber count and may hold an actual byte-view factory for Core-owned native encoding.',
-    purposeZh:
-      '从实际 event reader、writer 与物理关闭操作构造 raw byte I/O。观察其真实寿命和 subscriber count，并可持有实际 byte-view 工厂供 Core 自己构造原生编码器。'
-  }),
-  'rpc-core:adapter:createRuntimeMessageConnection': guide({
-    ...rpcAdapterGuideContexts.message,
-    purposeEn:
-      'Constructs the fixed V1 whole-message profile without hello and enables proposed extensions only from a bounded actual ACK. Missing ACK retains the local fixed subset; malformed control rejects using the existing diagnostics.',
-    purposeZh:
-      '零 hello 构造固定 V1 完整消息 profile，仅从有界真实 ACK 启用本地扩展提案。缺 ACK 时保留本地固定子集；格式错误控制使用原诊断拒绝。'
-  }),
-  'rpc-core:adapter:createRuntimeProviderGovernor': guide({
-    ...rpcAdapterGuideContexts.provider,
-    purposeEn:
-      'Owns the original per-connection rate, payload, idle and violation counters over a real Core channel. Its limits and endpoint operations produce canonical scalar/stream wrappers without exporting reservation or invocation registrars.',
-    purposeZh:
-      '在真实 Core channel 上拥有原每连接 rate、payload、idle 与 violation 计数。limits 和 endpoint 操作生成规范 scalar/stream wrapper，不公开 reservation 或 invocation registrar。'
-  }),
-  'rpc-core:adapter:createRuntimeProviderScope': guide({
-    ...rpcAdapterGuideContexts.provider,
-    purposeEn:
-      'Owns the shared provider admission resource and selected idempotency store. Session scope derives its identity only from exact Core-created channel membership, preserving the existing connection namespace without a signer input.',
-    purposeZh:
-      '拥有共享 provider admission 资源和所选 idempotency store。session scope 只从精确 Core channel 身份导出 identity，保留既有连接 namespace，不接受 signer 输入。'
-  }),
-  'rpc-core:adapter:createAdapterBindingDrain': guide({
-    ...rpcAdapterGuideContexts.provider,
-    purposeEn:
-      'Creates the existing Remote endpoint drain on the held scheduler and reporter. Its wrapping and draining operations preserve the original provider lifetime and close order rather than adding another lifecycle or supervisor.',
-    purposeZh:
-      '使用原 scheduler 与 reporter 创建既有 Remote endpoint drain。包装和排空操作保留原 provider 寿命与关闭顺序，不增加另一套 lifecycle 或 supervisor。'
-  }),
-  'rpc-core:adapter:createAdapterPlugin': guide({
-    ...rpcAdapterGuideContexts.binding,
-    purposeEn:
-      'Assembles a user-level Plugin over its actual adapter binding using the existing Remote installation owner. Optional lifecycle resources receive the real install/release events; their return values do not provide prepared-holder authority.',
-    purposeZh:
-      '用既有 Remote 安装 owner 在实际 adapter binding 上组装用户级 Plugin。可选 lifecycle 资源接收真实安装和释放事件；返回值不提供 prepared-holder 权限。'
-  }),
-  'rpc-core:adapter:holdAdapterRegistration': guide({
-    ...rpcAdapterGuideContexts.binding,
-    purposeEn:
-      'Retains one genuine binding registration and generation holder across prepare, Plugin construction and release. Repeated operations preserve the original owner and cleanup promises without accepting a caller-prepared holder.',
-    purposeZh:
-      '在 prepare、Plugin 构造和 release 之间保留同一真实 binding registration 与 generation holder。重复操作保留原 owner 和 cleanup Promise，不接受调用方 prepared holder。'
-  }),
-  'rpc-core:adapter:holdAdapterLaunch': guide({
-    ...rpcAdapterGuideContexts.launch,
-    purposeEn:
-      'Reads Core-attached local launch metadata only from the exact held launch request. It helps the native launcher encode its original bootstrap and exposes no public writer for Host, generation or accepted capability facts.',
-    purposeZh:
-      '仅从实际持有的原 launch request 读取 Core 附加的本地启动 metadata。用于原生 launcher 编码原 bootstrap，不公开 Host、generation 或已接受能力事实的 writer。'
-  }),
-  'rpc-core:adapter:createAdapterId': guide({
-    ...rpcAdapterGuideContexts.data,
-    purposeEn:
-      "Allocates an ordinary local resource address through Core's existing ID owner. The value is configuration and presentation data; it does not authenticate a peer or prove execution, carrier or provider ownership.",
-    purposeZh:
-      '通过 Core 既有 ID owner 分配普通本地资源地址。其值是配置和展示数据，不认证 peer，也不证明 execution、carrier 或 provider 所有权。'
-  }),
-  'rpc-core:adapter:readAdapterAbortReason': guide({
-    ...rpcAdapterGuideContexts.data,
-    purposeEn:
-      "Reads the actual signal's guarded abort reason without replacing its identity or creating a new cancellation. Adapters use the original reason when an owned preparation attempt observes cancellation.",
-    purposeZh:
-      '读取真实 signal 的受保护 abort reason，不替换其身份或制造新取消。adapter 在所属准备尝试观察取消时继续使用同一原 reason。'
-  }),
-  'rpc-core:adapter:validateAdapterPeerTimeout': guide({
-    ...rpcAdapterGuideContexts.data,
-    purposeEn:
-      'Validates the original local Peer default timeout before native discovery or I/O acquisition. It reuses the existing timeout owner and failure semantics rather than supplying an alternate deadline policy.',
-    purposeZh:
-      '在原生发现或 I/O 获取前校验本地 Peer 原默认 timeout。复用既有 timeout owner 与失败语义，不提供另一套 deadline policy。'
-  }),
-  'rpc-core:adapter:validateAdapterPeerMethods': guide({
-    ...rpcAdapterGuideContexts.data,
-    purposeEn:
-      'Compiles actual local provider declarations through the existing method and contract admission before bootstrap readers are installed. This is local validation, not remote directory acceptance or a capability registrar.',
-    purposeZh:
-      '在 bootstrap reader 安装前，通过既有 method 和 contract 准入编译实际本地 provider 声明。这是本地校验，不是远端目录接受或 capability registrar。'
-  }),
-  'rpc-core:adapter:normalizeAdapterDescription': guide({
-    ...rpcAdapterGuideContexts.data,
-    purposeEn:
-      'Normalizes a received Runtime directory as ordinary data using the canonical Remote grammar. The output describes methods and identity but cannot replace a negotiated channel or register Host and provider authority.',
-    purposeZh:
-      '使用规范 Remote grammar 将收到的 Runtime 目录归一化为普通数据。输出描述 methods 与 identity，但不能代替协商 channel，也不能登记 Host 或 provider 权限。'
-  }),
-  'rpc-core:adapter:adapterContractRequiresStream': guide({
-    ...rpcAdapterGuideContexts.data,
-    purposeEn:
-      'Inspects the admitted local contract for required stream operations before a carrier is selected. It preserves the existing stream-exclusion decision without enabling stream capability or creating a second contract compiler.',
-    purposeZh:
-      '在选择载体前检查已接纳本地 contract 是否需要 stream 操作。保留原 stream-exclusion 判断，不启用 stream 能力，也不创建第二套 contract compiler。'
-  }),
-  'rpc-core:adapter:materializeAdapterJson': guide({
-    ...rpcAdapterGuideContexts.data,
-    purposeEn:
-      "Produces the ordinary JSON view used by object carriers through Core's canonical materializer. The returned data does not carry a sender-owned snapshot, fast codec identity or transport qualification.",
-    purposeZh:
-      '通过 Core 规范 materializer 生成 object carrier 使用的普通 JSON 视图。返回数据不携带 sender-owned snapshot、fast codec 身份或 transport 资格。'
-  }),
-  'rpc-core:adapter:createAdapterConfigurationError': guide({
-    ...rpcAdapterGuideContexts.errors,
-    purposeEn:
-      "Constructs the established INVALID_CONFIG diagnostic with the adapter's maintained display text. It accepts no arbitrary Core code or target error and does not grant live cancellation, retry or close identity.",
-    purposeZh:
-      '使用 adapter 维护的展示文本构造既有 INVALID_CONFIG 诊断。不接受任意 Core code 或目标 error，也不授予实际取消、重试或关闭身份。'
-  }),
-  'rpc-core:adapter:createAdapterConfigurationTypeError': guide({
-    ...rpcAdapterGuideContexts.errors,
-    purposeEn:
-      "Constructs the established native TypeError configuration diagnostic inside Core while preserving an actual supplied cause. It keeps public diagnostic presentation separate from Core's private live-control error identity.",
-    purposeZh:
-      '在 Core 内构造既有原生 TypeError 配置诊断，并保留真实传入 cause。公开诊断展示与 Core 私有 live-control error 身份保持分离。'
-  }),
-  'rpc-core:adapter:createAdapterSourceConfigurationError': guide({
-    ...rpcAdapterGuideContexts.errors,
-    purposeEn:
-      "Constructs only the fixed original source-conflict configuration failure. Its no-argument operation preserves Core's canonical private text without exposing a diagnostic text catalog or accepting a code selector.",
-    purposeZh:
-      '仅构造固定的原 source-conflict 配置失败。无参数操作保留 Core 规范私有文本，不公开诊断文本目录，也不接受 code selector。'
-  }),
-  'rpc-core:adapter:createAdapterTransportError': guide({
-    ...rpcAdapterGuideContexts.errors,
-    purposeEn:
-      "Presents an actual carrier failure with the established transport error family and reachable original cause. Construction is diagnostic only; the connection owner's observed state continues to decide physical retirement.",
-    purposeZh:
-      '用既有 transport error family 展示真实载体失败，并保持原 cause 可追溯。构造仅提供诊断；物理退出仍由连接 owner 观察到的实际状态决定。'
-  }),
   'rpc-process:index:createProcessChannelClosedError': guide({
     ...rpcAdapterGuideContexts.errors,
     quickStart: `import { createProcessChannelClosedError } from '@migaia/rpc-process'
@@ -3753,7 +2855,7 @@ export function projectNativeClosure(cause?: unknown) {
   'rpc-process:index:openProcessObjectChannel': guide({
     ...rpcAdapterGuideContexts.object,
     quickStart: `import { openProcessObjectChannel, type IProcessCommonOptions } from '@migaia/rpc-process'
-import type { IRuntimeObjectConnection } from '@migaia/rpc-core/adapter'
+import type { IRuntimeObjectConnection } from '@migaia/rpc-core/adapter/internal-advanced'
 
 /** The same held Core connection has completed its actual object handshake. */
 export function adoptProcessObjectConnection(connection: IRuntimeObjectConnection, options: IProcessCommonOptions) {
@@ -4462,32 +3564,6 @@ console.log(IpcReporterContext)`,
       '把诊断元数据当作原资源或错误 owner 的替代物。'
     ]
   }),
-  'rpc-core:adapter/internal-advanced:carrierSizeBytes': guide({
-    purposeEn:
-      'Reads already-known native ArrayBuffer or view byte extents with intrinsic slots. Strings and opaque containers return -1, avoiding payload scans, encoding and negative-brand exceptions in metadata observation.',
-    purposeZh:
-      '通过 intrinsic slot 读取已知 native ArrayBuffer 或 view 字节跨度；字符串与 opaque container 返回 -1，避免元数据观察中的 payload 扫描、编码与负向品牌探测异常。',
-    quickStart: `import { carrierSizeBytes } from '@migaia/rpc-core/adapter/internal-advanced'
-
-console.log(carrierSizeBytes(new Uint8Array([1, 2]))) // 2
-console.log(carrierSizeBytes('payload')) // -1`,
-    useEn: [
-      'Reuse the existing Core owner for carrier metadata without scanning payload members.',
-      'Read a native byte span that the physical layer already owns.'
-    ],
-    useZh: [
-      '复用 Core owner 读取载体元数据，不扫描 payload 成员。',
-      '读取物理层已经拥有的 native byte span。'
-    ],
-    avoidEn: [
-      'Using this cold metadata contract as a new business-path validator.',
-      'Assuming diagnostic metadata replaces the original resource or error owner.'
-    ],
-    avoidZh: [
-      '把冷元数据契约作为新的业务路径验证器。',
-      '把诊断元数据当作原资源或错误 owner 的替代物。'
-    ]
-  }),
   'rpc-core:probe:RpcProbeStage': probeValueGuide({
     name: 'RpcProbeStage',
     expression: 'RpcProbeStage.message',
@@ -5172,8 +4248,6 @@ console.log(record.header.version)`,
       '没有显式 RPC 序列化，就把离线原生 Error 当作 service wire error。'
     ]
   }),
-  'rpc-devtools:index:RpcDevtoolsErrorCode': rpcDevtoolsErrorGuide,
-  'rpc-devtools:index:RPC_DEVTOOLS_SOURCE': rpcDevtoolsErrorGuide,
   'rpc-devtools:contract:RpcDevtoolsErrorCode': rpcDevtoolsErrorGuide,
   'rpc-devtools:contract:RPC_DEVTOOLS_SOURCE': rpcDevtoolsErrorGuide
 } satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>

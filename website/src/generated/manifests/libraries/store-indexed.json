@@ -214,7 +214,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "if (event.operation === IndexedOperation.write) reportMutation(event)"
+                "code": "// event 是消费方自己的诊断事件；operation 字段用 IndexedOperation 词表取值\nconst reportMutation = (event: { operation: IIndexedOperation }) => console.log('mutation', event)\nconst event: { operation: IIndexedOperation } = { operation: IndexedOperation.write }\nif (event.operation === IndexedOperation.write) reportMutation(event)"
               },
               {
                 "type": "paragraph",
@@ -1755,7 +1755,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IIndexedOperation.",
           "examples": [
             "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'",
-            "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]"
+            "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]",
+            "// event 是消费方自己的诊断事件；operation 字段用 IndexedOperation 词表取值\nconst reportMutation = (event: { operation: IIndexedOperation }) => console.log('mutation', event)\nconst event: { operation: IIndexedOperation } = { operation: IndexedOperation.write }\nif (event.operation === IndexedOperation.write) reportMutation(event)"
           ],
           "members": [],
           "aliasOf": "IIndexedOperation",
@@ -1802,7 +1803,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-indexed/dist/indexed-constants.d.ts:IIndexedOperation:export type IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];",
           "guidance": [],
-          "usageScore": 24,
+          "usageScore": 28,
           "configuration": [],
           "fragment": "store-indexed-index--IIndexedOperation"
         },
@@ -1823,7 +1824,7 @@
           "examples": [
             "import { IndexedOperation, type IIndexedOperation } from '@migaia/store-indexed'",
             "const IndexedOperation = {\n  read: 'read',\n  write: 'write',\n  delete: 'delete'\n} as const\ntype IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation]",
-            "if (event.operation === IndexedOperation.write) reportMutation(event)"
+            "// event 是消费方自己的诊断事件；operation 字段用 IndexedOperation 词表取值\nconst reportMutation = (event: { operation: IIndexedOperation }) => console.log('mutation', event)\nconst event: { operation: IIndexedOperation } = { operation: IndexedOperation.write }\nif (event.operation === IndexedOperation.write) reportMutation(event)"
           ],
           "members": [],
           "aliasOf": "IndexedOperation",
@@ -1870,7 +1871,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-indexed/dist/indexed-constants.d.ts:IndexedOperation:export declare const IndexedOperation: { readonly read: \"read\"; readonly write: \"write\"; readonly delete: \"delete\"; };",
           "guidance": [],
-          "usageScore": 46,
+          "usageScore": 50,
           "configuration": [],
           "fragment": "store-indexed-index--IndexedOperation"
         },

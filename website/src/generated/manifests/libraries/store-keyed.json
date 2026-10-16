@@ -708,7 +708,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`familyDisposed`(`FAMILY_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`evictionFailed`(`EVICTION_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
+                "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
               },
               {
                 "type": "paragraph",
@@ -810,7 +810,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
+                "code": "import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst todosDef = atomDef([{ done: true }, { done: false }])\nconst doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
               }
             ]
           },
@@ -1502,7 +1502,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
               },
               {
                 "type": "table",
@@ -1642,18 +1642,11 @@
                     "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                   ],
                   [
-                    "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                    "`AtomStore.dispose()`（多项失败）",
                     "`AggregateError`",
                     "`DISPOSAL_FAILED`",
                     "`atom store disposal failed` / `family disposal failed for multiple entries`",
                     "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                  ],
-                  [
-                    "家族容量淘汰（多项失败）",
-                    "`AggregateError`",
-                    "`EVICTION_FAILED`",
-                    "`family capacity eviction failed for multiple entries`",
-                    "容量淘汰时多个条目淘汰失败。"
                   ],
                   [
                     "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -2086,7 +2079,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -2226,18 +2219,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -2409,7 +2395,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`familyDisposed`(`FAMILY_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`evictionFailed`(`EVICTION_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
+                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
                 },
                 {
                   "type": "paragraph",
@@ -2585,7 +2571,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`familyDisposed`(`FAMILY_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`evictionFailed`(`EVICTION_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
+                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
                 },
                 {
                   "type": "paragraph",
@@ -2761,7 +2747,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`familyDisposed`(`FAMILY_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`evictionFailed`(`EVICTION_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
+                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
                 },
                 {
                   "type": "paragraph",
@@ -2937,7 +2923,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`familyDisposed`(`FAMILY_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`evictionFailed`(`EVICTION_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
+                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
                 },
                 {
                   "type": "paragraph",
@@ -3063,7 +3049,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -3203,18 +3189,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -3356,7 +3335,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -3496,18 +3475,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -3904,7 +3876,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -4044,18 +4016,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -4941,7 +4906,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -5081,18 +5046,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -5707,7 +5665,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -5847,18 +5805,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -5998,7 +5949,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`familyDisposed`(`FAMILY_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`evictionFailed`(`EVICTION_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
+                  "text": "全部取值：`atomStoreDisposed`(`ATOM_STORE_DISPOSED`)、`disposalFailed`(`DISPOSAL_FAILED`)、`circularPreview`(`CIRCULAR_PREVIEW`)、`cyclicOverride`(`CYCLIC_OVERRIDE`)、`overrideContract`(`OVERRIDE_CONTRACT`)、`previewUnsafe`(`PREVIEW_UNSAFE`)、`crossRuntime`(`CROSS_RUNTIME`)、`envUnsupported`(`ENV_UNSUPPORTED`)、`invalidOption`(`INVALID_OPTION`)。"
                 },
                 {
                   "type": "paragraph",
@@ -6133,7 +6084,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -6273,18 +6224,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -6622,7 +6566,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -6762,18 +6706,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -6819,7 +6756,8 @@
           "examples": [
             "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\n// —— 模块顶层：只建一次，纯描述，不含状态 ——\nconst sessionDef = atomDef<ISessionState>({\n  user: { name: 'guest' },\n  todos: []\n})\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\n// 每个会话各自的运行时状态由 familyDef 按 sessionId 缓存 token,\n// 但真正落地成值仍要经某个 AtomStore\nconst sessionBySessionId = familyDef((sessionId: string) => ({\n  user: { name: 'guest' },\n  todos: [] as ITodo[]\n}))\n\nfunction openSession(runtime: IRuntime, sessionId: string): IAtomStore {\n  const store = createAtomStore(runtime)\n  const state = sessionBySessionId(sessionId)\n  store.set(state, (previous) => ({ ...previous, user: { name: 'ada' } }))\n  return store\n}\n\n// —— 用法 ——\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\ntodosSplit.insert(store, { id: 't2', text: '发版', done: false })\n\nconst item = todosSplit.of('t1')\nstore.set(item, (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nconst unsubscribe = store.sub(doneCountDef, () => {\n  console.log('doneCount ->', store.peek(doneCountDef))\n})\n\n// —— 测试里替换某个定义的实现 ——\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999) // 只读定义可以路由到任意同值类型定义\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留\n\nunsubscribe()\ntodosSplit.remove(store, 't2')\ntodosSplit.prune(store) // 只清 splitDef 自己的 key 缓存\nstore.dispose() // 释放这个作用域建出的全部实例",
             "const count = atomDef(0, 'count')",
-            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例"
+            "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例",
+            "import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst todosDef = atomDef([{ done: true }, { done: false }])\nconst doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -6885,7 +6823,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -7025,18 +6963,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -7050,7 +6981,7 @@
               ]
             }
           ],
-          "usageScore": 84,
+          "usageScore": 94,
           "configuration": [],
           "fragment": "store-keyed-atom/definition--atomDef"
         },
@@ -7144,7 +7075,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -7284,18 +7215,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -7352,7 +7276,7 @@
             "const doubled = derivedDef((get) => get(count) * 2, 'doubled')",
             "const undo = store.override(\n  doubled,\n  derivedDef(() => 999)\n) // 只读定义可路由到任意同值定义\nundo() // 撤销，状态原样保留",
             "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例",
-            "import { createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
+            "import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst todosDef = atomDef([{ done: true }, { done: false }])\nconst doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
           ],
           "members": [],
           "exportPath": "./atom/definition",
@@ -7423,7 +7347,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -7563,18 +7487,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -7588,7 +7505,7 @@
               ]
             }
           ],
-          "usageScore": 114,
+          "usageScore": 116,
           "configuration": [],
           "fragment": "store-keyed-atom/definition--derivedDef"
         },
@@ -8614,7 +8531,7 @@
             "const store = createAtomStore(createRuntime())",
             "import { createRuntime, type IRuntime } from '@migaia/reactive'\nimport {\n  atomDef,\n  derivedDef,\n  createAtomStore,\n  focusDef,\n  splitDef,\n  familyDef,\n  type IAtomStore\n} from '@migaia/store-keyed'\n\ntype ITodo = { id: string; text: string; done: boolean }\ntype ISessionState = { user: { name: string }; todos: readonly ITodo[] }\n\nconst sessionDef = atomDef<ISessionState>({ user: { name: 'guest' }, todos: [] })\nconst userNameDef = focusDef(sessionDef, 'user', 'name')\nconst todosSplit = splitDef(focusDef(sessionDef, 'todos'), (todo) => todo.id)\nconst doneCountDef = derivedDef(\n  (get) => get(focusDef(sessionDef, 'todos')).filter((todo) => todo.done).length\n)\n\nconst runtime = createRuntime()\nconst store = createAtomStore(runtime)\n\nstore.set(userNameDef, 'ada')\ntodosSplit.insert(store, { id: 't1', text: '写文档', done: false })\nstore.set(todosSplit.of('t1'), (previous) => ({ ...previous, done: true }))\nconsole.log(store.get(doneCountDef)) // 1\n\nstore.dispose() // 释放这个作用域建出的全部实例",
             "import { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport type { IRuntime } from '@migaia/reactive'\n\nconst sessionByChatId = familyDef((chatId: string) => ({ messages: [] as string[] }))\n\nfunction openChat(runtime: IRuntime, chatId: string) {\n  const store = createAtomStore(runtime)\n  const state = sessionByChatId(chatId) // 同一 chatId 在任意作用域下都是同一个 token\n  store.set(state, (previous) => ({ messages: [...previous.messages, 'hi'] }))\n  return store\n}",
-            "import { createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
+            "import { atomDef, createAtomStore, derivedDef } from '@migaia/store-keyed'\nimport { createRuntime } from '@migaia/reactive'\n\nconst todosDef = atomDef([{ done: true }, { done: false }])\nconst doneCountDef = derivedDef((get) => get(todosDef).filter((todo) => todo.done).length)\nconst store = createAtomStore(createRuntime())\nconst undo = store.override(\n  doneCountDef,\n  derivedDef(() => 999)\n)\nconsole.log(store.get(doneCountDef)) // 999\nundo() // 撤销后状态原样保留"
           ],
           "members": [],
           "exportPath": "./atom/store",
@@ -8917,7 +8834,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -9057,18 +8974,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",
@@ -9166,7 +9076,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  familyDisposed: 'FAMILY_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  evictionFailed: 'EVICTION_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
+                  "code": "const StoreKeyedErrorCode = {\n  atomStoreDisposed: 'ATOM_STORE_DISPOSED',\n  disposalFailed: 'DISPOSAL_FAILED',\n  circularPreview: 'CIRCULAR_PREVIEW',\n  cyclicOverride: 'CYCLIC_OVERRIDE',\n  overrideContract: 'OVERRIDE_CONTRACT',\n  previewUnsafe: 'PREVIEW_UNSAFE',\n  crossRuntime: 'CROSS_RUNTIME',\n  envUnsupported: 'ENV_UNSUPPORTED',\n  invalidOption: 'INVALID_OPTION'\n} as const\ntype IStoreKeyedErrorCode = (typeof StoreKeyedErrorCode)[keyof typeof StoreKeyedErrorCode]"
                 },
                 {
                   "type": "table",
@@ -9306,18 +9216,11 @@
                       "实例式 atom 的 `runtime` 与调用方绑定的 runtime 不一致。"
                     ],
                     [
-                      "`AtomStore.dispose()` / `family.dispose()`（多项失败）",
+                      "`AtomStore.dispose()`（多项失败）",
                       "`AggregateError`",
                       "`DISPOSAL_FAILED`",
                       "`atom store disposal failed` / `family disposal failed for multiple entries`",
                       "释放多个实例/条目时不止一个抛错，原因各自保留在 `errors[]`。"
-                    ],
-                    [
-                      "家族容量淘汰（多项失败）",
-                      "`AggregateError`",
-                      "`EVICTION_FAILED`",
-                      "`family capacity eviction failed for multiple entries`",
-                      "容量淘汰时多个条目淘汰失败。"
                     ],
                     [
                       "`AtomStore` 内部所有权登记（继承自 `@migaia/reactive`）",

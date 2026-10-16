@@ -69,7 +69,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';"
+                "code": "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';"
               },
               {
                 "type": "paragraph",
@@ -153,16 +153,16 @@
               },
               {
                 "type": "paragraph",
-                "text": "`StoreMiddlewareHost`｜10 秒上手 —— `createStoreMiddlewareHost()` 背后的类，`extends PluginHost`："
+                "text": "`IStoreMiddlewareHost<S>`｜10 秒上手 —— `createStoreMiddlewareHost()` 返回的冻结句柄（不是类，没有 `new`）。它通过 `@migaia/plugin-host` 的 `defineHost` 组合而成，同时带有宿主公共成员（`use`/`unUse`/`dispose` 等）和下面的 Store 领域成员："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const host = new StoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state\n});\nhost.runAction('increment', () => {\n  state = { ...state, count: state.count + 1 };\n});\n  await host.dispose(); // returns the structured PluginHost disposal result"
+                "code": "import { createRuntime } from '@migaia/reactive';\nimport { createStoreMiddlewareHost } from '@migaia/store-middleware';\n\nconst runtime = createRuntime();\nlet state = { count: 0 };\nconst host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state\n});\nhost.runAction('increment', () => {\n  state = { ...state, count: state.count + 1 };\n});\nawait host.dispose(); // returns the structured PluginHost disposal result"
               },
               {
                 "type": "paragraph",
-                "text": "构造参数同 `createStoreMiddlewareHost`。实例成员："
+                "text": "领域成员："
               },
               {
                 "type": "list",
@@ -174,7 +174,7 @@
                   "`recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void` —— 派发一个 `error` 事件；重入（处理上一个 `error` 事件期间又调用）时直接转发给 `runtime.reportError`，不再触发一轮 pipeline",
                   "`connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>` —— `name` 默认 `'store-devtools'`",
                   "`attachBindingDisposer(disposer: IDisposer): void` —— 登记额外的清理函数，`dispose()` 时按后进先出顺序先于插件卸载执行",
-                  "`override dispose(): Promise<void>` —— 稳定 Promise（重复调用返回同一个）；多项清理失败抛 `code: 'CLEANUP_FAILED'` 的 `AggregateError`"
+                  "`dispose()` —— 先逆序执行绑定 disposer，再委托 plugin-host 卸载插件；返回结构化结果 `{ logicalTerminal, cleanupComplete, cleanupErrors }`，绑定 disposer 抛出的错误排在 `cleanupErrors` 前面，不会以异常形式抛出"
                 ]
               },
               {
@@ -232,7 +232,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "返回值是 `StoreMiddlewareHost` 实例，额外挂了只读的 `store` 属性指回传入的 Store。"
+                "text": "返回值是一个新的冻结对象：带有 `IStoreMiddlewareHost` 的全部成员，外加只读的 `store` 属性指回传入的 Store。若绑定过程中订阅失败且回滚清理也失败，`bindStoreMiddleware()` 抛 `code: 'CLEANUP_FAILED'` 的 `AggregateError`（原始错误位于 `errors[0]`）。"
               },
               {
                 "type": "paragraph",
@@ -352,7 +352,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "与根导出中同名的 `ClonePolicy`/`immutableSnapshotClone`/`opaqueReferenceClone`/`diagnosticClone`/`tolerantClone` 是同一份实现（根导出 `export * from './tolerant-clone.js'`）；这个子路径只是给只需要克隆策略、不想连带引入 `StoreMiddlewareHost`/`bindStoreMiddleware` 等其余符号的调用方一个更窄的导入面。用法与全部选项见上方根导出对应条目。"
+                "text": "与根导出中同名的 `ClonePolicy`/`immutableSnapshotClone`/`opaqueReferenceClone`/`diagnosticClone`/`tolerantClone` 是同一份实现（根导出 `export * from './tolerant-clone.js'`）；这个子路径只是给只需要克隆策略、不想连带引入 `createStoreMiddlewareHost`/`bindStoreMiddleware` 等其余符号的调用方一个更窄的导入面。用法与全部选项见上方根导出对应条目。"
               }
             ]
           },
@@ -363,7 +363,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();"
+                "code": "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware<Record<string, unknown>>());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();"
               }
             ]
           },
@@ -442,7 +442,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "1. 定位与依赖关系 2. 事件模型 3. MutationPolicy 写入策略 4. StoreMiddlewareHost API 参考 5. bindStoreMiddleware 完整行为 6. 编写中间件插件 7. DevTools 集成 8. ClonePolicy 克隆策略 9. Pipeline 模式与错误边界 10. 生命周期与资源释放 11. 与相关包的关系 12. 常见问题排查"
+                "text": "1. 定位与依赖关系 2. 事件模型 3. MutationPolicy 写入策略 4. IStoreMiddlewareHost API 参考 5. bindStoreMiddleware 完整行为 6. 编写中间件插件 7. DevTools 集成 8. ClonePolicy 克隆策略 9. Pipeline 模式与错误边界 10. 生命周期与资源释放 11. 与相关包的关系 12. 常见问题排查"
               }
             ]
           },
@@ -452,12 +452,12 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "`@migaia/store-middleware` 依赖 `@migaia/store-light`（Store 本体）、`@migaia/reactive`（Runtime）和 `@migaia/plugin-host`（通用插件宿主机制）。它自己不实现插件安装/卸载/资源清理这些通用能力，全部通过继承 `PluginHost` 复用；这一层只负责\"Store 领域该有哪些事件、哪些写入策略\"。"
+                "text": "`@migaia/store-middleware` 依赖 `@migaia/store-light`（Store 本体）、`@migaia/reactive`（Runtime）和 `@migaia/plugin-host`（通用插件宿主机制）。它自己不实现插件安装/卸载/资源清理这些通用能力，全部通过 `@migaia/plugin-host` 的 `defineHost` 组合复用；这一层只负责\"Store 领域该有哪些事件、哪些写入策略\"。"
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { StoreMiddlewareHost } from '@migaia/store-middleware';\n// StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>>"
+                "code": "import { createStoreMiddlewareHost, type IStoreMiddlewareHost } from '@migaia/store-middleware';\n// IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Store 领域成员"
               },
               {
                 "type": "paragraph",
@@ -559,17 +559,17 @@
             ]
           },
           {
-            "id": "4-storemiddlewarehost-api-参考",
-            "heading": "4. StoreMiddlewareHost API 参考",
+            "id": "4-istoremiddlewarehost-api-参考",
+            "heading": "4. IStoreMiddlewareHost API 参考",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {\n  readonly mutationPolicy: MutationPolicy;\n  constructor(options: IStoreMiddlewareHostOptions<S>);\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n  override dispose(): Promise<void>;\n}\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};"
+                "code": "function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;\n\n// 冻结句柄：IHostHandle 的公共成员（use/unUse/dispose 等）加下列 Store 领域成员\ntype IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & {\n  readonly mutationPolicy: MutationPolicy;\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n};\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};"
               },
               {
                 "type": "paragraph",
-                "text": "构造函数会强制把 pipeline 模式覆盖成 `'sync'`——即便 `options.pipeline.mode` 传了别的值也会被覆盖。原因：Store 领域事件要求同步、可预测的处理顺序，中间件不应该让一次状态变化的观察产生跨微任务的乱序。这意味着所有中间件插件只能用 `core.usePipeline`，调用 `core.useAsyncPipeline`/`core.useGeneratorPipeline` 会触发 `@migaia/plugin-host` 的 `PIPELINE_MODE_MISMATCH` 错误。"
+                "text": "`createStoreMiddlewareHost()` 会强制把 pipeline 模式覆盖成 `'sync'`——即便 `options.pipeline.mode` 传了别的值也会被覆盖。原因：Store 领域事件要求同步、可预测的处理顺序，中间件不应该让一次状态变化的观察产生跨微任务的乱序。这意味着所有中间件插件只能用 `core.usePipeline`，调用 `core.useAsyncPipeline`/`core.useGeneratorPipeline` 会触发 `@migaia/plugin-host` 的 `PIPELINE_MODE_MISMATCH` 错误。"
               },
               {
                 "type": "table",
@@ -608,7 +608,7 @@
                     "`adapter: IDevToolsAdapter<S>`；`name?: string`",
                     "异步",
                     "见 §7",
-                    "安装失败按 `PluginHost.use()` 的规则处理"
+                    "安装失败按 `host.use()` 的规则处理"
                   ],
                   [
                     "`attachBindingDisposer(disposer)`",
@@ -641,7 +641,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 structuredClone\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
+                "code": "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 ClonePolicy.diagnostic\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
               },
               {
                 "type": "paragraph",
@@ -649,7 +649,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `structuredClone`，因此每次读取都是一份新的独立快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。"
+                "text": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `ClonePolicy.diagnostic`（尽力深拷贝，不抛错），因此每次读取都是一份新的快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。"
               },
               {
                 "type": "paragraph",
@@ -671,7 +671,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "返回值是 `StoreMiddlewareHost` 实例本身，额外挂了一个只读的 `store` 属性指回传入的 Store，方便拿到 Host 后还能访问原始 Store。"
+                "text": "返回值是一个新的冻结对象：带有 Host 句柄的全部成员，额外挂了一个只读的 `store` 属性指回传入的 Store，方便拿到 Host 后还能访问原始 Store。"
               }
             ]
           },
@@ -805,7 +805,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`bindStoreMiddleware()` 默认用的是 `state => structuredClone(state)`，语义上等同于手写了一份不带错误兜底的 `immutable`。如果 Store 状态里可能出现不可结构化克隆的值（比如存了一个类实例、`Map`、外部句柄），默认 `clone` 会直接抛错；这种情况下应该显式传 `options.clone: ClonePolicy.diagnostic`（保留诊断可用性）或 `ClonePolicy.opaque`（接受引用共享、换取零开销）。"
+                "text": "`bindStoreMiddleware()` 默认用的是 `state => ClonePolicy.diagnostic(state)`：尽力深拷贝，遇到不可结构化克隆的值（类实例、外部句柄等）时按引用保留那个子树，不抛错。需要严格独立快照时显式传 `options.clone: ClonePolicy.immutable`（做不到就抛错）；接受引用共享、换取零开销时传 `ClonePolicy.opaque`。"
               },
               {
                 "type": "paragraph",
@@ -819,18 +819,18 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "包边界错误带 `source: '@migaia/store-middleware'` 与稳定 `code`。`actions-only` 越界写入为 `ACTION_SCOPE_REQUIRED`；不可克隆值为 `CLONE_UNSUPPORTED`；遗漏 `next()` 只经 Runtime 报告 `MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；多项清理失败为 `CLEANUP_FAILED`。"
+                "text": "包边界错误带 `source: '@migaia/store-middleware'` 与稳定 `code`。`actions-only` 越界写入为 `ACTION_SCOPE_REQUIRED`；不可克隆值为 `CLONE_UNSUPPORTED`；遗漏 `next()` 只经 Runtime 报告 `MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；`bindStoreMiddleware()` 绑定失败且回滚清理也失败时为 `CLEANUP_FAILED`。"
               },
               {
                 "type": "paragraph",
-                "text": "`StoreMiddlewareHost` 的 pipeline 模式固定是 `sync`（见 §4），这决定了："
+                "text": "Host 的 pipeline 模式固定是 `sync`（见 §4），这决定了："
               },
               {
                 "type": "list",
                 "items": [
                   "中间件只能用 `core.usePipeline((event, next) => void)`，`next(event)` 必须在 stage 函数返回前调用。",
                   "sync 是\"扁平转换管道\"：`next()` 只是记录下一个值，下游 stage 在当前 stage 返回之后才执行，当前 stage 调用 `next()` 之后无法同步观察到下游已经处理完的结果（想要\"后置逻辑能看到下游效果\"的洋葱模型语义，需要 async pipeline——但本包的 Host 不支持切换）。",
-                  "`emit()`/`runAction()`/`recordState()`/`recordError()` 内部统一走 `#emitIsolated()`：中间件 stage 抛出的异常会被捕获，通过 `runtime.reportError(error, { phase: 'trace-listener' })` 上报，不会从 `recordState()`/`recordError()` 等调用点抛出；唯一的例外是 `runAction()` 包裹的业务函数本身抛错——那是业务异常，会原样重新抛出给调用方。",
+                  "`emit()`/`runAction()`/`recordState()`/`recordError()` 内部统一走隔离派发（`emitIsolated`）：中间件 stage 抛出的异常会被捕获，通过 `runtime.reportError(error, { phase: 'trace-listener' })` 上报，不会从 `recordState()`/`recordError()` 等调用点抛出；唯一的例外是 `runAction()` 包裹的业务函数本身抛错——那是业务异常，会原样重新抛出给调用方。",
                   "如果一个 pipeline stage 忘了调用 `next()`，`emit()` 会检测到 `completed` 标记未被置位，同样以 `phase: 'trace-listener'` 上报一条 `[store] middleware did not call next()` 错误。"
                 ]
               },
@@ -848,7 +848,7 @@
                 "type": "list",
                 "items": [
                   "`host.use(plugin)` / `host.unUse(name)` / `host.dispose()` 都是异步 API，语义完全继承自 `@migaia/plugin-host`——安装失败自动回滚，卸载资源自动逆序清理。",
-                  "`StoreMiddlewareHost` 重写了 `dispose()`：先按后进先出顺序执行 `attachBindingDisposer()` 登记的 disposer（`bindStoreMiddleware()` 用它登记状态订阅和 trace 订阅的取消函数），再调用 `super.dispose()` 卸载所有已安装插件。",
+                  "Host 通过 `defineHost` 的 `dispose` 钩子：先按后进先出顺序执行 `attachBindingDisposer()` 登记的 disposer（`bindStoreMiddleware()` 用它登记状态订阅和 trace 订阅的取消函数），再委托 plugin-host 卸载所有已安装插件。结果是结构化的 `{ logicalTerminal, cleanupComplete, cleanupErrors }`，绑定 disposer 的错误排在 `cleanupErrors` 前面，不以异常抛出。",
                   "`host.dispose()` 不会销毁 Store 或 Runtime，只释放这个 middleware Host 自己拥有的资源（订阅、已安装插件）。",
                   "同一个 Host 内插件名称必须唯一；重复安装同名插件会按 `@migaia/plugin-host` 的规则报错。",
                   "middleware 诊断层的失败不应该、也不会阻断业务写入；真正的业务异常仍按原始异常传播（见 §9）。"
@@ -899,19 +899,19 @@
               },
               {
                 "type": "paragraph",
-                "text": "Q：装了一个用 `useAsyncPipeline` 注册 stage 的插件，报 `PIPELINE_MODE_MISMATCH`。 `StoreMiddlewareHost` 的 pipeline 模式固定是 `sync`，构造时传的 `pipeline.mode` 会被强制覆盖，见 §4。中间件只能用 `core.usePipeline`。"
+                "text": "Q：装了一个用 `useAsyncPipeline` 注册 stage 的插件，报 `PIPELINE_MODE_MISMATCH`。 Host 的 pipeline 模式固定是 `sync`，创建时传的 `pipeline.mode` 会被强制覆盖，见 §4。中间件只能用 `core.usePipeline`。"
               },
               {
                 "type": "paragraph",
-                "text": "Q：`connectDevTools()` 报错 `[store] DevTools state command requires applyState`。 构造 `StoreMiddlewareHost` 时没有传 `applyState`；如果是自己 `new StoreMiddlewareHost(.)` 而不是用 `bindStoreMiddleware()`，需要手动提供 `applyState` 才能支持 DevTools 的 `jump`/`reset`。"
+                "text": "Q：`connectDevTools()` 报错 `[store] DevTools state command requires applyState`。 创建 Host 时没有传 `applyState`；如果是自己调用 `createStoreMiddlewareHost(.)` 而不是用 `bindStoreMiddleware()`，需要手动提供 `applyState` 才能支持 DevTools 的 `jump`/`reset`。"
               },
               {
                 "type": "paragraph",
-                "text": "Q：`state` 事件里的 `previous`/`next` 拿到的是同一个对象，改了一个另一个也变了。 检查是否自定义了 `options.clone` 且传的是 `ClonePolicy.opaque`（有意不拷贝，返回同一引用）——如果需要独立快照，用默认的 `structuredClone` 或显式传 `ClonePolicy.immutable`/`ClonePolicy.diagnostic`。"
+                "text": "Q：`state` 事件里的 `previous`/`next` 拿到的是同一个对象，改了一个另一个也变了。 检查是否自定义了 `options.clone` 且传的是 `ClonePolicy.opaque`（有意不拷贝，返回同一引用）——如果需要独立快照，用默认的 `ClonePolicy.diagnostic` 或显式传 `ClonePolicy.immutable`。"
               },
               {
                 "type": "paragraph",
-                "text": "Q：`getState()` 在状态树很大、事件很密集时明显拖慢速度。 默认 `clone` 是 `structuredClone`，每次调用都做一次完整深拷贝。如果不需要\"绝对独立\"这个保证，换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。"
+                "text": "Q：`getState()` 在状态树很大、事件很密集时明显拖慢速度。 默认 `clone` 是 `ClonePolicy.diagnostic`，每次调用都做一次尽力深拷贝。如果不需要\"绝对独立\"这个保证，换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。"
               },
               {
                 "type": "paragraph",
@@ -919,7 +919,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "Q：`host.dispose()` 抛了一个 `AggregateError`。 检查 `error.errors`——里面是绑定 disposer（状态订阅、trace 订阅）和插件卸载各自抛出的原始错误；`code` 固定是 `CLEANUP_FAILED`，见 §10。"
+                "text": "Q：`host.dispose()` 的清理错误在哪里？ `dispose()` 不抛清理错误，而是返回 `{ logicalTerminal, cleanupComplete, cleanupErrors }`；`cleanupErrors` 里先是绑定 disposer（状态订阅、trace 订阅）的原始错误，再是插件卸载的错误，见 §10。`CLEANUP_FAILED` 的 `AggregateError` 只出现在 `bindStoreMiddleware()` 绑定失败且回滚清理也失败时。"
               },
               {
                 "type": "code",
@@ -977,7 +977,7 @@
           "examples": [
             "import { createStore } from '@migaia/store-light';\nimport { createMutationPolicy, bindStoreMiddleware } from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\n\nconst store = createStore(shape, { mutationPolicy }); // ① Store 自己的字段写入走这个实例判断\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n}); // ② Host 拿到的是同一个实例",
             "import { createStore } from '@migaia/store-light';\nimport { bindStoreMiddleware, createMutationPolicy } from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\n\nstore.increment(); // 允许：action 内\nawait host.dispose(); // 只释放这次绑定，Store 本身不受影响",
-            "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();",
+            "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware<Record<string, unknown>>());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();",
             "import { bindStoreMiddleware, ClonePolicy } from '@migaia/store-middleware';\n\n// 默认 clone 是 ClonePolicy.diagnostic（尽力而为、逐层深拷贝）；\n// 状态树很大或事件很密集时，改成零拷贝的 opaque 换取性能，\n// 代价是中间件之间、以及和 Store 本身共享同一份引用。\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  clone: ClonePolicy.opaque\n});"
           ],
           "members": [],
@@ -1063,6 +1063,33 @@
           "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:bindStoreMiddleware:export declare function bindStoreMiddleware<S extends Record<string, unknown>>(store: IReactiveStore<S>, options: IStoreMiddlewareBindingOptions): IStoreMiddlewareBinding<S>;",
           "guidance": [
             {
+              "id": "9-pipeline-模式与错误边界",
+              "heading": "9. Pipeline 模式与错误边界",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "包边界错误带 `source: '@migaia/store-middleware'` 与稳定 `code`。`actions-only` 越界写入为 `ACTION_SCOPE_REQUIRED`；不可克隆值为 `CLONE_UNSUPPORTED`；遗漏 `next()` 只经 Runtime 报告 `MIDDLEWARE_NOT_CHAINED`，不反向中断业务写入；`bindStoreMiddleware()` 绑定失败且回滚清理也失败时为 `CLEANUP_FAILED`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Host 的 pipeline 模式固定是 `sync`（见 §4），这决定了："
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "中间件只能用 `core.usePipeline((event, next) => void)`，`next(event)` 必须在 stage 函数返回前调用。",
+                    "sync 是\"扁平转换管道\"：`next()` 只是记录下一个值，下游 stage 在当前 stage 返回之后才执行，当前 stage 调用 `next()` 之后无法同步观察到下游已经处理完的结果（想要\"后置逻辑能看到下游效果\"的洋葱模型语义，需要 async pipeline——但本包的 Host 不支持切换）。",
+                    "`emit()`/`runAction()`/`recordState()`/`recordError()` 内部统一走隔离派发（`emitIsolated`）：中间件 stage 抛出的异常会被捕获，通过 `runtime.reportError(error, { phase: 'trace-listener' })` 上报，不会从 `recordState()`/`recordError()` 等调用点抛出；唯一的例外是 `runAction()` 包裹的业务函数本身抛错——那是业务异常，会原样重新抛出给调用方。",
+                    "如果一个 pipeline stage 忘了调用 `next()`，`emit()` 会检测到 `completed` 标记未被置位，同样以 `phase: 'trace-listener'` 上报一条 `[store] middleware did not call next()` 错误。"
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "更细的 pipeline 执行顺序、错误码、`onDispose` 清理协议等通用机制，见 `@migaia/plugin-host` 的 USEGUIDE。"
+                }
+              ]
+            },
+            {
               "id": "10-生命周期与资源释放",
               "heading": "10. 生命周期与资源释放",
               "blocks": [
@@ -1070,7 +1097,7 @@
                   "type": "list",
                   "items": [
                     "`host.use(plugin)` / `host.unUse(name)` / `host.dispose()` 都是异步 API，语义完全继承自 `@migaia/plugin-host`——安装失败自动回滚，卸载资源自动逆序清理。",
-                    "`StoreMiddlewareHost` 重写了 `dispose()`：先按后进先出顺序执行 `attachBindingDisposer()` 登记的 disposer（`bindStoreMiddleware()` 用它登记状态订阅和 trace 订阅的取消函数），再调用 `super.dispose()` 卸载所有已安装插件。",
+                    "Host 通过 `defineHost` 的 `dispose` 钩子：先按后进先出顺序执行 `attachBindingDisposer()` 登记的 disposer（`bindStoreMiddleware()` 用它登记状态订阅和 trace 订阅的取消函数），再委托 plugin-host 卸载所有已安装插件。结果是结构化的 `{ logicalTerminal, cleanupComplete, cleanupErrors }`，绑定 disposer 的错误排在 `cleanupErrors` 前面，不以异常抛出。",
                     "`host.dispose()` 不会销毁 Store 或 Runtime，只释放这个 middleware Host 自己拥有的资源（订阅、已安装插件）。",
                     "同一个 Host 内插件名称必须唯一；重复安装同名插件会按 `@migaia/plugin-host` 的规则报错。",
                     "middleware 诊断层的失败不应该、也不会阻断业务写入；真正的业务异常仍按原始异常传播（见 §9）。"
@@ -1079,7 +1106,7 @@
               ]
             }
           ],
-          "usageScore": 130,
+          "usageScore": 140,
           "configuration": [
             {
               "name": "execution",
@@ -1109,9 +1136,9 @@
               "name": "clone",
               "type": "(state: Record<string, unknown>) => Record<string, unknown>",
               "optional": true,
-              "description": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `structuredClone`，因此每次读取都是一份新的独立快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。",
+              "description": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `ClonePolicy.diagnostic`（尽力深拷贝，不抛错），因此每次读取都是一份新的快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。",
               "descriptionEn": "",
-              "descriptionZh": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `structuredClone`，因此每次读取都是一份新的独立快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。"
+              "descriptionZh": "1. 创建 Host：`getState` 每次调用都返回 `clone(store.$plain())`——默认用 `ClonePolicy.diagnostic`（尽力深拷贝，不抛错），因此每次读取都是一份新的快照，中间件互相之间、以及和 Store 本身都不会共享引用。`applyState` 桥接到 `store.$hydrate(state)`。 2. 订阅状态变化：`store.$subscribe(() => { . })`——每次 Store 通知，取一份新的 `clone($plain())` 作为 `next`，连同上一次记录的 `previous` 一起 `host.recordState('store:update', previous, next)`，事件名固定是 `'store:update'`，然后把 `previous` 更新为这次的 `next`。"
             }
           ],
           "fragment": "store-middleware-index--bindStoreMiddleware"
@@ -1141,7 +1168,7 @@
             "const policy = createMutationPolicy('actions-only');\n\npolicy.runInAction(() => {\n  policy.assertMutationAllowed('settings.theme');\n});",
             "const mutationPolicy = createMutationPolicy('actions-only');",
             "import { createStore } from '@migaia/store-light';\nimport { bindStoreMiddleware, createMutationPolicy } from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\n\nstore.increment(); // 允许：action 内\nawait host.dispose(); // 只释放这次绑定，Store 本身不受影响",
-            "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();",
+            "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware<Record<string, unknown>>());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();",
             "import { createMutationPolicy, StoreMiddlewareErrorCode } from '@migaia/store-middleware';\n\nconst policy = createMutationPolicy('actions-only');\n\ntry {\n  policy.assertMutationAllowed('settings.theme'); // 不在 action 内，抛错\n} catch (error) {\n  if ((error as { code?: string }).code === StoreMiddlewareErrorCode.actionScopeRequired) {\n    console.warn('write attempted outside an action');\n  }\n}\n\npolicy.runInAction(() => {\n  policy.assertMutationAllowed('settings.theme'); // 处于 action 内，放行\n});"
           ],
           "members": [],
@@ -1235,7 +1262,7 @@
           "examples": [
             "await host.connectDevTools(createReduxDevToolsAdapter(connection));\n// ...\nawait host.unUse('store-devtools');",
             "const adapter = createReduxDevToolsAdapter(connection); // connection: { init, send, subscribe }",
-            "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();",
+            "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware<Record<string, unknown>>());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();",
             "import { createStoreMiddlewareHost, createReduxDevToolsAdapter } from '@migaia/store-middleware';\n\nlet state = { count: 0 };\nconst host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state,\n  applyState: (next) => {\n    state = next;\n  } // 缺省时 connectDevTools 的 jump/reset 会抛 DEVTOOLS_CAPABILITY\n});\n\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\nhost.runAction('increment', () => {\n  state = { count: state.count + 1 };\n});"
           ],
           "members": [],
@@ -1522,6 +1549,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreMiddlewareHost.",
           "examples": [
             "const host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => currentState\n});",
+            "import { createRuntime } from '@migaia/reactive';\nimport { createStoreMiddlewareHost } from '@migaia/store-middleware';\n\nconst runtime = createRuntime();\nlet state = { count: 0 };\nconst host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state\n});\nhost.runAction('increment', () => {\n  state = { ...state, count: state.count + 1 };\n});\nawait host.dispose(); // returns the structured PluginHost disposal result",
             "import { createStoreMiddlewareHost, createReduxDevToolsAdapter } from '@migaia/store-middleware';\n\nlet state = { count: 0 };\nconst host = createStoreMiddlewareHost({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  runtime,\n  getState: () => state,\n  applyState: (next) => {\n    state = next;\n  } // 缺省时 connectDevTools 的 jump/reset 会抛 DEVTOOLS_CAPABILITY\n});\n\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\nhost.runAction('increment', () => {\n  state = { count: state.count + 1 };\n});"
           ],
           "members": [],
@@ -1601,39 +1629,39 @@
           ],
           "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:createStoreMiddlewareHost:export declare function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 58,
           "configuration": [
             {
               "name": "runtime",
               "type": "IRuntime",
               "optional": false,
-              "description": "`runtime: IRuntime`（必填）—— 来自 `@migaia/reactive`，用于 `reportError`/`batch`",
+              "description": "`emit(event)` — `event: IMiddlewareEvent<S>` — 同步 — 同步跑一遍 pipeline；若某个 stage 忘了调用 `next()`，会以 `phase: 'trace-listener'` 上报到 `runtime.reportError()`，但 `emit()` 本身不抛错 — 不抛错，异常通过 `runtime.reportError` 上报",
               "descriptionEn": "",
-              "descriptionZh": "`runtime: IRuntime`（必填）—— 来自 `@migaia/reactive`，用于 `reportError`/`batch`"
+              "descriptionZh": "`emit(event)` — `event: IMiddlewareEvent<S>` — 同步 — 同步跑一遍 pipeline；若某个 stage 忘了调用 `next()`，会以 `phase: 'trace-listener'` 上报到 `runtime.reportError()`，但 `emit()` 本身不抛错 — 不抛错，异常通过 `runtime.reportError` 上报"
             },
             {
               "name": "getState",
               "type": "() => S",
               "optional": false,
-              "description": "`getState: () => S`（必填）",
+              "description": "Q：`getState()` 在状态树很大、事件很密集时明显拖慢速度。 默认 `clone` 是 `ClonePolicy.diagnostic`，每次调用都做一次尽力深拷贝。如果不需要\"绝对独立\"这个保证，换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。",
               "descriptionEn": "",
-              "descriptionZh": "`getState: () => S`（必填）"
+              "descriptionZh": "Q：`getState()` 在状态树很大、事件很密集时明显拖慢速度。 默认 `clone` 是 `ClonePolicy.diagnostic`，每次调用都做一次尽力深拷贝。如果不需要\"绝对独立\"这个保证，换成 `ClonePolicy.opaque`（零拷贝，接受引用共享）或只在真正需要独立快照的少数中间件里手动拷贝。"
             },
             {
               "name": "applyState",
               "type": "(state: S) => void",
               "optional": true,
-              "description": "`applyState?: (state: S) => void` —— 未提供时，DevTools 的 `jump`/`reset` 命令会抛出 `code: 'DEVTOOLS_CAPABILITY'`",
+              "description": "Q：`connectDevTools()` 报错 `[store] DevTools state command requires applyState`。 创建 Host 时没有传 `applyState`；如果是自己调用 `createStoreMiddlewareHost(.)` 而不是用 `bindStoreMiddleware()`，需要手动提供 `applyState` 才能支持 DevTools 的 `jump`/`reset`。",
               "descriptionEn": "",
-              "descriptionZh": "`applyState?: (state: S) => void` —— 未提供时，DevTools 的 `jump`/`reset` 命令会抛出 `code: 'DEVTOOLS_CAPABILITY'`"
+              "descriptionZh": "Q：`connectDevTools()` 报错 `[store] DevTools state command requires applyState`。 创建 Host 时没有传 `applyState`；如果是自己调用 `createStoreMiddlewareHost(.)` 而不是用 `bindStoreMiddleware()`，需要手动提供 `applyState` 才能支持 DevTools 的 `jump`/`reset`。"
             },
             {
               "name": "mutationPolicy",
               "type": "MutationPolicy",
               "optional": true,
-              "description": "单参数 `mode?: 'off' | 'actions-only'`（默认 `'off'`）——`'off'` 时永远放行；`'actions-only'` 时只有处于 `runInAction()` 内部才放行，深度为 0 时 `assertMutationAllowed()` 抛出携带 `code: 'ACTION_SCOPE_REQUIRED'` 的 `Error`。必须和传给 `createStore({ mutationPolicy })` 的是同一个实例，各自 `createMutationPolicy()` 出两个实例互不知道对方，策略形同虚设。",
+              "description": "`runAction(name, fn, metadata?)` — `name: string`；`fn: () => T`；`metadata?: Readonly<Record<string, unknown>>` — 同步 — 派发 `action:start` → 用 `mutationPolicy.runInAction(() => runtime.batch(fn))` 执行 `fn` → 成功派发 `action:end`（带 `durationMs`），失败派发 `action:error` 后重新抛出原始异常 — `fn` 抛出的异常会正常向调用方传播",
               "descriptionEn": "",
-              "descriptionZh": "单参数 `mode?: 'off' | 'actions-only'`（默认 `'off'`）——`'off'` 时永远放行；`'actions-only'` 时只有处于 `runInAction()` 内部才放行，深度为 0 时 `assertMutationAllowed()` 抛出携带 `code: 'ACTION_SCOPE_REQUIRED'` 的 `Error`。必须和传给 `createStore({ mutationPolicy })` 的是同一个实例，各自 `createMutationPolicy()` 出两个实例互不知道对方，策略形同虚设。"
+              "descriptionZh": "`runAction(name, fn, metadata?)` — `name: string`；`fn: () => T`；`metadata?: Readonly<Record<string, unknown>>` — 同步 — 派发 `action:start` → 用 `mutationPolicy.runInAction(() => runtime.batch(fn))` 执行 `fn` → 成功派发 `action:end`（带 `durationMs`），失败派发 `action:error` 后重新抛出原始异常 — `fn` 抛出的异常会正常向调用方传播"
             }
           ],
           "fragment": "store-middleware-index--createStoreMiddlewareHost"
@@ -1653,7 +1681,7 @@
           "errors": ["No documented errors are declared for IDevToolsAdapter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDevToolsAdapter.",
           "examples": [
-            "class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {\n  readonly mutationPolicy: MutationPolicy;\n  constructor(options: IStoreMiddlewareHostOptions<S>);\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n  override dispose(): Promise<void>;\n}\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};",
+            "function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;\n\n// 冻结句柄：IHostHandle 的公共成员（use/unUse/dispose 等）加下列 Store 领域成员\ntype IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & {\n  readonly mutationPolicy: MutationPolicy;\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n};\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};",
             "type IDevToolsCommand<S> =\n  { type: 'jump'; state: S } | { type: 'reset'; state: S } | { type: 'commit' };\n\ntype IDevToolsAdapter<S> = {\n  init(state: S): void;\n  send(event: IMiddlewareEvent<S>, state: S): void;\n  subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer;\n};\n\nfunction createReduxDevToolsAdapter<S>(\n  connection: IReduxDevToolsConnection<S>\n): IDevToolsAdapter<S>;"
           ],
           "members": [],
@@ -2041,8 +2069,8 @@
           "errors": ["No documented errors are declared for IMiddlewareEvent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IMiddlewareEvent.",
           "examples": [
-            "import { StoreMiddlewareHost } from '@migaia/store-middleware';\n// StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>>",
-            "class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {\n  readonly mutationPolicy: MutationPolicy;\n  constructor(options: IStoreMiddlewareHostOptions<S>);\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n  override dispose(): Promise<void>;\n}\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};",
+            "import { createStoreMiddlewareHost, type IStoreMiddlewareHost } from '@migaia/store-middleware';\n// IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Store 领域成员",
+            "function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;\n\n// 冻结句柄：IHostHandle 的公共成员（use/unUse/dispose 等）加下列 Store 领域成员\ntype IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & {\n  readonly mutationPolicy: MutationPolicy;\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n};\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};",
             "function loggerMiddleware<S>(\n  sink?: (event: IMiddlewareEvent<unknown>, state: unknown) => void\n): IStoreMiddlewarePlugin<S>;",
             "type IDevToolsCommand<S> =\n  { type: 'jump'; state: S } | { type: 'reset'; state: S } | { type: 'commit' };\n\ntype IDevToolsAdapter<S> = {\n  init(state: S): void;\n  send(event: IMiddlewareEvent<S>, state: S): void;\n  subscribe?(listener: (command: IDevToolsCommand<S>) => void): IDisposer;\n};\n\nfunction createReduxDevToolsAdapter<S>(\n  connection: IReduxDevToolsConnection<S>\n): IDevToolsAdapter<S>;"
           ],
@@ -2556,7 +2584,7 @@
           "errors": ["No documented errors are declared for IStoreMiddlewareBinding."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreMiddlewareBinding.",
           "examples": [
-            "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 structuredClone\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
+            "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 ClonePolicy.diagnostic\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
           ],
           "members": [],
           "exportPath": ".",
@@ -2621,7 +2649,7 @@
           "errors": ["No documented errors are declared for IStoreMiddlewareBindingOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreMiddlewareBindingOptions.",
           "examples": [
-            "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 structuredClone\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = StoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
+            "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 ClonePolicy.diagnostic\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
           ],
           "members": [],
           "exportPath": ".",
@@ -2686,8 +2714,8 @@
           "errors": ["No documented errors are declared for IStoreMiddlewareCore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreMiddlewareCore.",
           "examples": [
-            "import { StoreMiddlewareHost } from '@migaia/store-middleware';\n// StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>>",
-            "class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {\n  readonly mutationPolicy: MutationPolicy;\n  constructor(options: IStoreMiddlewareHostOptions<S>);\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n  override dispose(): Promise<void>;\n}\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};",
+            "import { createStoreMiddlewareHost, type IStoreMiddlewareHost } from '@migaia/store-middleware';\n// IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Store 领域成员",
+            "function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;\n\n// 冻结句柄：IHostHandle 的公共成员（use/unUse/dispose 等）加下列 Store 领域成员\ntype IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & {\n  readonly mutationPolicy: MutationPolicy;\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n};\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};",
             "type IStoreMiddlewareCore<S> = {\n  runtime: IRuntime;\n  getState(): S;\n  applyState(state: S): void; // 未提供 options.applyState 时调用会抛错\n  reportError(error: unknown, phase: string): void; // 透传到 runtime.reportError\n};"
           ],
           "members": [],
@@ -2752,7 +2780,11 @@
           "returns": "No explicit return annotation is declared for this type.",
           "errors": ["No documented errors are declared for IStoreMiddlewareHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreMiddlewareHost.",
-          "examples": [],
+          "examples": [
+            "import { createStoreMiddlewareHost, type IStoreMiddlewareHost } from '@migaia/store-middleware';\n// IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Store 领域成员",
+            "function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;\n\n// 冻结句柄：IHostHandle 的公共成员（use/unUse/dispose 等）加下列 Store 领域成员\ntype IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & {\n  readonly mutationPolicy: MutationPolicy;\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n};\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};",
+            "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 ClonePolicy.diagnostic\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;"
+          ],
           "members": [],
           "exportPath": ".",
           "overloadSignatures": [
@@ -2797,7 +2829,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-middleware/dist/store-middleware-host.d.ts:IStoreMiddlewareHost:export type IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & Readonly<{ readonly mutationPolicy: MutationPolicy; emit(event: IMiddlewareEvent<S>): void; runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T; recordState(name: string, previous: S, next: S, metadata?: Readonly<Record<string, unknown>>): void; recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void; connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; attachBindingDisposer(disposer: IDisposer): void; }>;",
           "guidance": [],
-          "usageScore": 0,
+          "usageScore": 58,
           "configuration": [],
           "fragment": "store-middleware-index--IStoreMiddlewareHost"
         },
@@ -2816,7 +2848,7 @@
           "errors": ["No documented errors are declared for IStoreMiddlewareHostOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreMiddlewareHostOptions.",
           "examples": [
-            "class StoreMiddlewareHost<S> extends PluginHost<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>> {\n  readonly mutationPolicy: MutationPolicy;\n  constructor(options: IStoreMiddlewareHostOptions<S>);\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n  override dispose(): Promise<void>;\n}\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};"
+            "function createStoreMiddlewareHost<S>(options: IStoreMiddlewareHostOptions<S>): IStoreMiddlewareHost<S>;\n\n// 冻结句柄：IHostHandle 的公共成员（use/unUse/dispose 等）加下列 Store 领域成员\ntype IStoreMiddlewareHost<S> = IHostHandle<IStoreMiddlewareCore<S>, IMiddlewareEvent<S>, readonly []> & {\n  readonly mutationPolicy: MutationPolicy;\n  emit(event: IMiddlewareEvent<S>): void;\n  runAction<T>(name: string, fn: () => T, metadata?: Readonly<Record<string, unknown>>): T;\n  recordState(\n    name: string,\n    previous: S,\n    next: S,\n    metadata?: Readonly<Record<string, unknown>>\n  ): void;\n  recordError(phase: string, error: unknown, metadata?: Readonly<Record<string, unknown>>): void;\n  connectDevTools(adapter: IDevToolsAdapter<S>, name?: string): Promise<void>; // name 默认 'store-devtools'\n  attachBindingDisposer(disposer: IDisposer): void;\n};\n\ntype IStoreMiddlewareHostOptions<S> = IPluginHostOptions & {\n  runtime: IRuntime;\n  getState: () => S;\n  applyState?: (state: S) => void;\n  mutationPolicy?: MutationPolicy; // 缺省时内部新建一个 mode: 'off' 的实例\n};"
           ],
           "members": [],
           "exportPath": ".",
@@ -2955,8 +2987,7 @@
           "errors": ["No documented errors are declared for loggerMiddleware."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for loggerMiddleware.",
           "examples": [
-            "await host.use(loggerMiddleware()); // 默认 console.log('[store]', event, state)\nawait host.use(loggerMiddleware((event, state) => myLogger(event, state)));",
-            "import { createStore } from '@migaia/store-light';\nimport {\n  bindStoreMiddleware,\n  createMutationPolicy,\n  loggerMiddleware,\n  createReduxDevToolsAdapter\n} from '@migaia/store-middleware';\n\nconst mutationPolicy = createMutationPolicy('actions-only');\nconst store = createStore(\n  {\n    count: 0,\n    increment() {\n      this.count++;\n    }\n  },\n  { mutationPolicy }\n);\n\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  mutationPolicy\n});\nawait host.use(loggerMiddleware());\nawait host.connectDevTools(createReduxDevToolsAdapter(connection));\n\nstore.increment(); // 允许：action 内\n// store.count = 1;  // 抛 ACTION_SCOPE_REQUIRED：actions-only 下不允许 action 外直接写\n\n// 应用退出、组件卸载或请求结束时\nawait host.dispose();"
+            "await host.use(loggerMiddleware()); // 默认 console.log('[store]', event, state)\nawait host.use(loggerMiddleware((event, state) => myLogger(event, state)));"
           ],
           "members": [],
           "exportPath": ".",
@@ -3029,7 +3060,7 @@
           "errors": ["No documented errors are declared for MiddlewareCommandType."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MiddlewareCommandType.",
           "examples": [
-            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
+            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "MiddlewareEventType.action; // 'action' | 'state' | 'error' 之一\nMiddlewareEventPhase.start; // 'start' | 'end' | 'error'\nMiddlewareCommandType.commit; // 'commit' | 'jump' | 'reset'"
           ],
           "members": [],
@@ -3096,7 +3127,7 @@
           "errors": ["No documented errors are declared for MiddlewareEventPhase."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MiddlewareEventPhase.",
           "examples": [
-            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
+            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "MiddlewareEventType.action; // 'action' | 'state' | 'error' 之一\nMiddlewareEventPhase.start; // 'start' | 'end' | 'error'\nMiddlewareCommandType.commit; // 'commit' | 'jump' | 'reset'"
           ],
           "members": [],
@@ -3163,7 +3194,7 @@
           "errors": ["No documented errors are declared for MiddlewareEventType."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for MiddlewareEventType.",
           "examples": [
-            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
+            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "MiddlewareEventType.action; // 'action' | 'state' | 'error' 之一\nMiddlewareEventPhase.start; // 'start' | 'end' | 'error'\nMiddlewareCommandType.commit; // 'commit' | 'jump' | 'reset'"
           ],
           "members": [],
@@ -3448,7 +3479,7 @@
           "errors": ["No documented errors are declared for STORE_MIDDLEWARE_SOURCE."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_MIDDLEWARE_SOURCE.",
           "examples": [
-            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
+            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "STORE_MIDDLEWARE_SOURCE; // '@migaia/store-middleware'"
           ],
           "members": [],
@@ -3594,8 +3625,9 @@
           "errors": ["No documented errors are declared for ClonePolicy."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ClonePolicy.",
           "examples": [
+            "type IStoreMiddlewareBindingOptions = {\n  execution: {\n    mutationTimeoutMs: number | false;\n    pipelineDrainTimeoutMs: number | false;\n  };\n  mutationPolicy?: MutationPolicy;\n  actionPrefix?: string;\n  clone?: (state: Record<string, unknown>) => Record<string, unknown>; // 默认 ClonePolicy.diagnostic\n};\n\ntype IStoreMiddlewareBinding<S extends Record<string, unknown>> = IStoreMiddlewareHost<\n  Record<string, unknown>\n> & { readonly store: IReactiveStore<S> };\n\nfunction bindStoreMiddleware<S extends Record<string, unknown>>(\n  store: IReactiveStore<S>,\n  options: IStoreMiddlewareBindingOptions\n): IStoreMiddlewareBinding<S>;",
             "type IClonePolicyMode = 'immutable' | 'opaque' | 'diagnostic';\n\nfunction immutableSnapshotClone<T>(value: T): T; // 真独立深拷贝，做不到就抛错\nfunction opaqueReferenceClone<T>(value: T): T; // 完全不拷贝，原样返回引用\nfunction diagnosticClone<T>(value: T): T; // 尽力而为，永不抛错\n\nconst ClonePolicy: {\n  immutable: typeof immutableSnapshotClone;\n  opaque: typeof opaqueReferenceClone;\n  diagnostic: typeof diagnosticClone;\n};\n\n/** @deprecated 用 ClonePolicy.diagnostic（或 diagnosticClone），行为相同，名字更明确 */\nconst tolerantClone: typeof diagnosticClone;",
-            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
+            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "ClonePolicy.immutable(value); // 真独立深拷贝，做不到就抛错\nClonePolicy.opaque(value); // 完全不拷贝，原样返回引用\nClonePolicy.diagnostic(value); // 尽力而为，永不抛错",
             "import {\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone\n} from '@migaia/store-middleware/tolerant-clone';",
             "import { bindStoreMiddleware, ClonePolicy } from '@migaia/store-middleware';\n\n// 默认 clone 是 ClonePolicy.diagnostic（尽力而为、逐层深拷贝）；\n// 状态树很大或事件很密集时，改成零拷贝的 opaque 换取性能，\n// 代价是中间件之间、以及和 Store 本身共享同一份引用。\nconst host = bindStoreMiddleware(store, {\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  clone: ClonePolicy.opaque\n});"
@@ -3644,7 +3676,7 @@
           "declaredConfiguration": [],
           "identity": "packages/store-middleware/dist/tolerant-clone.d.ts:ClonePolicy:export declare const ClonePolicy: { readonly immutable: typeof immutableSnapshotClone; readonly opaque: typeof opaqueReferenceClone; readonly diagnostic: typeof diagnosticClone; };",
           "guidance": [],
-          "usageScore": 124,
+          "usageScore": 146,
           "configuration": [],
           "fragment": "store-middleware-tolerant-clone--ClonePolicy"
         },
@@ -3956,7 +3988,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for tolerantClone.",
           "examples": [
             "type IClonePolicyMode = 'immutable' | 'opaque' | 'diagnostic';\n\nfunction immutableSnapshotClone<T>(value: T): T; // 真独立深拷贝，做不到就抛错\nfunction opaqueReferenceClone<T>(value: T): T; // 完全不拷贝，原样返回引用\nfunction diagnosticClone<T>(value: T): T; // 尽力而为，永不抛错\n\nconst ClonePolicy: {\n  immutable: typeof immutableSnapshotClone;\n  opaque: typeof opaqueReferenceClone;\n  diagnostic: typeof diagnosticClone;\n};\n\n/** @deprecated 用 ClonePolicy.diagnostic（或 diagnosticClone），行为相同，名字更明确 */\nconst tolerantClone: typeof diagnosticClone;",
-            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  StoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
+            "import {\n  createMutationPolicy,\n  MutationPolicy,\n  MiddlewareEventType,\n  MiddlewareEventPhase,\n  MiddlewareCommandType,\n  createReduxDevToolsAdapter,\n  createStoreMiddlewareHost,\n  middlewarePlugin,\n  loggerMiddleware,\n  bindStoreMiddleware,\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone,\n  StoreMiddlewareErrorCode,\n  STORE_MIDDLEWARE_SOURCE,\n  createStoreMiddlewareError,\n  createStoreMiddlewareAggregateError\n} from '@migaia/store-middleware';",
             "tolerantClone === diagnosticClone; // true",
             "import {\n  ClonePolicy,\n  immutableSnapshotClone,\n  opaqueReferenceClone,\n  diagnosticClone,\n  tolerantClone\n} from '@migaia/store-middleware/tolerant-clone';"
           ],

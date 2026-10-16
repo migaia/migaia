@@ -973,7 +973,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// 写入\nconst html = createSSRStateScript(state); // 默认 elementId = '__STORE_STATE__'\n// => <script type=\"application/json\" id=\"__STORE_STATE__\">{\"version\":1,...}</script>\n\n// 读取(浏览器端)\nconst state = readSSRStateFromDocument(); // 默认同一个 elementId"
+                "code": "// 写入(服务端)\nconst html = createSSRStateScript(scope.dehydrate()); // 默认 elementId = '__STORE_STATE__'\n// => <script type=\"application/json\" id=\"__STORE_STATE__\">{\"version\":1,...}</script>\n\n// 读取(浏览器端)\nconst state = readSSRStateFromDocument(); // 默认同一个 elementId"
               },
               {
                 "type": "table",
@@ -1030,7 +1030,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\n\nconst codecs = createSerializeRegistry([jsonPlugin()]);\n\n// 写入\nconst html = await createSSRStateScriptWith(state, { codecs });\n\n// 读取\nconst state = await readSSRStateFromDocumentWith({ codecs, document });"
+                "code": "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\n\nconst codecs = createSerializeRegistry([jsonPlugin()]);\n\n// 写入(服务端)\nconst html = await createSSRStateScriptWith(scope.dehydrate(), { codecs });\n\n// 读取\nconst state = await readSSRStateFromDocumentWith({ codecs, document });"
               },
               {
                 "type": "table",
@@ -1629,7 +1629,7 @@
           "errors": ["No documented errors are declared for createSSRStateScript."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSSRStateScript.",
           "examples": [
-            "// 写入\nconst html = createSSRStateScript(state); // 默认 elementId = '__STORE_STATE__'\n// => <script type=\"application/json\" id=\"__STORE_STATE__\">{\"version\":1,...}</script>\n\n// 读取(浏览器端)\nconst state = readSSRStateFromDocument(); // 默认同一个 elementId",
+            "// 写入(服务端)\nconst html = createSSRStateScript(scope.dehydrate()); // 默认 elementId = '__STORE_STATE__'\n// => <script type=\"application/json\" id=\"__STORE_STATE__\">{\"version\":1,...}</script>\n\n// 读取(浏览器端)\nconst state = readSSRStateFromDocument(); // 默认同一个 elementId",
             "// server.ts —— 带异步 Resource 预取的完整请求处理流程\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\nimport { createSSRRequestScope, createSSRStateScript } from '@migaia/store-ssr';\n\nexport async function renderPage(userId: string): Promise<string> {\n  const scope = createSSRRequestScope();\n  try {\n    const app = createStore({ theme: 'dark' }, { runtime: scope.runtime });\n    scope.register('app', app);\n\n    const user = new Resource(\n      async ({ signal }) => {\n        const response = await fetch(`/api/users/${userId}`, { signal });\n        if (!response.ok) throw new Error('加载用户失败');\n        return response.json();\n      },\n      scope.runtime,\n      { ttl: 30_000 }\n    );\n    scope.registerResource('user', user);\n\n    const state = await scope.dehydrateAsync({\n      timeoutMs: 3000,\n      onResourceError: (failure) =>\n        console.warn(`[ssr] resource \"${failure.key}\" failed`, failure.error)\n    });\n\n    return `<!doctype html><html><body>${createSSRStateScript(state)}<div id=\"root\"></div></body></html>`;\n  } finally {\n    scope.dispose(); // 无论成功失败,请求结束都要释放这个请求专属的 Runtime\n  }\n}",
             "const html = createSSRStateScript(state); // 默认 elementId = '__STORE_STATE__'",
             "import { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\nimport { createSSRRequestScope, createSSRStateScript } from '@migaia/store-ssr';\n\nexport async function renderPage(userId: string): Promise<string> {\n  const scope = createSSRRequestScope();\n  try {\n    const app = createStore({ theme: 'dark' }, { runtime: scope.runtime });\n    scope.register('app', app);\n\n    const user = new Resource(\n      async ({ signal }) => {\n        const response = await fetch(`/api/users/${userId}`, { signal });\n        if (!response.ok) throw new Error('加载用户失败');\n        return response.json();\n      },\n      scope.runtime,\n      { ttl: 30_000 }\n    );\n    scope.registerResource('user', user);\n\n    const state = await scope.dehydrateAsync({\n      timeoutMs: 3000,\n      onResourceError: (failure) =>\n        console.warn(`[ssr] resource \"${failure.key}\" failed`, failure.error)\n    });\n\n    return `<!doctype html><html><body>${createSSRStateScript(state)}<div id=\"root\"></div></body></html>`;\n  } finally {\n    scope.dispose();\n  }\n}"
@@ -1721,7 +1721,7 @@
           "errors": ["No documented errors are declared for createSSRStateScriptWith."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSSRStateScriptWith.",
           "examples": [
-            "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\n\nconst codecs = createSerializeRegistry([jsonPlugin()]);\n\n// 写入\nconst html = await createSSRStateScriptWith(state, { codecs });\n\n// 读取\nconst state = await readSSRStateFromDocumentWith({ codecs, document });",
+            "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\n\nconst codecs = createSerializeRegistry([jsonPlugin()]);\n\n// 写入(服务端)\nconst html = await createSSRStateScriptWith(scope.dehydrate(), { codecs });\n\n// 读取\nconst state = await readSSRStateFromDocumentWith({ codecs, document });",
             "const codecs = createSerializeRegistry([jsonPlugin()]);\nconst html = await createSSRStateScriptWith(state, { codecs });",
             "import { createSerializeRegistry } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\nimport { binaryPlugin } from './binary-plugin.js';\n\nconst codecs = createSerializeRegistry([binaryPlugin()]);\nconst html = await createSSRStateScriptWith(state, { codecs, elementId: 'app-state' });\n\n// 浏览器端，读取时必须用同一份 codecs 配置\nconst restored = await readSSRStateFromDocumentWith({ codecs, elementId: 'app-state', document });"
           ],
@@ -4473,7 +4473,7 @@
           "errors": ["No documented errors are declared for readSSRStateFromDocument."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readSSRStateFromDocument.",
           "examples": [
-            "// 写入\nconst html = createSSRStateScript(state); // 默认 elementId = '__STORE_STATE__'\n// => <script type=\"application/json\" id=\"__STORE_STATE__\">{\"version\":1,...}</script>\n\n// 读取(浏览器端)\nconst state = readSSRStateFromDocument(); // 默认同一个 elementId",
+            "// 写入(服务端)\nconst html = createSSRStateScript(scope.dehydrate()); // 默认 elementId = '__STORE_STATE__'\n// => <script type=\"application/json\" id=\"__STORE_STATE__\">{\"version\":1,...}</script>\n\n// 读取(浏览器端)\nconst state = readSSRStateFromDocument(); // 默认同一个 elementId",
             "// client.ts —— 浏览器端复水\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\nimport { readSSRStateFromDocument } from '@migaia/store-ssr';\n\nconst runtime = createRuntime(); // 客户端自己的 Runtime,与服务端隔离\nconst app = createStore({ theme: 'dark' }, { runtime });\nconst user = new Resource(fetchUser, runtime, { ttl: 30_000, autoStart: false });\n\nconst state = readSSRStateFromDocument();\nif (state) {\n  if (state.stores.app) app.$hydrate(state.stores.app);\n  if (state.resources?.user) user.hydrate(state.resources.user);\n}",
             "const state = readSSRStateFromDocument(); // 默认同一个 elementId，浏览器端传 window.document",
             "import { createRuntime } from '@migaia/reactive';\nimport { createStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\nimport { readSSRStateFromDocument } from '@migaia/store-ssr';\n\nconst runtime = createRuntime();\nconst app = createStore({ theme: 'dark' }, { runtime });\nconst user = new Resource(fetchUser, runtime, { ttl: 30_000, autoStart: false });\n\nconst state = readSSRStateFromDocument();\nif (state) {\n  if (state.stores.app) app.$hydrate(state.stores.app);\n  if (state.resources?.user) user.hydrate(state.resources.user);\n}"
@@ -4560,7 +4560,7 @@
           "errors": ["No documented errors are declared for readSSRStateFromDocumentWith."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readSSRStateFromDocumentWith.",
           "examples": [
-            "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\n\nconst codecs = createSerializeRegistry([jsonPlugin()]);\n\n// 写入\nconst html = await createSSRStateScriptWith(state, { codecs });\n\n// 读取\nconst state = await readSSRStateFromDocumentWith({ codecs, document });",
+            "import { createSerializeRegistry, jsonPlugin } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\n\nconst codecs = createSerializeRegistry([jsonPlugin()]);\n\n// 写入(服务端)\nconst html = await createSSRStateScriptWith(scope.dehydrate(), { codecs });\n\n// 读取\nconst state = await readSSRStateFromDocumentWith({ codecs, document });",
             "const state = await readSSRStateFromDocumentWith({ codecs, document });",
             "import { createSerializeRegistry } from '@migaia/serialize';\nimport { createSSRStateScriptWith, readSSRStateFromDocumentWith } from '@migaia/store-ssr';\nimport { binaryPlugin } from './binary-plugin.js';\n\nconst codecs = createSerializeRegistry([binaryPlugin()]);\nconst html = await createSSRStateScriptWith(state, { codecs, elementId: 'app-state' });\n\n// 浏览器端，读取时必须用同一份 codecs 配置\nconst restored = await readSSRStateFromDocumentWith({ codecs, elementId: 'app-state', document });"
           ],

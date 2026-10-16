@@ -887,7 +887,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IStorageCapabilities = {\n  readonly syncRead: boolean;\n  readonly binary: boolean;\n  readonly records: boolean;\n  readonly transactions: boolean;\n  readonly iteration: boolean;\n  readonly maxValueBytes: number | undefined;\n  readonly opaqueEntries: boolean;\n};"
+                "code": "type IStorageCapabilities = {\n  readonly syncRead: boolean;\n  readonly binary: boolean;\n  readonly records: boolean;\n  readonly transactions: boolean;\n  readonly iteration: boolean;\n  readonly secondaryIndexes: boolean;\n  readonly changeFeed: boolean;\n  readonly maxValueBytes: number | undefined;\n  readonly opaqueEntries: boolean;\n};"
               },
               {
                 "type": "paragraph",
@@ -5186,7 +5186,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageCapabilities.",
           "examples": [
             "type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory';\n\ntype ISyncKeyValueStore = {\n  get(key: string): string | null;\n  set(key: string, value: string, options?: ISyncWriteOptions): void;\n  remove(key: string): void;\n  has(key: string): boolean;\n  keys(): string[];\n  clearValues(): void;\n};\n\ntype IKeyValueStore = {\n  readonly backend: IBackendKind;\n  readonly capabilities: IStorageCapabilities;\n  get(key: string, ctx?: IOperationContext): Promise<string | null>;\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;\n  remove(key: string, ctx?: IOperationContext): Promise<void>;\n  has(key: string, ctx?: IOperationContext): Promise<boolean>;\n  keys(ctx?: IOperationContext): Promise<string[]>;\n  clearValues(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  dispose(): Promise<void>;\n  readonly sync?: ISyncKeyValueStore;\n};",
-            "type IStorageCapabilities = {\n  readonly syncRead: boolean;\n  readonly binary: boolean;\n  readonly records: boolean;\n  readonly transactions: boolean;\n  readonly iteration: boolean;\n  readonly maxValueBytes: number | undefined;\n  readonly opaqueEntries: boolean;\n};",
+            "type IStorageCapabilities = {\n  readonly syncRead: boolean;\n  readonly binary: boolean;\n  readonly records: boolean;\n  readonly transactions: boolean;\n  readonly iteration: boolean;\n  readonly secondaryIndexes: boolean;\n  readonly changeFeed: boolean;\n  readonly maxValueBytes: number | undefined;\n  readonly opaqueEntries: boolean;\n};",
             "function snapshotStorageCapabilities(value: unknown): IStorageCapabilities | undefined;",
             "function isStorageCapabilities(value: unknown): value is IStorageCapabilities;",
             "import {\n  snapshotStorageCapabilities,\n  isStorageCapabilities,\n  type IBackendKind,\n  type IStorageCapabilities\n} from '@migaia/storage-contract';"

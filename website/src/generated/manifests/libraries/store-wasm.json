@@ -124,12 +124,16 @@
               },
               {
                 "type": "paragraph",
+                "text": "构造器本身返回 `FieldBuilder`（不是字段）；下面的示例都假设已 `await ensureWasm()`，并通过 `createStore()` 产出字段。"
+              },
+              {
+                "type": "paragraph",
                 "text": "`number`｜3 秒上手 —— 单个 `f64`，8 字节："
               },
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = number()\nfield.value = 1.5"
+                "code": "const store = createStore({ field: number() })\nstore.field.value = 1.5"
               },
               {
                 "type": "paragraph",
@@ -142,7 +146,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = boolean()\nfield.value = true"
+                "code": "const store = createStore({ field: boolean() })\nstore.field.value = true"
               },
               {
                 "type": "paragraph",
@@ -155,7 +159,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = string(64) // 最多 64 字节\nfield.value = 'hello'"
+                "code": "const store = createStore({ field: string(64) }) // 最多 64 字节\nstore.field.value = 'hello'"
               },
               {
                 "type": "paragraph",
@@ -168,7 +172,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = array(number(), 1000) // length=1000, granularity 默认 64\nfield.setAt(0, 1)\nfield.setRange(1, 3, [2, 3])"
+                "code": "const store = createStore({ field: array(number(), 1000) }) // length=1000, granularity 默认 64\nstore.field.setAt(0, 1)\nstore.field.setRange(1, 3, [2, 3])"
               },
               {
                 "type": "paragraph",
@@ -197,7 +201,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const field = record({ x: number(), y: number() })\nfield.x = 1 // 直接属性读写，不经过 .value"
+                "code": "const store = createStore({ field: record({ x: number(), y: number() }) })\nstore.field.x = 1 // 直接属性读写，不经过 .value"
               },
               {
                 "type": "paragraph",
@@ -225,7 +229,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
               },
               {
                 "type": "paragraph",
@@ -380,7 +384,7 @@
             "blocks": [
               {
                 "type": "paragraph",
-                "text": "字段构造器实现的是 `@migaia/store-light` 的 `SyncFieldBuilder` 协议（`mode: 'sync'`），可以直接放进 `createStore()` 的字段声明："
+                "text": "字段构造器实现的是 `@migaia/store-light` 的 `ISyncFieldBuilder` 协议（`mode: 'sync'`），可以直接放进 `createStore()` 的字段声明："
               },
               {
                 "type": "code",
@@ -397,7 +401,7 @@
                   "`createStore()` 只接受 `mode: 'sync'` 的字段构造器，`store-wasm` 的全部构造器都满足这一点，可以直接用 `createStore()`，不需要 `createAsyncStore()`。真正的\"异步\"部分（WASM 加载）必须在调用 `createStore()` 之前用 `await ensureWasm()` 完成。",
                   "字段本身就是 `store.<key>` 的值，不是被拆包的原始类型——`number()`/`boolean()`/`string()` 产出的字段要通过 `.value` 读写（`store.hp.value`），`record()` 产出的字段直接把每个 key 暴露成可读写属性（`store.pos.x`），`array()` 产出的字段要用 `at()`/`setAt()`/`setRange()`/`view()`。",
                   "Store 拥有字段的生命周期：`createStore()` 内部会把每个 wasm 字段登记进 Store 自己的 disposal scope，`store.$dispose()` 时自动调用每个字段的 `dispose()`。业务代码不需要、也不应该在 Store 存活期间手动 `dispose()` 单个 wasm 字段。",
-                  "如果不经过 `createStore()`，而是直接拿字段构造器手写 `builder.create(context)`（比如写测试、写自定义 runtime 集成），字段的生命周期完全由调用方负责，`context` 需要自己提供符合 `FieldContext`（`runtime`、`signal`、`createSource`）形状的对象，这是 `@migaia/store-light` 定义的协议，详见该包文档。"
+                  "如果不经过 `createStore()`，而是直接拿字段构造器手写 `builder.create(context)`（比如写测试、写自定义 runtime 集成），字段的生命周期完全由调用方负责，`context` 需要自己提供符合 `IFieldContext`（`runtime`、`signal`、`createSource`）形状的对象，这是 `@migaia/store-light` 定义的协议，详见该包文档。"
                 ]
               }
             ]
@@ -703,12 +707,12 @@
                   [
                     "`number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`",
                     "`Error`",
-                    "`[store] cannot read a disposed wasm field`"
+                    "`[store] cannot use a disposed wasm field`"
                   ],
                   [
                     "`number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`",
                     "`Error`",
-                    "`[store] cannot write a disposed wasm field`"
+                    "`[store] cannot use a disposed wasm field`"
                   ],
                   [
                     "`array()` 字段 dispose 后调用任意方法",
@@ -790,7 +794,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
               },
               {
                 "type": "paragraph",
@@ -812,6 +816,10 @@
                   [
                     "`cleanupFailed`",
                     "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                  ],
+                  [
+                    "`instancePoisoned`",
+                    "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                   ]
                 ]
               },
@@ -1022,7 +1030,7 @@
             "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
             "const field = array(number(), 1000) // granularity 默认 64\nconst field2 = array(number(), 1000, 1) // 每个 index 独立追踪",
             "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = array(number(), 1000) // length=1000, granularity 默认 64\nfield.setAt(0, 1)\nfield.setRange(1, 3, [2, 3])",
+            "const store = createStore({ field: array(number(), 1000) }) // length=1000, granularity 默认 64\nstore.field.setAt(0, 1)\nstore.field.setRange(1, 3, [2, 3])",
             "import { StoreProvider } from '@migaia/store-react'\nimport { ensureWasm, number, array } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) })\n  return null\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  )\n}",
             "import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm())\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000)\nconst store = createStore({ particles })\n\nconst dx = new Float64Array(1000).fill(0.1)\nstore.particles.setRange(0, 1000, dx) // 落进同一批桶的写入合并到一次 commit"
           ],
@@ -1137,12 +1145,12 @@
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`",
                       "`Error`",
-                      "`[store] cannot read a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`",
                       "`Error`",
-                      "`[store] cannot write a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`array()` 字段 dispose 后调用任意方法",
@@ -1231,7 +1239,7 @@
             "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
             "const field = boolean() // FieldBuilder<IWasmBooleanField>",
             "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = boolean()\nfield.value = true"
+            "const store = createStore({ field: boolean() })\nstore.field.value = true"
           ],
           "members": [],
           "aliasOf": "boolean",
@@ -1304,12 +1312,12 @@
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`",
                       "`Error`",
-                      "`[store] cannot read a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`",
                       "`Error`",
-                      "`[store] cannot write a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`array()` 字段 dispose 后调用任意方法",
@@ -1493,7 +1501,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -1518,6 +1526,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -1584,7 +1596,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",
@@ -1734,7 +1746,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -1759,6 +1771,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -1825,7 +1841,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",
@@ -1959,7 +1975,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -1984,6 +2000,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -2050,7 +2070,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",
@@ -2198,7 +2218,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -2223,6 +2243,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -2289,7 +2313,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",
@@ -2438,12 +2462,12 @@
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`",
                       "`Error`",
-                      "`[store] cannot read a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`",
                       "`Error`",
-                      "`[store] cannot write a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`array()` 字段 dispose 后调用任意方法",
@@ -2525,7 +2549,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -2550,6 +2574,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -2597,7 +2625,7 @@
               ]
             }
           ],
-          "usageScore": 172,
+          "usageScore": 174,
           "configuration": [],
           "fragment": "store-wasm-index--ensureWasm"
         },
@@ -2680,7 +2708,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -2705,6 +2733,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -2835,7 +2867,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -2860,6 +2892,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -2932,9 +2968,9 @@
             "const field = record({ x: number(), y: number(), z: number() })",
             "await ensureWasm()\nconst store = createStore({ score: number() })\nstore.score.value = 100",
             "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = number()\nfield.value = 1.5",
-            "const field = array(number(), 1000) // length=1000, granularity 默认 64\nfield.setAt(0, 1)\nfield.setRange(1, 3, [2, 3])",
-            "const field = record({ x: number(), y: number() })\nfield.x = 1 // 直接属性读写，不经过 .value",
+            "const store = createStore({ field: number() })\nstore.field.value = 1.5",
+            "const store = createStore({ field: array(number(), 1000) }) // length=1000, granularity 默认 64\nstore.field.setAt(0, 1)\nstore.field.setRange(1, 3, [2, 3])",
+            "const store = createStore({ field: record({ x: number(), y: number() }) })\nstore.field.x = 1 // 直接属性读写，不经过 .value",
             "import { StoreProvider } from '@migaia/store-react'\nimport { ensureWasm, number, array } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nfunction Game() {\n  // 挂载时 ensureWasm() 已经 settle，可以直接同步构造\n  const store = createStore({ hp: number(), hits: array(number(), 1000) })\n  return null\n}\n\nfunction App() {\n  return (\n    <StoreProvider config={{ features: { wasm: true }, ready: [ensureWasm] }}>\n      <Game />\n    </StoreProvider>\n  )\n}",
             "import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm())\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000)\nconst store = createStore({ particles })\n\nconst dx = new Float64Array(1000).fill(0.1)\nstore.particles.setRange(0, 1000, dx) // 落进同一批桶的写入合并到一次 commit",
             "import { record, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) })\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1\nstore.pos.y = 2"
@@ -3010,12 +3046,12 @@
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`",
                       "`Error`",
-                      "`[store] cannot read a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`",
                       "`Error`",
-                      "`[store] cannot write a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`array()` 字段 dispose 后调用任意方法",
@@ -3110,7 +3146,7 @@
             "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
             "const field = record({ x: number(), y: number(), z: number() })",
             "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = record({ x: number(), y: number() })\nfield.x = 1 // 直接属性读写，不经过 .value",
+            "const store = createStore({ field: record({ x: number(), y: number() }) })\nstore.field.x = 1 // 直接属性读写，不经过 .value",
             "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一",
             "import { record, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) })\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1\nstore.pos.y = 2"
           ],
@@ -3215,12 +3251,12 @@
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`",
                       "`Error`",
-                      "`[store] cannot read a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`",
                       "`Error`",
-                      "`[store] cannot write a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`array()` 字段 dispose 后调用任意方法",
@@ -3302,7 +3338,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -3327,6 +3363,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -3393,7 +3433,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",
@@ -3509,7 +3549,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -3534,6 +3574,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -3600,7 +3644,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",
@@ -3670,7 +3714,7 @@
             "import { createStore } from '@migaia/store-light'\nimport { ensureWasm, number, boolean, string, array, record } from '@migaia/store-wasm'\n\nawait ensureWasm()\n\nconst store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\n\nstore.hp.value = 100\nstore.alive.value = true\nstore.name.value = 'boss'\nstore.hits.setAt(0, 1)\nstore.pos.x = 10\n\nstore.$dispose() // 递归释放上面五个字段各自持有的 WASM 分配",
             "const field = string() // maxBytes 默认 256\nconst field2 = string(64) // 自定义最大字节数",
             "const store = createStore({\n  hp: number(),\n  alive: boolean(),\n  name: string(64),\n  hits: array(number(), 1000),\n  pos: record({ x: number(), y: number() })\n})\nstore.$dispose() // 递归释放全部五个字段各自持有的 WASM 分配",
-            "const field = string(64) // 最多 64 字节\nfield.value = 'hello'"
+            "const store = createStore({ field: string(64) }) // 最多 64 字节\nstore.field.value = 'hello'"
           ],
           "members": [],
           "aliasOf": "string",
@@ -3751,12 +3795,12 @@
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后读 `.value`",
                       "`Error`",
-                      "`[store] cannot read a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`number()`/`boolean()`/`string()` 字段 dispose 后写 `.value`",
                       "`Error`",
-                      "`[store] cannot write a disposed wasm field`"
+                      "`[store] cannot use a disposed wasm field`"
                     ],
                     [
                       "`array()` 字段 dispose 后调用任意方法",
@@ -3838,7 +3882,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -3863,6 +3907,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -3929,7 +3977,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",
@@ -4056,7 +4104,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -4081,6 +4129,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -4147,7 +4199,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",
@@ -4263,7 +4315,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
                 },
                 {
                   "type": "paragraph",
@@ -4288,6 +4340,10 @@
                     [
                       "`cleanupFailed`",
                       "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
                     ]
                   ]
                 },
@@ -4354,7 +4410,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
                 },
                 {
                   "type": "paragraph",

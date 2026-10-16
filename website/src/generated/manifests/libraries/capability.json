@@ -243,7 +243,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
               },
               {
                 "type": "paragraph",
@@ -514,7 +514,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()"
+                "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()"
               }
             ]
           },
@@ -1228,7 +1228,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
+                "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
               },
               {
                 "type": "paragraph",
@@ -1615,7 +1615,7 @@
           "examples": [
             "import {\n  createCapabilityHost,\n  type ICapabilityHandle,\n  type ICapabilityState,\n  type ICapabilityEnableResult,\n  type ICapabilityDefinition,\n  type ICapabilityHostOptions,\n  type ICapabilityHost,\n  CapabilityState,\n  CapabilityEnableStatus,\n  CapabilityErrorCode,\n  type ICapabilityErrorCode,\n  CAPABILITY_SOURCE\n} from '@migaia/capability'",
             "const CapabilityEnableStatus = {\n  enabled: 'enabled',\n  gated: 'gated',\n  cancelled: 'cancelled',\n  failed: 'failed'\n} as const\ntype ICapabilityEnableStatusValue =\n  (typeof CapabilityEnableStatus)[keyof typeof CapabilityEnableStatus]",
-            "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用",
+            "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用",
             "import { CapabilityState, CapabilityEnableStatus } from '@migaia/capability'",
             "if (result.status === CapabilityEnableStatus.failed) console.error(result.error)"
           ],
@@ -1670,7 +1670,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
+                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
                 },
                 {
                   "type": "paragraph",
@@ -2038,7 +2038,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -2229,9 +2229,9 @@
           "errors": ["No documented errors are declared for createCapabilityHost."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createCapabilityHost.",
           "examples": [
-            "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用",
+            "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用",
             "import { createCapabilityHost, type ICapabilityHandle } from '@migaia/capability'\n\ntype INotificationCenter = ICapabilityHandle & {\n  show(message: string): void\n}\n\nconst mount = document.querySelector<HTMLElement>('#notification-center')!\nconst capabilities = createCapabilityHost({ mount }, { flags: { notificationCenter: true } })\n\ncapabilities.register<INotificationCenter>({\n  name: 'notificationCenter',\n  activate({ mount }) {\n    const panel = document.createElement('output')\n    mount.append(panel)\n    return {\n      show(message) {\n        panel.textContent = message\n      },\n      dispose() {\n        panel.remove()\n      }\n    }\n  }\n})\n\nasync function openNotificationCenter(message: string) {\n  const result = await capabilities.enable('notificationCenter')\n  if (result.status !== 'enabled') return\n\n  const notifications = capabilities.handle<INotificationCenter>('notificationCenter')\n  notifications?.show(message)\n}\n\nasync function closeNotificationCenter() {\n  await capabilities.disable('notificationCenter')\n}\n\nasync function shutdownApplication() {\n  await capabilities.dispose()\n}",
-            "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()",
+            "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()",
             "import { createCapabilityHost } from '@migaia/capability'\n\nfunction createTenantCapabilities(tenant: string, flags: Record<string, boolean>) {\n  const host = createCapabilityHost({ tenant }, { flags })\n  host.register({\n    name: 'experimental-ai',\n    activate: async ({ tenant }) => {\n      const controller = await connectAiSidecar(tenant)\n      return { dispose: () => controller.close() }\n    }\n  })\n  return host\n}\n\nconst acme = createTenantCapabilities('acme', { 'experimental-ai': true })\nconst globex = createTenantCapabilities('globex', { 'experimental-ai': false })\n\nawait acme.enable('experimental-ai') // { status: 'enabled' }\nawait globex.enable('experimental-ai') // { status: 'gated' }",
             "import { createCapabilityHost, CapabilityState } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { worker: true } })\nhost.register({\n  name: 'worker',\n  async activate() {\n    const port = await connectWorkerPort()\n    return { dispose: () => port.close() }\n  }\n})\n\nawait host.enable('worker')\nhost.state('worker') // CapabilityState.on\n\nhost.setFlag('worker', false) // 同步作废在途激活/释放已有 handle，不需要再调用 disable()\nhost.state('worker') // CapabilityState.gated",
             "import { createCapabilityHost } from '@migaia/capability'\n\nconst host = createCapabilityHost({}, { flags: { search: true } })\nlet activateCalls = 0\nhost.register({\n  name: 'search',\n  async activate() {\n    activateCalls++\n    const index = await buildSearchIndex()\n    return { dispose: () => index.close() }\n  }\n})\n\nconst [a, b, c] = await Promise.all([\n  host.enable('search'),\n  host.enable('search'),\n  host.enable('search')\n])\nactivateCalls // 1 —— 三个并发调用共享同一次 activate()",
@@ -2314,7 +2314,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
+                  "code": "import { createCapabilityHost, CapabilityEnableStatus } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === CapabilityEnableStatus.enabled) console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose() // LIFO 释放全部已启用能力，之后 host 不可再用"
                 },
                 {
                   "type": "paragraph",
@@ -2387,7 +2387,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -2543,7 +2543,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => reportError(name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const { persist, memoryStorage } = await import('@migaia/store-persist')\n    const handle = persist(store, { key: 'settings', storage: memoryStorage() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()"
+                  "code": "import { createCapabilityHost } from '@migaia/capability'\n\nconst capabilities = createCapabilityHost(\n  { store },\n  {\n    flags: { persistence: true },\n    onError: (name, error) => console.error('capability failed:', name, error)\n  }\n)\n\ncapabilities.register({\n  name: 'persistence',\n  async activate({ store }) {\n    // 只有开关打开、真正 enable() 时才会下载这个 chunk\n    const [{ persist }, { memoryStorageHost }] = await Promise.all([\n      import('@migaia/store-persist/light'),\n      import('@migaia/storage-web/memory')\n    ])\n    const handle = persist(store, { key: 'settings', storage: memoryStorageHost() })\n    return { dispose: () => handle.dispose() }\n  }\n})\n\nconst result = await capabilities.enable('persistence')\nif (result.status === 'enabled') console.log('持久化已启用')\n\nawait capabilities.disable('persistence')\nawait capabilities.dispose()"
                 }
               ]
             },
@@ -2773,7 +2773,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -3056,7 +3056,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -3628,7 +3628,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -3911,7 +3911,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -4193,7 +4193,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -4539,7 +4539,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.userId}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
+                  "code": "capabilities.register({\n  name: 'greeting',\n  activate(ctx) {\n    const timer = setInterval(() => console.log(`hi, ${ctx.mount.id}`), 1000)\n    return { dispose: () => clearInterval(timer) }\n  }\n})"
                 },
                 {
                   "type": "paragraph",
@@ -6176,7 +6176,7 @@
         {
           "name": "IGraphStartContext",
           "kind": "type",
-          "signature": "export type IGraphStartContext = { readonly nodeId: IGraphNodeId; readonly signal: IAbortSignal; readonly get: <T = unknown>(provider: IGraphNodeId) => T; readonly own: <T>(resource: T, descriptor: IReleaseDescriptor) => T; };",
+          "signature": "export type IGraphStartContext = { readonly nodeId: IGraphNodeId; readonly signal: INativeAbortSignal; readonly get: <T = unknown>(provider: IGraphNodeId) => T; readonly own: <T>(resource: T, descriptor: IReleaseDescriptor) => T; };",
           "declarationLine": 29,
           "source": "packages/capability/dist/graph/index.d.ts",
           "purpose": "Startup context with direct-provider reads and provisional auxiliary ownership.",
@@ -6194,7 +6194,7 @@
           "members": [],
           "exportPath": "./graph",
           "overloadSignatures": [
-            "export type IGraphStartContext = { readonly nodeId: IGraphNodeId; readonly signal: IAbortSignal; readonly get: <T = unknown>(provider: IGraphNodeId) => T; readonly own: <T>(resource: T, descriptor: IReleaseDescriptor) => T; };"
+            "export type IGraphStartContext = { readonly nodeId: IGraphNodeId; readonly signal: INativeAbortSignal; readonly get: <T = unknown>(provider: IGraphNodeId) => T; readonly own: <T>(resource: T, descriptor: IReleaseDescriptor) => T; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6233,7 +6233,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/capability/dist/graph/index.d.ts:IGraphStartContext:export type IGraphStartContext = { readonly nodeId: IGraphNodeId; readonly signal: IAbortSignal; readonly get: <T = unknown>(provider: IGraphNodeId) => T; readonly own: <T>(resource: T, descriptor: IReleaseDescriptor) => T; };",
+          "identity": "packages/capability/dist/graph/index.d.ts:IGraphStartContext:export type IGraphStartContext = { readonly nodeId: IGraphNodeId; readonly signal: INativeAbortSignal; readonly get: <T = unknown>(provider: IGraphNodeId) => T; readonly own: <T>(resource: T, descriptor: IReleaseDescriptor) => T; };",
           "guidance": [],
           "usageScore": 14,
           "configuration": [],

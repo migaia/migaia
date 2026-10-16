@@ -2505,6 +2505,12 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/api/IPluginConstraintTuple",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/api/IPluginDataOrderSlot",
       "locale": "en",
       "domain": "docs",
@@ -2602,6 +2608,18 @@
     },
     {
       "path": "/en/docs/plugin-host/api/IPluginHostCore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/IPluginHostCoreFor",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/en/docs/plugin-host/api/IPluginHostCoreTypeInfo",
       "locale": "en",
       "domain": "docs",
       "library": "plugin-host"
@@ -14559,6 +14577,12 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/api/host/ITrayHostSource",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/api/host/ITrayHostState",
       "locale": "en",
       "domain": "docs",
@@ -14566,6 +14590,12 @@
     },
     {
       "path": "/en/docs/tray/api/host/ITrayPluginConstraint",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/api/host/ITrayPluginCore",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -15633,7 +15663,19 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/api/promise/IDeadlineOnlyOperation",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/api/promise/IDeferred",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/promise/INativeAbortSignal",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -18567,6 +18609,12 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/api/IPluginConstraintTuple",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/api/IPluginDataOrderSlot",
       "locale": "zh",
       "domain": "docs",
@@ -18664,6 +18712,18 @@
     },
     {
       "path": "/zh/docs/plugin-host/api/IPluginHostCore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/IPluginHostCoreFor",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
+      "path": "/zh/docs/plugin-host/api/IPluginHostCoreTypeInfo",
       "locale": "zh",
       "domain": "docs",
       "library": "plugin-host"
@@ -30621,6 +30681,12 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/api/host/ITrayHostSource",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/api/host/ITrayHostState",
       "locale": "zh",
       "domain": "docs",
@@ -30628,6 +30694,12 @@
     },
     {
       "path": "/zh/docs/tray/api/host/ITrayPluginConstraint",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/api/host/ITrayPluginCore",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -31695,7 +31767,19 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/api/promise/IDeadlineOnlyOperation",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/api/promise/IDeferred",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/promise/INativeAbortSignal",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"

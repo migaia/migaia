@@ -148,7 +148,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
+                "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
               },
               {
                 "type": "paragraph",
@@ -408,7 +408,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。"
               },
               {
                 "type": "paragraph",
@@ -622,13 +622,13 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}"
+                "code": "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}"
               },
               {
                 "type": "list",
                 "items": [
                   "`subscribe(listener, options?)` —— 登记一个 listener，返回可直接调用的订阅句柄（同时是 `unsubscribe` 函数、`.unsubscribe` 自身别名、可链式 `.subscribe()` 追加更多订阅）。`listener` 非函数抛 `INVALID_LISTENER`；`options.taskId` 提供但非非空字符串抛 `INVALID_TASK_ID`；`options` 本身不是普通对象抛 `INVALID_OPTIONS`。缺省 `multiple` 下相同 listener 重复订阅会产生两份独立 registration（各自可单独退订）；显式 `unique` 的行为见上。",
-                  "`subscribeOnce`/`subscribeUntil` —— 与下方 Helper 模块的同名独立函数语义完全一致，channel 上直接暴露方便链式调用。",
+                  "channel 本身没有 `subscribeOnce`/`subscribeUntil` 方法；一次性或带 signal 的订阅用下方 Helper 模块的同名独立函数，第一个参数传 channel。",
                   "`publish(value)` —— 按注册顺序（快照）同步调用全部 listener，不等待返回的 Promise；默认同步重入 publish 递归交付，只有 `dispatchPolicy: EventDispatchPolicy.queued` 才会排队到当前快照完成后再交付。listener 同步抛出的错误会被收集并以携带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出；listener 返回的 thenable 迟到 reject（即在 `publish()` 同步返回之后才拒绝）会转发给 `options.report`（见上），不计入 `publish()` 本身抛出的错误。",
                   "`filterTaskId(taskId)` —— 创建一个只读的 task 选择 view（`IFilteredEventChannel`），交给异步发布 helper 使用；`taskId` 必须是非空字符串，否则抛 `INVALID_TASK_ID`。",
                   "`clear()` —— 清空全部 registration，不执行 listener 自身的 cleanup（listener 本身没有 dispose 概念，只是不再被调用）。",
@@ -666,7 +666,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
+                "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
               },
               {
                 "type": "paragraph",
@@ -926,7 +926,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]"
+                "code": "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style\n  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]"
               },
               {
                 "type": "paragraph",
@@ -1100,6 +1100,11 @@
                     "`invocationClosed`",
                     "`INVOCATION_CLOSED`",
                     "已完成或已调用过的捕获 invocation 被再次调用"
+                  ],
+                  [
+                    "`subscriptionDisposeFailed`",
+                    "`SUBSCRIPTION_DISPOSE_FAILED`",
+                    "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                   ]
                 ]
               },
@@ -1119,7 +1124,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "内部文本与 17 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`。"
+                "text": "内部文本与 18 个错误码一一对应：`invalidListener`、`invalidReporter`、`invalidChannel`、`invalidSignal`、`invalidSubscriber`、`invalidEventKey`、`taskNotFound`、`taskNotUnique`、`invalidTaskId`、`invalidOptions`、`aborted`、`publishFailed`、`valueProjectionFailed`、`unhandledListenerFailure`、`subscriptionClosed`、`subscriptionHandleProjectionFailed`、`invocationClosed`、`subscriptionDisposeFailed`。"
               }
             ]
           },
@@ -1350,7 +1355,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createEventChannel.",
           "examples": [
             "const channel = createEventChannel<{ readonly text: string }>()\nconst unsubscribe = channel.subscribe((event) => console.log(event.value.text))\nchannel.publish({ text: 'ready' })\nunsubscribe()",
-            "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()",
+            "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()",
             "import { createEventChannel } from '@migaia/event-subscriber'\nimport { subscribeSubscriber, type IEventSubscriber } from '@migaia/event-subscriber/subscriber'\n\nclass Counter implements IEventSubscriber<number> {\n  total = 0\n  handle(event: { readonly value: number }) {\n    this.total += event.value\n  }\n}\nconst channel = createEventChannel<number>()\nsubscribeSubscriber(channel, new Counter())",
             "import { createEventChannel, invokeTaskSettled } from '@migaia/event-subscriber'\n\ntype IEmailJob = { readonly recipient: string; readonly template: 'welcome' }\ntype IEmailReceipt = { readonly messageId: string }\n\nconst tasks = createEventChannel<IEmailJob, IEmailReceipt>()\ntasks.subscribe(\n  async ({ value: job }) => {\n    const response = await fetch('/api/email', {\n      method: 'POST',\n      headers: { 'content-type': 'application/json' },\n      body: JSON.stringify(job)\n    })\n    return response.json() as Promise<IEmailReceipt>\n  },\n  { taskId: 'email' }\n)\n\nconst job: IEmailJob = { recipient: 'ada@example.com', template: 'welcome' }\nconst result = await invokeTaskSettled(tasks, 'email', job)\n// result 是 { status: 'fulfilled', value: { messageId } }\n// 或 { status: 'rejected', reason }",
             "import { createEventChannel, invokeTask } from '@migaia/event-subscriber'\n\nconst jobs = createEventChannel<string, string>()\njobs.subscribe((event) => `email:${event.value}`, { taskId: 'email' })\njobs.subscribe((event) => `audit:${event.value}`, { taskId: 'audit' })\n\nconst emailResult = await invokeTask(jobs, 'email', 'created')",
@@ -1359,7 +1364,7 @@
             "import { createEventChannel, invokeSerial } from '@migaia/event-subscriber'\nimport { subscribeSubscriber } from '@migaia/event-subscriber/subscriber'\n\nconst pipeline = createEventChannel<string, void>()\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => writeAuditLog(event.value)\n})\nsubscribeSubscriber(pipeline, {\n  handle: async (event) => notifyDownstream(event.value)\n})\n\nawait invokeSerial(pipeline, 'order-created')",
             "type IEvent = { readonly data: { readonly id: number } }\nconst valueConfig = { readPath: 'data.id', alias: 'resource' } as const\nconst channel = createEventChannel<IEvent, void, undefined, typeof valueConfig>({ valueConfig })\nchannel.subscribe((event) => {\n  event.value // 原始 published value\n  event.resource // number | undefined\n  event.abort() // 原有 context controls 保留\n})",
             "const events = createEventChannel<number>({ style: 'on-emit' })\nconst stop = events.on((event) => console.log(event.value))\nevents.emit(1)\nstop.off()",
-            "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()",
+            "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()",
             "type IEvent = { readonly data: { readonly id: number } }\nconst valueConfig = { readPath: 'data.id', alias: 'resource' } as const\nconst channel = createEventChannel<IEvent, void, undefined, typeof valueConfig>({ valueConfig })\n\nchannel.subscribe((event) => {\n  event.value // 原始 IEvent，identity 保留\n  event.resource // number | undefined；alias 可任意命名\n  event.abort()\n})"
           ],
           "members": [],
@@ -1595,13 +1600,13 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}"
+                  "code": "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}"
                 },
                 {
                   "type": "list",
                   "items": [
                     "`subscribe(listener, options?)` —— 登记一个 listener，返回可直接调用的订阅句柄（同时是 `unsubscribe` 函数、`.unsubscribe` 自身别名、可链式 `.subscribe()` 追加更多订阅）。`listener` 非函数抛 `INVALID_LISTENER`；`options.taskId` 提供但非非空字符串抛 `INVALID_TASK_ID`；`options` 本身不是普通对象抛 `INVALID_OPTIONS`。缺省 `multiple` 下相同 listener 重复订阅会产生两份独立 registration（各自可单独退订）；显式 `unique` 的行为见上。",
-                    "`subscribeOnce`/`subscribeUntil` —— 与下方 Helper 模块的同名独立函数语义完全一致，channel 上直接暴露方便链式调用。",
+                    "channel 本身没有 `subscribeOnce`/`subscribeUntil` 方法；一次性或带 signal 的订阅用下方 Helper 模块的同名独立函数，第一个参数传 channel。",
                     "`publish(value)` —— 按注册顺序（快照）同步调用全部 listener，不等待返回的 Promise；默认同步重入 publish 递归交付，只有 `dispatchPolicy: EventDispatchPolicy.queued` 才会排队到当前快照完成后再交付。listener 同步抛出的错误会被收集并以携带 `PUBLISH_FAILED` 码的 `AggregateError` 抛出；listener 返回的 thenable 迟到 reject（即在 `publish()` 同步返回之后才拒绝）会转发给 `options.report`（见上），不计入 `publish()` 本身抛出的错误。",
                     "`filterTaskId(taskId)` —— 创建一个只读的 task 选择 view（`IFilteredEventChannel`），交给异步发布 helper 使用；`taskId` 必须是非空字符串，否则抛 `INVALID_TASK_ID`。",
                     "`clear()` —— 清空全部 registration，不执行 listener 自身的 cleanup（listener 本身没有 dispose 概念，只是不再被调用）。",
@@ -1639,7 +1644,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -1744,6 +1749,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -1788,7 +1798,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -1805,7 +1815,7 @@
               ]
             }
           ],
-          "usageScore": 282,
+          "usageScore": 288,
           "configuration": [
             {
               "name": "report",
@@ -2084,7 +2094,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]"
+                  "code": "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style\n  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]"
                 },
                 {
                   "type": "paragraph",
@@ -2177,8 +2187,8 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for defineEventApiStyle.",
           "examples": [
             "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
-            "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()",
-            "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
+            "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()",
+            "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
           ],
           "members": [],
           "aliasOf": "defineEventApiStyle",
@@ -2254,7 +2264,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -2294,7 +2304,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -2311,7 +2321,7 @@
               ]
             }
           ],
-          "usageScore": 34,
+          "usageScore": 40,
           "configuration": [],
           "fragment": "event-subscriber-index--defineEventApiStyle"
         },
@@ -2467,6 +2477,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -2509,7 +2524,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -2682,7 +2697,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst events = createEventChannel<number>({ style: 'on-trigger' })\nconst off = events.on((event) => console.log(event.value))\nevents.trigger(1)\noff.off()\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst custom = createEventChannel<number, void, typeof style>({ style })\nconst customHandle = custom.observe((event) => console.log(event.value))\ncustom.dispatch(1)\ncustomHandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -2722,7 +2737,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -3026,6 +3041,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -3068,7 +3088,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -3183,7 +3203,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -3482,7 +3502,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventChannel.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import {\n  createEventChannel,\n  type IEventChannel,\n  type IEventContext\n} from '@migaia/event-subscriber'"
           ],
           "members": [],
@@ -3616,7 +3636,7 @@
           "errors": ["No documented errors are declared for IEventChannelSubscription."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventChannelSubscription.",
           "examples": [
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import type { IEventChannelSubscription, IEventHubSubscription } from '@migaia/event-subscriber'"
           ],
           "members": [],
@@ -3748,7 +3768,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventHub.",
           "examples": [
             "import {\n  createEventHub,\n  type IEventHub,\n  type IEventHubOptions,\n  type IEventMap,\n  type IEventHubReport\n} from '@migaia/event-subscriber'",
-            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
+            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style\n  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
             "type IEventHub<C extends IEventMap> = {\n  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>\n  publish<K extends keyof C>(key: K, value: C[K]): void\n  clear(key?: keyof C): void\n  size(key?: keyof C): number\n}",
             "import { createEventHub, type IEventHub, type IEventHubOptions } from '@migaia/event-subscriber'"
           ],
@@ -3817,7 +3837,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventHubOptions.",
           "examples": [
             "import {\n  createEventHub,\n  type IEventHub,\n  type IEventHubOptions,\n  type IEventMap,\n  type IEventHubReport\n} from '@migaia/event-subscriber'",
-            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
+            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style\n  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
             "import { createEventHub, type IEventHub, type IEventHubOptions } from '@migaia/event-subscriber'"
           ],
           "members": [],
@@ -3885,7 +3905,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventHubReport.",
           "examples": [
             "import {\n  createEventHub,\n  type IEventHub,\n  type IEventHubOptions,\n  type IEventMap,\n  type IEventHubReport\n} from '@migaia/event-subscriber'",
-            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]"
+            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style\n  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]"
           ],
           "members": [],
           "aliasOf": "IEventHubReport",
@@ -4147,7 +4167,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventMap.",
           "examples": [
             "import {\n  createEventHub,\n  type IEventHub,\n  type IEventHubOptions,\n  type IEventMap,\n  type IEventHubReport\n} from '@migaia/event-subscriber'",
-            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
+            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style\n  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
             "type IEventHub<C extends IEventMap> = {\n  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>\n  publish<K extends keyof C>(key: K, value: C[K]): void\n  clear(key?: keyof C): void\n  size(key?: keyof C): number\n}"
           ],
           "members": [],
@@ -4479,6 +4499,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -4521,7 +4546,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -4618,7 +4643,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFilteredEventChannel.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "function invokeParallelSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeParallel<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>",
             "function invokeSerialSettled<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly IListenerResult<R>[]>\nfunction invokeSerial<T, R>(\n  channel: ICanonicalEventChannel<T, R> | IFilteredEventChannel<T, R>,\n  value: T\n): Promise<readonly Awaited<R>[]>"
           ],
@@ -4970,6 +4995,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -5207,6 +5237,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -5443,6 +5478,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -5610,6 +5650,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -5987,7 +6032,7 @@
             "function createEventChannel<T, R = void>(\n  options?: IEventChannelOptions<T>\n): ICanonicalEventChannel<T, R>\n\ntype IEventChannelOptions<T> = {\n  readonly report?: (failure: IEventReport<T>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly dispatchPolicy?: EventDispatchPolicy\n  readonly admissionPolicy?: EventAdmissionPolicy\n  readonly removalPolicy?: 'handle' | 'listener-all'\n  readonly publishBudget?: number\n  readonly throwOnAborted?: boolean\n  readonly style?: IEventApiStyle\n  readonly valueConfig?: IValidatedEventValueConfig<T>\n}\n\ntype IEventApiStyleNames<\n  TSubscribe extends string = string,\n  TPublish extends string = string,\n  TUnsubscribe extends string = string\n> = {\n  readonly subscribe: TSubscribe\n  readonly publish: TPublish\n  readonly unsubscribe?: TUnsubscribe\n}\n\ntype IEventApiStyle =\n  'subscribe-publish' | 'on-emit' | 'on-trigger' | 'listen-fire' | IEventApiStyleNames\n\ndeclare function defineEventApiStyle<const S extends IEventApiStyleNames>(style: S): S\n\ntype IEventReport<T> = { readonly event: IEventContext<T>; readonly error: unknown }",
             "type IEventContext<T> = {\n  readonly value: T\n  readonly aborted: boolean\n  readonly abortReason: unknown\n  readonly taskId: string | undefined\n  abort(reason?: unknown): void\n  setTaskId(taskId: string | undefined): void\n}",
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }",
-            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
+            "function createEventHub<C extends IEventMap>(options?: IEventHubOptions<C>): IEventHub<C>\n\ntype IEventMap = object // 事件名到 payload 类型的映射\ntype IEventHubOptions<C extends IEventMap> = {\n  readonly report?: (failure: IEventHubReport<C>) => void | PromiseLike<void>\n  readonly terminalReport?: (error: unknown) => void | PromiseLike<void>\n  readonly style?: IEventApiStyleOption // 与 channel 相同的 style preset，见 API style\n  readonly valueConfig?: IValidatedEventValueConfig // payload 值配置，与 channel 的同名选项一致\n}\ntype IEventHubReport<C extends IEventMap> = {\n  [K in keyof C]: { readonly key: K; readonly event: IEventContext<C[K]>; readonly error: unknown }\n}[keyof C]",
             "import {\n  createEventChannel,\n  type IEventChannel,\n  type IEventContext\n} from '@migaia/event-subscriber'"
           ],
           "members": [],
@@ -6055,7 +6100,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IEventListener.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
+            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "function subscribeOnce<T, R>(\n  channel: IEventChannelLike<T, R>,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe",
             "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "type IEventHub<C extends IEventMap> = {\n  subscribe<K extends keyof C>(key: K, listener: IEventListener<C[K]>): IEventHubSubscription<C, K>\n  publish<K extends keyof C>(key: K, value: C[K]): void\n  clear(key?: keyof C): void\n  size(key?: keyof C): number\n}"
@@ -6105,7 +6150,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/types.d.ts:IEventListener:export type IEventListener<T, R = void, V = undefined> = (event: IProjectedEventContext<T, V>) => R | PromiseLike<R>;",
           "guidance": [],
-          "usageScore": 62,
+          "usageScore": 54,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--IEventListener"
         },
@@ -6262,6 +6307,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -6304,7 +6354,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)。"
+                  "text": "`publishFailed`(`PUBLISH_FAILED`)、`valueProjectionFailed`(`VALUE_PROJECTION_FAILED`)、`unhandledListenerFailure`(`UNHANDLED_LISTENER_FAILURE`)、`subscriptionClosed`(`SUBSCRIPTION_CLOSED`)、`subscriptionHandleProjectionFailed`(`SUBSCRIPTION_HANDLE_PROJECTION_FAILED`)、`invocationClosed`(`INVOCATION_CLOSED`)、`subscriptionDisposeFailed`(`SUBSCRIPTION_DISPOSE_FAILED`)。"
                 },
                 {
                   "type": "paragraph",
@@ -6337,7 +6387,6 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IUnsubscribe.",
           "examples": [
             "import {\n  createEventChannel,\n  type ICanonicalEventChannel,\n  type IEventChannel,\n  type IEventChannelLike,\n  type IEventChannelOptions,\n  type IEventContext,\n  type IEventListener,\n  type IFilteredEventChannel,\n  type IUnsubscribe\n} from '@migaia/event-subscriber'",
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "function subscribeOnce<T, R>(\n  channel: IEventChannelLike<T, R>,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe",
             "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "function subscribeSubscriber<T, R>(\n  channel: IEventChannelLike<T, R>,\n  subscriber: IEventSubscriber<T, R>\n): IUnsubscribe\n\ntype IEventSubscriber<T, R = void> = { handle(event: IEventContext<T>): R | PromiseLike<R> }"
@@ -6385,7 +6434,7 @@
           "declaredConfiguration": [],
           "identity": "packages/event-subscriber/dist/types.d.ts:IUnsubscribe:export type IUnsubscribe = () => void;",
           "guidance": [],
-          "usageScore": 84,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--IUnsubscribe"
         },
@@ -6404,7 +6453,6 @@
           "errors": ["No documented errors are declared for subscribeOnce."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for subscribeOnce.",
           "examples": [
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber/subscriber'",
             "function subscribeOnce<T, R>(\n  channel: IEventChannelLike<T, R>,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe",
             "subscribeOnce(channel, (event) => console.log('only once', event.value))"
@@ -6502,7 +6550,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -6519,7 +6567,7 @@
               ]
             }
           ],
-          "usageScore": 80,
+          "usageScore": 70,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--subscribeOnce"
         },
@@ -6709,6 +6757,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -6738,7 +6791,6 @@
           "errors": ["No documented errors are declared for subscribeUntil."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for subscribeUntil.",
           "examples": [
-            "type IEventChannel<T, R = void> = {\n  subscribe(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IEventChannelSubscription<T, R>\n  subscribeOnce(\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  subscribeUntil(\n    signal: IAbortSignal,\n    listener: IEventListener<T, R>,\n    options?: { readonly taskId?: string }\n  ): IUnsubscribe\n  publish(value: T): void\n  filterTaskId(taskId: string): IFilteredEventChannel<T, R>\n  clear(): void\n  readonly size: number\n}",
             "import {\n  subscribeOnce,\n  subscribeUntil,\n  subscribeSubscriber,\n  type IEventSubscriber\n} from '@migaia/event-subscriber/subscriber'",
             "function subscribeUntil<T, R>(\n  channel: IEventChannelLike<T, R>,\n  signal: IAbortSignal,\n  listener: IEventListener<T, R>,\n  options?: { readonly taskId?: string }\n): IUnsubscribe\n\ntype IAbortSignal = {\n  readonly aborted: boolean\n  readonly reason?: unknown\n  addEventListener(type: 'abort', listener: () => void, options?: { readonly once?: boolean }): void\n  removeEventListener(type: 'abort', listener: () => void): void\n}",
             "const controller = new AbortController()\nsubscribeUntil(channel, controller.signal, (event) => consume(event.value))\ncontroller.abort('owner closed')",
@@ -6902,6 +6954,11 @@
                       "`invocationClosed`",
                       "`INVOCATION_CLOSED`",
                       "已完成或已调用过的捕获 invocation 被再次调用"
+                    ],
+                    [
+                      "`subscriptionDisposeFailed`",
+                      "`SUBSCRIPTION_DISPOSE_FAILED`",
+                      "关闭订阅链时多个 disposer 失败（单个失败原样重抛）；`AggregateError.errors` 按执行顺序保留原始错误"
                     ]
                   ]
                 },
@@ -6946,7 +7003,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "const style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
+                  "code": "import { createEventChannel, defineEventApiStyle } from '@migaia/event-subscriber'\n\nconst style = defineEventApiStyle({\n  subscribe: 'observe',\n  publish: 'dispatch',\n  unsubscribe: 'dispose'\n})\nconst events = createEventChannel<number, void, typeof style>({ style })\nconst handle = events.observe((event) => console.log(event.value))\nevents.dispatch(1)\nhandle.dispose()"
                 },
                 {
                   "type": "paragraph",
@@ -6963,7 +7020,7 @@
               ]
             }
           ],
-          "usageScore": 136,
+          "usageScore": 126,
           "configuration": [],
           "fragment": "event-subscriber-subscriber--subscribeUntil"
         }

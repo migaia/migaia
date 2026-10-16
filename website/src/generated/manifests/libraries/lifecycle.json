@@ -194,7 +194,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "`own(resource, descriptor)` 返回的方法：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`；descriptor 形状非法时 `own()` 在注册时抛 `INVALID_OPTION`。环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                "text": "`own(resource, descriptor)` 返回的方法：`own`、`release(resource)`（反注册但不释放，用于调用方已自行释放的场景）、`close()`、`dispose()`。`dispose()` 并发多次调用复用同一个 Promise；disposer 内部重入 `own()`/`dispose()` 分别抛 `SCOPE_REENTRANT_OWN`/`SCOPE_REENTRANT_DISPOSE`；descriptor 形状非法时 `own()` 在注册时抛 `INVALID_OPTION`。提供 `Symbol.asyncDispose`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
               },
               {
                 "type": "paragraph",
@@ -207,7 +207,11 @@
               },
               {
                 "type": "paragraph",
-                "text": "全部选项（`ISyncLifecycleScopeOptions`）：`errorPolicy?`（同上，默认 `'throw'`）、`report?`（同上）。约束：每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`；descriptor 形状非法（如 `order` 非有限数、缺 `force`）在 `own()` 时抛 `INVALID_OPTION`，与异步 scope 一致；某个 callback 若返回 thenable，同样在释放时抛 `SCOPE_SYNC_VIOLATION`。不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例。环境支持时挂载 `[Symbol.dispose]`。"
+                "text": "全部选项（`ISyncLifecycleScopeOptions`）：`errorPolicy?`（同上，默认 `'throw'`）、`report?`（同上）。约束：每个 descriptor 必须显式 `syncSafe: true`，否则 `own()` 在注册时（不是释放时）就抛 `SCOPE_SYNC_VIOLATION`；descriptor 形状非法（如 `order` 非有限数、缺 `force`）在 `own()` 时抛 `INVALID_OPTION`，与异步 scope 一致；某个 callback 若返回 thenable，同样在释放时抛 `SCOPE_SYNC_VIOLATION`。不能 `own()` 一个 `LifecycleScope`/`ProvisionalScope` 实例。提供 `Symbol.dispose`，可直接用于 `using`（TypeScript 需包含 `ESNext."
+              },
+              {
+                "type": "paragraph",
+                "text": "Disposable` 类型库）。"
               },
               {
                 "type": "paragraph",
@@ -757,7 +761,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 环境支持 `[Symbol.dispose]` 时可用 `using`\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n  // 作用域结束时自动 dispose()，移除监听器\n}"
+                "code": "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 离开作用域时自动调用 [Symbol.dispose]()，同步释放\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n}"
               }
             ]
           },
@@ -950,7 +954,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+                "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
               },
               {
                 "type": "paragraph",
@@ -972,7 +976,7 @@
                   "`release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。",
                   "`close()`：同步、幂等；`open → closing`。",
                   "`dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。",
-                  "环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                  "提供 `Symbol.asyncDispose: Promise<void>`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                 ]
               }
             ]
@@ -984,7 +988,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+                "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
               },
               {
                 "type": "paragraph",
@@ -1008,7 +1012,7 @@
                   "某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。",
                   "降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。",
                   "`release()`/`close()` 语义与异步版本一致；`dispose()` 幂等，二次调用返回 `[]`；在 disposer 内部重入抛 `SCOPE_REENTRANT_DISPOSE`。",
-                  "环境支持时挂载 `[Symbol.dispose]`，可配合 `using` 语法。"
+                  "提供 `Symbol.dispose: void`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                 ]
               }
             ]
@@ -1044,7 +1048,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
+                "code": "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
               },
               {
                 "type": "paragraph",
@@ -1176,7 +1180,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
+                "code": "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
               },
               {
                 "type": "paragraph",
@@ -1386,7 +1390,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'"
+                "code": "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'"
               },
               {
                 "type": "paragraph",
@@ -1993,13 +1997,13 @@
             ]
           },
           {
-            "id": "高阶组合示例-5-同步作用域-可暴露-using-语法的纯同步资源",
-            "heading": "高阶组合示例 · 5. 同步作用域：可暴露 using 语法的纯同步资源",
+            "id": "高阶组合示例-5-同步作用域-用-using-确定性释放纯同步资源",
+            "heading": "高阶组合示例 · 5. 同步作用域：用 using 确定性释放纯同步资源",
             "blocks": [
               {
                 "type": "code",
                 "language": "ts",
-                "code": "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 环境支持 `[Symbol.dispose]` 时可用 `using`\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n  // 作用域结束时自动 dispose()，移除监听器\n}"
+                "code": "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 离开作用域时自动调用 [Symbol.dispose]()，同步释放\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n}"
               }
             ]
           },
@@ -2033,7 +2037,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "这里 `PendingTracker` 只负责“还有多少工作”，`LifecycleScope` 只负责“资源由谁释放”；职责不互相替代。"
+                "text": "这里 `createPendingTracker()` 产出的 tracker 只负责“还有多少工作”，`LifecycleScope` 只负责“资源由谁释放”；职责不互相替代。"
               }
             ]
           },
@@ -2300,7 +2304,7 @@
           "errors": ["No documented errors are declared for boundedWait."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for boundedWait.",
           "examples": [
-            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
             "function boundedWait(\n  task: PromiseLike<unknown>,\n  deadlineAt: number,\n  options?: { readonly scheduler?: IScheduler } // 默认 systemScheduler\n): Promise<boolean>",
             "const won = await boundedWait(task, deadlineAt) // true=task 先完成；false=截止时间先到（task 仍在跑）",
             "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController\n} from '@migaia/lifecycle'\nimport { systemScheduler, createManualScheduler, type IScheduler } from '@migaia/utils/scheduler'"
@@ -2690,7 +2694,7 @@
           "name": "createSyncLifecycleScope",
           "kind": "function",
           "signature": "export declare function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope;",
-          "declarationLine": 28,
+          "declarationLine": 30,
           "source": "packages/lifecycle/dist/sync-lifecycle-scope.d.ts",
           "purpose": "The `syncSafe`-only scope. Exists so a scope that owns nothing but reactive-graph-style nodes can offer a real, deterministic `[Symbol.dispose]` instead of the general `LifecycleScope`'s always-async `[Symbol.asyncDispose]` (D-6).",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createSyncLifecycleScope.",
@@ -2708,7 +2712,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSyncLifecycleScope.",
           "examples": [
             "const scope = createSyncLifecycleScope()\nscope.own(node, { syncSafe: true, force: () => node.detach() })\nscope.close()\nconst failures = scope.dispose() // 同步返回",
-            "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 环境支持 `[Symbol.dispose]` 时可用 `using`\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n  // 作用域结束时自动 dispose()，移除监听器\n}",
+            "import { createSyncLifecycleScope } from '@migaia/lifecycle'\n\nfunction withListeners() {\n  using scope = createSyncLifecycleScope() // 离开作用域时自动调用 [Symbol.dispose]()，同步释放\n  const handler = () => console.log('tick')\n  window.addEventListener('tick', handler)\n  scope.own(handler, { syncSafe: true, force: () => window.removeEventListener('tick', handler) })\n}",
             "const scope = createSyncLifecycleScope()\nscope.own(node, { syncSafe: true, force: () => node.detach() })\nscope.close()\nconst failures = scope.dispose() // 同步返回，不可能有异步资源"
           ],
           "members": [],
@@ -2784,7 +2788,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -2808,7 +2812,7 @@
                     "某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。",
                     "降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。",
                     "`release()`/`close()` 语义与异步版本一致；`dispose()` 幂等，二次调用返回 `[]`；在 disposer 内部重入抛 `SCOPE_REENTRANT_DISPOSE`。",
-                    "环境支持时挂载 `[Symbol.dispose]`，可配合 `using` 语法。"
+                    "提供 `Symbol.dispose: void`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -3172,9 +3176,9 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICollectedError.",
           "examples": [
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'",
-            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}",
-            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}",
-            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
+            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}",
+            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}",
+            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
             "function createSyncStartedDisposalLedger(): ISyncStartedDisposalLedger\n\ntype ISyncStartedDisposalLedger = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  readonly pending: number\n  start(source: string, callback: () => unknown): void\n  seal(): ISyncStartedDisposalOutcome\n  whenTerminal(): Promise<void>\n}\n\ntype ICleanupResult<TError = unknown> = Readonly<{\n  cleanupErrors: readonly TError[]\n  physicalCompletion?: Promise<ICleanupResult<TError>>\n}>\n\ntype ISyncStartedDisposalOutcome = ICleanupResult<ICollectedError> & Readonly<{\n  physicalCompletion: Promise<ICleanupResult<ICollectedError>>\n}>",
             "function createErrorCollector(\n  policy: 'throw' | 'collect' | 'report' | 'firstError',\n  report: ((error: unknown) => void) | undefined\n): IErrorCollector\n\ntype IErrorCollector = {\n  readonly policy: IErrorPolicy\n  add(source: string, error: unknown): void\n  finalize(message: string): readonly ICollectedError[]\n}",
             "const collector = createErrorCollector('collect', undefined)\ncollector.add('item-1', error)\nconst collected = collector.finalize('teardown failed') // 'collect' 策略下返回 ICollectedError[]"
@@ -3231,7 +3235,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -3253,7 +3257,7 @@
                     "`release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。",
                     "`close()`：同步、幂等；`open → closing`。",
                     "`dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。",
-                    "环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                    "提供 `Symbol.asyncDispose: Promise<void>`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -3265,7 +3269,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -3289,7 +3293,7 @@
                     "某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。",
                     "降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。",
                     "`release()`/`close()` 语义与异步版本一致；`dispose()` 幂等，二次调用返回 `[]`；在 disposer 内部重入抛 `SCOPE_REENTRANT_DISPOSE`。",
-                    "环境支持时挂载 `[Symbol.dispose]`，可配合 `using` 语法。"
+                    "提供 `Symbol.dispose: void`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -3544,6 +3548,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDisposerContext.",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
+            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  type IDisposerContext,\n  type IReleaseDescriptor,\n  type IReleaseContext\n} from '@migaia/lifecycle'"
           ],
           "members": [],
@@ -3591,7 +3596,7 @@
           "declaredConfiguration": [],
           "identity": "packages/lifecycle/dist/disposer-context.d.ts:IDisposerContext:export type IDisposerContext = { /** Rejects an attempt to join the disposal currently waiting for this callback. */ readonly join: () => never; };",
           "guidance": [],
-          "usageScore": 26,
+          "usageScore": 36,
           "configuration": [],
           "fragment": "lifecycle-index--IDisposerContext"
         },
@@ -4167,7 +4172,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleOwner.",
           "examples": [
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'",
-            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}",
+            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}",
             "import {\n  createProvisionalScope,\n  type IProvisionalScope,\n  type IProvisionalScopeOptions,\n  type ILifecycleOwner\n} from '@migaia/lifecycle'",
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }",
             "import { createProvisionalScope, type ILifecycleOwner } from '@migaia/lifecycle'"
@@ -4224,7 +4229,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -4246,7 +4251,7 @@
                     "`release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。",
                     "`close()`：同步、幂等；`open → closing`。",
                     "`dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。",
-                    "环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                    "提供 `Symbol.asyncDispose: Promise<void>`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -4587,7 +4592,7 @@
         {
           "name": "IProvisionalScope",
           "kind": "type",
-          "signature": "export type IProvisionalScope = { readonly signal: IAbortSignal; own<T>(resource: T, descriptor: IReleaseDescriptor): T; /** * Transfers every owned resource to `parent`, in registration order. If `parent.own()` rejects * partway (e.g. `parent` is already closing), everything already transferred stays with `parent`; * everything not yet transferred is released by this scope (in reverse order) and **awaited** * before the original error is rethrown — nothing is left owned by neither side, and the returned * Promise settles only after the compensation has completed. */ commitTo(parent: ILifecycleOwner): Promise<void>; /** * Releases every owned resource in reverse order, collecting every failure into one * `AggregateError` (idempotent). */ rollback(): Promise<void>; };",
+          "signature": "export type IProvisionalScope = { readonly signal: INativeAbortSignal; own<T>(resource: T, descriptor: IReleaseDescriptor): T; /** * Transfers every owned resource to `parent`, in registration order. If `parent.own()` rejects * partway (e.g. `parent` is already closing), everything already transferred stays with `parent`; * everything not yet transferred is released by this scope (in reverse order) and **awaited** * before the original error is rethrown — nothing is left owned by neither side, and the returned * Promise settles only after the compensation has completed. */ commitTo(parent: ILifecycleOwner): Promise<void>; /** * Releases every owned resource in reverse order, collecting every failure into one * `AggregateError` (idempotent). */ rollback(): Promise<void>; };",
           "declarationLine": 7,
           "source": "packages/lifecycle/dist/provisional-scope.d.ts",
           "purpose": "IProvisionalScope is part of this module's public type contract.",
@@ -4606,7 +4611,7 @@
           "aliasOf": "IProvisionalScope",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type IProvisionalScope = { readonly signal: IAbortSignal; own<T>(resource: T, descriptor: IReleaseDescriptor): T; /** * Transfers every owned resource to `parent`, in registration order. If `parent.own()` rejects * partway (e.g. `parent` is already closing), everything already transferred stays with `parent`; * everything not yet transferred is released by this scope (in reverse order) and **awaited** * before the original error is rethrown — nothing is left owned by neither side, and the returned * Promise settles only after the compensation has completed. */ commitTo(parent: ILifecycleOwner): Promise<void>; /** * Releases every owned resource in reverse order, collecting every failure into one * `AggregateError` (idempotent). */ rollback(): Promise<void>; };"
+            "export type IProvisionalScope = { readonly signal: INativeAbortSignal; own<T>(resource: T, descriptor: IReleaseDescriptor): T; /** * Transfers every owned resource to `parent`, in registration order. If `parent.own()` rejects * partway (e.g. `parent` is already closing), everything already transferred stays with `parent`; * everything not yet transferred is released by this scope (in reverse order) and **awaited** * before the original error is rethrown — nothing is left owned by neither side, and the returned * Promise settles only after the compensation has completed. */ commitTo(parent: ILifecycleOwner): Promise<void>; /** * Releases every owned resource in reverse order, collecting every failure into one * `AggregateError` (idempotent). */ rollback(): Promise<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4645,7 +4650,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/provisional-scope.d.ts:IProvisionalScope:export type IProvisionalScope = { readonly signal: IAbortSignal; own<T>(resource: T, descriptor: IReleaseDescriptor): T; /** * Transfers every owned resource to `parent`, in registration order. If `parent.own()` rejects * partway (e.g. `parent` is already closing), everything already transferred stays with `parent`; * everything not yet transferred is released by this scope (in reverse order) and **awaited** * before the original error is rethrown — nothing is left owned by neither side, and the returned * Promise settles only after the compensation has completed. */ commitTo(parent: ILifecycleOwner): Promise<void>; /** * Releases every owned resource in reverse order, collecting every failure into one * `AggregateError` (idempotent). */ rollback(): Promise<void>; };",
+          "identity": "packages/lifecycle/dist/provisional-scope.d.ts:IProvisionalScope:export type IProvisionalScope = { readonly signal: INativeAbortSignal; own<T>(resource: T, descriptor: IReleaseDescriptor): T; /** * Transfers every owned resource to `parent`, in registration order. If `parent.own()` rejects * partway (e.g. `parent` is already closing), everything already transferred stays with `parent`; * everything not yet transferred is released by this scope (in reverse order) and **awaited** * before the original error is rethrown — nothing is left owned by neither side, and the returned * Promise settles only after the compensation has completed. */ commitTo(parent: ILifecycleOwner): Promise<void>; /** * Releases every owned resource in reverse order, collecting every failure into one * `AggregateError` (idempotent). */ rollback(): Promise<void>; };",
           "guidance": [],
           "usageScore": 28,
           "configuration": [],
@@ -4805,10 +4810,10 @@
             "type IDisposer = () => void\ntype ILifecycleState = 'open' | 'closing' | 'terminal'\ntype IUnitState = 'idle' | 'loading' | 'loaded' | 'failed'\n\ntype ILifecycleOwner = {\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n}\n\ntype ICollectedError = Readonly<{\n  source: string\n  error: unknown\n}>\n\ntype IErrorPolicy = 'throw' | 'collect' | 'report' | 'firstError'",
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
             "type IReleaseDescriptor = {\n  readonly syncSafe?: boolean\n  readonly order?: number\n  readonly graceful?: (context: IReleaseContext) => void | PromiseLike<void>\n  readonly gracefulTimeoutMs?: number\n  readonly force: (context: IReleaseContext) => void | PromiseLike<void>\n  readonly gcFallback?: boolean\n  readonly custom?: (context: IReleaseContext) => void | PromiseLike<void>\n}",
-            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}",
-            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}",
+            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}",
+            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}",
             "function executeReleaseDescriptor(\n  descriptor: IReleaseDescriptor,\n  context: IReleaseContext\n): Promise<readonly unknown[]>",
-            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
+            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
             "function createProvisionalScope(options?: IProvisionalScopeOptions): IProvisionalScope\n\ntype IProvisionalScopeOptions = { readonly parentSignal?: IAbortSignal }\n\ntype IProvisionalScope = {\n  readonly signal: IAbortSignal\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  commitTo(parent: ILifecycleOwner): Promise<void>\n  rollback(): Promise<void>\n}\n\ntype ILifecycleOwner = { own<T>(resource: T, descriptor: IReleaseDescriptor): T }",
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  type IDisposerContext,\n  type IReleaseDescriptor,\n  type IReleaseContext\n} from '@migaia/lifecycle'"
           ],
@@ -4864,7 +4869,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -4886,7 +4891,7 @@
                     "`release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。",
                     "`close()`：同步、幂等；`open → closing`。",
                     "`dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。",
-                    "环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                    "提供 `Symbol.asyncDispose: Promise<void>`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -4898,7 +4903,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -4922,7 +4927,7 @@
                     "某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。",
                     "降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。",
                     "`release()`/`close()` 语义与异步版本一致；`dispose()` 幂等，二次调用返回 `[]`；在 disposer 内部重入抛 `SCOPE_REENTRANT_DISPOSE`。",
-                    "环境支持时挂载 `[Symbol.dispose]`，可配合 `using` 语法。"
+                    "提供 `Symbol.dispose: void`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -4935,7 +4940,7 @@
         {
           "name": "ISyncLifecycleScope",
           "kind": "type",
-          "signature": "export type ISyncLifecycleScope = { readonly lifecycle: ILifecycleState; own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T; release(resource: unknown): boolean; close(): void; /** Always synchronous — this is the whole reason this type exists (D-6). */ dispose(): readonly ICollectedError[]; };",
+          "signature": "export type ISyncLifecycleScope = { readonly lifecycle: ILifecycleState; own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T; release(resource: unknown): boolean; close(): void; /** Always synchronous — this is the whole reason this type exists (D-6). */ dispose(): readonly ICollectedError[]; /** Releases the scope synchronously for `using`, discarding the collected-error result. */ [Symbol.dispose](): void; };",
           "declarationLine": 15,
           "source": "packages/lifecycle/dist/sync-lifecycle-scope.d.ts",
           "purpose": "ISyncLifecycleScope is part of this module's public type contract.",
@@ -4948,13 +4953,13 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISyncLifecycleScope.",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
           ],
           "members": [],
           "aliasOf": "ISyncLifecycleScope",
           "exportPath": ".",
           "overloadSignatures": [
-            "export type ISyncLifecycleScope = { readonly lifecycle: ILifecycleState; own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T; release(resource: unknown): boolean; close(): void; /** Always synchronous — this is the whole reason this type exists (D-6). */ dispose(): readonly ICollectedError[]; };"
+            "export type ISyncLifecycleScope = { readonly lifecycle: ILifecycleState; own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T; release(resource: unknown): boolean; close(): void; /** Always synchronous — this is the whole reason this type exists (D-6). */ dispose(): readonly ICollectedError[]; /** Releases the scope synchronously for `using`, discarding the collected-error result. */ [Symbol.dispose](): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -4993,7 +4998,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/sync-lifecycle-scope.d.ts:ISyncLifecycleScope:export type ISyncLifecycleScope = { readonly lifecycle: ILifecycleState; own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T; release(resource: unknown): boolean; close(): void; /** Always synchronous — this is the whole reason this type exists (D-6). */ dispose(): readonly ICollectedError[]; };",
+          "identity": "packages/lifecycle/dist/sync-lifecycle-scope.d.ts:ISyncLifecycleScope:export type ISyncLifecycleScope = { readonly lifecycle: ILifecycleState; own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T; release(resource: unknown): boolean; close(): void; /** Always synchronous — this is the whole reason this type exists (D-6). */ dispose(): readonly ICollectedError[]; /** Releases the scope synchronously for `using`, discarding the collected-error result. */ [Symbol.dispose](): void; };",
           "guidance": [
             {
               "id": "createsynclifecyclescope",
@@ -5002,7 +5007,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -5026,7 +5031,7 @@
                     "某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。",
                     "降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。",
                     "`release()`/`close()` 语义与异步版本一致；`dispose()` 幂等，二次调用返回 `[]`；在 disposer 内部重入抛 `SCOPE_REENTRANT_DISPOSE`。",
-                    "环境支持时挂载 `[Symbol.dispose]`，可配合 `using` 语法。"
+                    "提供 `Symbol.dispose: void`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -5052,7 +5057,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISyncLifecycleScopeOptions.",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
           ],
           "members": [],
           "aliasOf": "ISyncLifecycleScopeOptions",
@@ -5106,7 +5111,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -5130,7 +5135,7 @@
                     "某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。",
                     "降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。",
                     "`release()`/`close()` 语义与异步版本一致；`dispose()` 幂等，二次调用返回 `[]`；在 disposer 内部重入抛 `SCOPE_REENTRANT_DISPOSE`。",
-                    "环境支持时挂载 `[Symbol.dispose]`，可配合 `using` 语法。"
+                    "提供 `Symbol.dispose: void`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -5156,7 +5161,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISyncReleaseDescriptor.",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+            "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
           ],
           "members": [],
           "aliasOf": "ISyncReleaseDescriptor",
@@ -5210,7 +5215,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n}"
+                  "code": "function createSyncLifecycleScope(options?: ISyncLifecycleScopeOptions): ISyncLifecycleScope\n\ntype ISyncLifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n}\n\ntype ISyncReleaseDescriptor = IReleaseDescriptor & { readonly syncSafe: true }\n\ntype ISyncLifecycleScope = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): readonly ICollectedError[] // 永远同步\n  [Symbol.dispose](): void // using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -5234,7 +5239,7 @@
                     "某个 callback（`custom`/`graceful`/`force`）若返回 thenable，在释放当次同步探测到并抛 `SCOPE_SYNC_VIOLATION`（`graceful` 违规时会继续跑 `force`，`force`/`custom` 违规则该项失败计入当前错误策略）。",
                     "降级链与异步版本相同（`custom` → 否则 `graceful` → `force`），但没有超时竞速——没有可等待的对象。",
                     "`release()`/`close()` 语义与异步版本一致；`dispose()` 幂等，二次调用返回 `[]`；在 disposer 内部重入抛 `SCOPE_REENTRANT_DISPOSE`。",
-                    "环境支持时挂载 `[Symbol.dispose]`，可配合 `using` 语法。"
+                    "提供 `Symbol.dispose: void`，可直接用于 `using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -5259,7 +5264,7 @@
           "errors": ["No documented errors are declared for ITerminalController."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ITerminalController.",
           "examples": [
-            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
             "function createTerminalController(): ITerminalController\n\ntype ITerminalController = {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  close(): void\n  forceTerminal(): void\n  whenTerminal(): Promise<void>\n}"
           ],
           "members": [],
@@ -6288,9 +6293,9 @@
           "ownerFragment": "lifecycle-disposal--executeReleaseDescriptor"
         },
         {
-          "identity": "packages/lifecycle/dist/abort.d.ts:IAbortController:export type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };",
+          "identity": "packages/lifecycle/dist/abort.d.ts:IAbortController:export type IAbortController = { readonly signal: INativeAbortSignal; abort(reason?: unknown): void; };",
           "name": "IAbortController",
-          "signature": "export type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };",
+          "signature": "export type IAbortController = { readonly signal: INativeAbortSignal; abort(reason?: unknown): void; };",
           "source": "packages/lifecycle/dist/abort.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./abort",
@@ -6378,9 +6383,9 @@
           "ownerFragment": "lifecycle-generation--IGenerationControllerOptions"
         },
         {
-          "identity": "packages/lifecycle/dist/generation-controller.d.ts:IGenerationRequest:export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: IAbortSignal; };",
+          "identity": "packages/lifecycle/dist/generation-controller.d.ts:IGenerationRequest:export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: INativeAbortSignal; };",
           "name": "IGenerationRequest",
-          "signature": "export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: IAbortSignal; };",
+          "signature": "export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: INativeAbortSignal; };",
           "source": "packages/lifecycle/dist/generation-controller.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./generation",
@@ -6418,9 +6423,9 @@
           "ownerFragment": "lifecycle-errors--ILifecycleError"
         },
         {
-          "identity": "packages/lifecycle/dist/lifecycle-scope.d.ts:ILifecycleScope:export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; };",
+          "identity": "packages/lifecycle/dist/lifecycle-scope.d.ts:ILifecycleScope:export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; /** Awaits scope release for `await using`, discarding the collected-error result. */ [Symbol.asyncDispose](): Promise<void>; };",
           "name": "ILifecycleScope",
-          "signature": "export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; };",
+          "signature": "export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; /** Awaits scope release for `await using`, discarding the collected-error result. */ [Symbol.asyncDispose](): Promise<void>; };",
           "source": "packages/lifecycle/dist/lifecycle-scope.d.ts",
           "exportPath": ".",
           "ownerExportPath": "./scope",
@@ -6637,7 +6642,7 @@
         {
           "name": "IAbortController",
           "kind": "type",
-          "signature": "export type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };",
+          "signature": "export type IAbortController = { readonly signal: INativeAbortSignal; abort(reason?: unknown): void; };",
           "declarationLine": 4,
           "source": "packages/lifecycle/dist/abort.d.ts",
           "purpose": "Structural controller returned by the public factory.",
@@ -6649,13 +6654,13 @@
           "errors": ["No documented errors are declared for IAbortController."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAbortController.",
           "examples": [
-            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortSignal,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
+            "import {\n  snapshotScheduler,\n  createAbortController,\n  boundedWait,\n  createTerminalController,\n  type IAbortController,\n  type ITerminalController\n} from '@migaia/lifecycle'\nimport type { IAbortSignal } from '@migaia/utils/promise'\n\n// 仅 leaf entry 导出的 scheduler 组合工具：\nimport {\n  addSchedulerTime,\n  resolveScheduler,\n  resolveSchedulerOption\n} from '@migaia/lifecycle/scheduler'\n\n// 调度器契约与实现来自 utils：\nimport {\n  systemScheduler,\n  createManualScheduler,\n  type IScheduler,\n  type IScheduledTask,\n  type IManualScheduler\n} from '@migaia/utils/scheduler'",
             "function createAbortController(): IAbortController\n// type IAbortSignal = { readonly aborted: boolean; readonly reason?: unknown; addEventListener(...); removeEventListener(...) };\n// type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void };"
           ],
           "members": [],
           "exportPath": "./abort",
           "overloadSignatures": [
-            "export type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };"
+            "export type IAbortController = { readonly signal: INativeAbortSignal; abort(reason?: unknown): void; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -6694,7 +6699,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/abort.d.ts:IAbortController:export type IAbortController = { readonly signal: IAbortSignal; abort(reason?: unknown): void; };",
+          "identity": "packages/lifecycle/dist/abort.d.ts:IAbortController:export type IAbortController = { readonly signal: INativeAbortSignal; abort(reason?: unknown): void; };",
           "guidance": [],
           "usageScore": 32,
           "configuration": [],
@@ -7093,7 +7098,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
+                  "code": "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
                 },
                 {
                   "type": "paragraph",
@@ -7676,7 +7681,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDisposeItem.",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
+            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}",
             "import { createDisposeTransaction, type IDisposeItem } from '@migaia/lifecycle'\nimport { createManualScheduler } from '@migaia/utils/scheduler'\n\nconst scheduler = createManualScheduler()\nconst items: IDisposeItem[] = [\n  {\n    source: 'socket',\n    descriptor: {\n      order: 10,\n      graceful: (ctx) => flushSocket(),\n      gracefulTimeoutMs: 100,\n      force: () => forceCloseSocket()\n    }\n  },\n  { source: 'db', descriptor: { order: 5, force: () => closeDb() } }\n]\nconst transaction = createDisposeTransaction(\n  { kind: 'order' },\n  { errorPolicy: 'collect', scheduler }\n)\nconst runPromise = transaction.run(items)\nscheduler.advance(100) // 驱动 socket 的 graceful 超时降级到 force\nconst failures = await runPromise"
           ],
           "members": [],
@@ -7744,7 +7749,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDisposeTransaction.",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
+            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
           ],
           "members": [],
           "aliasOf": "IDisposeTransaction",
@@ -7877,7 +7882,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDisposeTransactionOptions.",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
+            "function createDisposeTransaction(\n  mode: { readonly kind: 'order' } | { readonly kind: 'plan' },\n  options?: IDisposeTransactionOptions\n): IDisposeTransaction\n\ntype IDisposeItem = { readonly source: string; readonly descriptor: IReleaseDescriptor }\n\ntype IDisposeTransactionOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly signal?: IAbortSignal\n  readonly disposer?: IDisposerContext // LifecycleScope 驱动时传入，提供 disposer.join()\n  readonly pending?: { drain(): Promise<void> }\n}\n\ntype IDisposeTransaction = {\n  readonly mode: { readonly kind: 'order' } | { readonly kind: 'plan' }\n  run(items: readonly IDisposeItem[]): Promise<readonly ICollectedError[]>\n}"
           ],
           "members": [],
           "aliasOf": "IDisposeTransactionOptions",
@@ -9640,7 +9645,7 @@
           "errors": ["No documented errors are declared for ILifecycleError."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleError.",
           "examples": [
-            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}",
+            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}",
             "import {\n  LIFECYCLE_SOURCE,\n  createLifecycleError,\n  containAsyncRejection,\n  createErrorCollector,\n  type ILifecycleError,\n  type IErrorCollector\n} from '@migaia/lifecycle'\nimport { probeThenable, assimilateCapturedThen, type IThenableProbe } from '@migaia/utils/function'",
             "function createLifecycleError(\n  code: string,\n  message: string,\n  options?: {\n    readonly cause?: unknown\n    readonly phase?: string\n    readonly detail?: Readonly<Record<string, unknown>>\n    readonly errors?: readonly unknown[]\n  }\n): ILifecycleError // Error & { source, code, phase?, detail?, cause?, errors? }",
             "import { createLifecycleFailure, createLifecycleTypeError } from '@migaia/lifecycle/errors'\n\nfunction createLifecycleTypeError(\n  code: string,\n  message: string,\n  options?: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> }\n): TypeError\n\nfunction createLifecycleFailure(code: string, message: string, error: unknown): ILifecycleError"
@@ -10246,7 +10251,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
+                  "code": "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
                 },
                 {
                   "type": "paragraph",
@@ -10329,7 +10334,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGenerationController.",
           "examples": [
             "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
-            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
+            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
           "members": [],
           "exportPath": "./generation",
@@ -10395,7 +10400,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGenerationControllerOptions.",
           "examples": [
             "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
-            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
+            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
           "members": [],
           "exportPath": "./generation",
@@ -10448,7 +10453,7 @@
         {
           "name": "IGenerationRequest",
           "kind": "type",
-          "signature": "export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: IAbortSignal; };",
+          "signature": "export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: INativeAbortSignal; };",
           "declarationLine": 5,
           "source": "packages/lifecycle/dist/generation-controller.d.ts",
           "purpose": "IGenerationRequest is part of this module's public type contract.",
@@ -10461,12 +10466,12 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGenerationRequest.",
           "examples": [
             "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
-            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
+            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
           "members": [],
           "exportPath": "./generation",
           "overloadSignatures": [
-            "export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: IAbortSignal; };"
+            "export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: INativeAbortSignal; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -10505,7 +10510,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/generation-controller.d.ts:IGenerationRequest:export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: IAbortSignal; };",
+          "identity": "packages/lifecycle/dist/generation-controller.d.ts:IGenerationRequest:export type IGenerationRequest = { readonly generation: number; readonly token: IGenerationToken; readonly signal: INativeAbortSignal; };",
           "guidance": [],
           "usageScore": 28,
           "configuration": [],
@@ -10527,7 +10532,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IGenerationToken.",
           "examples": [
             "import {\n  createGenerationController,\n  type IGenerationController,\n  type IGenerationControllerOptions,\n  type IGenerationRequest,\n  type IGenerationToken\n} from '@migaia/lifecycle'",
-            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
+            "function createGenerationController(options?: IGenerationControllerOptions): IGenerationController\n\ntype IGenerationControllerOptions = {\n  readonly parentSignal?: IAbortSignal\n  readonly onSuperseded?: (info: ILifecycleError) => void\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n  readonly report?: (error: unknown) => void\n}\n\ntype IGenerationToken = object\n\ntype IGenerationRequest = {\n  readonly generation: number\n  readonly token: IGenerationToken\n  readonly signal: IAbortSignal\n}\n\ntype IGenerationController = {\n  readonly generation: number\n  readonly disposed: boolean\n  begin(options?: { readonly timeoutMs?: number }): IGenerationRequest\n  isCurrent(token: IGenerationToken): boolean\n  complete(token: IGenerationToken): boolean\n  supersede(reason?: unknown): void\n  adopt<T>(\n    token: IGenerationToken,\n    value: T,\n    release: (value: T) => void | PromiseLike<void>,\n    onReleaseError?: (error: unknown) => void\n  ): boolean\n  dispose(reason?: unknown): void\n}"
           ],
           "members": [],
           "exportPath": "./generation",
@@ -10747,7 +10752,7 @@
               ]
             }
           ],
-          "usageScore": 122,
+          "usageScore": 126,
           "configuration": [],
           "fragment": "lifecycle-quiescence--createPendingTracker"
         },
@@ -11553,7 +11558,7 @@
           "name": "createLifecycleScope",
           "kind": "function",
           "signature": "export declare function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope;",
-          "declarationLine": 42,
+          "declarationLine": 44,
           "source": "packages/lifecycle/dist/lifecycle-scope.d.ts",
           "purpose": "The general-purpose, async-only scope. Ported from `@migaia/reactive`'s `LifecycleScopeImpl` baseline (sync/async reentrancy guard, atomic splice+reverse teardown) with the sync path removed per D-1 and error handling generalized to the four §4.5 policies.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createLifecycleScope.",
@@ -11659,7 +11664,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -11681,7 +11686,7 @@
                     "`release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。",
                     "`close()`：同步、幂等；`open → closing`。",
                     "`dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。",
-                    "环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                    "提供 `Symbol.asyncDispose: Promise<void>`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -11727,7 +11732,7 @@
         {
           "name": "ILifecycleScope",
           "kind": "type",
-          "signature": "export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; };",
+          "signature": "export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; /** Awaits scope release for `await using`, discarding the collected-error result. */ [Symbol.asyncDispose](): Promise<void>; };",
           "declarationLine": 20,
           "source": "packages/lifecycle/dist/lifecycle-scope.d.ts",
           "purpose": "ILifecycleScope is part of this module's public type contract.",
@@ -11740,12 +11745,12 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleScope.",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
           ],
           "members": [],
           "exportPath": "./scope",
           "overloadSignatures": [
-            "export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; };"
+            "export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; /** Awaits scope release for `await using`, discarding the collected-error result. */ [Symbol.asyncDispose](): Promise<void>; };"
           ],
           "overloadParameterDetails": [[]],
           "overloadReturns": [],
@@ -11784,7 +11789,7 @@
             }
           ],
           "declaredConfiguration": [],
-          "identity": "packages/lifecycle/dist/lifecycle-scope.d.ts:ILifecycleScope:export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; };",
+          "identity": "packages/lifecycle/dist/lifecycle-scope.d.ts:ILifecycleScope:export type ILifecycleScope = ILifecycleOwner & { readonly lifecycle: ILifecycleState; /** Unregisters a resource without releasing it — the caller has already released it independently. */ release(resource: unknown): boolean; /** Synchronous, idempotent, never calls user code (L-T27). */ close(): void; /** * Always asynchronous (D-1) — there is no synchronous `dispose()` on this type. Resolves to the * collected errors for the `collect` policy (empty for the other three, which throw/report * internally instead). * * Concurrent external calls reuse the same published Promise even while release is in flight. * Only a synchronous call from an active disposer callback is rejected as reentrant, preventing * that callback from self-awaiting the Promise it is currently helping to settle. */ dispose(): Promise<readonly ICollectedError[]>; /** Awaits scope release for `await using`, discarding the collected-error result. */ [Symbol.asyncDispose](): Promise<void>; };",
           "guidance": [
             {
               "id": "createlifecyclescope",
@@ -11793,7 +11798,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -11815,7 +11820,7 @@
                     "`release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。",
                     "`close()`：同步、幂等；`open → closing`。",
                     "`dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。",
-                    "环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                    "提供 `Symbol.asyncDispose: Promise<void>`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]
@@ -11841,7 +11846,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILifecycleScopeOptions.",
           "examples": [
             "import {\n  createLifecycleScope,\n  createSyncLifecycleScope,\n  executeReleaseDescriptor,\n  createDisposeTransaction,\n  createSyncStartedDisposalLedger,\n  type IReleaseDescriptor,\n  type IDisposerContext,\n  type IReleaseContext,\n  type ILifecycleScope,\n  type ILifecycleScopeOptions,\n  type ISyncLifecycleScope,\n  type ISyncLifecycleScopeOptions,\n  type ISyncReleaseDescriptor,\n  type IDisposeItem,\n  type IDisposeTransaction,\n  type IDisposeTransactionMode,\n  type IDisposeTransactionOptions,\n  type ISyncStartedDisposalLedger,\n  type ISyncStartedDisposalOutcome\n} from '@migaia/lifecycle'",
-            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+            "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
           ],
           "members": [],
           "exportPath": "./scope",
@@ -11894,7 +11899,7 @@
                 {
                   "type": "code",
                   "language": "ts",
-                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n}"
+                  "code": "function createLifecycleScope(options?: ILifecycleScopeOptions): ILifecycleScope\n\ntype ILifecycleScopeOptions = {\n  readonly errorPolicy?: 'throw' | 'collect' | 'report' | 'firstError' // 默认 'throw'\n  readonly report?: (error: unknown) => void\n  readonly deadlineAt?: number\n  readonly scheduler?: IScheduler // 默认 systemScheduler\n}\n\ntype ILifecycleScope = ILifecycleOwner & {\n  readonly lifecycle: 'open' | 'closing' | 'terminal'\n  own<T>(resource: T, descriptor: IReleaseDescriptor): T\n  release(resource: unknown): boolean\n  close(): void\n  dispose(): Promise<readonly ICollectedError[]>\n  [Symbol.asyncDispose](): Promise<void> // await using；丢弃收集到的错误结果\n}"
                 },
                 {
                   "type": "paragraph",
@@ -11916,7 +11921,7 @@
                     "`release(resource)`：反注册但不释放（调用方已自行释放），返回是否找到并移除了该条目；若曾设置 `gcFallback`，同时 unregister 对应的 `FinalizationRegistry` 条目。",
                     "`close()`：同步、幂等；`open → closing`。",
                     "`dispose()`：逆序（LIFO）释放全部已注册资源；并发多次调用复用同一个 Promise；需要在 disposer 中表达 owner self-join 时使用 `context.disposer.join()`，该操作抛 `SCOPE_REENTRANT_DISPOSE` 且不改变 canonical Promise；容器已 `terminal` 时立即 resolve 空数组。`errorPolicy: 'collect'` 时返回值为收集到的 `ICollectedError[]`；其余三种策略要么抛出要么内部上报，返回空数组。",
-                    "环境支持时自动挂载 `[Symbol.asyncDispose]`。"
+                    "提供 `Symbol.asyncDispose: Promise<void>`，可直接用于 `await using`（TypeScript 需包含 `ESNext.Disposable` 类型库）。"
                   ]
                 }
               ]

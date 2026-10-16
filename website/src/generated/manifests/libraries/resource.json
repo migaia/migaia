@@ -582,7 +582,7 @@
               {
                 "type": "code",
                 "language": "ts",
-                "code": "// 服务端：\nconst snapshot = userResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})"
+                "code": "// 服务端：\nconst snapshot = serverUserResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})"
               }
             ]
           },
@@ -1484,7 +1484,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for Resource.",
           "examples": [
             "import { Resource, ResourceStatus } from '@migaia/resource'\nimport { createRuntime } from '@migaia/reactive'\nimport { fetchUser } from './user-api.js'\n\nconst runtime = createRuntime()\nconst userId = runtime.signal('1')\n\nconst user = new Resource(\n  ({ signal }) => {\n    const id = userId.value\n    return fetchUser(id, { signal })\n  },\n  runtime,\n  { ttl: 30_000, staleWhileRevalidate: true, retry: 2 }\n)\n\nconst stopRendering = runtime.effect(() => {\n  const state = user.state\n  if (state.status === ResourceStatus.pending) console.log('loading user')\n  if (state.status === ResourceStatus.success) console.log('render', state.data)\n})\n\nuserId.value = '2'\n\nexport function disposeUserPanel(): void {\n  stopRendering.dispose()\n  user.dispose()\n  userId.dispose()\n}",
-            "// 服务端：\nconst snapshot = userResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})",
+            "// 服务端：\nconst snapshot = serverUserResource.dehydrate() // undefined 或 { version: 1, data, updatedAt, expiresAt }\n// 序列化 snapshot 注入 HTML\n\n// 客户端：\nconst userResource = new Resource(fetchUser, runtime, {\n  initialSnapshot: snapshot, // 有值且未过期时不会重新发起请求\n  ttl: 30_000\n})",
             "const list = new Resource(fetchList, runtime, {\n  ttl: 10_000,\n  staleWhileRevalidate: true\n})\n\n// list.state.status === 'success' 时，即使正在后台刷新，\n// list.state.data 仍是旧数据，list.refreshing === true 可用来展示\"刷新中\"角标",
             "const resource = new Resource(fetchWithFlakyBackend, runtime, {\n  retry: (failureCount, error) => failureCount < 5 && !(error instanceof TypeError),\n  retryDelay: (failureCount) => Math.min(1000 * 2 ** failureCount, 30_000) // 指数退避，封顶 30s\n})",
             "import { createRuntime } from '@migaia/reactive'\nimport { Resource } from '@migaia/resource'\n\nconst value = new Resource(({ generation }) => generation, createRuntime(), { autoStart: false })\nconsole.log(value.peekState().status) // idle: no loader was invoked\nconsole.log(await value.promise)\nvalue.reset()\nconsole.log(value.peekState().status) // idle: same owner, no cached data\nconsole.log(await value.promise) // a later generation\nvalue.dispose()",
