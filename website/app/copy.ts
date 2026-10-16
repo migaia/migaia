@@ -220,6 +220,92 @@ export const WebsiteCopy = {
   }
 } as const
 
+/**
+ * Stable shell and reference-surface labels introduced by the visual system: header controls,
+ * command palette, theme choices, and API card vocabulary. Consumed by root.tsx,
+ * components/command-palette.tsx, and the API reference in routes/docs.tsx.
+ */
+export const InterfaceCopy = {
+  en: {
+    brandHome: 'Migaia docs home',
+    searchTrigger: 'Search docs',
+    switchLibrary: 'Switch library',
+    paletteLabel: 'Search libraries, APIs, and guides',
+    paletteLibraries: 'Libraries',
+    palettePages: 'Pages',
+    paletteSearching: 'Searching…',
+    paletteEmpty: 'No page matches this query. Try a library or API name.',
+    paletteHint: '↑↓ move · ↵ open · esc close',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    themeSystem: 'System',
+    themeCurrent: 'Color theme',
+    heroEyebrow: 'migaia · TypeScript libraries',
+    heroSearch: 'Search APIs, guides, and libraries',
+    heroLibraries: 'libraries',
+    heroModules: 'public entry points',
+    importLabel: 'Import',
+    overloads: 'overloads',
+    optional: 'optional',
+    required: 'required',
+    defaultLabel: 'Default',
+    outputLabel: 'Output',
+    valuesTitle: 'Values',
+    valueLabel: 'Value',
+    installLabel: 'Install'
+  },
+  zh: {
+    brandHome: 'Migaia 文档首页',
+    searchTrigger: '搜索文档',
+    switchLibrary: '切换类库',
+    paletteLabel: '搜索类库、API 与指南',
+    paletteLibraries: '类库',
+    palettePages: '页面',
+    paletteSearching: '正在搜索…',
+    paletteEmpty: '没有匹配的页面，试试类库名或 API 名。',
+    paletteHint: '↑↓ 选择 · ↵ 打开 · esc 关闭',
+    themeLight: '浅色',
+    themeDark: '深色',
+    themeSystem: '跟随系统',
+    themeCurrent: '配色',
+    heroEyebrow: 'migaia · TypeScript 类库',
+    heroSearch: '搜索 API、指南和类库',
+    heroLibraries: '个类库',
+    heroModules: '个公开入口',
+    importLabel: '导入',
+    overloads: '个重载',
+    optional: '可选',
+    required: '必填',
+    defaultLabel: '默认',
+    outputLabel: '输出',
+    valuesTitle: '取值',
+    valueLabel: '值',
+    installLabel: '安装'
+  }
+} as const
+
+/** Reader-facing names for extracted declaration kinds, shown on API badges and nav markers. */
+export const ApiKindLabel = {
+  en: {
+    function: 'Function',
+    class: 'Class',
+    type: 'Type',
+    interface: 'Interface',
+    const: 'Constant'
+  },
+  zh: { function: '函数', class: '类', type: '类型', interface: '接口', const: '常量' }
+} as const
+
+/** Returns the localized label for a declaration kind, falling back to the raw kind name. */
+export function apiKindLabel(locale: ILocale, kind: string): string {
+  return ApiKindLabel[locale][kind as keyof (typeof ApiKindLabel)['en']] ?? kind
+}
+
+/** Returns the localized shell and reference-surface labels. */
+export function interfaceCopyFor(locale: ILocale) {
+  return InterfaceCopy[locale]
+}
+
 /** Returns the localized website copy for one canonical locale. */
 export function copyFor(locale: ILocale) {
   return WebsiteCopy[locale]
