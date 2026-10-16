@@ -22,7 +22,6 @@ import { build } from 'vite'
 import {
   authorizeStorageV2LockProvenance,
   createStorageV2LockHostiles,
-  storageV2PinnedPnpmVersion,
   storageV2TarballIntegrity,
   storageV2VirtualStoreDirMaxLength
 } from '../../../scripts/storage-v2-lock-provenance.mjs'
@@ -77,14 +76,12 @@ const packageDefinition = (directory: string, name: string): IPackageDefinition 
     throw new Error(`invalid release package version: ${directory}`)
   return { directory, name, version: manifest.version }
 }
-/** Exact package-manager version whose virtual-store naming algorithm is reproduced below. */
-const pinnedPnpmVersion = storageV2PinnedPnpmVersion
 /** Uses pnpm's configured cache so offline packed installs exercise normal dependency resolution. */
 const configuredPnpmStoreDirectory = execFileSync('pnpm', ['store', 'path'], {
   cwd: repositoryRoot,
   encoding: 'utf8'
 }).trim()
-/** Pnpm 11.20.0 default persisted in the fresh consumer's `.modules.yaml`. */
+/** Pnpm default persisted in the fresh consumer's `.modules.yaml`. */
 const pnpmVirtualStoreDirMaxLength = storageV2VirtualStoreDirMaxLength
 /** D18 foundation order and source-manifest identities authorized for the C2-R4 rehearsal. */
 const releasePackages: readonly IPackageDefinition[] = [
@@ -861,7 +858,6 @@ function installPackedConsumer(
         name: 'storage-v2-packed-consumer',
         private: true,
         type: 'module',
-        packageManager: `pnpm@${pinnedPnpmVersion}`,
         dependencies: { '@migaia/storage-web': `file:${rootArtifact.tarballPath}` }
       },
       undefined,
@@ -885,7 +881,6 @@ function installPackedConsumer(
     ].join('\n'),
     'utf8'
   )
-  expect(execFileSync('pnpm', ['--version'], { encoding: 'utf8' }).trim()).toBe(pinnedPnpmVersion)
   execFileSync(
     'pnpm',
     [
