@@ -79,6 +79,7 @@ const sharedInputPaths = new Set([
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
   'tsconfig.base.json',
+  'turbo.json',
   'Makefile'
 ])
 /** Only root tool configurations and scripts trigger the explicitly requested full fallback. */
@@ -116,6 +117,26 @@ const packedCommands = Object.freeze({
     'test/bundle-boundary.spec.ts'
   ]
 })
+/** Turbo builds packages only; the website keeps its own bun gates and is never a turbo task. */
+const turboBuildArgs = Object.freeze(['exec', 'turbo', 'run', 'build', '--filter=./packages/*'])
+
+/**
+ * Run one package script through Turbo so unchanged inputs replay their cached result. `--only`
+ * skips dependency tasks: the preparation build has already produced every dist.
+ *
+ * @param {string} name Package directory name.
+ * @param {string} gate Package script name.
+ * @returns {string[]} Pnpm arguments that execute the cached Turbo task.
+ */
+const turboGateArgs = (name, gate) => [
+  'exec',
+  'turbo',
+  'run',
+  gate,
+  `--filter=./packages/${name}`,
+  '--only'
+]
+
 /** CLI and error text belongs to the scheduler rather than scattered throw sites. */
 const text = Object.freeze({
   summary: '\n==> CI summary',
@@ -341,7 +362,7 @@ const beginPackage = async (result, runtime) => {
         `${result.name}/${gate}`,
         'required',
         'pnpm',
-        ['--filter', `./packages/${result.name}`, 'run', gate],
+        turboGateArgs(result.name, gate),
         { env: runtime.env }
       )
     )
@@ -566,7 +587,7 @@ export const runCi = async (
   /** Root rows stay in their old order even though both package groups now share one pool. */
   const results = []
   results.push(
-    await runGate(GateName.build, 'required', 'pnpm', ['-r', 'run', 'build'], { env: runtime.env })
+    await runGate(GateName.build, 'required', 'pnpm', [...turboBuildArgs], { env: runtime.env })
   )
   for (const name of [GateName.dependencies, GateName.release])
     results.push(
@@ -819,7 +840,7 @@ const preparePackages = async (runtime) => {
   } catch (error) {
     if (error?.code !== DistStampErrorCode.stale) throw error
     console.log(text.preparation)
-    return runCommand('pnpm', ['-r', 'run', 'build'], { env: runtime.env })
+    return runCommand('pnpm', [...turboBuildArgs], { env: runtime.env })
   }
 }
 

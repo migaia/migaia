@@ -104,7 +104,7 @@ ship-dry-run:
 	@$(MAKE) ship-pack-check
 	@echo "==> ship dry-run passed; no release mutations performed"
 
-# Build every workspace in pnpm's dependency-topological order before release
+# Build every package in Turbo's dependency-topological order (cached) before release
 # validation reads package outputs. Repository gates retain their own exit codes;
 # no release mutation or registry authentication runs.
 ci:
@@ -121,6 +121,7 @@ ci-affected:
 		--release "$(RELEASE_PACKAGES)" --store "$(STORE_RELEASE_PACKAGES)"
 
 # Daily checks run format before lint and types, without tests or builds.
+# Lint and typecheck gates replay Turbo's cache when package inputs are unchanged.
 # wasm has no typecheck:test script; its native tests stay in full CI.
 ci-fast:
 	@$(CI_REPORT) \
@@ -129,7 +130,7 @@ ci-fast:
 			if [ "$$gate" = fmt ]; then \
 				run_gate required "$$package/$$gate" $(CI_MAKE) fmt-check DIRECTORY="packages/$$package"; \
 			elif node -e 'const p=require("./packages/"+process.argv[1]+"/package.json"); process.exit(p.scripts?.[process.argv[2]] ? 0 : 1)' "$$package" "$$gate"; then \
-				run_gate required "$$package/$$gate" pnpm --filter "./packages/$$package" run "$$gate"; \
+				run_gate required "$$package/$$gate" pnpm exec turbo run "$$gate" --filter="./packages/$$package" --only; \
 			else \
 				printf '\n==> %s/%s skipped: no package script\n' "$$package" "$$gate"; \
 				if [ "$$gate" = typecheck:test ]; then record_gate SKIP-WARN "$$package/$$gate (no script)" 0 0; \
