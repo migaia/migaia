@@ -19,6 +19,8 @@ export type IGuideApiLink = {
   readonly module: string
   readonly name: string
   readonly symbolPath: string
+  /** Declaration kind (`function`, `class`, `const`, …) drawn as the sidebar marker. */
+  readonly kind: string
 }
 
 type ILibraryRouteContentOptions = {
@@ -67,7 +69,8 @@ export async function loadLibraryApiLinks(slug: string): Promise<readonly IGuide
       .map((symbol) => ({
         module: api.module,
         name: symbol.name,
-        symbolPath: symbolSlug(symbol, api.symbols)
+        symbolPath: symbolSlug(symbol, api.symbols),
+        kind: symbol.kind
       }))
   )
 }
