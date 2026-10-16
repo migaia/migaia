@@ -591,6 +591,12 @@
       "library": "capability"
     },
     {
+      "path": "/en/docs/capability/graph-dependency",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
       "path": "/en/docs/capability/graph-dynamic",
       "locale": "en",
       "domain": "docs",
@@ -598,6 +604,18 @@
     },
     {
       "path": "/en/docs/capability/graph-topology",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/en/docs/capability/troubleshooting",
       "locale": "en",
       "domain": "docs",
       "library": "capability"
@@ -934,6 +952,12 @@
     },
     {
       "path": "/en/docs/event-subscriber/publish-and-errors",
+      "locale": "en",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/en/docs/event-subscriber/readme",
       "locale": "en",
       "domain": "docs",
       "library": "event-subscriber"
@@ -1485,6 +1509,12 @@
       "library": "lifecycle"
     },
     {
+      "path": "/en/docs/lifecycle/application-load-state",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
       "path": "/en/docs/lifecycle/disposal",
       "locale": "en",
       "domain": "docs",
@@ -1509,7 +1539,19 @@
       "library": "lifecycle"
     },
     {
+      "path": "/en/docs/lifecycle/mutation-queue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
       "path": "/en/docs/lifecycle/quiescence",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/readme",
       "locale": "en",
       "domain": "docs",
       "library": "lifecycle"
@@ -1522,6 +1564,12 @@
     },
     {
       "path": "/en/docs/lifecycle/scope",
+      "locale": "en",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/en/docs/lifecycle/troubleshooting",
       "locale": "en",
       "domain": "docs",
       "library": "lifecycle"
@@ -2031,6 +2079,12 @@
       "library": "logger"
     },
     {
+      "path": "/en/docs/logger/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
       "path": "/en/docs/logger/runtime-and-forwarding",
       "locale": "en",
       "domain": "docs",
@@ -2230,6 +2284,12 @@
     },
     {
       "path": "/en/docs/middleware-pipeline/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/en/docs/middleware-pipeline/readme",
       "locale": "en",
       "domain": "docs",
       "library": "middleware-pipeline"
@@ -2913,6 +2973,12 @@
       "library": "plugin-host"
     },
     {
+      "path": "/en/docs/plugin-host/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/en/docs/plugin-host/removal-and-rollback",
       "locale": "en",
       "domain": "docs",
@@ -3255,6 +3321,12 @@
       "library": "reactive"
     },
     {
+      "path": "/en/docs/reactive/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/en/docs/reactive/runtime",
       "locale": "en",
       "domain": "docs",
@@ -3370,6 +3442,12 @@
     },
     {
       "path": "/en/docs/resource/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/en/docs/resource/readme",
       "locale": "en",
       "domain": "docs",
       "library": "resource"
@@ -3597,7 +3675,49 @@
       "library": "rpc-browser"
     },
     {
+      "path": "/en/docs/rpc-browser/broadcast-and-service-workers",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
       "path": "/en/docs/rpc-browser/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/peers-and-window",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/rtc-data-channels",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/shared-workers",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/troubleshooting",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/en/docs/rpc-browser/web-transport-datagrams",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-browser"
@@ -4983,7 +5103,79 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/en/docs/rpc-contract/binary-messages",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/descriptors-and-envelopes",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/fetch",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/framing-and-streams",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/en/docs/rpc-contract/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/portable-values",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/process",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/real-world-bindings",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/runtime-bindings",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/sse",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/websocket",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/en/docs/rpc-contract/wire-errors-and-metadata",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-contract"
@@ -7101,6 +7293,12 @@
       "library": "rpc-core"
     },
     {
+      "path": "/en/docs/rpc-core/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
       "path": "/en/docs/rpc-core/replay-retry-and-lifecycle",
       "locale": "en",
       "domain": "docs",
@@ -7335,7 +7533,43 @@
       "library": "rpc-devtools"
     },
     {
+      "path": "/en/docs/rpc-devtools/collector-and-queries",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
       "path": "/en/docs/rpc-devtools/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/en/docs/rpc-devtools/hub-and-offline",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/en/docs/rpc-devtools/log-ingestion",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/en/docs/rpc-devtools/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/en/docs/rpc-devtools/recordings-and-service",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/en/docs/rpc-devtools/troubleshooting",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-devtools"
@@ -7425,7 +7659,49 @@
       "library": "rpc-pool"
     },
     {
+      "path": "/en/docs/rpc-pool/cancellation-and-shutdown",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/choose-thread-or-process",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/dispatch-and-queue",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
       "path": "/en/docs/rpc-pool/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/notifications-and-streams",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/resize-and-idle-members",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/en/docs/rpc-pool/troubleshooting",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-pool"
@@ -8145,6 +8421,54 @@
       "library": "rpc-process"
     },
     {
+      "path": "/en/docs/rpc-process/launchers-and-stdio",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/peers-and-sources",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/plugins-and-exposure",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/protocol-and-bootstrap",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/resilience-and-shutdown",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/socket-and-message-channels",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/en/docs/rpc-process/troubleshooting",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
       "path": "/en/docs/rpc-threads",
       "locale": "en",
       "domain": "docs",
@@ -8553,7 +8877,49 @@
       "library": "rpc-threads"
     },
     {
+      "path": "/en/docs/rpc-threads/binary-and-transfer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/en/docs/rpc-threads/channels-and-bootstrap",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
       "path": "/en/docs/rpc-threads/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/en/docs/rpc-threads/native-launchers",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/en/docs/rpc-threads/peers-and-sources",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/en/docs/rpc-threads/plugins-and-hosts",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/en/docs/rpc-threads/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/en/docs/rpc-threads/troubleshooting",
       "locale": "en",
       "domain": "docs",
       "library": "rpc-threads"
@@ -9117,7 +9483,25 @@
       "library": "serialize"
     },
     {
+      "path": "/en/docs/serialize/codecs",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
       "path": "/en/docs/serialize/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/portable-values",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/readme",
       "locale": "en",
       "domain": "docs",
       "library": "serialize"
@@ -9550,6 +9934,12 @@
     },
     {
       "path": "/en/docs/storage-contract/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/readme",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -10317,6 +10707,12 @@
       "library": "storage-web"
     },
     {
+      "path": "/en/docs/storage-web/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
       "path": "/en/docs/store-devtools",
       "locale": "en",
       "domain": "docs",
@@ -10444,6 +10840,12 @@
     },
     {
       "path": "/en/docs/store-devtools/performance-and-disposal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/docs/store-devtools/readme",
       "locale": "en",
       "domain": "docs",
       "library": "store-devtools"
@@ -10594,6 +10996,12 @@
     },
     {
       "path": "/en/docs/store-indexed/mutation-guards-and-runtime",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/docs/store-indexed/readme",
       "locale": "en",
       "domain": "docs",
       "library": "store-indexed"
@@ -11031,6 +11439,12 @@
       "library": "store-keyed"
     },
     {
+      "path": "/en/docs/store-keyed/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
       "path": "/en/docs/store-keyed/release-and-disposal",
       "locale": "en",
       "domain": "docs",
@@ -11326,6 +11740,12 @@
     },
     {
       "path": "/en/docs/store-light/object-store-model",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/docs/store-light/readme",
       "locale": "en",
       "domain": "docs",
       "library": "store-light"
@@ -11637,6 +12057,12 @@
       "library": "store-middleware"
     },
     {
+      "path": "/en/docs/store-middleware/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
       "path": "/en/docs/store-middleware/shutdown-and-ownership",
       "locale": "en",
       "domain": "docs",
@@ -11914,6 +12340,12 @@
     },
     {
       "path": "/en/docs/store-persist/partialize-merge-and-migrations",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/docs/store-persist/readme",
       "locale": "en",
       "domain": "docs",
       "library": "store-persist"
@@ -12225,6 +12657,12 @@
       "library": "store-react"
     },
     {
+      "path": "/en/docs/store-react/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
       "path": "/en/docs/store-react/registry-and-dependency-injection",
       "locale": "en",
       "domain": "docs",
@@ -12340,6 +12778,12 @@
     },
     {
       "path": "/en/docs/store-shared/ownership-pruning-and-disposal",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/docs/store-shared/readme",
       "locale": "en",
       "domain": "docs",
       "library": "store-shared"
@@ -12615,6 +13059,12 @@
       "library": "store-ssr"
     },
     {
+      "path": "/en/docs/store-ssr/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
       "path": "/en/docs/store-ssr/register-and-own-state",
       "locale": "en",
       "domain": "docs",
@@ -12784,6 +13234,12 @@
     },
     {
       "path": "/en/docs/store-wasm/performance-and-when-not-to-use",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/docs/store-wasm/readme",
       "locale": "en",
       "domain": "docs",
       "library": "store-wasm"
@@ -12976,6 +13432,12 @@
     },
     {
       "path": "/en/docs/store-worker/performance-and-shutdown-order",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/docs/store-worker/readme",
       "locale": "en",
       "domain": "docs",
       "library": "store-worker"
@@ -13623,7 +14085,91 @@
       "library": "supervision"
     },
     {
+      "path": "/en/docs/supervision/budget-and-queues",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/coroutine-heartbeat",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/coroutine-tasks",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
       "path": "/en/docs/supervision/getting-started",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/process-output-and-usage",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/process-parent-loss",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/process-prewarm",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/process-profile",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/process-recovery",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/profiles-and-hooks",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/restart-and-health",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/supervisor-control",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/thread-profile",
+      "locale": "en",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/en/docs/supervision/troubleshooting",
       "locale": "en",
       "domain": "docs",
       "library": "supervision"
@@ -14217,7 +14763,25 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/instances-and-routing",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/loaders-and-adapters",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/mutation-and-blocking",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/native-thread-and-process",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -14235,13 +14799,31 @@
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/resource-ownership",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
     },
     {
+      "path": "/en/docs/tray/runtime-tasks",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/en/docs/tray/static-composition",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/topics-and-events",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -15351,6 +15933,12 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/retry-and-concurrency",
       "locale": "en",
       "domain": "docs",
@@ -15466,6 +16054,18 @@
     },
     {
       "path": "/en/docs/wasm/ownership-and-cleanup",
+      "locale": "en",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/docs/wasm/readme",
+      "locale": "en",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/docs/wasm/troubleshooting",
       "locale": "en",
       "domain": "docs",
       "library": "wasm"
@@ -16053,6 +16653,12 @@
       "library": "capability"
     },
     {
+      "path": "/zh/docs/capability/graph-dependency",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
       "path": "/zh/docs/capability/graph-dynamic",
       "locale": "zh",
       "domain": "docs",
@@ -16060,6 +16666,18 @@
     },
     {
       "path": "/zh/docs/capability/graph-topology",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "capability"
+    },
+    {
+      "path": "/zh/docs/capability/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "capability"
@@ -16396,6 +17014,12 @@
     },
     {
       "path": "/zh/docs/event-subscriber/publish-and-errors",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "event-subscriber"
+    },
+    {
+      "path": "/zh/docs/event-subscriber/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "event-subscriber"
@@ -16947,6 +17571,12 @@
       "library": "lifecycle"
     },
     {
+      "path": "/zh/docs/lifecycle/application-load-state",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
       "path": "/zh/docs/lifecycle/disposal",
       "locale": "zh",
       "domain": "docs",
@@ -16971,7 +17601,19 @@
       "library": "lifecycle"
     },
     {
+      "path": "/zh/docs/lifecycle/mutation-queue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
       "path": "/zh/docs/lifecycle/quiescence",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"
@@ -16984,6 +17626,12 @@
     },
     {
       "path": "/zh/docs/lifecycle/scope",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "lifecycle"
+    },
+    {
+      "path": "/zh/docs/lifecycle/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "lifecycle"
@@ -17493,6 +18141,12 @@
       "library": "logger"
     },
     {
+      "path": "/zh/docs/logger/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "logger"
+    },
+    {
       "path": "/zh/docs/logger/runtime-and-forwarding",
       "locale": "zh",
       "domain": "docs",
@@ -17692,6 +18346,12 @@
     },
     {
       "path": "/zh/docs/middleware-pipeline/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "middleware-pipeline"
+    },
+    {
+      "path": "/zh/docs/middleware-pipeline/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "middleware-pipeline"
@@ -18375,6 +19035,12 @@
       "library": "plugin-host"
     },
     {
+      "path": "/zh/docs/plugin-host/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "plugin-host"
+    },
+    {
       "path": "/zh/docs/plugin-host/removal-and-rollback",
       "locale": "zh",
       "domain": "docs",
@@ -18717,6 +19383,12 @@
       "library": "reactive"
     },
     {
+      "path": "/zh/docs/reactive/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "reactive"
+    },
+    {
       "path": "/zh/docs/reactive/runtime",
       "locale": "zh",
       "domain": "docs",
@@ -18832,6 +19504,12 @@
     },
     {
       "path": "/zh/docs/resource/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "resource"
+    },
+    {
+      "path": "/zh/docs/resource/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "resource"
@@ -19059,7 +19737,49 @@
       "library": "rpc-browser"
     },
     {
+      "path": "/zh/docs/rpc-browser/broadcast-and-service-workers",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
       "path": "/zh/docs/rpc-browser/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/peers-and-window",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/rtc-data-channels",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/shared-workers",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/troubleshooting",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-browser"
+    },
+    {
+      "path": "/zh/docs/rpc-browser/web-transport-datagrams",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-browser"
@@ -20445,7 +21165,79 @@
       "library": "rpc-contract"
     },
     {
+      "path": "/zh/docs/rpc-contract/binary-messages",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/descriptors-and-envelopes",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/fetch",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/framing-and-streams",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
       "path": "/zh/docs/rpc-contract/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/portable-values",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/process",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/real-world-bindings",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/runtime-bindings",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/sse",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/websocket",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-contract"
+    },
+    {
+      "path": "/zh/docs/rpc-contract/wire-errors-and-metadata",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-contract"
@@ -22563,6 +23355,12 @@
       "library": "rpc-core"
     },
     {
+      "path": "/zh/docs/rpc-core/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-core"
+    },
+    {
       "path": "/zh/docs/rpc-core/replay-retry-and-lifecycle",
       "locale": "zh",
       "domain": "docs",
@@ -22797,7 +23595,43 @@
       "library": "rpc-devtools"
     },
     {
+      "path": "/zh/docs/rpc-devtools/collector-and-queries",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
       "path": "/zh/docs/rpc-devtools/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/zh/docs/rpc-devtools/hub-and-offline",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/zh/docs/rpc-devtools/log-ingestion",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/zh/docs/rpc-devtools/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/zh/docs/rpc-devtools/recordings-and-service",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-devtools"
+    },
+    {
+      "path": "/zh/docs/rpc-devtools/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-devtools"
@@ -22887,7 +23721,49 @@
       "library": "rpc-pool"
     },
     {
+      "path": "/zh/docs/rpc-pool/cancellation-and-shutdown",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/choose-thread-or-process",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/dispatch-and-queue",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
       "path": "/zh/docs/rpc-pool/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/notifications-and-streams",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/resize-and-idle-members",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-pool"
+    },
+    {
+      "path": "/zh/docs/rpc-pool/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-pool"
@@ -23607,6 +24483,54 @@
       "library": "rpc-process"
     },
     {
+      "path": "/zh/docs/rpc-process/launchers-and-stdio",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/peers-and-sources",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/plugins-and-exposure",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/protocol-and-bootstrap",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/resilience-and-shutdown",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/socket-and-message-channels",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
+      "path": "/zh/docs/rpc-process/troubleshooting",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-process"
+    },
+    {
       "path": "/zh/docs/rpc-threads",
       "locale": "zh",
       "domain": "docs",
@@ -24015,7 +24939,49 @@
       "library": "rpc-threads"
     },
     {
+      "path": "/zh/docs/rpc-threads/binary-and-transfer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/zh/docs/rpc-threads/channels-and-bootstrap",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
       "path": "/zh/docs/rpc-threads/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/zh/docs/rpc-threads/native-launchers",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/zh/docs/rpc-threads/peers-and-sources",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/zh/docs/rpc-threads/plugins-and-hosts",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/zh/docs/rpc-threads/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "rpc-threads"
+    },
+    {
+      "path": "/zh/docs/rpc-threads/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "rpc-threads"
@@ -24579,7 +25545,25 @@
       "library": "serialize"
     },
     {
+      "path": "/zh/docs/serialize/codecs",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
       "path": "/zh/docs/serialize/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/portable-values",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"
@@ -25012,6 +25996,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -25779,6 +26769,12 @@
       "library": "storage-web"
     },
     {
+      "path": "/zh/docs/storage-web/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
       "path": "/zh/docs/store-devtools",
       "locale": "zh",
       "domain": "docs",
@@ -25906,6 +26902,12 @@
     },
     {
       "path": "/zh/docs/store-devtools/performance-and-disposal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/docs/store-devtools/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "store-devtools"
@@ -26056,6 +27058,12 @@
     },
     {
       "path": "/zh/docs/store-indexed/mutation-guards-and-runtime",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/docs/store-indexed/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "store-indexed"
@@ -26493,6 +27501,12 @@
       "library": "store-keyed"
     },
     {
+      "path": "/zh/docs/store-keyed/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
       "path": "/zh/docs/store-keyed/release-and-disposal",
       "locale": "zh",
       "domain": "docs",
@@ -26788,6 +27802,12 @@
     },
     {
       "path": "/zh/docs/store-light/object-store-model",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/docs/store-light/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "store-light"
@@ -27099,6 +28119,12 @@
       "library": "store-middleware"
     },
     {
+      "path": "/zh/docs/store-middleware/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
       "path": "/zh/docs/store-middleware/shutdown-and-ownership",
       "locale": "zh",
       "domain": "docs",
@@ -27376,6 +28402,12 @@
     },
     {
       "path": "/zh/docs/store-persist/partialize-merge-and-migrations",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/docs/store-persist/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "store-persist"
@@ -27687,6 +28719,12 @@
       "library": "store-react"
     },
     {
+      "path": "/zh/docs/store-react/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
       "path": "/zh/docs/store-react/registry-and-dependency-injection",
       "locale": "zh",
       "domain": "docs",
@@ -27802,6 +28840,12 @@
     },
     {
       "path": "/zh/docs/store-shared/ownership-pruning-and-disposal",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/docs/store-shared/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "store-shared"
@@ -28077,6 +29121,12 @@
       "library": "store-ssr"
     },
     {
+      "path": "/zh/docs/store-ssr/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
       "path": "/zh/docs/store-ssr/register-and-own-state",
       "locale": "zh",
       "domain": "docs",
@@ -28246,6 +29296,12 @@
     },
     {
       "path": "/zh/docs/store-wasm/performance-and-when-not-to-use",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/docs/store-wasm/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "store-wasm"
@@ -28438,6 +29494,12 @@
     },
     {
       "path": "/zh/docs/store-worker/performance-and-shutdown-order",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/docs/store-worker/readme",
       "locale": "zh",
       "domain": "docs",
       "library": "store-worker"
@@ -29085,7 +30147,91 @@
       "library": "supervision"
     },
     {
+      "path": "/zh/docs/supervision/budget-and-queues",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/coroutine-heartbeat",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/coroutine-tasks",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
       "path": "/zh/docs/supervision/getting-started",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/process-output-and-usage",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/process-parent-loss",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/process-prewarm",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/process-profile",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/process-recovery",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/profiles-and-hooks",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/restart-and-health",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/supervisor-control",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/thread-profile",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "supervision"
+    },
+    {
+      "path": "/zh/docs/supervision/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "supervision"
@@ -29679,7 +30825,25 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/instances-and-routing",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/loaders-and-adapters",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/mutation-and-blocking",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/native-thread-and-process",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -29697,13 +30861,31 @@
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/resource-ownership",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
     },
     {
+      "path": "/zh/docs/tray/runtime-tasks",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
       "path": "/zh/docs/tray/static-composition",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/topics-and-events",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -30813,6 +31995,12 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/retry-and-concurrency",
       "locale": "zh",
       "domain": "docs",
@@ -30928,6 +32116,18 @@
     },
     {
       "path": "/zh/docs/wasm/ownership-and-cleanup",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/readme",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/troubleshooting",
       "locale": "zh",
       "domain": "docs",
       "library": "wasm"

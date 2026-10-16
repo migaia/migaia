@@ -1480,19 +1480,26 @@ try {
       'Creates two opposite in-process transport ends. Default delivery remains a native microtask; an optional scheduler controls pair delivery for deterministic tests without owning endpoint deadlines.',
     purposeZh:
       '创建互相连接的两个进程内 transport。默认仍以原生微任务交付；可选 scheduler 控制通道交付，便于确定性测试，不接管 endpoint 截止时间。',
-    quickStart: `import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
-import { createManualScheduler } from '@migaia/utils/scheduler'
-
-// This manual clock is for deterministic testing/simulation of the adapter.
-const clock = createManualScheduler()
-const [sender, receiver] = createMemoryTransportPair({ scheduler: clock })
-const messages: unknown[] = []
-const stop = receiver.subscribe(({ data }) => { messages.push(data) })
-sender.send('hello')
-clock.advance(0)
-console.log(messages) // ['hello']
-stop()
-await sender.close()`,
+    quickStart: `import { connect, createEndpoint } from '@migaia/rpc-core'
+import { createMemoryTransportPair } from '@migaia/rpc-core/adapters/memory'
+const [transport, serviceTransport] = createMemoryTransportPair()
+const service = await createEndpoint({
+  id: 'pricing',
+  transport: serviceTransport,
+  middlewares: [connect({ transport: serviceTransport })] as const
+})
+const client = await createEndpoint({
+  id: 'checkout',
+  transport,
+  middlewares: [connect({ transport })] as const
+})
+service.provide('total', (context) => context.success(Number(context.data) * 2))
+try {
+  console.log('Order total', await client.send<number>('pricing', 'total', 25))
+} finally {
+  await Promise.all([client.dispose(), service.dispose()])
+  transport.close()
+}`,
     useEn: [
       'Two endpoints need an isolated in-process connection.',
       'A test must control delivery without a host microtask queue.',
@@ -5171,7 +5178,33 @@ console.log(record.header.version)`,
   'rpc-devtools:contract:RPC_DEVTOOLS_SOURCE': rpcDevtoolsErrorGuide
 } satisfies Readonly<Record<string, Readonly<Record<IGuideLocale, IApiGuide>>>>
 
+/** Maintains one bilingual decision guide for each published RPC runtime symbol. */
 export const rpcApiGuides = {
+  'rpc-core:index:defaultRpcReporter': guide({
+    purposeEn:
+      'Reports one background RPC failure by passing the original value to the host console.error. RPC packages use this shared function when no report callback is supplied, so applications can recognize the default reporter by comparing the function itself.',
+    purposeZh:
+      '把一次后台 RPC 失败的原始值交给宿主的 console.error。没有传入 report 回调时，RPC 包使用这个共同的默认函数；应用可以比较函数本身，判断当前是否仍使用默认报告方式。',
+    quickStart: `import { defaultRpcReporter } from '@migaia/rpc-core'
+
+defaultRpcReporter('RPC upload failed: retry later')`,
+    useEn: [
+      'Keep console reporting for background failures when the application has no custom log destination.',
+      'Compare the configured reporter with this export to recognize the RPC default.'
+    ],
+    useZh: [
+      '应用没有专门的日志去向时，把后台失败保留在宿主控制台。',
+      '将当前 report 与这个导出函数比较，识别是否使用 RPC 默认报告。'
+    ],
+    avoidEn: [
+      'Supply an application report callback when errors need structured fields, sampling, or remote storage.',
+      'Configure retry or cancellation separately; reporting a failure does not perform either action.'
+    ],
+    avoidZh: [
+      '需要结构化字段、采样或远程保存时，应传应用自己的 report 回调。',
+      '重试和取消需要分别配置，报告失败本身不会执行这两种操作。'
+    ]
+  }),
   ...rpcProbeGuides,
   ...rpcDevtoolsGuides,
   ...rpcBrowserPeerGuides,

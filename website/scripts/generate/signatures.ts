@@ -229,13 +229,34 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'resource-ownership',
     'dynamic-host',
     'mutation-and-blocking',
-    'physical-cleanup'
+    'physical-cleanup',
+    'loaders-and-adapters',
+    'runtime-tasks',
+    'instances-and-routing',
+    'native-thread-and-process',
+    'topics-and-events'
+  ],
+  supervision: [
+    'budget-and-queues',
+    'supervisor-control',
+    'restart-and-health',
+    'profiles-and-hooks',
+    'coroutine-tasks',
+    'coroutine-heartbeat',
+    'thread-profile',
+    'process-profile',
+    'process-output-and-usage',
+    'process-recovery',
+    'process-prewarm',
+    'process-parent-loss',
+    'troubleshooting'
   ],
   wasm: [
     'initialization-and-hosts',
     'arena-memory',
     'conversion-boundaries',
-    'ownership-and-cleanup'
+    'ownership-and-cleanup',
+    'troubleshooting'
   ],
   'store-light': [
     'object-store-model',
@@ -338,9 +359,20 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'ownership-pruning-and-disposal',
     'security-capacity-and-recovery'
   ],
-  capability: ['graph', 'graph-dynamic', 'graph-topology'],
+  capability: ['graph', 'graph-dynamic', 'graph-topology', 'graph-dependency', 'troubleshooting'],
   reactive: ['reactive', 'runtime', 'troubleshooting'],
-  lifecycle: ['scope', 'disposal', 'abort', 'quiescence', 'scheduler', 'generation', 'errors'],
+  lifecycle: [
+    'scope',
+    'disposal',
+    'abort',
+    'quiescence',
+    'scheduler',
+    'generation',
+    'application-load-state',
+    'mutation-queue',
+    'errors',
+    'troubleshooting'
+  ],
   'event-subscriber': [
     'subscriptions',
     'publish-and-errors',
@@ -359,6 +391,8 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'chunk-shapes-and-wire-conversion',
     'registry-and-plugins',
     'streaming-and-backpressure',
+    'portable-values',
+    'codecs',
     'shutdown-and-errors'
   ],
   'storage-contract': [
@@ -383,6 +417,59 @@ const GUIDE_TOPICS: Readonly<Record<string, readonly string[]>> = {
     'flush-and-shutdown',
     'runtime-and-forwarding',
     'troubleshooting'
+  ],
+  'rpc-pool': [
+    'choose-thread-or-process',
+    'dispatch-and-queue',
+    'notifications-and-streams',
+    'resize-and-idle-members',
+    'cancellation-and-shutdown',
+    'troubleshooting'
+  ],
+  'rpc-devtools': [
+    'collector-and-queries',
+    'recordings-and-service',
+    'hub-and-offline',
+    'log-ingestion',
+    'troubleshooting'
+  ],
+  'rpc-browser': [
+    'peers-and-window',
+    'shared-workers',
+    'rtc-data-channels',
+    'broadcast-and-service-workers',
+    'web-transport-datagrams',
+    'troubleshooting'
+  ],
+  'rpc-threads': [
+    'peers-and-sources',
+    'plugins-and-hosts',
+    'native-launchers',
+    'channels-and-bootstrap',
+    'binary-and-transfer',
+    'troubleshooting'
+  ],
+  'rpc-process': [
+    'peers-and-sources',
+    'plugins-and-exposure',
+    'launchers-and-stdio',
+    'socket-and-message-channels',
+    'protocol-and-bootstrap',
+    'resilience-and-shutdown',
+    'troubleshooting'
+  ],
+  'rpc-contract': [
+    'descriptors-and-envelopes',
+    'portable-values',
+    'framing-and-streams',
+    'wire-errors-and-metadata',
+    'runtime-bindings',
+    'binary-messages',
+    'real-world-bindings',
+    'fetch',
+    'websocket',
+    'sse',
+    'process'
   ],
   'rpc-core': [
     'endpoint-composition',
@@ -1744,6 +1831,12 @@ async function generateManifests() {
           ? [
               {
                 path: `/${locale}/${domain}/${library.slug}/getting-started`,
+                locale,
+                domain,
+                library: library.slug
+              },
+              {
+                path: `/${locale}/${domain}/${library.slug}/readme`,
                 locale,
                 domain,
                 library: library.slug
