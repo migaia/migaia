@@ -227,3 +227,91 @@ export function localizeReference(
     )
   }
 }
+
+/** Identifier tokens in serialized manifest or doc text, used to follow type references. */
+const IDENTIFIER = /[A-Za-z_$][\w$]*/g
+
+/**
+ * Cuts a localized library reference down to what one page renders, so a page's loader data (and
+ * the copy inlined into its HTML for hydration) does not carry every other API's documentation. The
+ * page keeps: its module doc; a purpose-only entry for every symbol of its module (listing and
+ * links); and full docs for the selected symbol plus every reference entry its declaration reaches
+ * through type names (options types, returned instances, member types, enums, enhancer guides).
+ * `declarations` are the manifest symbols of the selected module; `roots` are the selected symbol
+ * and type names (empty on a module page).
+ */
+export function pageReference(
+  reference: ILocalizedReference,
+  module: string,
+  declarations: readonly Readonly<{ name: string }>[],
+  roots: readonly string[]
+): ILocalizedReference {
+  /** Strips the `module:` qualifier so qualified and bare keys match one declaration name. */
+  const bare = (key: string) => key.slice(key.lastIndexOf(':') + 1)
+  /** Reference entries reached from the roots, by bare name. */
+  const reached = new Set<string>()
+  /** Names still to expand. */
+  const pending = [...roots]
+  /** Every bare name the reference documents, so unrelated identifiers are ignored. */
+  const documented = new Set(
+    [reference.symbols, reference.types, reference.enums, reference.enhancers].flatMap((record) =>
+      Object.keys(record).map(bare)
+    )
+  )
+  while (pending.length > 0) {
+    const name = pending.pop() as string
+    if (reached.has(name)) continue
+    reached.add(name)
+    /** Declaration text plus the doc fields that name other types. */
+    const texts = declarations
+      .filter((declaration) => declaration.name === name)
+      .map((declaration) => JSON.stringify(declaration))
+    for (const [key, doc] of Object.entries(reference.symbols))
+      if (bare(key) === name && doc.optionsType) texts.push(doc.optionsType)
+    for (const [key, doc] of Object.entries(reference.types))
+      if (bare(key) === name && doc.surface) texts.push(doc.surface)
+    for (const text of texts)
+      for (const token of text.match(IDENTIFIER) ?? [])
+        if (documented.has(token) && !reached.has(token)) pending.push(token)
+  }
+  /** Names listed on the module page or in the module's symbol list. */
+  const listed = new Set(declarations.map((declaration) => declaration.name))
+  /** Keeps full entries for reached names. */
+  const full = <T>(record: Readonly<Record<string, T>>) =>
+    Object.fromEntries(Object.entries(record).filter(([key]) => reached.has(bare(key))))
+  return {
+    modules: reference.modules[module] ? { [module]: reference.modules[module] } : {},
+    symbols: Object.fromEntries(
+      Object.entries(reference.symbols).flatMap(([key, doc]) =>
+        reached.has(bare(key))
+          ? [[key, doc]]
+          : listed.has(bare(key))
+            ? [
+                [
+                  key,
+                  {
+                    role: doc.role,
+                    purpose: doc.purpose,
+                    params: {},
+                    options: {},
+                    scenarios: [],
+                    avoid: []
+                  }
+                ]
+              ]
+            : []
+      )
+    ),
+    types: Object.fromEntries(
+      Object.entries(reference.types).flatMap(([key, doc]) =>
+        reached.has(bare(key))
+          ? [[key, doc]]
+          : listed.has(bare(key))
+            ? [[key, { summary: doc.summary, scenarios: [], members: {} }]]
+            : []
+      )
+    ),
+    enums: full(reference.enums),
+    enhancers: full(reference.enhancers)
+  }
+}
