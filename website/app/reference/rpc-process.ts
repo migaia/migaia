@@ -4,15 +4,23 @@
  * plugin/types.ts, resilience/*, offer.ts, constants.ts, error-code.ts), the shared Core types in
  * `rpc-runtime-shared.ts`, README and USEGUIDE on 2026-10-17. Source clarification:
  * `receiveAdapterBootstrap` and the public stdio openers do not install a timeout when omitted; the
- * 10000 ms budget belongs to higher-level discovery. Both stdio openers reject `fd` mode.
+ * 10000 ms budget belongs to higher-level discovery. Both stdio openers reject `fd` mode. Interop
+ * review: USEGUIDE labels Bun spawn and Deno sockets with native Bun/Deno APIs, but bun-spawn
+ * re-exports Node child_process, bun-socket re-exports Node net, and deno-socket delegates to
+ * Node-compatible net while rejecting Windows pipes. Electron has no automatic stdio child
+ * discovery: its launcher rejects bootstrap and non-ignore stdin; use explicit message sources.
+ * Windows Job launch always rejects and does not import koffi. The public launch helpers prepare
+ * bootstrap/channel ownership; native spawning is still the custom launcher's responsibility.
+ * Electron parentPort event.data comes from the native API documented at
+ * https://www.electronjs.org/docs/latest/api/parent-port (read 2026-10-17).
  */
 import type { ICode, ILibraryReference, IMemberDoc, ISymbolDoc, IText } from './contract.js'
 import {
   runtimeEventEnum,
-  runtimeEventSymbol,
+  runtimePairedEventSymbol,
   runtimeOutletGrants,
   runtimePeerOptionMembers,
-  runtimeSharedTypes
+  runtimePairedTypes
 } from './rpc-runtime-shared.js'
 
 /** Builds one bilingual text. */
@@ -79,6 +87,1248 @@ const bootstrapOptionDocs: Readonly<Record<string, IMemberDoc>> = {
   )
 }
 
+/** Matching contracts copied into each file so both processes type their remote calls. */
+const processApiCode = `type IMainApi = { parent: { prefix(value: string): string } }
+type IServiceApi = {
+  math: { double(value: number): number | Promise<number> }
+  log: { note(value: string): void }
+  feed: { count(limit: number): AsyncIterableIterator<number> }
+}`
+
+/** Child owns its providers; the parent's Peer owns the launched process lifetime. */
+const processProvidersCode = `const provide: IServiceApi = {
+  math: { double: (value) => value * 2 },
+  log: { note: (value) => console.error(value) },
+  feed: { count: async function* (limit) {
+    for (let value = 1; value <= limit; value++) yield value
+  } }
+}`
+
+/** A forward request waits for the child's reverse call before the parent may close it. */
+const processReverseProvidersCode = `const provide: IServiceApi = {
+  math: { double: async (value): Promise<number> => {
+    const peer = await parent
+    console.error(await peer.request('parent.prefix', 'double'))
+    return value * 2
+  } },
+  log: { note: (value) => console.error(value) },
+  feed: { count: async function* (limit) {
+    for (let value = 1; value <= limit; value++) yield value
+  } }
+}`
+
+/** Build complete service/main examples with a real optional launcher selection. */
+const processSpawnExample = (module?: string, factory?: string): ICode => {
+  /** Adapter-specific examples execute under the runtime that owns the selected launcher. */
+  const runtime =
+    module === 'deno-command'
+      ? 'Deno'
+      : module === 'bun-spawn'
+        ? 'Bun'
+        : module === 'node-child-process'
+          ? 'Node'
+          : 'Node/Bun/Deno'
+  const code = (
+    zh: boolean
+  ) => `// ${zh ? `service.ts：${runtime} 子进程，标准输出留给协议` : `service.ts: ${runtime} child; stdout is reserved for protocol bytes`}
+import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
+
+${processApiCode}
+if (!isProcessChild()) throw new TypeError('library-launched child required')
+${processReverseProvidersCode}
+const parent = createProcessPeer<IMainApi>({ provide })
+await parent
+// ${zh ? '父端关闭连接后，库结束子进程生命周期。' : 'The parent closes the connection and ends the child lifetime.'}
+
+// ${zh ? `main.ts：${runtime} 父进程；Deno 需要相应的读取、环境和启动权限` : `main.ts: ${runtime} parent; Deno needs read, env and run permissions`}
+import { createProcessPeer, RuntimeEventName } from '@migaia/rpc-process'
+${module ? `import { ${factory} } from '@migaia/rpc-process/adapters/${module}'\n` : ''}
+${processApiCode}
+const service = await createProcessPeer<IServiceApi>({
+  spawn: ${module ? `{ entry: new URL('./service.ts', import.meta.url), supervision: { launcher: ${factory}() } }` : `new URL('./service.ts', import.meta.url)`},
+  provide: { parent: { prefix: (value: string) => 'main: ' + value } }
+})
+const off = service.on(RuntimeEventName.exit, (event) => console.error(event))
+try {
+  console.log(await service.request('math.double', 21))
+  await service.notify('log.note', 'hello')
+  for await (const value of service.stream('feed.count', 3)) console.log(value)
+} finally {
+  off()
+  await service.close()
+}`
+  return t(code(false), code(true))
+}
+
+/** Complete automatic child plus parent, including both directions and all three call modes. */
+const peerExample = processSpawnExample()
+
+/** Host installation and its child share the exact same method contracts. */
+const pluginExample: ICode = t(
+  `// service.ts: child; use stderr for application logs.
+import { createProcessPeer } from '@migaia/rpc-process'
+
+${processApiCode}
+${processReverseProvidersCode}
+const parent = createProcessPeer<IMainApi>({ provide })
+await parent
+
+// main.ts: host owns the connection and the child.
+import { defineHost } from '@migaia/plugin-host'
+import { createProcessPlugin } from '@migaia/rpc-process'
+
+${processApiCode}
+const service = createProcessPlugin<IServiceApi, IMainApi, 'service'>({
+  name: 'service',
+  spawn: new URL('./service.ts', import.meta.url),
+  provide: { parent: { prefix: (value) => 'main: ' + value } }
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+try {
+  await host.use(service)
+  console.log(await host.process!.request('service', 'math.double', 21))
+  await host.process!.notify('service', 'log.note', 'hello')
+  for await (const value of host.process!.stream('service', 'feed.count', 3)) console.log(value)
+} finally {
+  await host.dispose()
+}`,
+  `// service.ts：子进程；应用日志写入标准错误。
+import { createProcessPeer } from '@migaia/rpc-process'
+
+${processApiCode}
+${processReverseProvidersCode}
+const parent = createProcessPeer<IMainApi>({ provide })
+await parent
+
+// main.ts：宿主持有连接与子进程。
+import { defineHost } from '@migaia/plugin-host'
+import { createProcessPlugin } from '@migaia/rpc-process'
+
+${processApiCode}
+const service = createProcessPlugin<IServiceApi, IMainApi, 'service'>({
+  name: 'service',
+  spawn: new URL('./service.ts', import.meta.url),
+  provide: { parent: { prefix: (value) => 'main: ' + value } }
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof service]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+try {
+  await host.use(service)
+  console.log(await host.process!.request('service', 'math.double', 21))
+  await host.process!.notify('service', 'log.note', 'hello')
+  for await (const value of host.process!.stream('service', 'feed.count', 3)) console.log(value)
+} finally {
+  await host.dispose()
+}`
+)
+
+/** Self-spawn must branch before any parent-only initialization. */
+const selfSpawnExample: ICode = t(
+  `// main.ts: both branches execute the same entry under the current runtime.
+import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
+
+${processApiCode}
+if (isProcessChild()) {
+  ${processReverseProvidersCode}
+  const parent = createProcessPeer<IMainApi>({ provide })
+  await parent
+  } else {
+  const service = await createProcessPeer<IServiceApi>({
+    spawn: true,
+    provide: { parent: { prefix: (value: string) => 'main: ' + value } }
+  })
+  try {
+    console.log(await service.request('math.double', 21))
+    await service.notify('log.note', 'hello')
+    for await (const value of service.stream('feed.count', 3)) console.log(value)
+  } finally {
+    await service.close()
+  }
+}`,
+  `// main.ts：两条分支由当前运行时执行同一个入口。
+import { createProcessPeer, isProcessChild } from '@migaia/rpc-process'
+
+${processApiCode}
+if (isProcessChild()) {
+  ${processReverseProvidersCode}
+  const parent = createProcessPeer<IMainApi>({ provide })
+  await parent
+  } else {
+  const service = await createProcessPeer<IServiceApi>({
+    spawn: true,
+    provide: { parent: { prefix: (value: string) => 'main: ' + value } }
+  })
+  try {
+    console.log(await service.request('math.double', 21))
+    await service.notify('log.note', 'hello')
+    for await (const value of service.stream('feed.count', 3)) console.log(value)
+  } finally {
+    await service.close()
+  }
+}`
+)
+
+/** Separate independently running services retain process ownership after client disconnection. */
+const namedSocketExample: ICode = t(
+  `// service.ts: start this resident process first; Ctrl-C closes its listener and sessions.
+import { once } from 'node:events'
+import process from 'node:process'
+import { createProcessPeer } from '@migaia/rpc-process'
+
+${processApiCode}
+${processProvidersCode}
+const server = await createProcessPeer({ listen: 'reference-math-service', provide })
+try {
+  await once(process, 'SIGINT')
+} finally {
+  await server.close()
+}
+
+// main.ts: a separate client; closing it does not terminate service.ts.
+import { createProcessPeer } from '@migaia/rpc-process'
+
+${processApiCode}
+const client = await createProcessPeer<IServiceApi>({ connect: 'reference-math-service' })
+try {
+  console.log(await client.request('math.double', 21))
+  await client.notify('log.note', 'hello')
+  for await (const value of client.stream('feed.count', 3)) console.log(value)
+} finally {
+  await client.close()
+}`,
+  `// service.ts：先启动此常驻进程；中断信号关闭监听与会话。
+import { once } from 'node:events'
+import process from 'node:process'
+import { createProcessPeer } from '@migaia/rpc-process'
+
+${processApiCode}
+${processProvidersCode}
+const server = await createProcessPeer({ listen: 'reference-math-service', provide })
+try {
+  await once(process, 'SIGINT')
+} finally {
+  await server.close()
+}
+
+// main.ts：独立客户端；关闭客户端不会终止服务进程。
+import { createProcessPeer } from '@migaia/rpc-process'
+
+${processApiCode}
+const client = await createProcessPeer<IServiceApi>({ connect: 'reference-math-service' })
+try {
+  console.log(await client.request('math.double', 21))
+  await client.notify('log.note', 'hello')
+  for await (const value of client.stream('feed.count', 3)) console.log(value)
+} finally {
+  await client.close()
+}`
+)
+
+/** Full adapter pair exposes both native dial/listen and the protocol establishment owner. */
+const processSocketExample = (module: string, runtime: string): ICode => {
+  const code = (
+    zh: boolean
+  ) => `// ${zh ? `service.ts：${runtime} 服务进程；先启动，中断信号负责关闭` : `service.ts: ${runtime} service; start first, interrupt to close`}
+import { once } from 'node:events'
+import process from 'node:process'
+import { createNativeProcessOffer, createProcessPeer } from '@migaia/rpc-process'
+import { listenProcessByteChannel } from '@migaia/rpc-process/adapters/${module}'
+
+${processApiCode}
+${processProvidersCode}
+// ${zh ? '仅示例凭据；部署时由应用凭据所有者向两端发放同一密钥。' : 'Example credential only; the application distributes a shared secret in deployment.'}
+const token = 'reference-local-demo'
+let sequence = 0
+const server = await createProcessPeer({
+  report: console.error,
+  provide,
+  listen: {
+    kind: 'listener',
+    address: 'tcp://127.0.0.1:4000',
+    listen: async (options) => {
+      const listener = await listenProcessByteChannel({
+        ...options,
+        onConnection: (pending) => options.onConnection({
+          accept: (context) => pending.accept(context),
+          close: () => pending.close()
+        })
+      })
+      return { address: listener.address, close: () => listener.close() }
+    },
+    verify: (auth) => {
+      if (auth !== token) throw new TypeError('invalid credential')
+      return 'reference-client'
+    },
+    offer: createNativeProcessOffer({ peer: { id: 'reference-service', runtime: '${runtime.toLowerCase()}' }, stream: true }),
+    createConnectionContext: () => {
+      sequence += 1
+      return { peerId: 'client-' + sequence, ipc: {
+        connectionId: 'connection-' + sequence,
+        sessionId: 'session-' + sequence,
+        log: () => undefined
+      } }
+    }
+  }
+})
+try {
+  await once(process, 'SIGINT')
+} finally {
+  await server.close()
+}
+
+// ${zh ? `main.ts：独立 ${runtime} 客户端；只持有会话，不持有服务进程` : `main.ts: independent ${runtime} client; owns its session, not the service process`}
+import { createProcessPeer, createProcessTransport, type IProcessByteChannel } from '@migaia/rpc-process'
+import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/${module}'
+
+${processApiCode}
+const client = await createProcessPeer<IServiceApi>({
+  report: console.error,
+  connect: {
+    kind: 'connect',
+    address: 'tcp://127.0.0.1:4000',
+    token: 'reference-local-demo',
+    dial: (address, signal) => dialProcessByteChannel({ address, signal }),
+    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {
+      role: 'initiator',
+      offer: prepared.offer!,
+      peerId: 'reference-service',
+      scheduler: prepared.scheduler,
+      signal: prepared.signal,
+      ipc: { ...prepared.session, log: () => undefined },
+      report: console.error
+    })
+  }
+})
+try {
+  console.log(await client.request('math.double', 21))
+  await client.notify('log.note', 'hello')
+  for await (const value of client.stream('feed.count', 3)) console.log(value)
+} finally {
+  await client.close()
+}`
+  return t(code(false), code(true))
+}
+
+/** Native socket example shared by transport and byte-channel nodes. */
+const socketExample = processSocketExample('node-socket', 'Node')
+
+/** Make each byte operation visible without attaching a second protocol reader. */
+const byteForwardingCode = `function forwardByte(raw: IProcessByteChannel): IProcessByteChannel {
+  return {
+    kind: 'byte',
+    write: (chunk) => raw.write(chunk),
+    onData: (listener) => raw.onData(listener),
+    onClose: (listener) => raw.onClose(listener),
+    close: () => raw.close()
+  }
+}`
+
+/** Manual stdio sources own only channels; the application must terminate its native child. */
+const processStdioExample = (
+  mode: 'raw' | 'open' | 'bootstrap' | 'web' = 'raw',
+  runtime = 'Node'
+): ICode => {
+  const deno = runtime === 'Deno' || mode === 'web'
+  const childImport =
+    mode === 'web'
+      ? `import { createAdapterWebByteIO } from '@migaia/rpc-process'`
+      : `import { ${mode === 'open' ? 'openProcessStdioChannel' : 'createAdapterProcessStdio'} } from '@migaia/rpc-process/adapters/${deno ? 'deno-command' : 'node-child-process'}'`
+  const openCode =
+    mode === 'web'
+      ? 'const raw = createAdapterWebByteIO(Deno.stdin.readable, Deno.stdout.writable)'
+      : mode === 'open'
+        ? "const { channel: raw } = await openProcessStdioChannel({ bootstrap: 'none' })"
+        : mode === 'bootstrap'
+          ? "const { channel: raw } = await receiveAdapterBootstrap(createAdapterProcessStdio(process), 'none')"
+          : 'const raw = createAdapterProcessStdio(process)'
+  const code = (
+    zh: boolean
+  ) => `// ${zh ? `service.ts：${deno ? 'Deno' : runtime} 子进程；此手动启动不写入启动帧` : `service.ts: ${deno ? 'Deno' : runtime} child; this manual launch writes no bootstrap frame`}
+import process from 'node:process'
+import { createProcessPeer, createProcessTransport, createNativeProcessOffer, ${mode === 'bootstrap' ? 'receiveAdapterBootstrap, ' : ''}type IProcessByteChannel } from '@migaia/rpc-process'
+${childImport}
+
+${processApiCode}
+${processReverseProvidersCode}
+${byteForwardingCode}
+const parent = createProcessPeer<IMainApi>({
+  self: { name: 'service', instanceId: 'manual-service' },
+  provide,
+  connect: async (context) => {
+    ${openCode}
+    return createProcessTransport(forwardByte(raw), {
+      role: 'responder',
+      peerId: 'manual-main',
+      offer: createNativeProcessOffer({ peer: { id: context.self.instanceId, runtime: '${deno ? 'deno' : runtime.toLowerCase()}' }, capabilities: context.capabilities }),
+      auth: { mode: 'required', verify: (auth) => {
+        if (auth !== 'manual-demo') throw new TypeError('invalid credential')
+        return 'manual-main'
+      } },
+      ipc: { connectionId: 'manual-child', sessionId: 'manual-session', log: () => undefined },
+      report: console.error
+    })
+  }
+})
+await parent
+
+// ${zh ? 'main.ts：Node 父进程；连接关闭后仍由应用终止并等待原生子进程' : 'main.ts: Node parent; the application terminates and joins its borrowed child'}
+import process from 'node:process'
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { fileURLToPath } from 'node:url'
+import { createProcessPeer, createProcessTransport, createNativeProcessOffer, type IProcessByteChannel } from '@migaia/rpc-process'
+import { createAdapterChildStdio } from '@migaia/rpc-process/adapters/node-child-process'
+
+${processApiCode}
+${byteForwardingCode}
+const entry = fileURLToPath(new URL('./service.ts', import.meta.url))
+const child = spawn(${deno ? "'deno', ['run', '--allow-all', entry]" : runtime === 'Bun' ? "'bun', [entry]" : 'process.execPath, [...process.execArgv, entry]'}, { stdio: ['pipe', 'pipe', 'inherit'] })
+const exited = once(child, 'close')
+try {
+  const service = await createProcessPeer<IServiceApi>({
+    self: { name: 'main', instanceId: 'manual-main' },
+    provide: { parent: { prefix: (value: string) => 'main: ' + value } },
+    spawn: async (context) => createProcessTransport(forwardByte(createAdapterChildStdio(child)), {
+      role: 'initiator',
+      peerId: 'manual-service',
+      offer: createNativeProcessOffer({ peer: { id: context.self.instanceId, runtime: 'node' }, auth: 'manual-demo', capabilities: context.capabilities }),
+      ipc: { connectionId: 'manual-parent', sessionId: 'manual-session', log: () => undefined },
+      report: console.error
+    })
+  })
+  try {
+    console.log(await service.request('math.double', 21))
+    await service.notify('log.note', 'hello')
+    for await (const value of service.stream('feed.count', 3)) console.log(value)
+  } finally {
+    await service.close()
+  }
+} finally {
+  child.kill()
+  await exited
+}`
+  return t(code(false), code(true))
+}
+
+/** Covers raw byte methods and the two public Node stdio wrapper operations. */
+const stdioExample = processStdioExample()
+
+/** Electron exposes a real message port, but no stdio/bootstrap automatic-child combination. */
+const electronExample: ICode = (() => {
+  const code = (
+    zh: boolean
+  ) => `// ${zh ? 'service.ts：编译为 service.js，在 Electron 的实用进程中执行' : 'service.ts: compile to service.js; runs in the Electron utility process'}
+import process from 'node:process'
+import type {} from 'electron'
+import { createProcessPeer, createProcessTransport, type IProcessMessageChannel } from '@migaia/rpc-process'
+
+${processApiCode}
+${processReverseProvidersCode}
+// ${zh ? '等父端先发送真实控制消息，再把该原始消息交回核心校验，避免子端先发送而父端尚未监听。' : 'Wait for the parent first, then replay its actual control message for Core validation before sending from the child.'}
+const first = await new Promise<unknown>((resolve) => process.parentPort.once('message', (event: { data: unknown }) => resolve(event.data)))
+let firstPending = true
+const raw: IProcessMessageChannel = {
+  kind: 'message',
+  send: (value) => process.parentPort.postMessage(value),
+  onMessage: (listener) => {
+    const receive = (event: { data: unknown }) => listener(event.data)
+    process.parentPort.on('message', receive)
+    if (firstPending) {
+      firstPending = false
+      listener(first)
+    }
+    return () => process.parentPort.off('message', receive)
+  },
+  onClose: (listener) => {
+    process.on('exit', listener)
+    return () => process.off('exit', listener)
+  },
+  close: () => undefined
+}
+const parent = createProcessPeer<IMainApi>({
+  self: { name: 'service', instanceId: 'electron-service' },
+  provide,
+  connect: async ({ capabilities }) => {
+    const profile = { codec: 'identity' as const, capabilities }
+    return createProcessTransport(raw, {
+      peerId: 'electron-main',
+      staticAgreement: { local: profile, peer: profile },
+      ipc: { connectionId: 'utility-child', sessionId: 'utility-session', log: () => undefined },
+      report: console.error
+    })
+  }
+})
+await parent
+// ${zh ? '关闭协议只移除监听；原生子进程由主进程持有的句柄终止。' : 'Protocol close removes listeners; the main process terminates the native child handle.'}
+
+// ${zh ? 'main.ts：Electron 主进程，在应用就绪后启动，不能把启动帧或标准输入交给此启动器' : 'main.ts: Electron main after app ready; this launcher rejects bootstrap and stdin channels'}
+import { app } from 'electron'
+import { fileURLToPath } from 'node:url'
+import { createProcessPeer, createProcessTransport } from '@migaia/rpc-process'
+import { createElectronUtilityProcessLauncher } from '@migaia/rpc-process/adapters/electron-utility-process'
+
+${processApiCode}
+await app.whenReady()
+const handle = await createElectronUtilityProcessLauncher().launch({
+  command: fileURLToPath(new URL('./service.js', import.meta.url)),
+  args: [],
+  env: { inherit: ['PATH'], set: {} },
+  stdio: { stdin: 'ignore', stdout: 'drain', stderr: 'drain' }
+}, { signal: new AbortController().signal, output: (_stream, chunk) => console.error(new TextDecoder().decode(chunk)) })
+try {
+  const service = await createProcessPeer<IServiceApi>({
+    self: { name: 'main', instanceId: 'electron-main' },
+    provide: { parent: { prefix: (value: string) => 'main: ' + value } },
+    spawn: async ({ capabilities }) => {
+      const profile = { codec: 'identity' as const, capabilities }
+      const raw = handle.channel
+      return createProcessTransport({
+        kind: 'message',
+        send: (value) => raw.send(value),
+        onMessage: (listener) => raw.onMessage(listener),
+        onClose: (listener) => raw.onClose(listener),
+        close: () => raw.close()
+      }, {
+        peerId: 'electron-service',
+        staticAgreement: { local: profile, peer: profile },
+        ipc: { connectionId: 'utility-main', sessionId: 'utility-session', log: () => undefined },
+        report: console.error
+      })
+    }
+  })
+  try {
+    console.log(await service.request('math.double', 21))
+    await service.notify('log.note', 'hello')
+    for await (const value of service.stream('feed.count', 3)) console.log(value)
+  } finally {
+    await service.close()
+  }
+} finally {
+  handle.terminate('force')
+  await handle.exited
+  app.quit()
+}`
+  return t(code(false), code(true))
+})()
+
+/** Foreign implementations speak this protocol; no foreign-language client API is assumed. */
+const jsonRpcExample: ICode = (() => {
+  const capabilities = ['jsonrpc-bridge@1', 'runtime-api@1', 'batch@1', 'abort@1', 'wire-error@1']
+  const messages = JSON.stringify(
+    [
+      {
+        receive: {
+          jsonrpc: '2.0',
+          id: 'migaia.hello',
+          method: 'migaia.hello',
+          params: {
+            hello: JSON.stringify({
+              kind: 'handshake',
+              step: 'hello',
+              protocol: 'migaia.rpc',
+              versions: [{ major: 1, minor: 1 }],
+              codecs: ['json'],
+              capabilities,
+              peer: { id: 'jsonrpc-main', runtime: 'node' },
+              auth: 'protocol-demo'
+            })
+          }
+        }
+      },
+      {
+        send: {
+          jsonrpc: '2.0',
+          id: 'migaia.hello',
+          result: {
+            reply: JSON.stringify({
+              kind: 'handshake',
+              step: 'accept',
+              protocol: 'migaia.rpc',
+              major: 1,
+              minor: 1,
+              codec: 'json',
+              capabilities,
+              peer: { id: 'foreign-service', runtime: 'python' }
+            }),
+            methods: ['migaia.hello', 'migaia.describe', 'migaia.invoke', 'migaia.cancel']
+          }
+        }
+      },
+      { receive: { jsonrpc: '2.0', id: 'd1', method: 'migaia.describe', params: { args: [] } } },
+      {
+        send: {
+          jsonrpc: '2.0',
+          id: 'd1',
+          result: {
+            schemaVersion: 2,
+            self: { name: 'foreign', instanceId: 'foreign-service' },
+            methods: [
+              { name: 'math.add', supportedModes: ['request', 'notify'], modeSource: 'declared' },
+              { name: 'log.note', supportedModes: ['notify'], modeSource: 'declared' }
+            ]
+          }
+        }
+      },
+      {
+        receive: {
+          jsonrpc: '2.0',
+          id: 'r1',
+          method: 'migaia.invoke',
+          params: { method: 'math.add', args: [20, 22] }
+        }
+      },
+      { send: { jsonrpc: '2.0', id: 'r1', result: 42 } },
+      {
+        receive: {
+          jsonrpc: '2.0',
+          method: 'migaia.invoke',
+          params: { method: 'log.note', args: ['hello'] }
+        }
+      },
+      {
+        receive: {
+          jsonrpc: '2.0',
+          id: 'r2',
+          method: 'migaia.invoke',
+          params: { method: 'math.add', args: [1, 2] }
+        }
+      },
+      { receive: { jsonrpc: '2.0', method: 'migaia.cancel', params: { id: 'r2' } } }
+    ],
+    null,
+    2
+  )
+  const code = (
+    zh: boolean
+  ) => `// ${zh ? 'main.ts：TypeScript 发起端；先启动遵循下面协议的本机服务' : 'main.ts: TypeScript initiator; start a local responder implementing the protocol below'}
+import { createProcessPeer, createProcessJsonRpcChannel } from '@migaia/rpc-process'
+import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
+import { RpcProtocol } from '@migaia/rpc-contract'
+import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
+
+type IForeignApi = {
+  math: { add(args: [number, number]): number }
+  log: { note(args: [string]): void }
+}
+const peer = await createProcessPeer<IForeignApi>({
+  self: { name: 'main', instanceId: 'jsonrpc-main' },
+  connect: async ({ self }) => createProcessJsonRpcChannel({
+    byte: await dialProcessByteChannel({ address: 'tcp://127.0.0.1:4001' }),
+    peerId: 'foreign-service',
+    target: { kind: 'plugin', contract: {
+      schemaVersion: 1, plugin: 'foreign', features: {
+        math: { methods: { add: { mode: 'request', idempotent: false } } },
+        log: { methods: { note: { mode: 'one-way', idempotent: false } } }
+      }
+    } },
+    offer: {
+      peer: { id: self.instanceId, runtime: 'node' },
+      versions: [{ major: RpcProtocol.major, minor: RpcProtocol.minor }],
+      capabilities: []
+    },
+    token: 'protocol-demo',
+    scheduler: systemScheduler,
+    wallClock: systemWallClock,
+    ipc: { connectionId: 'foreign-connection', sessionId: 'foreign-session', log: () => undefined },
+    report: console.error
+  })
+})
+try {
+  console.log(await peer.request('math.add', [20, 22]))
+  await peer.notify('log.note', ['hello'])
+} finally {
+  await peer.close()
+}
+
+// ${zh ? 'peer.protocol.json：另一个进程的收发记录示意，不是虚构的外语库接口' : 'peer.protocol.json: responder transcript, not an invented foreign-language library API'}
+// ${zh ? '应用实现监听、凭据校验和方法执行；必须原样回复收到的关联标识。' : 'The application implements listening, authentication and methods; echo each received correlation id.'}
+// ${zh ? '每条消息独立按 UTF-8 字节数编码为 Content-Length: N\\r\\n\\r\\nJSON；下面的外层记录数组不发送。' : 'Frame each message separately as Content-Length: N\\r\\n\\r\\nJSON using UTF-8 byte length; do not send the transcript array.'}
+// ${zh ? '先校验握手密钥，按对方提议顺序返回共同能力；描述目录中的实例标识必须与握手一致。' : 'Authenticate hello, preserve offered capability order, and keep the description instance id equal to the handshake peer id.'}
+// ${zh ? '通知不回复；取消只尽力停止对应在途调用，不回滚副作用。此配置不支持流或转移。' : 'Notifications receive no reply; cancel is best effort without rollback. Streams and transfer are unsupported.'}
+${messages}`
+  return t(code(false), code(true))
+})()
+
+/** Local variants retain complete bilingual files while demonstrating one advanced constructor. */
+const processExampleVariant = (
+  example: ICode,
+  transform: (code: string, zh: boolean) => string
+): ICode =>
+  t(
+    transform(typeof example === 'string' ? example : example.en, false),
+    transform(typeof example === 'string' ? example : example.zh, true)
+  )
+
+/** Node launch preparation is used once, then the application performs the actual native spawn. */
+const nodeLaunchExample = processExampleVariant(stdioExample, (code) =>
+  code
+    .replace(
+      "import { createAdapterChildStdio } from '@migaia/rpc-process/adapters/node-child-process'",
+      "import { createAdapterNodeProcessLaunch } from '@migaia/rpc-process/adapters/node-child-process'"
+    )
+    .replace(
+      "const child = spawn(process.execPath, [...process.execArgv, entry], { stdio: ['pipe', 'pipe', 'inherit'] })",
+      `const spec = {
+  command: process.execPath, args: [...process.execArgv, entry],
+  env: { inherit: ['PATH'], set: {} },
+  stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' } as const
+}
+const launch = createAdapterNodeProcessLaunch(spec, {
+  signal: new AbortController().signal, output: (_stream, chunk) => console.error(chunk)
+})
+launch.assertActive()
+const child = spawn(spec.command, spec.args, { stdio: ['pipe', 'pipe', 'inherit'] })`
+    )
+    .replace(
+      'forwardByte(createAdapterChildStdio(child))',
+      'forwardByte(launch.createChildChannel(child))'
+    )
+)
+
+/** Web-stream preparation wraps a real manually launched Deno process without a bootstrap claim. */
+const webLaunchExample = processExampleVariant(processStdioExample('web', 'Deno'), (code, zh) =>
+  code
+    .replace("import { spawn } from 'node:child_process'\n", '')
+    .replace("import { once } from 'node:events'\n", '')
+    .replace(
+      "import { createAdapterChildStdio } from '@migaia/rpc-process/adapters/node-child-process'",
+      "import { createAdapterProcessLaunch } from '@migaia/rpc-process'"
+    )
+    .replace(
+      zh
+        ? '// main.ts：Node 父进程；连接关闭后仍由应用终止并等待原生子进程'
+        : '// main.ts: Node parent; the application terminates and joins its borrowed child',
+      zh
+        ? '// main.ts：Deno 父进程，以所需的环境、读取和启动权限运行；应用终止并等待子进程'
+        : '// main.ts: Deno parent with env, read and run permissions; the application terminates and joins its child'
+    )
+    .replace(
+      "const child = spawn('deno', ['run', '--allow-all', entry], { stdio: ['pipe', 'pipe', 'inherit'] })\nconst exited = once(child, 'close')",
+      `const spec = {
+  command: Deno.execPath(), args: ['run', '--allow-all', entry],
+  env: { inherit: ['PATH'], set: {} },
+  stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' } as const
+}
+const launch = createAdapterProcessLaunch(spec, {
+  signal: new AbortController().signal, output: (_stream, chunk) => console.error(chunk)
+})
+launch.assertActive()
+const child = new Deno.Command(spec.command, {
+  args: spec.args, stdin: 'piped', stdout: 'piped', stderr: 'inherit'
+}).spawn()
+let childExited = false
+const exited = child.status.then((status) => { childExited = true; return status })`
+    )
+    .replace(
+      'forwardByte(createAdapterChildStdio(child))',
+      'forwardByte(launch.createWebChannel(child.stdout, child.stdin))'
+    )
+    .replace('  child.kill()', '  if (!childExited) child.kill("SIGTERM")')
+)
+
+/** The object-opening hook is supplied by the actual Core JSON-RPC negotiation owner. */
+const objectChannelExample = processExampleVariant(jsonRpcExample, (code) =>
+  code
+    .replace(
+      "import { createProcessPeer, createProcessJsonRpcChannel } from '@migaia/rpc-process'",
+      "import { createProcessPeer, createProcessChannelClosedError, openProcessObjectChannel } from '@migaia/rpc-process'\nimport { createAdapterJsonRpcChannel } from '@migaia/rpc-core/adapter/internal-advanced'"
+    )
+    .replace(
+      'connect: async ({ self }) => createProcessJsonRpcChannel({',
+      'connect: async ({ self }) => createAdapterJsonRpcChannel({'
+    )
+    .replace(
+      '    report: console.error\n  })\n})',
+      `    report: console.error
+  }, {
+    closedError: createProcessChannelClosedError,
+    openConnection: (connection, options) => openProcessObjectChannel(connection, options)
+  })
+})`
+    )
+)
+
+/** Existing native acquisition methods provide a concrete custom-loader example. */
+const processLoaderCode = `const runtime = {
+  load: async () => ({ processRuntimeIO: {
+    discover: () => {
+      const marker = process.env[PROCESS_RUNTIME_API_ENV]
+      if (marker !== undefined) delete process.env[PROCESS_RUNTIME_API_ENV]
+      return { marker, runtime: 'node' }
+    },
+    open: () => openProcessStdioChannel({ bootstrap: 'stdin', bootstrapTimeoutMs: 10_000 })
+  } })
+}`
+
+/** The custom-loader factory still connects to the same automatic child and matching providers. */
+const adapterPeerExample = processExampleVariant(peerExample, (code) =>
+  code
+    .replace(
+      "import { createProcessPeer, RuntimeEventName } from '@migaia/rpc-process'",
+      "import process from 'node:process'\nimport { createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV, RuntimeEventName } from '@migaia/rpc-process'\nimport { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'"
+    )
+    .replace(
+      'const service = await createProcessPeer<IServiceApi>({',
+      processLoaderCode + '\nconst service = await createAdapterProcessPeer<IServiceApi>({'
+    )
+    .replace('})\nconst off = service.on', '}, runtime)\nconst off = service.on')
+    .replace(
+      'Node/Bun/Deno parent; Deno needs read, env and run permissions',
+      'Node parent using this custom native loader'
+    )
+    .replace(
+      'Node/Bun/Deno 父进程；Deno 需要相应的读取、环境和启动权限',
+      'Node 父进程，使用此自定义原生加载器'
+    )
+)
+
+/** Installation uses the same concrete native loader and exposes the canonical process slot. */
+const adapterPluginExample = processExampleVariant(pluginExample, (code) =>
+  code
+    .replace(
+      "import { createProcessPlugin } from '@migaia/rpc-process'",
+      "import process from 'node:process'\nimport { createAdapterProcessPlugin, PROCESS_RUNTIME_API_ENV } from '@migaia/rpc-process'\nimport { openProcessStdioChannel } from '@migaia/rpc-process/adapters/node-child-process'"
+    )
+    .replace(
+      "const service = createProcessPlugin<IServiceApi, IMainApi, 'service'>({",
+      processLoaderCode +
+        "\nconst service = createAdapterProcessPlugin<IServiceApi, IMainApi, 'service'>({"
+    )
+    .replace('})\nconst host = defineHost', '}, runtime)\nconst host = defineHost')
+)
+
+/** The borrowed socket wrapper is created only after the actual Node connection is established. */
+const socketIoExample = processExampleVariant(socketExample, (code) =>
+  code
+    .replace(
+      "import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'",
+      "import { createAdapterSocketByteIO } from '@migaia/rpc-process/adapters/node-socket'\nimport { createConnection } from 'node:net'\nimport { once } from 'node:events'"
+    )
+    .replace(
+      'dial: (address, signal) => dialProcessByteChannel({ address, signal }),',
+      `dial: async () => {
+      const socket = createConnection({ host: '127.0.0.1', port: 4000 })
+      await once(socket, 'connect')
+      return createAdapterSocketByteIO(socket)
+    },`
+    )
+)
+
+/** Actual bootstrap discovery plus both callable ends gives constants their real native context. */
+const bootstrapExample = processExampleVariant(adapterPeerExample, (code) =>
+  code
+    .replace(
+      'createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV, RuntimeEventName',
+      'createAdapterProcessPeer, PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION, PROCESS_RUNTIME_API_BOOTSTRAP_KIND, PROCESS_RUNTIME_API_BOOTSTRAP_VERSION, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS, PROCESS_RUNTIME_API_FINGERPRINT_PREFIX, PROCESS_HANDSHAKE_MAX_FRAME_BYTES, RuntimeEventName'
+    )
+    .replace(
+      "bootstrap: 'stdin', bootstrapTimeoutMs: 10_000",
+      "bootstrap: 'stdin', bootstrapTimeoutMs: PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS"
+    )
+    .replace(
+      'const runtime = {',
+      `console.error({
+  discovery: PROCESS_RUNTIME_API_ENV,
+  discoveryVersion: PROCESS_RUNTIME_API_ENV_VERSION,
+  bootstrapKind: PROCESS_RUNTIME_API_BOOTSTRAP_KIND,
+  bootstrapVersion: PROCESS_RUNTIME_API_BOOTSTRAP_VERSION,
+  bootstrapLimit: PROCESS_HANDSHAKE_MAX_FRAME_BYTES,
+  nativeIdentityPrefix: PROCESS_RUNTIME_API_FINGERPRINT_PREFIX
+})
+const runtime = {`
+    )
+)
+
+/** Native close causes and public error identities are handled within one actual stdio pair. */
+const processErrorExample = processExampleVariant(stdioExample, (code) =>
+  code
+    .replaceAll(
+      'createNativeProcessOffer, type IProcessByteChannel',
+      'createNativeProcessOffer, createProcessChannelClosedError, RPC_PROCESS_ERROR_SOURCE, RpcProcessErrorCode, type IProcessByteChannel'
+    )
+    .replaceAll(
+      'onClose: (listener) => raw.onClose(listener)',
+      'onClose: (listener) => raw.onClose((reason) => listener(createProcessChannelClosedError(reason)))'
+    )
+    .replace(
+      `    for await (const value of service.stream('feed.count', 3)) console.log(value)
+  } finally {`,
+      `    for await (const value of service.stream('feed.count', 3)) console.log(value)
+  } catch (error) {
+    const failure = error as { source?: unknown; code?: unknown }
+    if (failure.source === RPC_PROCESS_ERROR_SOURCE && failure.code === RpcProcessErrorCode.channelClosed)
+      console.error(failure.source, failure.code)
+    throw error
+  } finally {`
+    )
+)
+
+/** A portable descriptor chooses data; the application still selects and owns live adapters. */
+const descriptorExample = processExampleVariant(socketExample, (code) =>
+  code
+    .replace(
+      'createProcessPeer, createProcessTransport, type IProcessByteChannel',
+      'createProcessPeer, createProcessTransport, parseProcessPluginDescriptor, type IProcessByteChannel'
+    )
+    .replace(
+      'const client = await createProcessPeer<IServiceApi>({',
+      `const descriptor = parseProcessPluginDescriptor({
+  descriptorVersion: 1, target: 'plugin', name: 'service', runtime: 'node',
+  deployment: { kind: 'connect', address: 'tcp://127.0.0.1:4000' },
+  contract: { schemaVersion: 1, plugin: 'service', features: {
+    math: { methods: { double: { mode: 'request', idempotent: false } } },
+    log: { methods: { note: { mode: 'one-way', idempotent: false } } },
+    feed: { methods: { count: { mode: 'async-generator', idempotent: false } } }
+  } }
+})
+if (descriptor.deployment.kind !== 'connect') throw new TypeError('connect descriptor required')
+const client = await createProcessPeer<IServiceApi>({`
+    )
+    .replace(
+      "    address: 'tcp://127.0.0.1:4000',\n    token:",
+      '    address: descriptor.deployment.address,\n    token:'
+    )
+)
+
+/** Native wire selection is a real full-deployment field beside its socket counterpart. */
+const wireExample = processExampleVariant(socketExample, (code) =>
+  code
+    .replace(
+      'createProcessPeer, createProcessTransport, type IProcessByteChannel',
+      'createProcessPeer, createProcessTransport, ProcessPluginWire, type IProcessByteChannel'
+    )
+    .replace(
+      "    kind: 'connect',\n    address:",
+      "    kind: 'connect',\n    wire: ProcessPluginWire.native,\n    address:"
+    )
+)
+
+/** A real process supervisor supplies registration state and replacement handles. */
+const registrationExample: ICode = (() => {
+  const code = (zh: boolean) => {
+    const original =
+      typeof stdioExample === 'string' ? stdioExample : zh ? stdioExample.zh : stdioExample.en
+    const child = original.slice(0, original.indexOf('// main.ts'))
+    return (
+      child +
+      `// ${zh ? 'main.ts：Node 父端；监督器持有原生进程，治理登记只观察它' : 'main.ts: Node parent; supervision owns the process, registration observes its actual state'}
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+import { createUnitBudget } from '@migaia/supervision'
+import { createProcessSupervisor } from '@migaia/supervision/process'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'
+import { createProcessPeer, createProcessTransport, createNativeProcessOffer, createProcessResilience, type IProcessByteChannel, type IProcessRegistrationBinding, type IProcessLiquidationOwner } from '@migaia/rpc-process'
+
+${processApiCode}
+${byteForwardingCode}
+const supervisor = createProcessSupervisor({
+  id: 'service',
+  launcher: createNodeProcessLauncher(),
+  budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),
+  scheduler: systemScheduler,
+  isolation: 'best-effort',
+  report: console.error,
+  spec: {
+    command: process.execPath,
+    args: [...process.execArgv, fileURLToPath(new URL('./service.ts', import.meta.url))],
+    env: { inherit: ['PATH'], set: {} },
+    stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
+  }
+})
+const resilience = createProcessResilience({ scheduler: systemScheduler, report: console.error, maxConnections: 16 })
+const off = resilience.onTerminal((snapshot) => console.error(snapshot.id, snapshot.state))
+let sequence = 0
+const openPeer = (handle: INodeProcessHandle) => createProcessPeer<IServiceApi>({
+  self: { name: 'main', instanceId: 'manual-main' },
+  provide: { parent: { prefix: (value: string) => 'main: ' + value } },
+  connect: async (context) => {
+    sequence += 1
+    return createProcessTransport(forwardByte(handle.channel!), {
+      role: 'initiator', peerId: 'manual-service',
+      offer: createNativeProcessOffer({ peer: { id: context.self.instanceId, runtime: 'node' }, auth: 'manual-demo', capabilities: context.capabilities }),
+      ipc: { connectionId: 'governed-' + sequence, sessionId: 'session-' + sequence, log: () => undefined },
+      report: console.error
+    })
+  }
+})
+let peer: Awaited<ReturnType<typeof openPeer>> | undefined
+const binding: IProcessRegistrationBinding = {
+  ownership: 'spawn-owned', health: 'none',
+  supervisor: {
+    restart: () => supervisor.restart(),
+    inspect: () => supervisor.inspect(),
+    dispose: () => supervisor.dispose(),
+    onTerminal: (listener) => supervisor.subscribe((event) => {
+      if (event.type === 'terminal') listener(event)
+    })
+  }
+}
+const owner: IProcessLiquidationOwner = { kind: 'standalone-host', release: async () => {
+  try { await peer?.close() } finally { await supervisor.dispose() }
+} }
+const registration = resilience.attachRegistration('service', binding, owner)
+const guard = resilience.callGuard('service')
+try {
+  const initial = await supervisor.start()
+  if (initial.state !== 'ready') throw new TypeError('process did not become ready')
+  peer = await openPeer(initial.unit)
+  guard.beforeDispatch({ method: 'math.double', mode: 'request', generation: supervisor.generation })
+  console.log(await peer.request('math.double', 21))
+  await peer.notify('log.note', 'before restart')
+  for await (const value of peer.stream('feed.count', 3)) console.log(value)
+  console.log(registration.inspect(), resilience.inspect('service'))
+  // ${zh ? '先关闭旧会话；重启返回的是新原生执行单元，必须重新建立协议连接。' : 'Close the old session first; a restarted native unit needs a new protocol connection.'}
+  await peer.close()
+  await registration.restart()
+  const successor = await supervisor.whenReady()
+  if (successor.state !== 'ready') throw new TypeError('replacement did not become ready')
+  peer = await openPeer(successor.unit)
+  guard.beforeDispatch({ method: 'math.double', mode: 'request', generation: supervisor.generation })
+  console.log(await peer.request('math.double', 22))
+} finally {
+  try { await peer?.close() } finally {
+    off()
+    try { await registration.close() } finally {
+      try { await resilience.close() } finally { await supervisor.dispose() }
+    }
+  }
+}`
+    )
+  }
+  return t(code(false), code(true))
+})()
+
+/** Authenticated candidate identity supplies real session policy and application-owned endpoints. */
+const registrationListenerExample: ICode = (() => {
+  const code = (
+    zh: boolean
+  ) => `// ${zh ? 'service.ts：Node 服务端；先启动，应用持有接纳后的端点与会话' : 'service.ts: Node responder; start first, application owns adopted endpoints and sessions'}
+import process from 'node:process'
+import { once } from 'node:events'
+import { createProcessResilience, createNativeProcessOffer } from '@migaia/rpc-process'
+import { listenProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
+import { createRuntimeApiEndpoint, codec, framer, connect, ping, type IRpcContext, type IRpcProviderResult } from '@migaia/rpc-core'
+import type { IRuntimePeerSourceResult } from '@migaia/rpc-core/remote'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+type IServiceApi = { double(value: number): number }
+type IMainApi = { title(): string }
+const api: IServiceApi = { double: (value) => value * 2 }
+const resilience = createProcessResilience({ scheduler: systemScheduler, report: console.error, maxConnections: 16 })
+const sessions = new Set<() => Promise<void>>()
+let sequence = 0
+const listener = await resilience.listenRegistrations({
+  wire: 'native',
+  address: 'tcp://127.0.0.1:4000',
+  listen: listenProcessByteChannel,
+  offer: createNativeProcessOffer({ peer: { id: 'service', runtime: 'node' } }),
+  verifyToken: (auth) => {
+    if (auth !== 'reference-local-demo') throw new TypeError('invalid credential')
+    return 'example-client'
+  },
+  createConnectionContext: () => {
+    sequence += 1
+    return { peerId: 'client', ipc: {
+      connectionId: 'accepted-' + sequence, sessionId: 'session-' + sequence, log: () => undefined
+    } }
+  },
+  onCandidate: async (candidate) => {
+    const channel = candidate.channel
+    const session = resilience.sessionOptions(candidate.identity)
+    const endpoint = createRuntimeApiEndpoint({
+      id: 'service', targetIds: [channel.peerId], transport: channel.transport,
+      scheduler: channel.scheduler, idempotency: session.idempotency, providerLimits: session.limits,
+      construction: { signal: candidate.signal },
+      provider: { double: async (context: IRpcContext): Promise<IRpcProviderResult> => {
+        console.error(await endpoint.send<ReturnType<IMainApi['title']>>('client', 'title', null))
+        return context.success(api.double(context.data as Parameters<IServiceApi['double']>[0]))
+      } },
+      middlewares: [codec(channel.pipeline.codec), framer(channel.pipeline.framer), connect({ transport: channel.transport }), ping()],
+      features: channel.features
+    }, channel)
+    const close = async () => {
+      try { await endpoint.dispose() } finally { await candidate.close() }
+    }
+    sessions.add(close)
+    await endpoint.ready
+    ;(channel as IRuntimePeerSourceResult).activateReceive?.()
+    return 'adopt'
+  }
+})
+console.error(listener.address)
+try {
+  await once(process, 'SIGINT')
+} finally {
+  try { await listener.close() } finally {
+    const results = await Promise.allSettled([...sessions].map((close) => close()))
+    for (const result of results) if (result.status === 'rejected') console.error(result.reason)
+    await resilience.close()
+  }
+}
+
+// ${zh ? 'main.ts：Node 客户端；端点释放后再关闭所持有的协议连接' : 'main.ts: Node client; dispose the endpoint before closing its protocol channel'}
+import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc-process'
+import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
+import { createRuntimeApiEndpoint, codec, framer, connect, ping } from '@migaia/rpc-core'
+
+type IServiceApi = { double(value: number): number }
+type IMainApi = { title(): string }
+const api: IMainApi = { title: () => 'main' }
+const channel = await createProcessTransport(await dialProcessByteChannel({ address: 'tcp://127.0.0.1:4000' }), {
+  role: 'initiator', peerId: 'service',
+  offer: createNativeProcessOffer({ peer: { id: 'client', runtime: 'node' }, auth: 'reference-local-demo' }),
+  ipc: { connectionId: 'client-1', sessionId: 'client-session-1', log: () => undefined },
+  report: console.error
+})
+const endpoint = createRuntimeApiEndpoint({
+  id: 'client', targetIds: ['service'], transport: channel.transport, scheduler: channel.scheduler,
+  provider: { title: (context) => context.success(api.title()) },
+  middlewares: [codec(channel.pipeline.codec), framer(channel.pipeline.framer), connect({ transport: channel.transport }), ping()],
+  features: channel.features
+}, channel)
+try {
+  await endpoint.ready
+  channel.activateReceive?.()
+  const payload: Parameters<IServiceApi['double']>[0] = 21
+  console.log(await endpoint.send<ReturnType<IServiceApi['double']>>('service', 'double', payload))
+} finally {
+  try { await endpoint.dispose() } finally { await channel.close() }
+}`
+  return t(code(false), code(true))
+})()
+
+/** The advanced plugin owns a real supervised deployment and replaces only after installation. */
+const legacyReplaceExample: ICode = (() => {
+  const declarations = `type IServiceApi = { math: { double(value: number): Promise<number> } }
+type IMainApi = { parent: { prefix(value: string): string } }
+const serviceContract: IRemoteContract = {
+  schemaVersion: 1, plugin: 'service',
+  features: { math: { methods: { double: { mode: 'request', idempotent: false } } } }
+}`
+  const code = (
+    zh: boolean
+  ) => `// ${zh ? 'service.ts：Node 子进程，使用显式原生协议，不读取自动启动帧' : 'service.ts: Node child using an explicit native protocol, without an automatic bootstrap frame'}
+import process from 'node:process'
+import { defineHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { createEndpoint, connect, contract, ping } from '@migaia/rpc-core'
+import { serveRemotePlugin, type IRemoteContract } from '@migaia/rpc-core/remote'
+import { createProcessTransport, createNativeProcessOffer } from '@migaia/rpc-process'
+import { createAdapterProcessStdio } from '@migaia/rpc-process/adapters/node-child-process'
+
+${declarations}
+const channel = await createProcessTransport(createAdapterProcessStdio(process), {
+  role: 'responder', peerId: 'legacy-main',
+  offer: createNativeProcessOffer({ peer: { id: 'legacy-service', runtime: 'node' }, stream: false, capabilities: ['runtime-api@1'] }),
+  auth: { mode: 'required', verify: (auth) => {
+    if (auth !== 'legacy-demo') throw new TypeError('invalid credential')
+    return 'legacy-main'
+  } },
+  ipc: { connectionId: 'legacy-child', sessionId: 'legacy-session', log: () => undefined },
+  report: console.error
+})
+// ${zh ? '原生字节通道返回的两个真实特性分别持有发送队列与诊断日志，原样安装。' : 'The native byte channel returns its actual queue and log features; install both unchanged.'}
+const [queue, log] = channel.features
+const endpoint = await createEndpoint({
+  id: 'legacy-service', targetIds: ['legacy-main'], transport: channel.transport, scheduler: channel.scheduler,
+  codec: channel.pipeline.codec, framer: channel.pipeline.framer,
+  features: [queue!, log!] as const,
+  middlewares: [connect({ transport: channel.transport }), contract({ version: '1.0.0' }), ping()]
+})
+const api: IServiceApi = { math: { double: async (value) => {
+  console.error(await endpoint.send<ReturnType<IMainApi['parent']['prefix']>>('legacy-main', 'parent.prefix', 'double'))
+  return value * 2
+} } }
+const local = definePlugin({ name: 'service', features: { math: defineFeature(() => api.math) }, install: () => ({}) })
+const childHost = defineHost<Record<string, never>, never, readonly [typeof local]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+await childHost.use(local)
+const served = await serveRemotePlugin({ host: childHost, contract: serviceContract, endpoint: { endpoint }, report: console.error })
+let offClose: () => void = () => undefined
+const closed = new Promise<void>((resolve) => {
+  offClose = channel.transport.onTransportError!(() => resolve())
+})
+channel.activateReceive?.()
+try {
+  await closed
+} finally {
+  offClose()
+  try { await served.close() } finally {
+    try { await childHost.dispose() } finally { await channel.close() }
+  }
+}
+
+// ${zh ? 'main.ts：Node 父进程；安装真实插件并调用，替换结果只证明原生就绪，不保证代理已经重新绑定。' : 'main.ts: Node parent; install and call the plugin. Replacement proves native readiness, not proxy rebinding.'}
+import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+import { defineHost } from '@migaia/plugin-host'
+import { createEndpoint, connect, contract, ping } from '@migaia/rpc-core'
+import type { IRemoteContract } from '@migaia/rpc-core/remote'
+import { createUnitBudget } from '@migaia/supervision'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createNodeProcessLauncher, type INodeProcessHandle } from '@migaia/rpc-process/adapters/node-child-process'
+import { createProcessPlugin, createProcessTransport, createNativeProcessOffer, type IProcessByteChannel, type IProcessPlugin } from '@migaia/rpc-process'
+
+${declarations}
+const host = defineHost<Record<string, never>, never, readonly [IProcessPlugin]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+const api: IMainApi = { parent: { prefix: (value) => 'main: ' + value } }
+const plugin = createProcessPlugin<INodeProcessHandle>({
+  name: 'service', contract: serviceContract,
+  registrationOwner: { name: 'service', host },
+  host: {
+    disable: (name, options) => host.plugin.disable(name, options),
+    enable: (name) => host.plugin.enable(name),
+    replace: (name, candidate) => host.replace(name, candidate)
+  },
+  endpointFactory: async (channel) => {
+    const [queue, log] = channel.features
+    const endpoint = await createEndpoint({
+      id: 'legacy-main', targetIds: [channel.peerId], transport: channel.transport, scheduler: channel.scheduler,
+      codec: channel.pipeline.codec, framer: channel.pipeline.framer,
+      features: [queue!, log!] as const,
+      provider: { 'parent.prefix': (context) => context.success(api.parent.prefix(context.data as Parameters<IMainApi['parent']['prefix']>[0])) },
+      middlewares: [connect({ transport: channel.transport }), contract({ version: '1.0.0' }), ping()]
+    })
+    return { endpoint }
+  },
+  deployment: {
+    kind: 'spawn', channelKind: 'byte', wire: 'native', token: 'legacy-demo',
+    offer: createNativeProcessOffer({ peer: { id: 'legacy-main', runtime: 'node' }, auth: 'legacy-demo', stream: false, capabilities: ['runtime-api@1'] }),
+    supervision: {
+      id: 'legacy-service', launcher: createNodeProcessLauncher(),
+      budget: createUnitBudget({ kind: 'process', maxUnits: 1 }),
+      scheduler: systemScheduler, isolation: 'best-effort', report: console.error,
+      spec: {
+        command: process.execPath, args: [...process.execArgv, fileURLToPath(new URL('./service.ts', import.meta.url))],
+        env: { inherit: ['PATH'], set: {} },
+        stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' }
+      }
+    },
+    rawChannel: async (handle) => handle.channel!,
+    establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {
+      role: 'initiator', offer: prepared.offer!, peerId: 'legacy-service', scheduler: prepared.scheduler,
+      signal: prepared.signal, ipc: { ...prepared.session, log: () => undefined }, report: console.error
+    })
+  },
+  report: console.error
+})
+try {
+  const [handle] = await host.use(plugin)
+  const math = handle.getFeature('math') as IServiceApi['math']
+  console.log(await math.double(21))
+  console.log(await plugin.replace({ strategy: 'stop-then-start' }))
+} finally {
+  await host.dispose()
+}`
+  return t(code(false), code(true))
+})()
+
 /** Shared authenticated listener fields inherited by reverse host registration. */
 const registrationCommonMembers: Readonly<Record<string, IMemberDoc>> = {
   listen: {
@@ -124,7 +1374,7 @@ const registrationCommonMembers: Readonly<Record<string, IMemberDoc>> = {
       'Caller-authored `{ peerId, ipc }` for that one connection, not a promise.',
       '调用方编写的此连接专属 `{ peerId, ipc }`，不能返回异步结果。'
     ),
-    example: `createConnectionContext: () => ({ peerId: 'service', ipc: { connectionId: issueConnectionId(), sessionId: issueSessionId(), log: console.log } })`
+    example: registrationListenerExample
   },
   verifyToken: {
     summary: t(
@@ -145,7 +1395,7 @@ const registrationCommonMembers: Readonly<Record<string, IMemberDoc>> = {
       'A verified principal string or its promise; never infer authorization from peer claims alone.',
       '校验后的主体字符串或其异步结果；不能只凭对端声明推断授权。'
     ),
-    example: `verifyToken: async (auth, peer) => validateCredential(auth, peer)`
+    example: registrationListenerExample
   },
   scheduler: {
     summary: t(
@@ -174,48 +1424,6 @@ const registrationCommonMembers: Readonly<Record<string, IMemberDoc>> = {
     )
   }
 }
-
-/** Parent side of the quick start; the child calls `createProcessPeer({ provide })`. */
-const peerExample: ICode = {
-  en: `import { createProcessPeer } from '@migaia/rpc-process'
-
-type IServiceApi = { math: { double(value: number): number } }
-const service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })
-try {
-  console.log(await service.request('math.double', 21)) // 42
-} finally {
-  await service.close() // closes the connection and stops the child
-}`,
-  zh: `import { createProcessPeer } from '@migaia/rpc-process'
-
-type IServiceApi = { math: { double(value: number): number } }
-const service = await createProcessPeer<IServiceApi>({ spawn: new URL('./service.ts', import.meta.url) })
-try {
-  console.log(await service.request('math.double', 21)) // 42
-} finally {
-  await service.close() // 关闭连接并停止子进程
-}`
-}
-
-/** Host-managed example of `createProcessPlugin`. */
-const pluginExample = `import { defineHost } from '@migaia/plugin-host'
-import { createProcessPlugin } from '@migaia/rpc-process'
-
-type IServiceApi = { math: { double(value: number): number } }
-const service = createProcessPlugin<IServiceApi, Record<never, never>, 'service'>({
-  name: 'service',
-  spawn: new URL('./service.js', import.meta.url)
-})
-const host = defineHost<Record<string, never>, never, readonly [typeof service]>({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-try {
-  await host.use(service)
-  console.log(await host.process!.request('service', 'math.double', 21)) // 42
-  host.process!.on('exit', (event) => console.warn(event.name, event.code))
-} finally {
-  await host.dispose()
-}`
 
 /** Doc of a `report(error)` callback member. */
 const reportMember: IMemberDoc = {
@@ -247,13 +1455,13 @@ const byteChannelMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     params: { chunk: t('Bytes to write.', '要写入的字节数据。') },
     returns: t('Resolves when written.', '写入完成后 resolve。'),
-    example: `await channel.write(new TextEncoder().encode('hi'))`
+    example: stdioExample
   },
   onData: {
     summary: t('Subscribes to incoming chunks.', '订阅对端发来的每个数据块。'),
     params: { listener: t('Receives each chunk in order.', '按顺序接收每个数据块的监听函数。') },
     returns: t('A function that removes the listener.', '移除该监听的函数。'),
-    example: `const stop = channel.onData((chunk) => decoder.push(chunk))`
+    example: stdioExample
   },
   onClose: {
     summary: t('Subscribes to the end of the carrier.', '订阅载体结束（关闭）的事件。'),
@@ -261,7 +1469,7 @@ const byteChannelMembers: Readonly<Record<string, IMemberDoc>> = {
       listener: t('Receives the close reason, if any.', '接收关闭原因（如果有）的监听函数。')
     },
     returns: t('A function that removes the listener.', '移除该监听的函数。'),
-    example: `channel.onClose((reason) => console.warn('closed', reason))`
+    example: stdioExample
   },
   close: {
     summary: t('Closes the carrier and releases it.', '关闭该字节载体，释放底层资源。'),
@@ -269,7 +1477,7 @@ const byteChannelMembers: Readonly<Record<string, IMemberDoc>> = {
       'Nothing or a Promise resolved when closed.',
       '无返回值，或在关闭后 resolve 的 Promise。'
     ),
-    example: `await channel.close()`
+    example: stdioExample
   }
 }
 
@@ -395,7 +1603,12 @@ const launchers = [
     'Node `child_process`',
     'Node `child_process`'
   ],
-  ['bun-spawn', 'createBunProcessLauncher', '`Bun.spawn`', '`Bun.spawn`'],
+  [
+    'bun-spawn',
+    'createBunProcessLauncher',
+    'Bun Node-compatible `child_process`',
+    'Bun 的 Node 兼容 `child_process`'
+  ],
   [
     'deno-command',
     'createDenoProcessLauncher',
@@ -407,8 +1620,12 @@ const launchers = [
 /** Socket modules sharing `dialProcessByteChannel` / `listenProcessByteChannel`. */
 const sockets = [
   ['node-socket', 'Node `net`', 'Node `net`'],
-  ['bun-socket', 'Bun sockets', 'Bun 的 socket'],
-  ['deno-socket', '`Deno.connect` / `Deno.listen`', '`Deno.connect` / `Deno.listen`']
+  ['bun-socket', 'Bun Node-compatible `net`', 'Bun 的 Node 兼容 `net`'],
+  [
+    'deno-socket',
+    'Deno Node-compatible `net` (no Windows pipes)',
+    'Deno 的 Node 兼容 `net`（不支持 Windows 命名管道）'
+  ]
 ] as const
 
 /** Docs of `listenProcessByteChannel` (shared by every socket adapter). */
@@ -416,7 +1633,7 @@ const listenSymbol: ISymbolDoc = {
   role: 'operation',
   purpose: t(
     'Listens on a local address (loopback TCP, Unix socket or Windows pipe) and hands each authenticated pending connection to `onConnection`.',
-    '在本机地址（回环 TCP、Unix socket 或 Windows 命名管道）上监听，并把每个待认证的连接交给 `onConnection`。'
+    '在本机地址监听，并把每个待认证连接交给 `onConnection`；配合 `dialProcessByteChannel` 与 `createProcessTransport` 完成双端通信。Deno 不支持 Windows 命名管道。'
   ),
   params: {
     options: t(
@@ -428,12 +1645,7 @@ const listenSymbol: ISymbolDoc = {
     'An `IProcessByteListener` with the actual `address` and `close()`; binding failures throw `PROCESS_CHANNEL_LISTEN_FAILED`.',
     '带实际 `address` 与 `close()` 的 `IProcessByteListener`；无法绑定时抛 `PROCESS_CHANNEL_LISTEN_FAILED`。'
   ),
-  example: `const listener = await listenProcessByteChannel({
-  address: 'tcp://127.0.0.1:0',
-  auth: { mode: 'required', verify: (auth) => checkToken(auth) },
-  onConnection: async (pending) => serve(await pending.accept(context)),
-  report: console.error
-})`
+  example: socketExample
 }
 
 /** Docs of `dialProcessByteChannel`. */
@@ -456,7 +1668,7 @@ const dialSymbol: ISymbolDoc = {
   },
   purpose: t(
     'Connects to a local address and returns the raw byte channel (before any handshake).',
-    '连接到本机地址，返回尚未握手的原始字节通道，之后交给 `establish` 完成认证。'
+    '连接到本机地址，返回尚未握手的原始字节通道；配合 `listenProcessByteChannel` 与 `createProcessTransport` 完成对端接纳及认证。'
   ),
   params: {
     options: t(
@@ -468,7 +1680,7 @@ const dialSymbol: ISymbolDoc = {
     'An `IProcessByteChannel`; failures throw `PROCESS_CHANNEL_CONNECT_FAILED` with the cause.',
     '一个 `IProcessByteChannel`；失败时抛带原因的 `PROCESS_CHANNEL_CONNECT_FAILED`。'
   ),
-  example: `const raw = await dialProcessByteChannel({ address: 'tcp://127.0.0.1:4000' })`
+  example: socketExample
 }
 
 /** Docs of `openProcessStdioChannel` (child side). */
@@ -518,20 +1730,20 @@ const stdioSymbol: ISymbolDoc = {
     )
   },
   returns: t('`{ channel, bootstrap? }`.', '包含字节通道与启动数据的 `{ channel, bootstrap? }`。'),
-  example: `const { channel, bootstrap } = await openProcessStdioChannel({ bootstrap: 'stdin' })`
+  example: processStdioExample('open')
 }
 
 /** Symbols of launcher and socket adapters. */
 const adapterSymbols: Record<string, ISymbolDoc> = {
   ...Object.fromEntries(
-    launchers.map(([, name, en, zh]) => [
+    launchers.map(([module, name, en, zh]) => [
       name,
       {
         role: 'factory',
         optionDocs: bootstrapOptionDocs,
         purpose: t(
           `Creates the launcher that starts child processes with ${en} for a full \`spawn\` source.`,
-          `创建使用${zh}启动子进程的 launcher，用作完整 \`spawn\` 来源里监督配置中的 \`supervision.launcher\`。`
+          `创建使用${zh}启动子进程的 launcher，配合 \`createProcessPeer\` 使用，用作完整 \`spawn\` 来源里监督配置中的 \`supervision.launcher\`。`
         ),
         params: {
           options: t(
@@ -543,21 +1755,21 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
           'An `IProcessLauncher` from `@migaia/supervision/process`, used as `supervision.launcher`.',
           '来自 `@migaia/supervision/process` 的 `IProcessLauncher`，用作 `supervision.launcher`。'
         ),
-        example: `const launcher = ${name}()`
+        example: processSpawnExample(module, name)
       } satisfies ISymbolDoc
     ])
   ),
   createElectronUtilityProcessLauncher: {
     role: 'factory',
     purpose: t(
-      'Creates a launcher for Electron utility processes; they talk over a message channel (`channelKind: "message"`).',
-      '创建在 Electron 主进程中启动 utility process 的 launcher；它们通过消息通道（`channelKind: "message"`）通信。'
+      'Creates an Electron main-process utility launcher. Pair with `createProcessTransport` over explicit message sources; the application terminates the native handle. Stdin bootstrap and automatic child discovery are unsupported.',
+      '创建在 Electron 主进程中启动实用进程的启动器；配合 `createProcessTransport` 手动组合消息通道，应用负责终止句柄。不支持标准输入启动帧或自动子进程来源。'
     ),
     returns: t(
       'An `IProcessLauncher` whose handles carry a message `channel`.',
       '一个 `IProcessLauncher`，其句柄带有消息通道 `channel`。'
     ),
-    example: `const launcher = createElectronUtilityProcessLauncher()`
+    example: electronExample
   },
   createWindowsJobProcessLauncher: {
     role: 'factory',
@@ -569,16 +1781,34 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
       'An `IProcessLauncher` that cannot launch yet.',
       '一个暂时无法启动进程的 `IProcessLauncher`。'
     ),
-    example: `const launcher = createWindowsJobProcessLauncher() // 目前 launch 一律拒绝`
+    example: t(
+      '// Unsupported: Windows Job launch always rejects, so no paired program can run with this launcher.',
+      '// 不受支持：Windows Job 启动一律拒绝，此启动器无法运行双端程序。'
+    )
   },
   'adapters/node-child-process:openProcessStdioChannel': stdioSymbol,
-  'adapters/deno-command:openProcessStdioChannel': stdioSymbol,
+  'adapters/deno-command:openProcessStdioChannel': {
+    ...stdioSymbol,
+    example: processStdioExample('open', 'Deno')
+  },
   ...Object.fromEntries(
     sockets
       .filter(([module]) => module !== 'bun-socket')
       .flatMap(([module]) => [
-        [`adapters/${module}:dialProcessByteChannel`, dialSymbol],
-        [`adapters/${module}:listenProcessByteChannel`, listenSymbol]
+        [
+          `adapters/${module}:dialProcessByteChannel`,
+          {
+            ...dialSymbol,
+            example: processSocketExample(module, module === 'deno-socket' ? 'Deno' : 'Node')
+          }
+        ],
+        [
+          `adapters/${module}:listenProcessByteChannel`,
+          {
+            ...listenSymbol,
+            example: processSocketExample(module, module === 'deno-socket' ? 'Deno' : 'Node')
+          }
+        ]
       ])
   ),
   createAdapterChildStdio: {
@@ -594,7 +1824,7 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
       )
     },
     returns: t('An `IProcessByteChannel`.', '一个可用于握手的 `IProcessByteChannel`。'),
-    example: `const channel = createAdapterChildStdio(spawn('node', ['service.js'], { stdio: 'pipe' }))`
+    example: stdioExample
   },
   createAdapterProcessStdio: {
     role: 'factory',
@@ -609,14 +1839,14 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
       )
     },
     returns: t('An `IProcessByteChannel`.', '一个可用于握手的 `IProcessByteChannel`。'),
-    example: `const channel = createAdapterProcessStdio({ stdin: process.stdin, stdout: process.stdout })`
+    example: stdioExample
   },
   createAdapterNodeProcessLaunch: {
     role: 'operation',
     optionDocs: bootstrapOptionDocs,
     purpose: t(
-      'Advanced: performs one Node child launch for a custom launcher, returning the launch description Core expects.',
-      '高级用法：为自定义 launcher 执行一次 Node 子进程启动，返回 Core 所需的启动描述。'
+      'Advanced: prepares bootstrap and channel construction for one actual Node child launch; the custom launcher still performs the native spawn and termination.',
+      '高级用法：为自定义启动器准备一次 Node 启动的引导数据与通道构造；原生进程仍由调用方创建、终止并等待。'
     ),
     params: {
       spec: t(
@@ -629,8 +1859,11 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
       ),
       options: t('`{ runtimeApiBootstrap? }`.', '可选的 `{ runtimeApiBootstrap? }` 启动身份设置。')
     },
-    returns: t('The launch result for Core.', '交给 Core 的启动结果。'),
-    example: `launch: (spec, context) => createAdapterNodeProcessLaunch(spec, context)`
+    returns: t(
+      'A prepared operation exposing bootstrap, assertActive() and createChildChannel(); it has not spawned a native process.',
+      '返回含引导数据、活动检查和子通道构造的准备对象，此时尚未创建原生进程。'
+    ),
+    example: nodeLaunchExample
   },
   createAdapterSocketByteIO: {
     role: 'factory',
@@ -640,7 +1873,7 @@ const adapterSymbols: Record<string, ISymbolDoc> = {
     ),
     params: { socket: t('A connected `Duplex` you own.', '你持有的、已连接的 `Duplex` 流。') },
     returns: t('An `IProcessByteChannel`.', '一个可用于握手的 `IProcessByteChannel`。'),
-    example: `const channel = createAdapterSocketByteIO(net.connect(4000, '127.0.0.1'))`
+    example: socketIoExample
   }
 }
 
@@ -1210,7 +2443,7 @@ export const rpcProcessReference: ILibraryReference = {
             `Launcher with ${en} (\`${name}\`) and the child-side \`openProcessStdioChannel\` for full sources.`,
             `基于${zh}启动子进程的 launcher（\`${name}\`），以及供完整来源在子进程端读取自身 stdio 的 \`openProcessStdioChannel\`。`
           ),
-          example: `import { ${name} } from '@migaia/rpc-process/adapters/${module}'`
+          example: processSpawnExample(module, name)
         }
       ])
     ),
@@ -1219,10 +2452,13 @@ export const rpcProcessReference: ILibraryReference = {
         `adapters/${module}`,
         {
           summary: t(
-            `Local sockets with ${en}: \`dialProcessByteChannel\` and \`listenProcessByteChannel\` (loopback TCP, Unix socket, Windows pipe).`,
+            `Local sockets with ${en}: \`dialProcessByteChannel\` and \`listenProcessByteChannel\` (loopback TCP and Unix socket; Node/Bun also accept Windows pipes).`,
             `基于${zh}的本机 socket 适配：拨号函数 \`dialProcessByteChannel\` 与监听函数 \`listenProcessByteChannel\`，支持回环 TCP、Unix socket 与 Windows 命名管道。`
           ),
-          example: `import { dialProcessByteChannel, listenProcessByteChannel } from '@migaia/rpc-process/adapters/${module}'`
+          example: processSocketExample(
+            module,
+            module === 'deno-socket' ? 'Deno' : module === 'bun-socket' ? 'Bun' : 'Node'
+          )
         }
       ])
     ),
@@ -1231,14 +2467,14 @@ export const rpcProcessReference: ILibraryReference = {
         'Electron utility process launcher; requires `electron`.',
         '在 Electron 主进程中启动 utility process 的 launcher，通过消息通道通信；需要安装 `electron`。'
       ),
-      example: `import { createElectronUtilityProcessLauncher } from '@migaia/rpc-process/adapters/electron-utility-process'`
+      example: electronExample
     },
     'adapters/windows-job': {
       summary: t(
-        'Placeholder Windows Job launcher; `launch` always rejects for now. Requires `koffi`.',
-        'Windows Job 对象 launcher 的占位实现，尚未经过真实验证，目前 `launch` 总是拒绝。需要安装 `koffi`。'
+        'Unsupported Windows Job launcher: `launch` always rejects before creating a process; the implementation does not load `koffi`.',
+        'Windows Job 对象启动器尚不支持实际启动；`launch` 在创建进程前总是拒绝，当前实现也不会加载 `koffi`。'
       ),
-      example: `import { createWindowsJobProcessLauncher } from '@migaia/rpc-process/adapters/windows-job'`
+      example: adapterSymbols.createWindowsJobProcessLauncher!.example!
     }
   },
   symbols: {
@@ -1247,7 +2483,7 @@ export const rpcProcessReference: ILibraryReference = {
       optionDocs: processPeerOptionMembers,
       purpose: t(
         'Opens a Runtime Peer to another process. Choose exactly one source: `spawn` (start and own a child), `connect` (dial a running service) or `listen` (accept sessions). A child started by the library may omit the source to connect back. Resolves after the authenticated handshake.',
-        '打开一个与另一个进程通信的 Runtime Peer。三种来源必须且只能选择一种：`spawn`（启动并拥有子进程）、`connect`（连接运行中的服务）或 `listen`（接受会话）。由本库启动的子进程可以省略来源以连回父进程。认证握手完成后 resolve。'
+        '打开一个与另一个进程通信的 Runtime Peer。三种来源必须且只能选择一种：`spawn`（启动并拥有子进程）、`connect`（连接运行中的服务）或 `listen`（接受会话）。由本库启动的子进程可以省略来源以连回父进程。配合 `isProcessChild` 判断子进程入口；独立服务需要先建立监听再连接。认证握手完成后 resolve。'
       ),
       params: {
         options: t(
@@ -1290,7 +2526,7 @@ export const rpcProcessReference: ILibraryReference = {
       optionDocs: processPluginDocs,
       purpose: t(
         'Creates a plugin that installs one process connection into a PluginHost; the host owns it and gains `host.process`. The advanced overload takes a full `IProcessPluginOptions` remote-plugin deployment.',
-        '创建把一个进程连接安装进 PluginHost 的插件；宿主持有该连接并获得 `host.process`。高级重载接受完整的 `IProcessPluginOptions` 远程插件部署。'
+        '创建把一个进程连接安装进 PluginHost 的插件，与子进程端的 `createProcessPeer` 配合使用；宿主持有该连接并获得 `host.process`。高级重载接受完整的 `IProcessPluginOptions` 远程插件部署。'
       ),
       params: {
         options: t(
@@ -1308,12 +2544,7 @@ export const rpcProcessReference: ILibraryReference = {
         '判断当前入口是否由本库 launcher 启动，使同一个文件可以在 `spawn: true` 时分支。它不授予信任，认证仍在握手中完成。'
       ),
       returns: t('`true` in a library-launched child.', '在由本库启动的子进程中返回 `true`。'),
-      example: `if (isProcessChild()) await createProcessPeer({ provide: { echo: (value: string) => value } })
-else {
-  const child = await createProcessPeer<{ echo(value: string): string }>({ spawn: true })
-  console.log(await child.request('echo', 'hello'))
-  await child.close()
-}`
+      example: selfSpawnExample
     },
     createProcessResilience: {
       role: 'factory',
@@ -1332,7 +2563,7 @@ else {
         'An `IProcessResilience`; bad limits throw `PROCESS_RESILIENCE_INVALID_OPTION`.',
         '一个 `IProcessResilience`；限制配置不合法时抛 `PROCESS_RESILIENCE_INVALID_OPTION`。'
       ),
-      example: `const resilience = createProcessResilience({ scheduler: systemScheduler, report: console.error, maxConnections: 16 })`,
+      example: registrationExample,
       scenarios: [
         t(
           'Protect a shared daemon from clients that open too many connections or send huge payloads.',
@@ -1361,14 +2592,7 @@ else {
         'The established channel; bad credentials throw `PROCESS_CHANNEL_AUTH_REJECTED`, slow handshakes `PROCESS_HANDSHAKE_TIMEOUT`.',
         '建立好的通道；凭据错误抛 `PROCESS_CHANNEL_AUTH_REJECTED`，握手超时抛 `PROCESS_HANDSHAKE_TIMEOUT`。'
       ),
-      example: `establish: (raw, prepared) => createProcessTransport(raw as IProcessByteChannel, {
-  role: 'initiator',
-  offer: prepared.offer!,
-  peerId: prepared.session.processId!,
-  scheduler: prepared.scheduler,
-  ipc: { ...prepared.session, log: () => undefined },
-  report: console.error
-})`
+      example: socketExample
     },
     createNativeProcessOffer: {
       role: 'operation',
@@ -1431,14 +2655,14 @@ else {
         )
       },
       returns: t('A frozen `IRpcHandshakeOffer`.', '冻结的握手提议 `IRpcHandshakeOffer`。'),
-      example: `const offer = createNativeProcessOffer({ peer: { id: 'cli', runtime: 'node' }, stream: true })`
+      example: socketExample
     },
     createProcessJsonRpcChannel: {
       role: 'operation',
       optionDocs: processJsonRpcDocs,
       purpose: t(
         'Bridges a byte channel to a JSON-RPC peer (Python, Go...) and returns a protocol channel.',
-        '把字节通道桥接到 JSON-RPC 对端（Python、Go 等其它语言），握手后返回协议通道。'
+        '把字节通道桥接到实现 `migaia.hello`、`migaia.describe`、`migaia.invoke` 与 `migaia.cancel` 协议的其他语言对端，配合 `createProcessPeer` 使用。握手后返回协议通道；对端须实现分帧和认证，不能连接任意 JSON-RPC 服务。'
       ),
       params: {
         options: t(
@@ -1450,7 +2674,7 @@ else {
         'A channel; `stream` and `transfer` are not supported over JSON-RPC.',
         '一个通道；JSON-RPC 下不支持 `stream` 与 `transfer`。'
       ),
-      example: `const channel = await createProcessJsonRpcChannel({ byte, peerId: 'py', target, offer, token, scheduler, wallClock, ipc, report })`
+      example: jsonRpcExample
     },
     createProcessChannelClosedError: {
       role: 'operation',
@@ -1460,7 +2684,7 @@ else {
       ),
       params: { cause: t('Original reason, kept on `cause`.', '原始原因，保存在 `cause` 上。') },
       returns: t('The error, not thrown.', '创建好的错误对象，不会被抛出。'),
-      example: `throw createProcessChannelClosedError(reason)`
+      example: processErrorExample
     },
     openProcessObjectChannel: {
       role: 'operation',
@@ -1474,7 +2698,7 @@ else {
         options: t('`IProcessCommonOptions`.', '通用握手选项 `IProcessCommonOptions`。')
       },
       returns: t('The opened connection result.', '打开后的连接结果。'),
-      example: `await openProcessObjectChannel(connection, { peerId, report: console.error, ipc })`
+      example: objectChannelExample
     },
     receiveAdapterBootstrap: {
       role: 'operation',
@@ -1506,8 +2730,11 @@ else {
           '`{ bootstrapTimeoutMs?, scheduler? }`；省略时不安装启动超时定时器。'
         )
       },
-      returns: t('The bootstrap bytes (or none).', '启动帧字节（或没有）。'),
-      example: `const bootstrap = await receiveAdapterBootstrap(channel, 'stdin')`
+      returns: t(
+        'The held channel together with optional bootstrap bytes; none mode returns the same channel without reading a frame.',
+        '返回所持有通道与可选启动帧字节；无启动帧模式原样返回该通道，不消费字节。'
+      ),
+      example: processStdioExample('bootstrap')
     },
     parseProcessPluginDescriptor: {
       role: 'operation',
@@ -1520,7 +2747,7 @@ else {
         'A normalised `IProcessPluginDescriptor`; invalid input throws `PROCESS_PLUGIN_INVALID_OPTION`.',
         '规范化后的 `IProcessPluginDescriptor`；不合法时抛 `PROCESS_PLUGIN_INVALID_OPTION`。'
       ),
-      example: `const descriptor = parseProcessPluginDescriptor(JSON.parse(text))`
+      example: descriptorExample
     },
     createAdapterWebByteIO: {
       role: 'factory',
@@ -1533,14 +2760,14 @@ else {
         writable: t('Outgoing bytes.', '发送字节的可写流。')
       },
       returns: t('An `IProcessByteChannel`.', '一个可用于握手的 `IProcessByteChannel`。'),
-      example: `const channel = createAdapterWebByteIO(child.stdout, child.stdin)`
+      example: processStdioExample('web', 'Deno')
     },
     createAdapterProcessLaunch: {
       role: 'operation',
       optionDocs: bootstrapOptionDocs,
       purpose: t(
-        'Advanced: performs one launch for a custom runtime launcher.',
-        '高级用法：为自定义运行时的 launcher 执行一次子进程启动，返回 Core 需要的启动结果。'
+        'Advanced: prepares bootstrap and Web Stream channel construction for a custom runtime launcher; native spawning remains the caller responsibility.',
+        '高级用法：为自定义运行时启动器准备引导数据与流通道构造，原生进程仍由调用方创建、终止并等待。'
       ),
       params: {
         spec: t('Process spec.', '进程启动规格，包含 command 与 args。'),
@@ -1553,8 +2780,11 @@ else {
           '可选的 `{ runtimeApiBootstrap? }` 启动身份设置。'
         )
       },
-      returns: t('The launch for Core.', '交给 Core 的启动结果对象。'),
-      example: `launch: (spec, context) => createAdapterProcessLaunch(spec, context)`
+      returns: t(
+        'A prepared operation exposing bootstrap, assertActive() and createWebChannel(); it has not spawned a native process.',
+        '返回含引导数据、活动检查和流通道构造的准备对象，此时尚未创建原生进程。'
+      ),
+      example: webLaunchExample
     },
     createAdapterProcessPeer: {
       role: 'factory',
@@ -1578,7 +2808,7 @@ else {
         )
       },
       returns: t('An `IRuntimeTypedPeer`.', '一个带类型的 `IRuntimeTypedPeer`。'),
-      example: `const peer = await createAdapterProcessPeer({ provide: api }, myRuntimeLoader)`
+      example: adapterPeerExample
     },
     createAdapterProcessPlugin: {
       role: 'factory',
@@ -1595,7 +2825,7 @@ else {
         )
       },
       returns: t('An `IProcessPlugin`.', '一个可安装的 `IProcessPlugin`。'),
-      example: `const plugin = createAdapterProcessPlugin(options, myRuntimeLoader)`
+      example: adapterPluginExample
     },
     PROCESS_HANDSHAKE_MAX_FRAME_BYTES: {
       role: 'constant',
@@ -1603,7 +2833,7 @@ else {
         'Largest unauthenticated handshake frame accepted (65536 bytes); larger frames are rejected at the length header.',
         '可接受的未认证握手帧的最大长度（65536 字节）；更大的帧在读取长度头时即被拒绝。'
       ),
-      example: `if (frame.byteLength > PROCESS_HANDSHAKE_MAX_FRAME_BYTES) reject()`
+      example: bootstrapExample
     },
     PROCESS_RUNTIME_API_ENV: {
       role: 'constant',
@@ -1611,7 +2841,7 @@ else {
         'Environment variable (`MIGAIA_RPC_RUNTIME_API_BOOTSTRAP`) that marks a library-launched child; sandbox and container wrappers must forward it.',
         '标记由本库启动的子进程的环境变量（`MIGAIA_RPC_RUNTIME_API_BOOTSTRAP`）；沙箱与容器包装器必须转发它。'
       ),
-      example: `docker run -e ${'$'}{PROCESS_RUNTIME_API_ENV} image`
+      example: bootstrapExample
     },
     PROCESS_RUNTIME_API_ENV_VERSION: {
       role: 'constant',
@@ -1619,7 +2849,7 @@ else {
         'Value (`1`) of `PROCESS_RUNTIME_API_ENV` that selects the current bootstrap format.',
         '环境变量 `PROCESS_RUNTIME_API_ENV` 的取值（`1`），用于选择当前的启动数据格式。'
       ),
-      example: `env[PROCESS_RUNTIME_API_ENV] === PROCESS_RUNTIME_API_ENV_VERSION`
+      example: bootstrapExample
     },
     PROCESS_RUNTIME_API_BOOTSTRAP_KIND: {
       role: 'constant',
@@ -1627,7 +2857,7 @@ else {
         '`kind` of the bootstrap frame (`rpc-runtime-api-bootstrap`) a launcher writes before the handshake.',
         'launcher 在协议握手之前写入子进程的启动帧所携带的类型标识 `kind`（`rpc-runtime-api-bootstrap`）。'
       ),
-      example: `frame.kind === PROCESS_RUNTIME_API_BOOTSTRAP_KIND`
+      example: bootstrapExample
     },
     PROCESS_RUNTIME_API_BOOTSTRAP_VERSION: {
       role: 'constant',
@@ -1635,7 +2865,7 @@ else {
         'Version (`1`) of the bootstrap frame accepted by launch and child.',
         '启动端与子进程端都必须接受的启动帧格式版本号（`1`）。'
       ),
-      example: `frame.version === PROCESS_RUNTIME_API_BOOTSTRAP_VERSION`
+      example: bootstrapExample
     },
     PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS: {
       role: 'constant',
@@ -1643,7 +2873,7 @@ else {
         'How long a child waits for the bootstrap frame (10000 ms) before the normal handshake deadline starts.',
         '子进程等待启动帧的时长（10000 毫秒），之后才开始正常的握手截止计时。'
       ),
-      example: `openProcessStdioChannel({ bootstrap: 'stdin', bootstrapTimeoutMs: PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS })`
+      example: bootstrapExample
     },
     PROCESS_RUNTIME_API_FINGERPRINT_PREFIX: {
       role: 'constant',
@@ -1651,7 +2881,7 @@ else {
         'Prefix (`rpc-process-`) of launcher-owned launch identities shown in details instead of native PIDs.',
         'launcher 生成的启动身份前缀（`rpc-process-`），在运行详情中代替原生 PID 显示。'
       ),
-      example: `detail.identity.instanceId.startsWith(PROCESS_RUNTIME_API_FINGERPRINT_PREFIX)`
+      example: bootstrapExample
     },
     ProcessPluginWire: {
       role: 'constant',
@@ -1659,7 +2889,7 @@ else {
         'Protocols a process connection can speak: `native` (this library) or `jsonrpc` (other languages).',
         '进程连接可以使用的协议：`native`（本库协议）或 `jsonrpc`（其它语言）。'
       ),
-      example: `createProcessPeer({ spawn: { command: 'python3', args: ['service.py'], wire: ProcessPluginWire.jsonrpc, contract } })`
+      example: wireExample
     },
     RPC_PROCESS_ERROR_SOURCE: {
       role: 'constant',
@@ -1667,7 +2897,7 @@ else {
         'The `source` value (`@migaia/rpc/process`) of errors owned by this package; call errors come from `@migaia/rpc/core`.',
         '本包自有错误的 `source` 值（`@migaia/rpc/process`）；超时、取消等调用层错误来自 `@migaia/rpc/core`。'
       ),
-      example: `if (error.source === RPC_PROCESS_ERROR_SOURCE && error.code === RpcProcessErrorCode.authRejected) promptForToken()`
+      example: processErrorExample
     },
     RpcProcessErrorCode: {
       role: 'constant',
@@ -1675,26 +2905,19 @@ else {
         'Table of the stable error codes of this package; values are the strings on `error.code`.',
         '本包稳定错误码的对照表；值就是错误对象 `error.code` 上的字符串。'
       ),
-      example: `if (error.code === RpcProcessErrorCode.connectionLimit) await backoff()`
+      example: processErrorExample
     },
-    RuntimeEventName: runtimeEventSymbol,
+    RuntimeEventName: runtimePairedEventSymbol('process'),
     ...adapterSymbols
   },
   types: {
-    ...runtimeSharedTypes,
+    ...runtimePairedTypes('process'),
     IRuntimeProcessPeerOptions: {
       summary: t(
         'Options of `createProcessPeer()`: one source plus authentication and the Core Peer options.',
         '`createProcessPeer()` 的选项：一种来源，加上认证设置与 Core Peer 的通用选项。'
       ),
-      example: `const server = await createProcessPeer({
-  listen: 'math-service',
-  provide: { math: { double: (value: number) => value * 2 } }
-})
-const client = await createProcessPeer<{ math: { double(value: number): number } }>({ connect: 'math-service' })
-console.log(await client.request('math.double', 21))
-await client.close()
-await server.close()`,
+      example: namedSocketExample,
       members: processPeerOptionMembers
     },
     IRuntimeProcessPluginOptions: {
@@ -1702,6 +2925,7 @@ await server.close()`,
         'Options of `createProcessPlugin()` (simple form).',
         '`createProcessPlugin()` 简单形式所使用的选项。'
       ),
+      example: pluginExample,
       members: processRuntimePluginMembers
     },
     IRuntimeProcessStopOptions: {
@@ -1747,6 +2971,7 @@ await server.close()`,
         'Short `spawn` object expanded into a full source with defaults.',
         '会用默认值展开为完整来源的简写 `spawn` 对象。'
       ),
+      example: peerExample,
       members: {
         entry: {
           summary: t(
@@ -1847,6 +3072,7 @@ await server.close()`,
         'Full spawn source: how to launch, which raw channel, how to handshake, which credential.',
         '完整的 spawn 来源：如何启动、使用哪个原始通道、如何握手、使用什么凭据。'
       ),
+      example: legacyReplaceExample,
       members: {
         kind: {
           summary: t(
@@ -1909,6 +3135,7 @@ await server.close()`,
     },
     IConnectProcessPluginDeployment: {
       summary: t('Full connect source for a running service.', '连接运行中服务的完整来源。'),
+      example: socketExample,
       members: {
         kind: {
           summary: t(
@@ -1981,11 +3208,7 @@ await server.close()`,
           '在宿主的多个进程插件之间共用同一套限制。'
         )
       ],
-      example: `const resilience = createProcessResilience({ scheduler: systemScheduler, report: console.error })
-const off = resilience.onTerminal((snapshot) => alertOps(snapshot.id))
-// ... 作为 resilience 传给插件或监听器
-off()
-await resilience.close()`,
+      example: registrationExample,
       members: {
         sessionOptions: {
           summary: t(
@@ -1999,7 +3222,7 @@ await resilience.close()`,
             )
           },
           returns: t('`{ idempotency, limits }`.', '`{ idempotency, limits }` 配置对象。'),
-          example: `const { limits } = resilience.sessionOptions(identity)`
+          example: registrationListenerExample
         },
         listenRegistrations: {
           summary: t(
@@ -2016,7 +3239,7 @@ await resilience.close()`,
             'A listener with `address` and `close()`.',
             '带 `address` 与 `close()` 的监听器。'
           ),
-          example: `const listener = await resilience.listenRegistrations(options)`
+          example: registrationListenerExample
         },
         attachRegistration: {
           summary: t(
@@ -2029,7 +3252,7 @@ await resilience.close()`,
             liquidation: t('Who removes it when liquidated.', '被清算时由谁负责移除它。')
           },
           returns: t('An `IProcessRegistration`.', '一个登记对象 `IProcessRegistration`。'),
-          example: `const registration = resilience.attachRegistration('service', binding, owner)`
+          example: registrationExample
         },
         callGuard: {
           summary: t(
@@ -2038,7 +3261,7 @@ await resilience.close()`,
           ),
           params: { name: t('Registration name.', '要守卫的登记名称。') },
           returns: t('A remote call guard.', '远程调用守卫对象。'),
-          example: `const guard = resilience.callGuard('service')`
+          example: registrationExample
         },
         inspect: {
           summary: t('Reads the current snapshot of one registration.', '读取某个登记的当前快照。'),
@@ -2047,7 +3270,7 @@ await resilience.close()`,
             'An `IProcessResilienceSnapshot`, or `undefined`.',
             '一个快照 `IProcessResilienceSnapshot`；未知 id 时为 `undefined`。'
           ),
-          example: `resilience.inspect('service')?.state`
+          example: registrationExample
         },
         onTerminal: {
           summary: t(
@@ -2056,12 +3279,18 @@ await resilience.close()`,
           ),
           params: { listener: t('Receives the snapshot.', '接收登记快照的监听函数。') },
           returns: t('An unsubscribe function.', '取消订阅的函数。'),
-          example: `resilience.onTerminal((snapshot) => alertOps(snapshot))`
+          example: registrationExample
         },
         close: {
-          summary: t('Closes every session and stops governance.', '关闭所有会话并停止治理。'),
-          returns: t('Resolves when closed.', '全部关闭后 resolve。'),
-          example: `await resilience.close()`
+          summary: t(
+            'Stops governance, closes its listeners and detaches registrations. Adopters still own accepted endpoints and sessions, and execution owners still dispose their supervisors.',
+            '停止治理、关闭本对象持有的监听并解除登记附加；接纳方仍负责端点与已接纳会话，执行所有者仍须释放监督器。'
+          ),
+          returns: t(
+            'Resolves after owned governance resources close; it does not dispose caller-owned endpoints or supervisors.',
+            '治理资源关闭后完成，不会代替调用方释放端点或监督器。'
+          ),
+          example: registrationExample
         }
       }
     },
@@ -2106,16 +3335,7 @@ await resilience.close()`,
           '连接到已经监听的本机服务，在释放原始字节通道时移除关闭监听；RPC 通信仍须经过进程握手层。'
         )
       ],
-      example: `import { dialProcessByteChannel } from '@migaia/rpc-process/adapters/node-socket'
-
-const channel = await dialProcessByteChannel({ address: 'tcp://127.0.0.1:4000' })
-const offClose = channel.onClose((reason) => console.log('closed', reason))
-try {
-  console.log(channel.kind)
-} finally {
-  offClose()
-  await channel.close()
-}`,
+      example: stdioExample,
       members: byteChannelMembers
     },
     IProcessMessageChannel: {
@@ -2123,6 +3343,7 @@ try {
         'Message channel (Electron utility process).',
         '消息通道，用于与 Electron utility process 互相发送消息。'
       ),
+      example: electronExample,
       members: {
         kind: {
           summary: t('Always `message`: a message channel.', '固定为 `message`，表示这是消息通道。')
@@ -2131,16 +3352,27 @@ try {
           summary: t('Sends one structured message.', '向 utility process 发送一条结构化消息。'),
           params: { value: t('Message to send.', '要发送的消息对象。') },
           returns: t('Nothing or a Promise.', '无返回值或一个 Promise。'),
-          example: `channel.send(message)`
+          example: electronExample
         },
         onMessage: {
           summary: t('Subscribes to incoming messages.', '订阅从对端接收到的消息。'),
           params: { listener: t('Receives each message.', '接收每条消息的监听函数。') },
           returns: t('A function that removes the listener.', '移除该监听的函数。'),
-          example: `channel.onMessage((value) => handle(value))`
+          example: electronExample
         },
-        onClose: byteChannelMembers.onClose as IMemberDoc,
-        close: byteChannelMembers.close as IMemberDoc
+        onClose: { ...(byteChannelMembers.onClose as IMemberDoc), example: electronExample },
+        close: {
+          ...(byteChannelMembers.close as IMemberDoc),
+          summary: t(
+            'Closes the logical message carrier; the native process remains with its original handle owner.',
+            '关闭逻辑消息载体；原生进程仍由原始句柄所有者终止并等待。'
+          ),
+          returns: t(
+            'The logical carrier is closed; this does not terminate the process.',
+            '逻辑载体已关闭，不会因此终止原生进程。'
+          ),
+          example: electronExample
+        }
       }
     },
     IProcessByteListener: {
@@ -2158,7 +3390,7 @@ try {
         close: {
           summary: t('Stops listening and frees the address.', '停止监听并释放占用的地址。'),
           returns: t('Resolves when closed.', '关闭完成后 resolve。'),
-          example: `await listener.close()`
+          example: socketExample
         }
       }
     },
@@ -2177,12 +3409,12 @@ try {
             options: t('Common options plus the native `offer`.', '通用选项加上原生 `offer`。')
           },
           returns: t('`{ channel, principalId }`.', '认证后的 `{ channel, principalId }`。'),
-          example: `const { channel, principalId } = await pending.accept({ ...context, offer })`
+          example: socketExample
         },
         close: {
           summary: t('Rejects and closes the connection.', '拒绝并关闭该待认证的连接。'),
           returns: t('Resolves when closed.', '关闭完成后 resolve。'),
-          example: `await pending.close()`
+          example: socketExample
         }
       }
     },
@@ -2258,7 +3490,7 @@ try {
           '在不重启宿主的情况下以新规格替换子进程。'
         )
       ],
-      example: `const result = await plugin.replace({ spec: newSpec, strategy: 'start-then-switch' })`,
+      example: legacyReplaceExample,
       members: {
         replace: {
           summary: t(
@@ -2270,7 +3502,7 @@ try {
             'The strategy used and its outcome or new plugin.',
             '采用的策略，以及替换结果或新插件。'
           ),
-          example: `await plugin.replace({ strategy: 'stop-then-start' })`
+          example: legacyReplaceExample
         }
       }
     },
@@ -2279,6 +3511,7 @@ try {
         'Full options of the advanced `createProcessPlugin()` overload.',
         '高级 `createProcessPlugin()` 重载使用的完整选项。'
       ),
+      example: legacyReplaceExample,
       members: processPluginOptionMembers
     },
     IAdapterProcessLaunchContext: {
@@ -2461,11 +3694,7 @@ try {
             'A `Promise<void>` indicating that standalone ownership release completed or failed.',
             '表示独立所有权释放完成或失败的 `Promise<void>`。'
           ),
-          example: `const owner: IProcessLiquidationOwner = {
-  kind: 'standalone-host',
-  release: async () => { await host.dispose() }
-}
-await owner.release()`
+          example: registrationExample
         }
       }
     },
@@ -2480,9 +3709,7 @@ await owner.release()`
           '选择运行时适配器并构造插件或宿主前，校验持久化的纯数据部署描述。'
         )
       ],
-      example: `const descriptor = parseProcessPluginDescriptor(JSON.parse(text))
-if (descriptor.target === 'plugin') console.log(descriptor.contract)
-else console.log(descriptor.catalog)`,
+      example: descriptorExample,
       members: {
         descriptorVersion: {
           summary: t(
@@ -2658,25 +3885,28 @@ else console.log(descriptor.catalog)`,
           '通过管理命令重启或查看某个受治理的进程。'
         )
       ],
-      example: `const registration = resilience.attachRegistration('service', binding, owner)
-console.log(registration.inspect()?.state)
-await registration.restart()
-await registration.close()`,
+      example: registrationExample,
       members: {
         restart: {
           summary: t('Restarts the registered unit.', '重启该登记对应的执行单元。'),
           returns: t('A ready outcome of the new generation.', '新代次的就绪结果。'),
-          example: `await registration.restart()`
+          example: registrationExample
         },
         inspect: {
           summary: t('Reads the current resilience snapshot.', '读取该登记当前的治理快照。'),
           returns: t('The snapshot or `undefined`.', '快照对象或 `undefined`。'),
-          example: `registration.inspect()?.liquidated`
+          example: registrationExample
         },
         close: {
-          summary: t('Detaches it from governance and closes it.', '解除治理附加并关闭该登记。'),
-          returns: t('Resolves when closed.', '关闭完成后 resolve。'),
-          example: `await registration.close()`
+          summary: t(
+            'Detaches terminal diagnostics and the supervisor subscription. It does not close the Peer, terminate the process or dispose its supervisor.',
+            '解除终态诊断与监督器订阅，不关闭对端连接、不终止进程，也不释放监督器；调用方仍须关闭连接并释放监督器。'
+          ),
+          returns: t(
+            'Resolves after governance detachment; the original Peer and supervisor retain their owners.',
+            '治理附加解除后完成，原对端连接与监督器仍由各自所有者释放。'
+          ),
+          example: registrationExample
         }
       }
     },
@@ -2726,9 +3956,7 @@ await registration.close()`,
           '让工作进程主动向协调进程登记自己。'
         )
       ],
-      example: `const listener = await resilience.listenRegistrations(options)
-console.log(listener.address)
-await listener.close()`,
+      example: registrationListenerExample,
       members: {
         address: {
           summary: t(
@@ -2739,7 +3967,7 @@ await listener.close()`,
         close: {
           summary: t('Stops accepting registrations.', '停止接受新的登记并释放地址。'),
           returns: t('Resolves when closed.', '关闭完成后 resolve。'),
-          example: `await listener.close()`
+          example: registrationListenerExample
         }
       }
     },
@@ -3122,8 +4350,7 @@ await listener.close()`,
         'After installation the host has `host.process`: calls by connection name, `list` / `get`, `broadcast`, `stop` / `kill` / `restart` / `replace` (spawn sources only), and events (`on`, `watch`). The host disposes the connection, and a spawned child, with itself.',
         '安装后宿主拥有 `host.process`：按连接名称调用、`list` / `get`、`broadcast`、`stop` / `kill` / `restart` / `replace`（仅 spawn 来源），以及事件（`on`、`watch`）。宿主释放时一并释放该连接与 spawn 的子进程。'
       ),
-      install: `const service = createProcessPlugin({ name: 'service', spawn: new URL('./service.js', import.meta.url) })
-await host.use(service)`,
+      install: pluginExample,
       grants: runtimeOutletGrants('process'),
       behaviors: [
         t(

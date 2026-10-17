@@ -2,16 +2,22 @@
  * Reference documentation of `@migaia/rpc-threads`. Rules: `app/reference/contract.ts`. Verified
  * against `packages/rpc-threads/src/threads` (runtime-peer.ts, plugin.ts, short-spawn.ts,
  * channel.ts, bootstrap.ts, child.ts, node-launcher.ts, web-launcher.ts, adapters/*), the shared
- * Core types in `rpc-runtime-shared.ts`, README and USEGUIDE on 2026-10-17.
+ * Core types in `rpc-runtime-shared.ts`, README and USEGUIDE on 2026-10-17. Source/guide
+ * difference: USEGUIDE says Electron main can confirm Worker exit, but its adapter explicitly
+ * declares termination, exit-observation and heap-limit unsupported. Only the Node adapter
+ * advertises those guarantees. Examples use built .js files, matching the guide's verified groups;
+ * browser entries must already be built rather than inferred by a bundler. The guide calls
+ * readThreadBootstrap().peerId the parent address, but both launchers write the launched handle
+ * fingerprint there. Runtime parent identity lives separately in Core bootstrap.
  */
 import type { ICode, ILibraryReference, IMemberDoc, IText, ISymbolDoc } from './contract.js'
 import {
   runtimeEventEnum,
-  runtimeEventSymbol,
+  runtimePairedEventSymbol,
   runtimePeerOptionMembers,
   runtimePluginOptionMembers,
   runtimeOutletGrants,
-  runtimeSharedTypes
+  runtimePairedTypes
 } from './rpc-runtime-shared.js'
 
 /** Builds one bilingual text. */
@@ -172,47 +178,467 @@ const nodeLauncherOptions = {
   }
 }
 
-/** Main thread side of the quick start. */
-const peerExample: ICode = {
-  en: `import { createThreadPeer } from '@migaia/rpc-threads'
+/** Shared application contract used by both actual modules in each Worker example. */
+const threadContractCode = `export type IWorkerApi = {
+  math: { double(value: number): Promise<number> }
+  feed: { count(limit: number): AsyncIterableIterator<number> }
+}
+export type IParentApi = { audit: { record(message: string): void } }`
 
-type IWorkerApi = { math: { double(value: number): number } }
-const worker = await createThreadPeer<IWorkerApi>({ spawn: new URL('./worker.js', import.meta.url) })
-try {
-  console.log(await worker.request('math.double', 21)) // 42
-} finally {
-  await worker.close() // closes the connection and terminates the Worker
-}`,
-  zh: `import { createThreadPeer } from '@migaia/rpc-threads'
+/** Worker implementation also calls its parent before completing the requested operation. */
+function workerCode(advanced = false): string {
+  return `${advanced ? "import { parentPort, workerData } from 'node:worker_threads'\n" : ''}import { ${advanced ? 'createAdapterNodeThreadPeer, readThreadBootstrap' : 'createThreadPeer'} } from '@migaia/rpc-threads'
+import type { IParentApi, IWorkerApi } from './contracts.js'
 
-type IWorkerApi = { math: { double(value: number): number } }
-const worker = await createThreadPeer<IWorkerApi>({ spawn: new URL('./worker.js', import.meta.url) })
-try {
-  console.log(await worker.request('math.double', 21)) // 42
-} finally {
-  await worker.close() // 关闭连接并终止 Worker
-}`
+${advanced ? 'const bootstrap = readThreadBootstrap(workerData)\nconsole.log(bootstrap.peerId, bootstrap.data)\n' : ''}const provide: IWorkerApi = {
+    math: {
+      double: async (value: number) => {
+        await (await parent).request('audit.record', 'double')
+        return value * 2
+      }
+    },
+    feed: {
+      count: async function* (limit: number) {
+        for (let index = 1; index <= limit; index++) yield index
+      }
+    }
+}
+const parent = ${advanced ? 'createAdapterNodeThreadPeer' : 'createThreadPeer<IParentApi>'}({ provide }${advanced ? ', parentPort, workerData' : ''})
+await parent`
 }
 
-/** Host-managed example of `createThreadPlugin`. */
-const pluginExample = `import { defineHost } from '@migaia/plugin-host'
-import { createThreadPlugin } from '@migaia/rpc-threads'
+/** Combines real contract, Worker and parent files, localizing every explanatory comment. */
+function pairedThreadExample(main: string, advanced = false): IText {
+  /** File boundaries carry prose in the selected locale, while module paths stay identical. */
+  const body = (zh: boolean) => `${zh ? '// 契约文件：contracts.ts' : '// contracts.ts'}
+${threadContractCode}
 
-type IWorkerApi = { math: { double(value: number): number } }
-const worker = createThreadPlugin<IWorkerApi, Record<never, never>, 'worker'>({
+${zh ? '// 工作线程文件：worker.ts；生命周期由父端持有，父端关闭时请求终止。' : '// worker.ts: the parent owns execution and requests termination when it closes.'}
+${workerCode(advanced)}
+
+${zh ? '// 父端文件：main.ts；先将这些文件编译为同目录的可执行模块。' : '// main.ts: compile these files to JavaScript modules in the same directory first.'}
+${main}`
+  return { en: body(false), zh: body(true) }
+}
+
+/** Bidirectional URL spawn, including unary and streaming calls and the owner's final close. */
+const peerExample: ICode =
+  pairedThreadExample(`import { createThreadPeer } from '@migaia/rpc-threads'
+import type { IParentApi, IWorkerApi } from './contracts.js'
+
+const provide: IParentApi = { audit: { record: (message) => console.log(message) } }
+const worker = await createThreadPeer<IWorkerApi>({
+  spawn: new URL('./worker.js', import.meta.url),
+  provide
+})
+try {
+  console.log(await worker.request('math.double', 21))
+  for await (const value of worker.stream('feed.count', 3)) console.log(value)
+} finally {
+  await worker.close()
+}`)
+
+/** Real background diagnostics are classified without replacing or deliberately triggering errors. */
+const diagnosticExample: ICode = pairedThreadExample(`import {
+  createThreadPeer,
+  RPC_THREAD_ERROR_SOURCE,
+  RpcThreadErrorCode
+} from '@migaia/rpc-threads'
+import type { IParentApi, IWorkerApi } from './contracts.js'
+
+const report = (error: unknown) => {
+  if (error instanceof Error && 'source' in error && 'code' in error &&
+      error.source === RPC_THREAD_ERROR_SOURCE && error.code === RpcThreadErrorCode.usageSampleFailed) {
+    console.warn(error)
+    return
+  }
+  console.error(error)
+}
+const worker = await createThreadPeer<IWorkerApi>({
+  spawn: new URL('./worker.js', import.meta.url),
+  provide: { audit: { record: (message: string) => console.log(message) } } satisfies IParentApi,
+  report
+})
+try {
+  console.log(await worker.request('math.double', 21))
+} finally {
+  await worker.close()
+}`)
+
+/** Host owns the plugin and Worker; the plugin's own provider serves the reverse call. */
+const pluginExample: ICode = pairedThreadExample(`import { defineHost } from '@migaia/plugin-host'
+import { createThreadPlugin } from '@migaia/rpc-threads'
+import type { IParentApi, IWorkerApi } from './contracts.js'
+
+const provide: IParentApi = { audit: { record: (message) => console.log(message) } }
+const worker = createThreadPlugin<IWorkerApi, IParentApi, 'worker'>({
   name: 'worker',
-  spawn: new URL('./worker.js', import.meta.url)
+  spawn: new URL('./worker.js', import.meta.url),
+  provide
 })
 const host = defineHost<Record<string, never>, never, readonly [typeof worker]>({
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
 })
 try {
   await host.use(worker)
-  console.log(await host.thread!.request('worker', 'math.double', 21)) // 42
-  await host.thread!.restart('worker')
+  console.log(await host.thread!.request('worker', 'math.double', 21))
+  for await (const value of host.thread!.stream('worker', 'feed.count', 3)) console.log(value)
+  console.log(await host.thread!.get('worker'))
 } finally {
   await host.dispose()
+}`)
+
+/** Self spawn executes the same compiled module in two branches and retains symmetric methods. */
+const selfSpawnExample: ICode = {
+  en: `// self.ts: compile to self.js, then run that file with Node, Bun or Deno.
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IWorkerApi = { double(value: number): Promise<number> }
+type IParentApi = { record(message: string): void }
+if (await isThreadChild()) {
+  const provide: IWorkerApi = {
+      double: async (value: number) => {
+        await (await parent).request('record', 'double')
+        return value * 2
+      }
+  }
+  const parent = createThreadPeer<IParentApi>({ provide })
+  await parent
+} else {
+  const worker = await createThreadPeer<IWorkerApi>({
+    spawn: true,
+    provide: { record: (message: string) => console.log(message) } satisfies IParentApi
+  })
+  try {
+    console.log(await worker.request('double', 21))
+  } finally {
+    await worker.close() // parent owns this Worker
+  }
+}`,
+  zh: `// 同文件的两端：self.ts；编译为 self.js 后由 Node、Bun 或 Deno 运行。
+import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'
+
+type IWorkerApi = { double(value: number): Promise<number> }
+type IParentApi = { record(message: string): void }
+if (await isThreadChild()) {
+  const provide: IWorkerApi = {
+      double: async (value: number) => {
+        await (await parent).request('record', 'double')
+        return value * 2
+      }
+  }
+  const parent = createThreadPeer<IParentApi>({ provide })
+  await parent
+} else {
+  const worker = await createThreadPeer<IWorkerApi>({
+    spawn: true,
+    provide: { record: (message: string) => console.log(message) } satisfies IParentApi
+  })
+  try {
+    console.log(await worker.request('double', 21))
+  } finally {
+    await worker.close() // 父端持有并释放此工作线程
+  }
 }`
+}
+
+/** Existing ports remain application-owned; two real modules share their exact API contract. */
+function borrowedPortExample(web: boolean): IText {
+  /** Web ports require explicit start; Node MessagePorts use the EventEmitter adapter. */
+  const body = (zh: boolean) => `${zh ? '// 左端文件：left.ts' : '// left.ts'}
+${web ? '' : "import type { MessagePort } from 'node:worker_threads'\n"}import { createThreadPeer, create${web ? 'Web' : 'Node'}ThreadChannel } from '@migaia/rpc-threads'
+import { systemScheduler } from '@migaia/utils/scheduler'
+
+export type ILeftApi = { double(value: number): Promise<number> }
+export type IRightApi = { record(message: string): void }
+export function createLeft(port: MessagePort) {
+  ${web ? 'port.start()\n  ' : ''}const provide: ILeftApi = {
+      double: async (value: number) => {
+        await (await peer).request('record', 'double')
+        return value * 2
+      }
+  }
+  const peer = createThreadPeer<IRightApi>({
+    self: { name: 'left', instanceId: 'left-1' },
+    provide,
+    connect: async (context) => create${web ? 'Web' : 'Node'}ThreadChannel(port, 'right-1', {
+      scheduler: systemScheduler,
+      capabilities: context.capabilities
+    })
+  })
+  return peer
+}
+
+${zh ? '// 右端文件：main.ts；两端可在同一线程中演示，端口也可由应用先传给其他线程。' : '// main.ts: both ends run locally here; the application can first move a port to another thread.'}
+${web ? '' : "import { MessageChannel } from 'node:worker_threads'\n"}import { createThreadPeer, create${web ? 'Web' : 'Node'}ThreadChannel } from '@migaia/rpc-threads'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { createLeft, type ILeftApi, type IRightApi } from './left.js'
+
+const { port1, port2 } = new MessageChannel()
+${web ? 'port2.start()\n' : ''}const [left, right] = await Promise.all([
+  createLeft(port1),
+  createThreadPeer<ILeftApi>({
+    self: { name: 'right', instanceId: 'right-1' },
+    provide: { record: (message: string) => console.log(message) } satisfies IRightApi,
+    connect: async (context) => create${web ? 'Web' : 'Node'}ThreadChannel(port2, 'left-1', {
+      scheduler: systemScheduler,
+      capabilities: context.capabilities
+    })
+  })
+])
+try {
+  console.log(await right.request('double', 21))
+} finally {
+  await Promise.all([left.close(), right.close()])
+  ${zh ? '// 逻辑连接只借用端口；应用在两端关闭后释放原生资源。' : '// Peers borrow the ports; the application releases both native resources after closing them.'}
+  port1.close()
+  port2.close()
+}`
+  return { en: body(false), zh: body(true) }
+}
+
+/** Native adapter authors borrow Worker messaging without claiming a library bootstrap. */
+function nativeWorkerExample(web: boolean): IText {
+  /** Native construction remains explicitly application-owned in this lower-level path. */
+  const body = (zh: boolean) => `${zh ? '// 契约文件：contracts.ts' : '// contracts.ts'}
+${threadContractCode}
+
+${zh ? '// 工作线程文件：worker.ts；应用自行创建工作线程，因此显式使用核心工厂。' : '// worker.ts: an application-created Worker uses the explicit Core factory, not automatic discovery.'}
+${web ? '' : "import { parentPort } from 'node:worker_threads'\n"}import { ${web ? 'createWebThreadChannel' : 'AdapterNodeThreadParentChannel'} } from '@migaia/rpc-threads'
+import { createRuntimePeer } from '@migaia/rpc-core/remote'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import type { IParentApi, IWorkerApi } from './contracts.js'
+
+${web ? '' : 'const channel = new AdapterNodeThreadParentChannel(parentPort!)\n'}const provide: IWorkerApi = {
+  math: {
+    double: async (value: number) => {
+      await (await parent).request('audit.record', 'double')
+      return value * 2
+    }
+  },
+  feed: {
+    count: async function* (limit: number) {
+      for (let index = 1; index <= limit; index++) yield index
+    }
+  }
+}
+const parent = createRuntimePeer<IParentApi>({
+  self: { name: 'worker', instanceId: 'worker-1' },
+  provide,
+  connect: async () => ${web ? 'createWebThreadChannel(self, ' : 'channel.open('}'main-1', { scheduler: systemScheduler }),
+  report: (error) => console.error(error)
+})
+${web ? '' : "parentPort!.once('close', () => { void parent.then((peer) => peer.close()) })\nconsole.log(parentPort!.listenerCount('message'))\n"}await parent
+
+${zh ? '// 父端文件：main.ts；固定能力通道不协商扩展，父端负责停止原生工作线程。' : '// main.ts: the fixed channel negotiates no extensions; the parent owns native termination.'}
+${web ? '' : "import { Worker } from 'node:worker_threads'\nimport type { INodeMessagePortLike } from '@migaia/rpc-core/adapters/message-port'\n"}import { create${web ? 'Web' : 'Node'}ThreadChannel${web ? ', type IThreadWebPort' : ''} } from '@migaia/rpc-threads'
+import { createRuntimePeer } from '@migaia/rpc-core/remote'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import type { IParentApi, IWorkerApi } from './contracts.js'
+
+const native = new Worker(new URL('./worker.js', import.meta.url)${web ? ", { type: 'module' }" : ''})
+const report = (error: unknown) => console.error(error)
+${web ? "native.addEventListener('error', report)" : "native.on('error', report)\nconst exited = new Promise<number>((resolve) => native.once('exit', resolve))\nconsole.log(native.threadId, native.listenerCount('message'))"}
+const port: ${web ? 'IThreadWebPort' : 'INodeMessagePortLike'} = {
+  postMessage: (message, transfer) => native.postMessage(message, transfer as ${web ? 'Transferable[]' : "Parameters<Worker['postMessage']>[1]"}),
+  ${web ? 'addEventListener: (type, listener) => native.addEventListener(type, listener),\n  removeEventListener: (type, listener) => native.removeEventListener(type, listener)' : "on: (event, listener) => native.on(event === 'close' ? 'exit' : event, listener),\n  off: (event, listener) => native.off(event === 'close' ? 'exit' : event, listener)"}
+}
+const peer = await createRuntimePeer<IWorkerApi>({
+  self: { name: 'main', instanceId: 'main-1' },
+  provide: { audit: { record: (message: string) => console.log(message) } } satisfies IParentApi,
+  connect: async () => create${web ? 'Web' : 'Node'}ThreadChannel(port, 'worker-1', { scheduler: systemScheduler }),
+  report
+})
+try {
+  console.log(await peer.request('math.double', 21))
+} finally {
+  await peer.close()
+  ${web ? "native.removeEventListener('error', report)\n  native.terminate()\n  " + (zh ? '// 浏览器无法确认实际退出，不等待退出回执。' : '// Browser termination has no actual-exit receipt.') : "await native.terminate()\n  await exited\n  native.off('error', report)"}
+}`
+  return { en: body(false), zh: body(true) }
+}
+
+/** Raw Web launcher bootstrap is consumed once before constructing fixed-profile Core Peers. */
+function webBootstrapExample(handleOpen = false): IText {
+  /** This advanced path deliberately uses Core instead of consuming the same bootstrap twice. */
+  const body = (zh: boolean) => `${zh ? '// 契约文件：contracts.ts' : '// contracts.ts'}
+${threadContractCode}
+
+${zh ? '// 工作线程文件：worker.ts；启动准备只消费一次，然后显式打开固定能力通道。' : '// worker.ts: consume startup once, then explicitly open the fixed capability channel.'}
+import { receiveThreadData, createWebThreadChannel } from '@migaia/rpc-threads'
+import { createRuntimePeer } from '@migaia/rpc-core/remote'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import type { IParentApi, IWorkerApi } from './contracts.js'
+
+let address!: string
+await receiveThreadData(self, (data, peerId) => {
+  address = peerId
+  console.log(data)
+})
+const provide: IWorkerApi = {
+  math: {
+    double: async (value: number) => {
+      await (await parent).request('audit.record', 'double')
+      return value * 2
+    }
+  },
+  feed: {
+    count: async function* (limit: number) {
+      for (let index = 1; index <= limit; index++) yield index
+    }
+  }
+}
+const parent = createRuntimePeer<IParentApi>({
+  self: { name: 'worker', instanceId: address },
+  provide,
+  connect: async () => createWebThreadChannel(self, 'main-1', { scheduler: systemScheduler }),
+  report: (error) => console.error(error)
+})
+await parent
+
+${zh ? '// 父端文件：main.ts；原生工作线程由此处的句柄持有并请求终止。' : '// main.ts: this handle owns the native Worker and requests its termination.'}
+import { createWebThreadLauncher, createWebThreadChannelFactory } from '@migaia/rpc-threads'
+import { createRuntimePeer } from '@migaia/rpc-core/remote'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import type { IParentApi, IWorkerApi } from './contracts.js'
+
+const controller = new AbortController()
+const report = (error: unknown) => console.error(error)
+const launcher = createWebThreadLauncher({ report })
+const channelFactory = createWebThreadChannelFactory({ scheduler: systemScheduler })
+const handle = await launcher.launch({
+  entry: new URL('./worker.js', import.meta.url).href,
+  data: { label: 'math' }
+}, { signal: controller.signal })
+const peer = await createRuntimePeer<IWorkerApi>({
+  self: { name: 'main', instanceId: 'main-1' },
+  provide: { audit: { record: (message: string) => console.log(message) } } satisfies IParentApi,
+  connect: async () => ${handleOpen ? 'handle.open(controller.signal, { scheduler: systemScheduler })' : 'channelFactory.open(handle, controller.signal)'},
+  report
+})
+try {
+  console.log(await peer.request('math.double', 21))
+} finally {
+  await peer.close()
+  handle.terminate()
+  ${zh ? '// 此平台不支持实际退出确认，不能等待永不完成的退出回执。' : '// Actual exit observation is unsupported; do not await its never-settled exit receipt.'}
+}`
+  return { en: body(false), zh: body(true) }
+}
+
+/** Signed binary transfer follows the guide's verified HMAC group and consumes the original buffer. */
+const transferExample: IText = {
+  en: `// signing.ts: both ends read the same deployment key locally; never send the key over RPC.
+import { createHmac, timingSafeEqual } from 'node:crypto'
+import type { IRpcAuthenticationConfig } from '@migaia/rpc-core'
+
+const key = Buffer.from(process.env.RPC_SIGNING_KEY!, 'hex')
+const signature = (value: unknown) => createHmac('sha256', key).update(JSON.stringify(value)).digest()
+export const authentication: IRpcAuthenticationConfig = {
+  sign: (value) => ({ value, signature: signature(value).toString('hex') }),
+  verify: (input) => {
+    const frame = input as { value: unknown; signature: string }
+    const received = Buffer.from(frame.signature, 'hex')
+    const expected = signature(frame.value)
+    if (received.length !== expected.length || !timingSafeEqual(received, expected))
+      throw new TypeError('Invalid RPC signature')
+    return frame.value
+  }
+}
+
+// contracts.ts
+export type IBytesApi = { inspect(buffer: ArrayBuffer): Promise<{ length: number; first: number }> }
+export type IParentApi = { record(length: number): void }
+
+// worker.ts: compile all files first; the parent owns the Worker lifetime.
+import { createThreadPeer } from '@migaia/rpc-threads'
+import { authentication } from './signing.js'
+import type { IBytesApi, IParentApi } from './contracts.js'
+
+const provide: IBytesApi = {
+    inspect: async (buffer: ArrayBuffer) => {
+      await (await parent).request('record', buffer.byteLength)
+      return { length: buffer.byteLength, first: new Uint8Array(buffer)[0] }
+    }
+}
+const parent = createThreadPeer<IParentApi>({ authentication, provide })
+await parent
+
+// main.ts: set a demonstration key before importing signing.ts or starting the Worker.
+import { randomBytes } from 'node:crypto'
+import { createThreadPeer } from '@migaia/rpc-threads'
+import type { IBytesApi, IParentApi } from './contracts.js'
+
+process.env.RPC_SIGNING_KEY ??= randomBytes(32).toString('hex')
+const { authentication } = await import('./signing.js')
+const worker = await createThreadPeer<IBytesApi>({
+  spawn: new URL('./worker.js', import.meta.url),
+  authentication,
+  provide: { record: (length: number) => console.log(length) } satisfies IParentApi
+})
+try {
+  const buffer = new Uint8Array([7, 8, 9]).buffer
+  console.log(await worker.request('inspect', buffer, { transfer: [buffer] }))
+  console.log(buffer.byteLength) // 0: the transferred backing and every alias are detached.
+} finally {
+  await worker.close()
+}`,
+  zh: `// 签名文件：signing.ts；两端分别读取同一部署密钥，不通过远程调用发送密钥。
+import { createHmac, timingSafeEqual } from 'node:crypto'
+import type { IRpcAuthenticationConfig } from '@migaia/rpc-core'
+
+const key = Buffer.from(process.env.RPC_SIGNING_KEY!, 'hex')
+const signature = (value: unknown) => createHmac('sha256', key).update(JSON.stringify(value)).digest()
+export const authentication: IRpcAuthenticationConfig = {
+  sign: (value) => ({ value, signature: signature(value).toString('hex') }),
+  verify: (input) => {
+    const frame = input as { value: unknown; signature: string }
+    const received = Buffer.from(frame.signature, 'hex')
+    const expected = signature(frame.value)
+    if (received.length !== expected.length || !timingSafeEqual(received, expected))
+      throw new TypeError('Invalid RPC signature')
+    return frame.value
+  }
+}
+
+// 契约文件：contracts.ts
+export type IBytesApi = { inspect(buffer: ArrayBuffer): Promise<{ length: number; first: number }> }
+export type IParentApi = { record(length: number): void }
+
+// 工作线程文件：worker.ts；先编译所有文件，父端持有工作线程的生命周期。
+import { createThreadPeer } from '@migaia/rpc-threads'
+import { authentication } from './signing.js'
+import type { IBytesApi, IParentApi } from './contracts.js'
+
+const provide: IBytesApi = {
+    inspect: async (buffer: ArrayBuffer) => {
+      await (await parent).request('record', buffer.byteLength)
+      return { length: buffer.byteLength, first: new Uint8Array(buffer)[0] }
+    }
+}
+const parent = createThreadPeer<IParentApi>({ authentication, provide })
+await parent
+
+// 父端文件：main.ts；导入签名模块和启动工作线程前先设置演示密钥。
+import { randomBytes } from 'node:crypto'
+import { createThreadPeer } from '@migaia/rpc-threads'
+import type { IBytesApi, IParentApi } from './contracts.js'
+
+process.env.RPC_SIGNING_KEY ??= randomBytes(32).toString('hex')
+const { authentication } = await import('./signing.js')
+const worker = await createThreadPeer<IBytesApi>({
+  spawn: new URL('./worker.js', import.meta.url),
+  authentication,
+  provide: { record: (length: number) => console.log(length) } satisfies IParentApi
+})
+try {
+  const buffer = new Uint8Array([7, 8, 9]).buffer
+  console.log(await worker.request('inspect', buffer, { transfer: [buffer] }))
+  console.log(buffer.byteLength) // 为零：已转移的底层存储及其全部视图失效。
+} finally {
+  await worker.close()
+}`
+}
 
 /** Platform pairs: launcher plus channel factory. */
 const platforms = [
@@ -242,40 +668,40 @@ const platforms = [
  * factories document this pairing (`REF-PAIRED`). `launcherArgs` is the launcher call argument
  * text.
  */
-function fullSpawnExample(prefix: string, launcherArgs: string): IText {
-  /** Code shared by both locales apart from the comments. */
-  const body = (
-    entry: string,
-    scheduler: string,
-    peer: string
-  ) => `import { createThreadPeer } from '@migaia/rpc-threads'
+function fullSpawnExample(prefix: string, launcherArgs: string, handleOpen = false): IText {
+  /** Each platform owns its import path; generic Web and custom Node factories use root exports. */
+  const platform = platforms.find(([, name]) => name === prefix)?.[0]
+  /** The custom Node resource reuses the ordinary Node channel factory. */
+  const launcher =
+    prefix === 'AdapterNode' ? 'createAdapterNodeThreadLauncher' : `create${prefix}ThreadLauncher`
+  /** The ordinary channel factory preserves the actual custom launcher handle. */
+  const channelFactory =
+    prefix === 'AdapterNode'
+      ? 'createNodeThreadChannelFactory'
+      : `create${prefix}ThreadChannelFactory`
+  /** Both peer modules share real application types and a synchronous provider directory. */
+  const main = `import { createThreadPeer${prefix === 'Web' || prefix === 'AdapterNode' ? `, ${launcher}${prefix === 'Web' ? `, ${channelFactory}` : ''}` : ''}${handleOpen ? ', type IAdapterNodeThreadHandle' : ''} } from '@migaia/rpc-threads'
+${prefix === 'Web' ? '' : `import { ${prefix === 'AdapterNode' ? channelFactory : `${launcher}, ${channelFactory}`} } from '@migaia/rpc-threads/adapters/${platform ?? 'node'}'\n`}import type { IParentApi, IWorkerApi } from './contracts.js'
 import { createUnitBudget } from '@migaia/supervision'
-import { systemScheduler } from '@migaia/utils/scheduler'
+${handleOpen ? "import type { IAbortSignal } from '@migaia/utils/promise'\n" : ''}import { systemScheduler } from '@migaia/utils/scheduler'
 
 const report = (error: unknown) => console.error(error)
+${prefix === 'AdapterNode' ? "const runtime = { load: () => import('node:worker_threads'), pid: process.pid }\n" : ''}const provide: IParentApi = { audit: { record: (message) => console.log(message) } }
 const spawn = {
-  spec: { entry: workerEntry }, // ${entry}
+  spec: { entry: new URL('./worker.js', import.meta.url).href },
   budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),
   scheduler: systemScheduler,
-  launcher: create${prefix}ThreadLauncher(${launcherArgs}),
-  // ${scheduler}
-  channelFactory: create${prefix}ThreadChannelFactory({ scheduler: systemScheduler }),
+  launcher: ${launcher}(${prefix === 'AdapterNode' ? 'runtime' : launcherArgs}),
+  channelFactory: ${handleOpen ? '{ open: (handle: IAdapterNodeThreadHandle, signal: IAbortSignal) => handle.open(signal, { scheduler: systemScheduler }) }' : `${channelFactory}({ scheduler: systemScheduler })`},
   report
 }
-// ${peer}
-const worker = await createThreadPeer<IWorkerApi>({ spawn, report })`
-  return {
-    en: body(
-      'Worker entry of this platform',
-      'same scheduler as the source above',
-      'launcher starts the Worker, channelFactory opens the RPC channel on it'
-    ),
-    zh: body(
-      '本平台的 Worker 入口',
-      '与上面 source 使用同一个调度器',
-      'launcher 启动 Worker，channelFactory 在它的端口上打开 RPC 通道'
-    )
-  }
+const worker = await createThreadPeer<IWorkerApi>({ spawn, provide, report })
+try {
+  console.log(await worker.request('math.double', 21))
+} finally {
+  await worker.close()
+}`
+  return pairedThreadExample(main, prefix === 'AdapterNode')
 }
 
 const platformSymbols: Record<string, ISymbolDoc> = Object.fromEntries(
@@ -284,12 +710,16 @@ const platformSymbols: Record<string, ISymbolDoc> = Object.fromEntries(
     const launcherCall =
       module === 'electron-main' ? '()' : module === 'node' ? '()' : '({ report })'
     /** Termination note for Web-style Workers. */
-    const termination = web
-      ? t(
-          ' `terminate()` cannot confirm the code stopped, so supervision treats it as possibly still running.',
-          '`terminate()` 无法确认代码已停止，因此监督层保守地视其为可能仍在运行。'
-        )
-      : t(' Exits are observed, so termination is confirmed.', '可以观察到退出，因此终止可被确认。')
+    const termination =
+      web || module === 'electron-main'
+        ? t(
+            ' Termination, exit observation and heap limits are declared unsupported; requesting termination does not prove execution stopped.',
+            '终止确认、退出观察与堆限制均声明为不支持；请求终止不能证明代码已经停止。'
+          )
+        : t(
+            ' Exits are observed, so termination is confirmed.',
+            '可以观察到退出，因此终止可被确认。'
+          )
     return [
       [
         `create${prefix}ThreadLauncher`,
@@ -362,7 +792,10 @@ const platformModules = Object.fromEntries(
         `Explicit ${en} pair for a full \`spawn\` source: \`create${prefix}ThreadLauncher()\` and \`create${prefix}ThreadChannelFactory()\`. Short \`spawn\` forms load the right adapter automatically.`,
         `为完整 \`spawn\` 来源提供的${zh}组合：\`create${prefix}ThreadLauncher()\` 与 \`create${prefix}ThreadChannelFactory()\`。使用简写 \`spawn\` 时会自动加载对应的适配器。`
       ),
-      example: `import { create${prefix}ThreadChannelFactory, create${prefix}ThreadLauncher } from '@migaia/rpc-threads/adapters/${module}'`
+      example: fullSpawnExample(
+        prefix,
+        module === 'node' || module === 'electron-main' ? '' : '{ report }'
+      )
     }
   ])
 )
@@ -375,7 +808,7 @@ const postMessage: IMemberDoc = {
     transfer: t('Objects whose ownership moves with the message.', '随消息一起转移所有权的对象。')
   },
   returns: t('Nothing; the message is queued.', '无返回值；消息已进入队列。'),
-  example: `port.postMessage(message, [buffer])`
+  example: nativeWorkerExample(true)
 }
 
 /** Docs of EventTarget listener pairs. */
@@ -390,7 +823,7 @@ const eventTargetPair: Readonly<Record<string, IMemberDoc>> = {
       listener: t('Listener installed by the channel.', '由通道安装的监听函数。')
     },
     returns: t('Nothing; the listener is registered.', '无返回值；监听已登记。'),
-    example: `port.addEventListener('message', onMessage)`
+    example: nativeWorkerExample(true)
   },
   removeEventListener: {
     summary: t('Removes the listener when the channel closes.', '通道关闭时移除之前登记的监听。'),
@@ -399,7 +832,7 @@ const eventTargetPair: Readonly<Record<string, IMemberDoc>> = {
       listener: t('The same listener.', '之前登记的同一个监听函数。')
     },
     returns: t('Nothing; the listener is removed.', '无返回值；监听已移除。'),
-    example: `port.removeEventListener('message', onMessage)`
+    example: nativeWorkerExample(true)
   }
 }
 
@@ -411,7 +844,7 @@ const nativeWorkerMembers: Readonly<Record<string, IMemberDoc>> = {
       'Node 为该 Worker 线程分配的数字 id，用于资源详情。'
     )
   },
-  postMessage,
+  postMessage: { ...postMessage, example: nativeWorkerExample(false) },
   on: {
     summary: t(
       'Adds a Worker event listener (`message`, `error`, `exit`).',
@@ -422,7 +855,7 @@ const nativeWorkerMembers: Readonly<Record<string, IMemberDoc>> = {
       listener: t('Listener.', '事件触发时调用的监听函数。')
     },
     returns: t('The Worker, ignored.', '返回 Worker 本身，会被忽略。'),
-    example: `worker.on('error', onError)`
+    example: nativeWorkerExample(false)
   },
   off: {
     summary: t('Removes a Worker event listener.', '移除之前添加的 Worker 事件监听。'),
@@ -431,7 +864,7 @@ const nativeWorkerMembers: Readonly<Record<string, IMemberDoc>> = {
       listener: t('The same listener.', '之前添加的同一个监听函数。')
     },
     returns: t('The Worker, ignored.', '返回 Worker 本身，会被忽略。'),
-    example: `worker.off('error', onError)`
+    example: nativeWorkerExample(false)
   },
   once: {
     summary: t(
@@ -443,7 +876,7 @@ const nativeWorkerMembers: Readonly<Record<string, IMemberDoc>> = {
       listener: t('Receives the exit code.', '接收退出码的监听函数。')
     },
     returns: t('The Worker, ignored.', '返回 Worker 本身，会被忽略。'),
-    example: `worker.once('exit', (code) => console.log(code))`
+    example: nativeWorkerExample(false)
   },
   listenerCount: {
     summary: t(
@@ -452,12 +885,12 @@ const nativeWorkerMembers: Readonly<Record<string, IMemberDoc>> = {
     ),
     params: { event: t('Always `message`.', '固定为 `message` 事件。') },
     returns: t('Number of listeners.', '当前监听函数的数量。'),
-    example: `worker.listenerCount('message')`
+    example: nativeWorkerExample(false)
   },
   terminate: {
     summary: t('Stops the Worker thread forcibly.', '强制停止该 Worker 线程的运行。'),
     returns: t('Resolves with the exit code.', '以退出码 resolve。'),
-    example: `await worker.terminate()`
+    example: nativeWorkerExample(false)
   },
   getHeapStatistics: {
     summary: t(
@@ -562,13 +995,13 @@ export const rpcThreadsReference: ILibraryReference = {
         'Resolves `true` in a library-launched Worker; it does not authorise foreign Workers.',
         '在由本库启动的 Worker 中 resolve 为 `true`；它不会为外部 Worker 授权。'
       ),
-      example: `if (await isThreadChild()) {
-  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })
-} else {
-  const worker = await createThreadPeer<{ double(value: number): number }>({ spawn: true })
-  console.log(await worker.request('double', 21))
-  await worker.close()
-}`
+      example: selfSpawnExample,
+      avoid: [
+        t(
+          'Self spawn is unsupported in browsers, Electron, REPL/eval sessions, bundled executables and entries controlled by a test runner; use an explicit built Worker URL.',
+          '浏览器、Electron、交互或求值入口、打包二进制及由测试运行器持有的入口不支持同文件自启动；应使用明确的已构建工作线程 URL。'
+        )
+      ]
     },
     RPC_THREAD_ERROR_SOURCE: {
       role: 'constant',
@@ -576,7 +1009,7 @@ export const rpcThreadsReference: ILibraryReference = {
         'The `source` value (`@migaia/rpc/threads`) of errors owned by this package; call errors come from `@migaia/rpc/core`.',
         '本包自有错误的 `source` 值（`@migaia/rpc/threads`）；超时、取消等调用层错误则来自 `@migaia/rpc/core`。'
       ),
-      example: `if (error.source === RPC_THREAD_ERROR_SOURCE) showUsageUnavailable()`
+      example: diagnosticExample
     },
     RpcThreadErrorCode: {
       role: 'constant',
@@ -584,9 +1017,9 @@ export const rpcThreadsReference: ILibraryReference = {
         'Error codes owned by this package; currently only `THREAD_USAGE_SAMPLE_FAILED`.',
         '本包自有的错误码对照表；目前只有资源采样失败 `THREAD_USAGE_SAMPLE_FAILED` 一项。'
       ),
-      example: `if (error.code === RpcThreadErrorCode.usageSampleFailed) console.warn('资源采样不可用')`
+      example: diagnosticExample
     },
-    RuntimeEventName: runtimeEventSymbol,
+    RuntimeEventName: runtimePairedEventSymbol('thread'),
     createWebThreadLauncher: {
       options: 'IWebThreadLauncherOptions',
       role: 'factory',
@@ -604,7 +1037,7 @@ export const rpcThreadsReference: ILibraryReference = {
         'An `IThreadLauncher` whose handles open channels with `open(signal, options)`.',
         '一个 `IThreadLauncher`，其句柄通过 `open(signal, options)` 打开通道。'
       ),
-      example: fullSpawnExample('Web', '{ Worker: MyWorker, report }')
+      example: fullSpawnExample('Web', '{ Worker, report }')
     },
     createWebThreadChannelFactory: {
       options: 'IThreadChannelOptions',
@@ -623,7 +1056,7 @@ export const rpcThreadsReference: ILibraryReference = {
         'A channel factory with `open(handle, signal)`.',
         '带 `open(handle, signal)` 的通道工厂。'
       ),
-      example: fullSpawnExample('Web', '{ Worker: MyWorker, report }')
+      example: fullSpawnExample('Web', '{ Worker, report }')
     },
     createAdapterNodeThreadLauncher: {
       role: 'factory',
@@ -646,7 +1079,7 @@ export const rpcThreadsReference: ILibraryReference = {
         'An `IThreadLauncher` with handles that can `open()` a channel.',
         '一个 `IThreadLauncher`，其句柄可以 `open()` 通道。'
       ),
-      example: `const launcher = createAdapterNodeThreadLauncher({ load: () => import('node:worker_threads'), pid: process.pid })`
+      example: fullSpawnExample('AdapterNode', 'runtime')
     },
     createAdapterNodeThreadPeer: {
       options: 'IRuntimeThreadPeerOptions',
@@ -670,8 +1103,7 @@ export const rpcThreadsReference: ILibraryReference = {
         )
       },
       returns: t('The Worker-side `IRuntimePeer`.', '已连回父线程的 Worker 端 `IRuntimePeer`。'),
-      example: `import { parentPort, workerData } from 'node:worker_threads'
-const peer = await createAdapterNodeThreadPeer({ provide: api }, parentPort, workerData)`
+      example: fullSpawnExample('AdapterNode', 'runtime')
     },
     createNodeThreadChannel: {
       options: 'IThreadChannelOptions',
@@ -698,10 +1130,7 @@ const peer = await createAdapterNodeThreadPeer({ provide: api }, parentPort, wor
         'The channel (sync for the fixed profile, a Promise when extensions are negotiated).',
         '通道对象（固定能力时同步返回，协商扩展能力时返回 Promise）。'
       ),
-      example: `const { port1 } = new MessageChannel()
-await createThreadPeer({
-  connect: async (context) => createNodeThreadChannel(port1, 'right-1', { scheduler: systemScheduler, capabilities: context.capabilities })
-})`
+      example: borrowedPortExample(false)
     },
     createWebThreadChannel: {
       options: 'IThreadChannelOptions',
@@ -728,7 +1157,7 @@ await createThreadPeer({
         'The channel (sync for the fixed profile, a Promise otherwise).',
         '通道对象（固定能力时同步返回，否则返回 Promise）。'
       ),
-      example: `createWebThreadChannel(channel.port1, 'worker-1', { scheduler: systemScheduler })`
+      example: borrowedPortExample(true)
     },
     readThreadBootstrap: {
       role: 'operation',
@@ -743,7 +1172,7 @@ await createThreadPeer({
         '`{ peerId, data? }`; invalid input throws `INVALID_CONFIG`.',
         '`{ peerId, data? }`；输入不合法时抛 `INVALID_CONFIG`。'
       ),
-      example: `const { peerId, data } = readThreadBootstrap(workerData)`
+      example: fullSpawnExample('AdapterNode', 'runtime')
     },
     receiveThreadData: {
       role: 'operation',
@@ -757,15 +1186,15 @@ await createThreadPeer({
           '接收启动消息的 Worker 全局作用域或端口。'
         ),
         prepare: t(
-          '`(data, peerId) => void | Promise`; `data` is `spec.data` from the parent, `peerId` the parent address.',
-          '`(data, peerId) => void | Promise`；`data` 是父端的 `spec.data`，`peerId` 是父端地址。'
+          '`(data, peerId) => void | Promise`; `data` is `spec.data` from the launcher, and `peerId` is the launched handle fingerprint used for the fixed channel address.',
+          '`(data, peerId) => void | Promise`；`data` 来自 launcher 的 `spec.data`，`peerId` 是用于固定通道寻址的已启动句柄指纹。'
         )
       },
       returns: t(
         'Resolves with the bootstrap data after acknowledging.',
         '确认之后以启动数据 resolve。'
       ),
-      example: `const data = await receiveThreadData(self, async (data) => configure(data))`
+      example: webBootstrapExample()
     },
     AdapterNodeThreadParentChannel: {
       role: 'factory',
@@ -783,18 +1212,25 @@ await createThreadPeer({
         'An object whose `open(peerId, options)` returns a Peer source.',
         '一个对象，其 `open(peerId, options)` 返回 Peer 来源。'
       ),
-      example: `const parent = new AdapterNodeThreadParentChannel(parentPort!)`
+      example: nativeWorkerExample(false)
     },
     ...platformSymbols
   },
   types: {
-    ...runtimeSharedTypes,
+    ...runtimePairedTypes('thread'),
     IRuntimeThreadPeerOptions: {
       summary: t(
         'Options of `createThreadPeer()`: the Worker source plus the Core Peer options.',
         '`createThreadPeer()` 的选项：Worker 来源以及 Core Peer 的通用选项。'
       ),
-      members: threadPeerOptionMembers
+      example: transferExample,
+      members: {
+        ...threadPeerOptionMembers,
+        authentication: {
+          ...threadPeerOptionMembers.authentication!,
+          example: transferExample
+        }
+      }
     },
     IRuntimeThreadPluginOptions: {
       summary: t(
@@ -808,13 +1244,25 @@ await createThreadPeer({
         'Short `spawn` object expanded to a full source with defaults.',
         '会用默认值展开为完整 source 的简写 `spawn` 对象。'
       ),
-      example: `const spawn = {
-  entry: new URL('./worker.js', import.meta.url),
-  launcher: createNodeThreadLauncher(),
-  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler })
-}
-const peer = await createThreadPeer({ spawn })
-await peer.close()`,
+      example: pairedThreadExample(`import { createThreadPeer } from '@migaia/rpc-threads'
+import { createNodeThreadLauncher, createNodeThreadChannelFactory } from '@migaia/rpc-threads/adapters/node'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import type { IParentApi, IWorkerApi } from './contracts.js'
+
+const worker = await createThreadPeer<IWorkerApi>({
+  spawn: {
+    entry: new URL('./worker.js', import.meta.url),
+    name: 'math-worker',
+    launcher: createNodeThreadLauncher(),
+    channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler })
+  },
+  provide: { audit: { record: (message: string) => console.log(message) } } satisfies IParentApi
+})
+try {
+  console.log(await worker.request('math.double', 21))
+} finally {
+  await worker.close()
+}`),
       members: {
         ...threadSpawnMembers,
         entry: {
@@ -880,6 +1328,7 @@ await peer.close()`,
         'Options of channel constructors and factories.',
         '通道构造函数与通道工厂的选项。'
       ),
+      example: borrowedPortExample(false),
       members: threadChannelOptionMembers
     },
     IThreadChannelFactory: {
@@ -893,7 +1342,7 @@ await peer.close()`,
           '把自定义 launcher 与其通道打开逻辑配对使用。'
         )
       ],
-      example: `const channel = await channelFactory.open(handle, signal)`,
+      example: webBootstrapExample(),
       members: {
         open: {
           summary: t(
@@ -908,14 +1357,14 @@ await peer.close()`,
             signal: t('Aborts the opening.', '用于中止打开过程的信号。')
           },
           returns: t('The remote channel.', '远程通道对象。'),
-          example: `await channelFactory.open(handle, controller.signal)`
+          example: webBootstrapExample()
         }
       }
     },
     IThreadBootstrapData: {
       summary: t(
-        'Bootstrap data written by a launcher: parent address and optional data.',
-        'launcher 写入的启动数据：父端地址以及可选数据。'
+        'Bootstrap data written by a launcher: the launched handle channel address and optional application data.',
+        'launcher 写入的启动数据：已启动句柄的通道地址以及可选的应用数据。'
       ),
       scenarios: [
         t(
@@ -923,10 +1372,13 @@ await peer.close()`,
           '在自定义的 Worker 入口中读取启动配置。'
         )
       ],
-      example: `const { peerId, data } = readThreadBootstrap(workerData)`,
+      example: fullSpawnExample('AdapterNode', 'runtime'),
       members: {
         peerId: {
-          summary: t('Instance id of the parent Peer.', '父线程中 Peer 的实例 id，用于连回父端。')
+          summary: t(
+            'Launcher-generated handle fingerprint; matches `handle.identity.fingerprint`, not the runtime parent identity.',
+            'launcher 生成的句柄指纹，与 `handle.identity.fingerprint` 相同，不是运行时父端身份。'
+          )
         },
         data: {
           summary: t('`spec.data` given by the parent.', '父端在启动规格中给出的 `spec.data`。')
@@ -952,7 +1404,7 @@ await peer.close()`,
             '停止该 Worker；无法观察其是否真正结束。'
           ),
           returns: t('Nothing.', '无返回值；已请求停止。'),
-          example: `worker.terminate()`
+          example: nativeWorkerExample(true)
         },
         postMessage,
         ...eventTargetPair
@@ -1012,7 +1464,7 @@ await peer.close()`,
             )
           },
           returns: t('A Peer source result.', '一个 Peer 来源结果。'),
-          example: `const source = await handle.open(signal, { scheduler: systemScheduler })`
+          example: fullSpawnExample('AdapterNode', 'runtime', true)
         }
       }
     },
@@ -1044,7 +1496,7 @@ await peer.close()`,
             )
           },
           returns: t('A Peer source result.', '一个 Peer 来源结果。'),
-          example: `const source = await handle.open(signal, { scheduler: systemScheduler })`
+          example: webBootstrapExample(true)
         }
       }
     },
@@ -1063,7 +1515,7 @@ await peer.close()`,
             '`{ Worker, parentPort, workerData }`.',
             '`{ Worker, parentPort, workerData }` 模块对象。'
           ),
-          example: `load: () => import('node:worker_threads')`
+          example: fullSpawnExample('AdapterNode', 'runtime')
         },
         pid: { summary: t('Process id shown in resource details.', '资源详情中显示的进程 id。') }
       }
@@ -1121,7 +1573,7 @@ await peer.close()`,
             listener: t('Called once on close.', '关闭时调用一次的监听函数。')
           },
           returns: t('The port, ignored.', '返回端口本身，会被忽略。'),
-          example: `parentPort.once('close', onClose)`
+          example: nativeWorkerExample(false)
         },
         listenerCount: {
           summary: t(
@@ -1130,7 +1582,7 @@ await peer.close()`,
           ),
           params: { event: t('Always `message`.', '固定为 `message` 事件。') },
           returns: t('Number of listeners.', '当前监听函数的数量。'),
-          example: `parentPort.listenerCount('message')`
+          example: nativeWorkerExample(false)
         }
       }
     },
@@ -1145,8 +1597,7 @@ await peer.close()`,
           '编写复用本库启动流程的第三方 Worker 适配器。'
         )
       ],
-      example: `const parent = new AdapterNodeThreadParentChannel(parentPort!)
-const source = parent.open(peerId, { scheduler: systemScheduler })`,
+      example: nativeWorkerExample(false),
       members: {
         open: {
           summary: t(
@@ -1155,8 +1606,8 @@ const source = parent.open(peerId, { scheduler: systemScheduler })`,
           ),
           params: {
             peerId: t(
-              'Parent instance id from the bootstrap (`readThreadBootstrap(workerData).peerId`).',
-              '父端实例 id，取自启动数据 `readThreadBootstrap(workerData).peerId`。'
+              'Peer instance id from the actual parent’s `self.instanceId`; both example modules explicitly configure `main-1`.',
+              '对端实例标识取自真实父端配置的 `self.instanceId`；示例两个模块显式配置为 `main-1`。'
             ),
             options: t(
               '`{ scheduler, capabilities? }`.',
@@ -1164,7 +1615,7 @@ const source = parent.open(peerId, { scheduler: systemScheduler })`,
             )
           },
           returns: t('A Peer source result.', '一个 Peer 来源结果。'),
-          example: `parent.open(peerId, { scheduler: systemScheduler })`
+          example: nativeWorkerExample(false)
         }
       }
     },
@@ -1199,8 +1650,7 @@ const source = parent.open(peerId, { scheduler: systemScheduler })`,
         'After installation the host has `host.thread`: calls to the Worker by connection name, queries (`list`, `get`), `broadcast`, lifecycle control (`stop`, `kill`, `restart`, `replace`) and events (`on`, `watch`). The host disposes the Worker with itself.',
         '安装后宿主拥有 `host.thread`：按连接名称调用 Worker、查询（`list`、`get`）、`broadcast`、生命周期控制（`stop`、`kill`、`restart`、`replace`）以及事件（`on`、`watch`）。宿主释放时一并释放 Worker。'
       ),
-      install: `const worker = createThreadPlugin({ name: 'worker', spawn: new URL('./worker.js', import.meta.url) })
-await host.use(worker)`,
+      install: pluginExample,
       grants: runtimeOutletGrants('thread'),
       behaviors: [
         t(
