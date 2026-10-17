@@ -1035,6 +1035,7 @@
             "import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm())\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000)\nconst store = createStore({ particles })\n\nconst dx = new Float64Array(1000).fill(0.1)\nstore.particles.setRange(0, 1000, dx) // 落进同一批桶的写入合并到一次 commit"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "array",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1242,6 +1243,7 @@
             "const store = createStore({ field: boolean() })\nstore.field.value = true"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "boolean",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1424,6 +1426,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreWasmAggregateError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWasmAggregateError(code: IStoreWasmErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1669,6 +1672,7 @@
             "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWasmError(code: IStoreWasmErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1727,7 +1731,14 @@
               "content": "No additional advanced behavior is declared for createStoreWasmError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-wasm/dist/errors.d.ts:createStoreWasmError:export declare function createStoreWasmError(code: IStoreWasmErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
           "guidance": [
             {
@@ -1873,7 +1884,16 @@
             }
           ],
           "usageScore": 32,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "`instancePoisoned` — WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程",
+              "descriptionEn": "",
+              "descriptionZh": "`instancePoisoned` — WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
+            }
+          ],
           "fragment": "store-wasm-index--createStoreWasmError"
         },
         {
@@ -1903,6 +1923,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreWasmRangeError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError;"
@@ -2141,6 +2162,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreWasmTypeError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWasmTypeError(code: IStoreWasmErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;"
@@ -2199,7 +2221,14 @@
               "content": "No additional advanced behavior is declared for createStoreWasmTypeError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-wasm/dist/errors.d.ts:createStoreWasmTypeError:export declare function createStoreWasmTypeError(code: IStoreWasmErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;",
           "guidance": [
             {
@@ -2345,7 +2374,16 @@
             }
           ],
           "usageScore": 30,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "`instancePoisoned` — WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程",
+              "descriptionEn": "",
+              "descriptionZh": "`instancePoisoned` — WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
+            }
+          ],
           "fragment": "store-wasm-index--createStoreWasmTypeError"
         },
         {
@@ -2370,6 +2408,7 @@
             "import { array, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nawait import('@migaia/store-wasm').then((m) => m.ensureWasm())\n\n// 6 万个粒子，默认 granularity=64：约 940 个 Source，批量写入时通知合并\nconst particles = array(number(), 60_000)\nconst store = createStore({ particles })\n\nconst dx = new Float64Array(1000).fill(0.1)\nstore.particles.setRange(0, 1000, dx) // 落进同一批桶的写入合并到一次 commit"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "ensureWasm",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2630,6 +2669,217 @@
           "fragment": "store-wasm-index--ensureWasm"
         },
         {
+          "name": "IStoreWasmErrorCode",
+          "kind": "type",
+          "signature": "export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];",
+          "declarationLine": 53,
+          "source": "packages/store-wasm/dist/error-code.d.ts",
+          "purpose": "IStoreWasmErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreWasmErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IStoreWasmErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStoreWasmErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreWasmErrorCode.",
+          "examples": [
+            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'",
+            "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]",
+            "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IStoreWasmErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStoreWasmErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStoreWasmErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IStoreWasmErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStoreWasmErrorCode from @migaia/store-wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStoreWasmErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreWasmErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreWasmErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStoreWasmErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-wasm/dist/error-code.d.ts:IStoreWasmErrorCode:export type IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode];",
+          "guidance": [
+            {
+              "id": "11-错误模块公开导出-storewasmerrorcode-create-常量",
+              "heading": "11. 错误模块公开导出：StoreWasmErrorCode/create*/常量",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "除字段构造器与 `ensureWasm()` 外，根入口还公开导出以下错误相关符号，供调用方识别本包抛出的错误、或在扩展自定义字段时复用同一套错误构造逻辑："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "稳定错误码表，是公开 API 的一部分——改名视为破坏性变更。每条码值的触发条件："
+                },
+                {
+                  "type": "table",
+                  "headers": ["码值", "触发条件"],
+                  "rows": [
+                    ["`notInitialized`", "字段在 `ensureWasm()` settle 之前同步构造/分配"],
+                    ["`fieldDisposed`", "读写/使用一个已 `dispose()` 的字段"],
+                    ["`initAborted`", "字段初始化时 `context.signal` 已经 aborted"],
+                    [
+                      "`reservedFieldName`",
+                      "`record()` 的 `shape` 用了 `'dispose'`/`'disposed'` 作为 key"
+                    ],
+                    ["`allocationFailed`", "WASM 分配失败或对齐/长度校验失败"],
+                    [
+                      "`invalidOption`",
+                      "构造/写入参数非法（超容量、下标越界、granularity 非法等）"
+                    ],
+                    [
+                      "`cleanupFailed`",
+                      "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
+                    ]
+                  ]
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包每个抛出的错误上 `source` 字段的固定值，用于结合 `code` 做双重识别，避免和其他包同名的 `code` 混淆。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "四个错误构造函数，均通过 `attachErrorIdentity`（`@migaia/utils/error`）把 `source: STORE_WASM_SOURCE` 与传入的 `code` 挂到对应类型的原生错误对象上，不修改 `stack`。包内部构造字段错误时统一走这四个函数；扩展自定义字段类型（见 §12）时可以复用它们保持错误身份风格一致。`createStoreWasmError`/`createStoreWasmTypeError` 的 `options.cause` 若提供会传给底层 `Error`/`TypeError` 构造函数的 `{ cause }`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "字段构造器 `mode` 字段的取值集合，目前只有 `'sync'`——本包全部字段构造器都同步产出字段，`create()` 中不发起任何异步操作（异步初始化已经被 `ensureWasm()` 提前完成）。`createStore()` 依据这个字段判断某个 `FieldBuilder` 能否被同步调用。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`record()` 的 `shape` 禁止使用的 key 集合——这两个名字被字段实例自身的 `dispose()`/`disposed` 占用。`record()` 内部在构造时用这个常量做校验（见 §8）。"
+                }
+              ]
+            },
+            {
+              "id": "错误模块",
+              "heading": "错误模块",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreWasmErrorCode`｜3 秒上手 —— 稳定错误码表："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (error.code === StoreWasmErrorCode.fieldDisposed) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWasmError` / `createStoreWasmRangeError` / `createStoreWasmTypeError` / `createStoreWasmAggregateError`｜5 秒上手 —— 一般由包内部使用，扩展自定义字段类型时可复用："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "参数：`code: IStoreWasmErrorCode`（必填）、`message: string`（必填）；`createStoreWasmError`/`createStoreWasmTypeError` 额外接受第三参数 `{ cause?: unknown }`；`createStoreWasmAggregateError` 签名为 `(code, errors: readonly unknown[], message: string)`。均返回已挂好 `(source, code)` 身份标记的对应错误类型（`Error`/`RangeError`/`TypeError`/`AggregateError`）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`WasmFieldMode` / `WasmReservedKey`｜3 秒上手 —— 常量对象，无调用参数："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`WasmFieldMode` 取值：`sync`。`WasmReservedKey` 取值：`dispose`、`disposed`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 32,
+          "configuration": [],
+          "fragment": "store-wasm-index--IStoreWasmErrorCode"
+        },
+        {
           "name": "IWasmFieldMode",
           "kind": "type",
           "signature": "export type IWasmFieldMode = (typeof WasmFieldMode)[keyof typeof WasmFieldMode];",
@@ -2648,6 +2898,7 @@
             "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IWasmFieldMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2807,6 +3058,7 @@
             "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IWasmReservedKey",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2976,6 +3228,7 @@
             "import { record, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) })\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1\nstore.pos.y = 2"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "number",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3136,7 +3389,8 @@
             {
               "name": "shape",
               "type": "Shape",
-              "optional": false
+              "optional": false,
+              "configurationType": "IRecordShape"
             }
           ],
           "returns": "IFieldBuilder<IWasmRecordField<Shape>>",
@@ -3151,6 +3405,7 @@
             "import { record, number } from '@migaia/store-wasm'\nimport { createStore } from '@migaia/store-light'\n\nconst store = createStore({ pos: record({ x: number(), y: number(), z: number() }) })\n\n// 只订阅 x 的观察者不会因为 y/z 的写入而重渲染——三个字段各自独立 Source\nstore.pos.x = 1\nstore.pos.y = 2"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "record",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3161,7 +3416,8 @@
               {
                 "name": "shape",
                 "type": "Shape",
-                "optional": false
+                "optional": false,
+                "configurationType": "IRecordShape"
               }
             ]
           ],
@@ -3490,6 +3746,7 @@
             "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm'\n\ntry {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error\n  }\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_WASM_SOURCE = \"@migaia/store-wasm\";"
@@ -3691,6 +3948,305 @@
           "fragment": "store-wasm-index--STORE_WASM_SOURCE"
         },
         {
+          "name": "StoreWasmErrorCode",
+          "kind": "const",
+          "signature": "export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: \"NOT_INITIALIZED\"; /** * Rejects reads, writes, or other use of a disposed WASM field. Create a new field instead of * reusing it. `detail` identifies the operation. */ readonly fieldDisposed: \"FIELD_DISPOSED\"; /** * Reports field initialization cancelled through an `AbortSignal`. Handle it as cooperative * cancellation. */ readonly initAborted: \"INIT_ABORTED\"; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: \"RESERVED_FIELD_NAME\"; /** * Reports WASM allocation failure or invalid alignment or memory length. Examples include * `byteLen` exceeding the Wasm32 limit, failed 8-byte alignment, or corrupt stored length. Check * allocation parameters and memory integrity. This is an allocation or memory failure rather than * a logic error. */ readonly allocationFailed: \"ALLOCATION_FAILED\"; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, or out-of-range indices or ranges. Correct the parameter instead of retrying the * same invalid input. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; /** * Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: \"INSTANCE_POISONED\"; };",
+          "declarationLine": 7,
+          "source": "packages/store-wasm/dist/error-code.d.ts",
+          "purpose": "Owns the error-code declarations for `@migaia/store-wasm`. Under `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/store-wasm'`. Throw sites reference these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`error-code-rollout.sdd.md` §1.2).",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreWasmErrorCode.",
+          "advanced": "No additional advanced behavior is declared for StoreWasmErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for StoreWasmErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreWasmErrorCode.",
+          "examples": [
+            "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'",
+            "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]",
+            "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}",
+            "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'",
+            "if (error.code === StoreWasmErrorCode.fieldDisposed) {\n  /* ... */\n}",
+            "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')",
+            "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm'\n\ntry {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error\n  }\n}"
+          ],
+          "members": [
+            {
+              "name": "notInitialized",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly notInitialized: \"NOT_INITIALIZED\";",
+              "description": "Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization.",
+              "parameterDetails": [],
+              "returns": "\"NOT_INITIALIZED\""
+            },
+            {
+              "name": "fieldDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly fieldDisposed: \"FIELD_DISPOSED\";",
+              "description": "Rejects reads, writes, or other use of a disposed WASM field. Create a new field instead of * reusing it. `detail` identifies the operation.",
+              "parameterDetails": [],
+              "returns": "\"FIELD_DISPOSED\""
+            },
+            {
+              "name": "initAborted",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly initAborted: \"INIT_ABORTED\";",
+              "description": "Reports field initialization cancelled through an `AbortSignal`. Handle it as cooperative * cancellation.",
+              "parameterDetails": [],
+              "returns": "\"INIT_ABORTED\""
+            },
+            {
+              "name": "reservedFieldName",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly reservedFieldName: \"RESERVED_FIELD_NAME\";",
+              "description": "Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name.",
+              "parameterDetails": [],
+              "returns": "\"RESERVED_FIELD_NAME\""
+            },
+            {
+              "name": "allocationFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly allocationFailed: \"ALLOCATION_FAILED\";",
+              "description": "Reports WASM allocation failure or invalid alignment or memory length. Examples include * `byteLen` exceeding the Wasm32 limit, failed 8-byte alignment, or corrupt stored length. Check * allocation parameters and memory integrity. This is an allocation or memory failure rather than * a logic error.",
+              "parameterDetails": [],
+              "returns": "\"ALLOCATION_FAILED\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, or out-of-range indices or ranges. Correct the parameter instead of retrying the * same invalid input.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            },
+            {
+              "name": "cleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupFailed: \"CLEANUP_FAILED\";",
+              "description": "Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order.",
+              "parameterDetails": [],
+              "returns": "\"CLEANUP_FAILED\""
+            },
+            {
+              "name": "instancePoisoned",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly instancePoisoned: \"INSTANCE_POISONED\";",
+              "description": "Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed.",
+              "parameterDetails": [],
+              "returns": "\"INSTANCE_POISONED\""
+            }
+          ],
+          "composes": [],
+          "aliasOf": "StoreWasmErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: \"NOT_INITIALIZED\"; /** * Rejects reads, writes, or other use of a disposed WASM field. Create a new field instead of * reusing it. `detail` identifies the operation. */ readonly fieldDisposed: \"FIELD_DISPOSED\"; /** * Reports field initialization cancelled through an `AbortSignal`. Handle it as cooperative * cancellation. */ readonly initAborted: \"INIT_ABORTED\"; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: \"RESERVED_FIELD_NAME\"; /** * Reports WASM allocation failure or invalid alignment or memory length. Examples include * `byteLen` exceeding the Wasm32 limit, failed 8-byte alignment, or corrupt stored length. Check * allocation parameters and memory integrity. This is an allocation or memory failure rather than * a logic error. */ readonly allocationFailed: \"ALLOCATION_FAILED\"; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, or out-of-range indices or ranges. Correct the parameter instead of retrying the * same invalid input. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; /** * Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: \"INSTANCE_POISONED\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use StoreWasmErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when StoreWasmErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Owns the error-code declarations for `@migaia/store-wasm`. Under `docs/contracts/error-codes.md`, `(source, code)` uniquely identifies an error. The `source` is always `'@migaia/store-wasm'`. Throw sites reference these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`error-code-rollout.sdd.md` §1.2)."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import StoreWasmErrorCode from @migaia/store-wasm, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use StoreWasmErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when StoreWasmErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreWasmErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for StoreWasmErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-wasm/dist/error-code.d.ts:StoreWasmErrorCode:export declare const StoreWasmErrorCode: { /** * Rejects synchronous field creation or allocation before `ensureWasm()` finishes, or after * initialization fails. First await `ensureWasm()`, or use the `StoreProvider` `ready` barrier to * finish initialization. */ readonly notInitialized: \"NOT_INITIALIZED\"; /** * Rejects reads, writes, or other use of a disposed WASM field. Create a new field instead of * reusing it. `detail` identifies the operation. */ readonly fieldDisposed: \"FIELD_DISPOSED\"; /** * Reports field initialization cancelled through an `AbortSignal`. Handle it as cooperative * cancellation. */ readonly initAborted: \"INIT_ABORTED\"; /** Rejects a `wasm.record` field named `dispose` or `disposed`. Choose a different field name. */ readonly reservedFieldName: \"RESERVED_FIELD_NAME\"; /** * Reports WASM allocation failure or invalid alignment or memory length. Examples include * `byteLen` exceeding the Wasm32 limit, failed 8-byte alignment, or corrupt stored length. Check * allocation parameters and memory integrity. This is an allocation or memory failure rather than * a logic error. */ readonly allocationFailed: \"ALLOCATION_FAILED\"; /** * Rejects invalid field construction or write arguments, including excessive length, invalid * `granularity`, or out-of-range indices or ranges. Correct the parameter instead of retrying the * same invalid input. */ readonly invalidOption: \"INVALID_OPTION\"; /** * Reports multiple owned-resource cleanup failures during field release or construction rollback. * Inspect `AggregateError.errors`. It preserves all original cleanup failures in execution * order. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; /** * Rejects allocation after an earlier call into the shared `@migaia/wasm` instance raised * `WebAssembly.RuntimeError` (a trap). A trap can leave the Rust arena borrow held, so every * later export would trap again; the instance is unusable for the rest of the page or process. * `cause` is the original trap. Reload the page or restart the process; retrying cannot succeed. */ readonly instancePoisoned: \"INSTANCE_POISONED\"; };",
+          "guidance": [
+            {
+              "id": "11-错误模块公开导出-storewasmerrorcode-create-常量",
+              "heading": "11. 错误模块公开导出：StoreWasmErrorCode/create*/常量",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "除字段构造器与 `ensureWasm()` 外，根入口还公开导出以下错误相关符号，供调用方识别本包抛出的错误、或在扩展自定义字段时复用同一套错误构造逻辑："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreWasmErrorCode,\n  type IStoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  type IWasmFieldMode,\n  WasmReservedKey,\n  type IWasmReservedKey\n} from '@migaia/store-wasm'"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const StoreWasmErrorCode = {\n  notInitialized: 'NOT_INITIALIZED',\n  fieldDisposed: 'FIELD_DISPOSED',\n  initAborted: 'INIT_ABORTED',\n  reservedFieldName: 'RESERVED_FIELD_NAME',\n  allocationFailed: 'ALLOCATION_FAILED',\n  invalidOption: 'INVALID_OPTION',\n  cleanupFailed: 'CLEANUP_FAILED',\n  instancePoisoned: 'INSTANCE_POISONED'\n} as const\ntype IStoreWasmErrorCode = (typeof StoreWasmErrorCode)[keyof typeof StoreWasmErrorCode]"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "稳定错误码表，是公开 API 的一部分——改名视为破坏性变更。每条码值的触发条件："
+                },
+                {
+                  "type": "table",
+                  "headers": ["码值", "触发条件"],
+                  "rows": [
+                    ["`notInitialized`", "字段在 `ensureWasm()` settle 之前同步构造/分配"],
+                    ["`fieldDisposed`", "读写/使用一个已 `dispose()` 的字段"],
+                    ["`initAborted`", "字段初始化时 `context.signal` 已经 aborted"],
+                    [
+                      "`reservedFieldName`",
+                      "`record()` 的 `shape` 用了 `'dispose'`/`'disposed'` 作为 key"
+                    ],
+                    ["`allocationFailed`", "WASM 分配失败或对齐/长度校验失败"],
+                    [
+                      "`invalidOption`",
+                      "构造/写入参数非法（超容量、下标越界、granularity 非法等）"
+                    ],
+                    [
+                      "`cleanupFailed`",
+                      "字段释放或构造回滚时有多个 owned resource 清理失败（携带 `AggregateError.errors`）"
+                    ],
+                    [
+                      "`instancePoisoned`",
+                      "WASM 实例此前已 trap，之后任何导出调用都会再次 trap；`cause` 是原始 trap，只能重载页面或重启进程"
+                    ]
+                  ]
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const STORE_WASM_SOURCE: '@migaia/store-wasm'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包每个抛出的错误上 `source` 字段的固定值，用于结合 `code` 做双重识别，避免和其他包同名的 `code` 混淆。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function createStoreWasmError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): Error\nfunction createStoreWasmRangeError(code: IStoreWasmErrorCode, message: string): RangeError\nfunction createStoreWasmTypeError(\n  code: IStoreWasmErrorCode,\n  message: string,\n  options?: { readonly cause?: unknown }\n): TypeError\nfunction createStoreWasmAggregateError(\n  code: IStoreWasmErrorCode,\n  errors: readonly unknown[],\n  message: string\n): AggregateError"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "四个错误构造函数，均通过 `attachErrorIdentity`（`@migaia/utils/error`）把 `source: STORE_WASM_SOURCE` 与传入的 `code` 挂到对应类型的原生错误对象上，不修改 `stack`。包内部构造字段错误时统一走这四个函数；扩展自定义字段类型（见 §12）时可以复用它们保持错误身份风格一致。`createStoreWasmError`/`createStoreWasmTypeError` 的 `options.cause` 若提供会传给底层 `Error`/`TypeError` 构造函数的 `{ cause }`。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "try {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放\n  }\n}"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const WasmFieldMode = { sync: 'sync' } as const\ntype IWasmFieldMode = 'sync'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "字段构造器 `mode` 字段的取值集合，目前只有 `'sync'`——本包全部字段构造器都同步产出字段，`create()` 中不发起任何异步操作（异步初始化已经被 `ensureWasm()` 提前完成）。`createStore()` 依据这个字段判断某个 `FieldBuilder` 能否被同步调用。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const WasmReservedKey = { dispose: 'dispose', disposed: 'disposed' } as const\ntype IWasmReservedKey = 'dispose' | 'disposed'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`record()` 的 `shape` 禁止使用的 key 集合——这两个名字被字段实例自身的 `dispose()`/`disposed` 占用。`record()` 内部在构造时用这个常量做校验（见 §8）。"
+                }
+              ]
+            },
+            {
+              "id": "错误模块",
+              "heading": "错误模块",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreWasmErrorCode`｜3 秒上手 —— 稳定错误码表："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (error.code === StoreWasmErrorCode.fieldDisposed) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值：`notInitialized`(`NOT_INITIALIZED`)、`fieldDisposed`(`FIELD_DISPOSED`)、`initAborted`(`INIT_ABORTED`)、`reservedFieldName`(`RESERVED_FIELD_NAME`)、`allocationFailed`(`ALLOCATION_FAILED`)、`invalidOption`(`INVALID_OPTION`)、`cleanupFailed`(`CLEANUP_FAILED`)、`instancePoisoned`(`INSTANCE_POISONED`)。每个错误对象都带 `source: '@migaia/store-wasm'`（即 `STORE_WASM_SOURCE`）与其中一个 `code`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWasmError` / `createStoreWasmRangeError` / `createStoreWasmTypeError` / `createStoreWasmAggregateError`｜5 秒上手 —— 一般由包内部使用，扩展自定义字段类型时可复用："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWasmError(StoreWasmErrorCode.invalidOption, 'my.field: bad value')"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "参数：`code: IStoreWasmErrorCode`（必填）、`message: string`（必填）；`createStoreWasmError`/`createStoreWasmTypeError` 额外接受第三参数 `{ cause?: unknown }`；`createStoreWasmAggregateError` 签名为 `(code, errors: readonly unknown[], message: string)`。均返回已挂好 `(source, code)` 身份标记的对应错误类型（`Error`/`RangeError`/`TypeError`/`AggregateError`）。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`WasmFieldMode` / `WasmReservedKey`｜3 秒上手 —— 常量对象，无调用参数："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`WasmFieldMode` 取值：`sync`。`WasmReservedKey` 取值：`dispose`、`disposed`。"
+                }
+              ]
+            },
+            {
+              "id": "高阶组合示例-4-识别本包错误并按错误码分支处理",
+              "heading": "高阶组合示例 · 4. 识别本包错误并按错误码分支处理",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '@migaia/store-wasm'\n\ntry {\n  field.value = 123\n} catch (error) {\n  const e = error as { source?: string; code?: string }\n  if (e.source === STORE_WASM_SOURCE && e.code === StoreWasmErrorCode.fieldDisposed) {\n    // 字段已释放：新建字段而不是复用已释放实例\n  } else {\n    throw error\n  }\n}"
+                }
+              ]
+            }
+          ],
+          "usageScore": 66,
+          "configuration": [],
+          "fragment": "store-wasm-index--StoreWasmErrorCode"
+        },
+        {
           "name": "string",
           "kind": "function",
           "signature": "export declare function string(maxBytes?: number): IFieldBuilder<IWasmStringField>;",
@@ -3717,6 +4273,7 @@
             "const store = createStore({ field: string(64) }) // 最多 64 字节\nstore.field.value = 'hello'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "string",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4043,7 +4600,18 @@
             "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'",
             "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "sync",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sync: \"sync\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"sync\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "WasmFieldMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4254,7 +4822,27 @@
             "import {\n  StoreWasmErrorCode,\n  STORE_WASM_SOURCE,\n  createStoreWasmError,\n  createStoreWasmRangeError,\n  createStoreWasmTypeError,\n  createStoreWasmAggregateError,\n  WasmFieldMode,\n  WasmReservedKey\n} from '@migaia/store-wasm'",
             "WasmFieldMode.sync // 'sync'，本包全部字段构造器的 mode\nWasmReservedKey.dispose // 'dispose'，record() 禁用的 key 之一"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "dispose",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dispose: \"dispose\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"dispose\""
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: \"disposed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"disposed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "WasmReservedKey",
           "exportPath": ".",
           "overloadSignatures": [

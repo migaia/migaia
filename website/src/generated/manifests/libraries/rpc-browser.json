@@ -683,6 +683,7 @@
             "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块由真实 SharedWorker 宿主加载；声明其 connect 事件形状供 DOM 文档编译器检查。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** Worker 的连接监听器；调用 close() 时停止接纳并关闭已接纳的逻辑 Peer。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong' },\n  report: (error) => console.error(error)\n})"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createBrowserPeer",
           "exportPath": ".",
           "overloadSignatures": [
@@ -743,11 +744,209 @@
               "content": "No additional advanced behavior is declared for createBrowserPeer."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "connect",
+              "type": "IRuntimeBrowserConnect",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "listen",
+              "type": "IRuntimeBrowserListen",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "signal",
+              "type": "IAdapterDefinitionPeerOptions<unknown>['signal']",
+              "optional": true,
+              "description": "Caller cancellation releases unfinished handshake subscriptions without closing borrowed carriers."
+            },
+            {
+              "name": "endpointFactory",
+              "type": "(channel: IRemoteChannelResources, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>",
+              "optional": true,
+              "description": "A custom runtime assembly receives only the operations held by this channel view."
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "provide",
+              "type": "IRuntimePeerProvide",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint."
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection."
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Only request/stream inherit this positive default in their original timeout scope."
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner."
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "Omission reports background failures to console.error through the original owner."
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-browser/dist/browser/peer.d.ts:createBrowserPeer:export declare function createBrowserPeer<TRemote = never>(options: IRuntimeBrowserPeerOptions): Promise<[TRemote] extends [never] ? IRuntimePeer : IRuntimeTypedPeer<TRemote>>;\nexport declare function createBrowserPeer(options: IRuntimeBrowserPeerOptions): Promise<IRuntimePeer>;",
           "guidance": [],
           "usageScore": 104,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "connect",
+              "type": "IRuntimeBrowserConnect",
+              "optional": true,
+              "description": "根入口的 `createBrowserPeer<TRemote>()` 返回与进程、线程相同的 Runtime Peer，按远端 API 类型推导方法名、payload 与结果类型。选择一个 `connect` 或 `listen` 来源；不接受已握手、已信任或已拥有的状态，也没有 `spawn`。",
+              "descriptionEn": "",
+              "descriptionZh": "根入口的 `createBrowserPeer<TRemote>()` 返回与进程、线程相同的 Runtime Peer，按远端 API 类型推导方法名、payload 与结果类型。选择一个 `connect` 或 `listen` 来源；不接受已握手、已信任或已拥有的状态，也没有 `spawn`。"
+            },
+            {
+              "name": "listen",
+              "type": "IRuntimeBrowserListen",
+              "optional": true,
+              "description": "根入口的 `createBrowserPeer<TRemote>()` 返回与进程、线程相同的 Runtime Peer，按远端 API 类型推导方法名、payload 与结果类型。选择一个 `connect` 或 `listen` 来源；不接受已握手、已信任或已拥有的状态，也没有 `spawn`。",
+              "descriptionEn": "",
+              "descriptionZh": "根入口的 `createBrowserPeer<TRemote>()` 返回与进程、线程相同的 Runtime Peer，按远端 API 类型推导方法名、payload 与结果类型。选择一个 `connect` 或 `listen` 来源；不接受已握手、已信任或已拥有的状态，也没有 `spawn`。"
+            },
+            {
+              "name": "signal",
+              "type": "IAdapterDefinitionPeerOptions<unknown>['signal']",
+              "optional": true,
+              "description": "公共选项包括 `provide`、`defaultTimeoutMs`、`signal` 与 `report`。`provide` 接受业务函数或异步生成器；不需要 `context.success`。`signal` 可取消未完成的握手；监听器保持订阅该 signal，取消时关闭监听器与已接纳的逻辑 Peer。`report` 接收不能从当前操作直接抛出的错误。默认调用 deadline 为 Core 的 30000 ms；工厂 `defaultTimeoutMs` 和单次调用的 `timeoutMs` 可调整等待上限。单次业务调用的取消使用该调用的 `signal`。",
+              "descriptionEn": "Caller cancellation releases unfinished handshake subscriptions without closing borrowed carriers.",
+              "descriptionZh": "公共选项包括 `provide`、`defaultTimeoutMs`、`signal` 与 `report`。`provide` 接受业务函数或异步生成器；不需要 `context.success`。`signal` 可取消未完成的握手；监听器保持订阅该 signal，取消时关闭监听器与已接纳的逻辑 Peer。`report` 接收不能从当前操作直接抛出的错误。默认调用 deadline 为 Core 的 30000 ms；工厂 `defaultTimeoutMs` 和单次调用的 `timeoutMs` 可调整等待上限。单次业务调用的取消使用该调用的 `signal`。"
+            },
+            {
+              "name": "endpointFactory",
+              "type": "(channel: IRemoteChannelResources, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>",
+              "optional": true,
+              "description": "A custom runtime assembly receives only the operations held by this channel view.",
+              "descriptionEn": "A custom runtime assembly receives only the operations held by this channel view.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "provide",
+              "type": "IRuntimePeerProvide",
+              "optional": true,
+              "description": "公共选项包括 `provide`、`defaultTimeoutMs`、`signal` 与 `report`。`provide` 接受业务函数或异步生成器；不需要 `context.success`。`signal` 可取消未完成的握手；监听器保持订阅该 signal，取消时关闭监听器与已接纳的逻辑 Peer。`report` 接收不能从当前操作直接抛出的错误。默认调用 deadline 为 Core 的 30000 ms；工厂 `defaultTimeoutMs` 和单次调用的 `timeoutMs` 可调整等待上限。单次业务调用的取消使用该调用的 `signal`。",
+              "descriptionEn": "",
+              "descriptionZh": "公共选项包括 `provide`、`defaultTimeoutMs`、`signal` 与 `report`。`provide` 接受业务函数或异步生成器；不需要 `context.success`。`signal` 可取消未完成的握手；监听器保持订阅该 signal，取消时关闭监听器与已接纳的逻辑 Peer。`report` 接收不能从当前操作直接抛出的错误。默认调用 deadline 为 Core 的 30000 ms；工厂 `defaultTimeoutMs` 和单次调用的 `timeoutMs` 可调整等待上限。单次业务调用的取消使用该调用的 `signal`。"
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "descriptionEn": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "`createBrowserPeer({ probe })` 将原 handle 交给 Core。`IMessageAdapterPort.observe?` 转发既有 native browser carrier 的观察 slot；不另建 MessagePort 事件路径。支持的 carrier 同步在 send 内 emit，失败由原 listener/report channel 报告，业务与 source proof 保持原路径。",
+              "descriptionEn": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "descriptionZh": "`createBrowserPeer({ probe })` 将原 handle 交给 Core。`IMessageAdapterPort.observe?` 转发既有 native browser carrier 的观察 slot；不另建 MessagePort 事件路径。支持的 carrier 同步在 send 内 emit，失败由原 listener/report channel 报告，业务与 source proof 保持原路径。"
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "公共选项包括 `provide`、`defaultTimeoutMs`、`signal` 与 `report`。`provide` 接受业务函数或异步生成器；不需要 `context.success`。`signal` 可取消未完成的握手；监听器保持订阅该 signal，取消时关闭监听器与已接纳的逻辑 Peer。`report` 接收不能从当前操作直接抛出的错误。默认调用 deadline 为 Core 的 30000 ms；工厂 `defaultTimeoutMs` 和单次调用的 `timeoutMs` 可调整等待上限。单次业务调用的取消使用该调用的 `signal`。",
+              "descriptionEn": "Only request/stream inherit this positive default in their original timeout scope.",
+              "descriptionZh": "公共选项包括 `provide`、`defaultTimeoutMs`、`signal` 与 `report`。`provide` 接受业务函数或异步生成器；不需要 `context.success`。`signal` 可取消未完成的握手；监听器保持订阅该 signal，取消时关闭监听器与已接纳的逻辑 Peer。`report` 接收不能从当前操作直接抛出的错误。默认调用 deadline 为 Core 的 30000 ms；工厂 `defaultTimeoutMs` 和单次调用的 `timeoutMs` 可调整等待上限。单次业务调用的取消使用该调用的 `signal`。"
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionEn": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "公共选项包括 `provide`、`defaultTimeoutMs`、`signal` 与 `report`。`provide` 接受业务函数或异步生成器；不需要 `context.success`。`signal` 可取消未完成的握手；监听器保持订阅该 signal，取消时关闭监听器与已接纳的逻辑 Peer。`report` 接收不能从当前操作直接抛出的错误。默认调用 deadline 为 Core 的 30000 ms；工厂 `defaultTimeoutMs` 和单次调用的 `timeoutMs` 可调整等待上限。单次业务调用的取消使用该调用的 `signal`。",
+              "descriptionEn": "Omission reports background failures to console.error through the original owner.",
+              "descriptionZh": "公共选项包括 `provide`、`defaultTimeoutMs`、`signal` 与 `report`。`provide` 接受业务函数或异步生成器；不需要 `context.success`。`signal` 可取消未完成的握手；监听器保持订阅该 signal，取消时关闭监听器与已接纳的逻辑 Peer。`report` 接收不能从当前操作直接抛出的错误。默认调用 deadline 为 Core 的 30000 ms；工厂 `defaultTimeoutMs` 和单次调用的 `timeoutMs` 可调整等待上限。单次业务调用的取消使用该调用的 `signal`。"
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-browser-index--createBrowserPeer"
         },
         {
@@ -766,6 +965,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcBrowserErrorCode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IRpcBrowserErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -830,6 +1030,11 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserConnect.",
           "examples": [],
           "members": [],
+          "composes": [
+            "IRuntimeBrowserWindowConnect",
+            "IRuntimeBrowserSharedWorkerConnect",
+            "IRuntimeBrowserRtcConnect"
+          ],
           "aliasOf": "IRuntimeBrowserConnect",
           "exportPath": ".",
           "overloadSignatures": [
@@ -893,7 +1098,18 @@
           "errors": ["No documented errors are declared for IRuntimeBrowserConnectEvent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserConnectEvent.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ports",
+              "kind": "property",
+              "optional": false,
+              "signature": "ports: readonly ISharedWorkerPort[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly ISharedWorkerPort[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeBrowserConnectEvent",
           "exportPath": ".",
           "overloadSignatures": [
@@ -960,7 +1176,49 @@
             "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块运行于真实 SharedWorker；文档编译器以公开 connect scope 形状声明宿主 self。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** 逐项生产计数，供每个页面的 stream 消费。 */\nasync function* count(limit: number) {\n  for (let value = 1; value <= limit; value++) yield value\n}\n/** 借用 SharedWorkerGlobalScope 的 connect 事件，不接管其原生生命周期。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong', note: (value: string) => console.log(value), count },\n  report: (error) => console.error(error)\n})\nserver.on('ready', (event) => console.log(event.instanceId))",
             "import { createBrowserPeer, type IRuntimeBrowserListen } from '@migaia/rpc-browser'\n\n/** 本模块由真实 SharedWorker 宿主加载；声明其 connect 事件形状供 DOM 文档编译器检查。 */\ndeclare const self: IRuntimeBrowserListen\n\n/** Worker 的连接监听器；调用 close() 时停止接纳并关闭已接纳的逻辑 Peer。 */\nconst server = await createBrowserPeer({\n  listen: self,\n  provide: { ping: () => 'pong' },\n  report: (error) => console.error(error)\n})"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'connect'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: IRuntimeBrowserConnectEvent) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: 'connect', listener: (event: IRuntimeBrowserConnectEvent) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'connect'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: IRuntimeBrowserConnectEvent) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeBrowserListen",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1024,7 +1282,152 @@
           "errors": ["No documented errors are declared for IRuntimeBrowserPeerOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserPeerOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "connect",
+              "kind": "property",
+              "optional": true,
+              "signature": "connect?: IRuntimeBrowserConnect;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeBrowserConnect"
+            },
+            {
+              "name": "listen",
+              "kind": "property",
+              "optional": true,
+              "signature": "listen?: IRuntimeBrowserListen;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeBrowserListen"
+            },
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": true,
+              "signature": "signal?: IAdapterDefinitionPeerOptions<unknown>['signal'];",
+              "description": "Caller cancellation releases unfinished handshake subscriptions without closing borrowed carriers.",
+              "parameterDetails": [],
+              "returns": "IAdapterDefinitionPeerOptions<unknown>['signal']"
+            },
+            {
+              "name": "endpointFactory",
+              "kind": "method",
+              "optional": true,
+              "signature": "endpointFactory?(channel: IRemoteChannelResources, signal: INativeAbortSignal): Promise<IRemoteServeEndpoint>;",
+              "description": "A custom runtime assembly receives only the operations held by this channel view.",
+              "parameterDetails": [
+                {
+                  "name": "channel",
+                  "type": "IRemoteChannelResources",
+                  "optional": false
+                },
+                {
+                  "name": "signal",
+                  "type": "INativeAbortSignal",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IRemoteServeEndpoint>"
+            },
+            {
+              "name": "self",
+              "kind": "property",
+              "optional": true,
+              "signature": "self?: IRuntimePeerIdentity;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity"
+            },
+            {
+              "name": "provide",
+              "kind": "property",
+              "optional": true,
+              "signature": "provide?: IRuntimePeerProvide;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerProvide"
+            },
+            {
+              "name": "providerLimits",
+              "kind": "property",
+              "optional": true,
+              "signature": "providerLimits?: IRpcProviderLimits;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcProviderLimits"
+            },
+            {
+              "name": "authentication",
+              "kind": "property",
+              "optional": true,
+              "signature": "authentication?: IRpcAuthenticationConfig;",
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "parameterDetails": [],
+              "returns": "IRpcAuthenticationConfig"
+            },
+            {
+              "name": "probe",
+              "kind": "property",
+              "optional": true,
+              "signature": "probe?: IRpcProbe | readonly IRpcProbe[];",
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "parameterDetails": [],
+              "returns": "IRpcProbe | readonly IRpcProbe[]"
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "defaultTimeoutMs?: number;",
+              "description": "Only request/stream inherit this positive default in their original timeout scope.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "contract",
+              "kind": "property",
+              "optional": true,
+              "signature": "contract?: IRemoteContract;",
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "parameterDetails": [],
+              "returns": "IRemoteContract"
+            },
+            {
+              "name": "report",
+              "kind": "method",
+              "optional": true,
+              "signature": "report?(error: unknown): void;",
+              "description": "Omission reports background failures to console.error through the original owner.",
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "keyFactory",
+              "kind": "property",
+              "optional": true,
+              "signature": "keyFactory?: () => string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => string"
+            },
+            {
+              "name": "retryPort",
+              "kind": "property",
+              "optional": true,
+              "signature": "retryPort?: IRemoteRetryPort;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRemoteRetryPort"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeBrowserPeerOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1088,7 +1491,18 @@
           "errors": ["No documented errors are declared for IRuntimeBrowserRtcConnect."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserRtcConnect.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "rtcDataChannel",
+              "kind": "property",
+              "optional": false,
+              "signature": "rtcDataChannel: IRuntimeBrowserRtcDataChannel;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeBrowserRtcDataChannel"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeBrowserRtcConnect",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1152,7 +1566,100 @@
           "errors": ["No documented errors are declared for IRuntimeBrowserRtcDataChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserRtcDataChannel.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ordered",
+              "kind": "property",
+              "optional": false,
+              "signature": "ordered: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "maxRetransmits",
+              "kind": "property",
+              "optional": false,
+              "signature": "maxRetransmits: number | null;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | null"
+            },
+            {
+              "name": "maxPacketLifeTime",
+              "kind": "property",
+              "optional": false,
+              "signature": "maxPacketLifeTime: number | null;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | null"
+            },
+            {
+              "name": "send",
+              "kind": "method",
+              "optional": false,
+              "signature": "send(data: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "data",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "readyState",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly readyState: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message' | 'closing' | 'close' | 'error'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: unknown) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message' | 'closing' | 'close' | 'error'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: unknown) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeBrowserRtcDataChannel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1216,7 +1723,18 @@
           "errors": ["No documented errors are declared for IRuntimeBrowserSharedWorkerConnect."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserSharedWorkerConnect.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "sharedWorker",
+              "kind": "property",
+              "optional": false,
+              "signature": "sharedWorker: Readonly<{ port: ISharedWorkerPort; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ port: ISharedWorkerPort; }>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeBrowserSharedWorkerConnect",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1280,7 +1798,45 @@
           "errors": ["No documented errors are declared for IRuntimeBrowserWindowConnect."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeBrowserWindowConnect.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "window",
+              "kind": "property",
+              "optional": false,
+              "signature": "window: IWindowMessageTarget;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IWindowMessageTarget"
+            },
+            {
+              "name": "origin",
+              "kind": "property",
+              "optional": false,
+              "signature": "origin: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "receiver",
+              "kind": "property",
+              "optional": true,
+              "signature": "receiver?: IWindowMessageReceiver;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IWindowMessageReceiver"
+            },
+            {
+              "name": "allowUnsafeTargetOrigin",
+              "kind": "property",
+              "optional": true,
+              "signature": "allowUnsafeTargetOrigin?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeBrowserWindowConnect",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1345,6 +1901,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RPC_BROWSER_ERROR_SOURCE.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ERROR_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1475,7 +2032,54 @@
           "errors": ["No documented errors are declared for RpcBrowserErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcBrowserErrorCode.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "windowOriginRequired",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly windowOriginRequired: \"WINDOW_ORIGIN_REQUIRED\";",
+              "description": "BP-R2 requires a nonempty explicit Window origin; provide the destination origin before * connecting.",
+              "parameterDetails": [],
+              "returns": "\"WINDOW_ORIGIN_REQUIRED\""
+            },
+            {
+              "name": "rtcChannelUnreliable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly rtcChannelUnreliable: \"RTC_CHANNEL_UNRELIABLE\";",
+              "description": "BP-R5 requires ordered reliable RTC delivery; use a reliable channel or the Endpoint API.",
+              "parameterDetails": [],
+              "returns": "\"RTC_CHANNEL_UNRELIABLE\""
+            },
+            {
+              "name": "listenerAlreadyBound",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly listenerAlreadyBound: \"LISTENER_ALREADY_BOUND\";",
+              "description": "BP-R3 allows one active listener per SharedWorker scope; close or reuse that listener first.",
+              "parameterDetails": [],
+              "returns": "\"LISTENER_ALREADY_BOUND\""
+            },
+            {
+              "name": "invalidPeerSource",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidPeerSource: \"INVALID_PEER_SOURCE\";",
+              "description": "BP-R1 rejects conflicting or unsupported sources; supply one concrete connect source or listen * scope.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_PEER_SOURCE\""
+            },
+            {
+              "name": "messageDecodeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly messageDecodeFailed: \"MESSAGE_DECODE_FAILED\";",
+              "description": "BP-R5 rejects malformed RTC JSON and retains the decoder cause; correct the remote wire input.",
+              "parameterDetails": [],
+              "returns": "\"MESSAGE_DECODE_FAILED\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "RpcBrowserErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1635,6 +2239,7 @@
             "import { connect, createEndpoint } from '@migaia/rpc-core'\nimport { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'\n\n/** 两个同源上下文使用同一频道名；创建者负责关闭频道。 */\nconst channelA = new BroadcastChannel('cart')\n/** 第二个逻辑标签页的独立频道实例。 */\nconst channelB = new BroadcastChannel('cart')\n/** 只借用第一个频道。 */\nconst tabATransport = createBroadcastChannelTransport(channelA)\n/** 只借用第二个频道。 */\nconst tabBTransport = createBroadcastChannelTransport(channelB)\n/** 提供方法的 Endpoint，由示例负责 dispose。 */\nconst tabB = await createEndpoint({\n  id: 'tab-b',\n  transport: tabBTransport,\n  middlewares: [connect({ transport: tabBTransport })]\n})\ntabB.provide('cart.count', (context) => context.success(3))\n/** 调用端固定目标 id，transport 仍为同源广播。 */\nconst tabA = await createEndpoint({\n  id: 'tab-a',\n  targetIds: ['tab-b'],\n  transport: tabATransport,\n  middlewares: [connect({ transport: tabATransport })]\n})\ntry {\n  console.log(await tabA.send<number>('tab-b', 'cart.count', null)) // 3\n} finally {\n  await tabA.dispose()\n  await tabB.dispose()\n  channelA.close()\n  channelB.close()\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/broadcast-channel",
           "overloadSignatures": [
             "export declare function createBroadcastChannelTransport(channel: BroadcastChannel): IRpcTransport;"
@@ -1731,6 +2336,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createRtcDataChannelTransport.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/rtc-data-channel",
           "overloadSignatures": [
             "export declare function createRtcDataChannelTransport(channel: IRTCDataChannel): IRpcTransport;"
@@ -1801,7 +2407,73 @@
           "errors": ["No documented errors are declared for IRTCDataChannel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRTCDataChannel.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "send",
+              "kind": "method",
+              "optional": false,
+              "signature": "send(data: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "data",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "readyState",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly readyState: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message' | 'closing' | 'close' | 'error'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: unknown) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message' | 'closing' | 'close' | 'error'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: unknown) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./adapters/rtc-data-channel",
           "overloadSignatures": [
             "export type IRTCDataChannel = { send(data: string): void; readonly readyState: string; addEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; removeEventListener(type: 'message' | 'closing' | 'close' | 'error', listener: (event: unknown) => void): void; };"
@@ -1893,6 +2565,7 @@
             "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/service-worker",
           "overloadSignatures": [
             "export declare function createServiceWorkerTransport(options: IServiceWorkerTransportOptions): IRpcTransport<unknown, Transferable>;"
@@ -2009,7 +2682,49 @@
           "examples": [
             "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: MessageEvent<unknown>) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: MessageEvent<unknown>) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./adapters/service-worker",
           "overloadSignatures": [
             "export type IServiceWorkerMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };"
@@ -2074,7 +2789,38 @@
           "examples": [
             "import {\n  createServiceWorkerTransport,\n  type IServiceWorkerMessageReceiver,\n  type IServiceWorkerMessageTarget\n} from '@migaia/rpc-browser/adapters/service-worker'\n\n/** 宿主从 clients.get() 取得实际 Client 后，借用该 Client 与真实 Worker receiver。 */\nexport function openClientTransport(\n  client: IServiceWorkerMessageTarget & { readonly id: string },\n  receiver: IServiceWorkerMessageReceiver\n) {\n  return createServiceWorkerTransport({ target: client, receiver, peerId: client.id })\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "postMessage",
+              "kind": "method",
+              "optional": false,
+              "signature": "postMessage(message: unknown, transfer?: readonly Transferable[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "transfer",
+                  "type": "readonly Transferable[]",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly id?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": "./adapters/service-worker",
           "overloadSignatures": [
             "export type IServiceWorkerMessageTarget = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; readonly id?: string; };"
@@ -2137,7 +2883,36 @@
           "errors": ["No documented errors are declared for IServiceWorkerTransportOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IServiceWorkerTransportOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "target",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly target: IServiceWorkerMessageTarget;",
+              "description": "ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target.",
+              "parameterDetails": [],
+              "returns": "IServiceWorkerMessageTarget"
+            },
+            {
+              "name": "receiver",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly receiver: IServiceWorkerMessageReceiver;",
+              "description": "Message event owner, usually navigator.serviceWorker in a page or self in the worker.",
+              "parameterDetails": [],
+              "returns": "IServiceWorkerMessageReceiver"
+            },
+            {
+              "name": "peerId",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly peerId?: string;",
+              "description": "Expected remote Client identity; defaults to target.id when that identity is available.",
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": "./adapters/service-worker",
           "overloadSignatures": [
             "export type IServiceWorkerTransportOptions = { /** ServiceWorker or Client that receives outgoing calls; pass the concrete authenticated target. */ readonly target: IServiceWorkerMessageTarget; /** Message event owner, usually navigator.serviceWorker in a page or self in the worker. */ readonly receiver: IServiceWorkerMessageReceiver; /** Expected remote Client identity; defaults to target.id when that identity is available. */ readonly peerId?: string; };"
@@ -2226,6 +3001,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createSharedWorkerTransport.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/shared-worker",
           "overloadSignatures": [
             "export declare function createSharedWorkerTransport(port: ISharedWorkerPort): IRpcTransport<unknown, Transferable>;"
@@ -2296,7 +3072,78 @@
           "errors": ["No documented errors are declared for ISharedWorkerPort."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISharedWorkerPort.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "postMessage",
+              "kind": "method",
+              "optional": false,
+              "signature": "postMessage(message: unknown, transfer?: readonly Transferable[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "transfer",
+                  "type": "readonly Transferable[]",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "start",
+              "kind": "method",
+              "optional": true,
+              "signature": "start?(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message' | 'messageerror'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: MessageEvent<unknown> | Event) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message' | 'messageerror'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: MessageEvent<unknown> | Event) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./adapters/shared-worker",
           "overloadSignatures": [
             "export type ISharedWorkerPort = { postMessage(message: unknown, transfer?: readonly Transferable[]): void; start?(): void; addEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; removeEventListener(type: 'message' | 'messageerror', listener: (event: MessageEvent<unknown> | Event) => void): void; };"
@@ -2387,6 +3234,7 @@
             "import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'\n\n/** 应用创建并持有服务器会话。 */\nconst session = new WebTransport('https://rpc.example:4433/rpc')\nawait session.ready\n/** transport 取得 datagram 写入端，但不接管整个会话。 */\nconst transport = createWebTransportDatagramTransport(session.datagrams)"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/web-transport",
           "overloadSignatures": [
             "export declare function createWebTransportDatagramTransport(datagrams: IWebTransportDatagrams): IRpcTransport<Uint8Array>;"
@@ -2457,7 +3305,27 @@
           "errors": ["No documented errors are declared for IWebTransportDatagrams."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebTransportDatagrams.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "writable",
+              "kind": "property",
+              "optional": false,
+              "signature": "writable: WritableStream<Uint8Array>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "WritableStream<Uint8Array>"
+            },
+            {
+              "name": "readable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readable: ReadableStream<Uint8Array>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReadableStream<Uint8Array>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./adapters/web-transport",
           "overloadSignatures": [
             "export type IWebTransportDatagrams = { writable: WritableStream<Uint8Array>; readable: ReadableStream<Uint8Array>; };"
@@ -2549,6 +3417,7 @@
             "// parent.ts\nimport { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'\nimport { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'\n\nconst iframe = document.querySelector<HTMLIFrameElement>('#billing')!\nawait new Promise<void>((resolve) =>\n  iframe.addEventListener('load', () => resolve(), { once: true })\n)\n\nconst transport = createWindowMessageTransport({\n  target: iframe.contentWindow!,\n  receiver: window,\n  targetOrigin: new URL(iframe.src).origin\n})\nconst billing = await createEndpoint({\n  id: 'checkout-page',\n  targetIds: ['billing-frame'],\n  transport,\n  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]\n})\n\nconst total = await billing.send<number>('billing-frame', 'calculateTotal', {\n  prices: [12, 30],\n  taxRate: 0.08\n})\nconsole.log(total) // 45.36\n\nawait billing.dispose()"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/window",
           "overloadSignatures": [
             "export declare function createWindowMessageTransport(options: IWindowMessageTransportOptions): IRpcTransport<unknown, Transferable>;"
@@ -2677,7 +3546,49 @@
           "errors": ["No documented errors are declared for IWindowMessageReceiver."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWindowMessageReceiver.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: MessageEvent<unknown>) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "'message'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: MessageEvent<unknown>) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./adapters/window",
           "overloadSignatures": [
             "export type IWindowMessageReceiver = { addEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; removeEventListener(type: 'message', listener: (event: MessageEvent<unknown>) => void): void; };"
@@ -2740,7 +3651,34 @@
           "errors": ["No documented errors are declared for IWindowMessageTarget."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWindowMessageTarget.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "postMessage",
+              "kind": "method",
+              "optional": false,
+              "signature": "postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "targetOrigin",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "transfer",
+                  "type": "readonly Transferable[]",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./adapters/window",
           "overloadSignatures": [
             "export type IWindowMessageTarget = { postMessage(message: unknown, targetOrigin: string, transfer?: readonly Transferable[]): void; };"
@@ -2803,7 +3741,45 @@
           "errors": ["No documented errors are declared for IWindowMessageTransportOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWindowMessageTransportOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "target",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly target: IWindowMessageTarget;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IWindowMessageTarget"
+            },
+            {
+              "name": "receiver",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly receiver?: IWindowMessageReceiver;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IWindowMessageReceiver"
+            },
+            {
+              "name": "targetOrigin",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly targetOrigin?: string;",
+              "description": "Defaults to current window.location.origin when available.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "allowUnsafeTargetOrigin",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly allowUnsafeTargetOrigin?: boolean;",
+              "description": "Explicit opt-in for wildcard delivery; source identity is still required on receive.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "exportPath": "./adapters/window",
           "overloadSignatures": [
             "export type IWindowMessageTransportOptions = { readonly target: IWindowMessageTarget; readonly receiver?: IWindowMessageReceiver; /** Defaults to current window.location.origin when available. */ readonly targetOrigin?: string; /** Explicit opt-in for wildcard delivery; source identity is still required on receive. */ readonly allowUnsafeTargetOrigin?: boolean; };"

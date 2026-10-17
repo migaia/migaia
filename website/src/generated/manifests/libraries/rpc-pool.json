@@ -236,6 +236,7 @@
             "import { createProcessPool } from '@migaia/rpc-pool'\n\nconst pool = await createProcessPool<{ add(value: { a: number; b: number }): number }>({\n  spawn: new URL('./service.js', import.meta.url),\n  size: 2,\n  maxQueue: 16\n})\ntry {\n  console.log(await pool.request('add', { a: 20, b: 22 }))\n} finally {\n  await pool.close()\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createProcessPool<TRemote = Record<never, never>>(options: IProcessPoolOptions): Promise<IProcessPool<TRemote>>;"
@@ -284,11 +285,97 @@
               "content": "No additional advanced behavior is declared for createProcessPool."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "spawn",
+              "type": "NonNullable<IRuntimeProcessPeerOptions['spawn']>",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "probe",
+              "type": "IRuntimeProcessPeerOptions['probe']",
+              "optional": true,
+              "description": "Every member receives the same source probe without cloning its handle."
+            },
+            {
+              "name": "size",
+              "type": "number",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "maxQueue",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "idleTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy."
+            }
+          ],
           "identity": "packages/rpc-pool/dist/index.d.ts:createProcessPool:export declare function createProcessPool<TRemote = Record<never, never>>(options: IProcessPoolOptions): Promise<IProcessPool<TRemote>>;",
           "guidance": [],
           "usageScore": 28,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "spawn",
+              "type": "NonNullable<IRuntimeProcessPeerOptions['spawn']>",
+              "optional": false,
+              "description": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。",
+              "descriptionEn": "",
+              "descriptionZh": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+            },
+            {
+              "name": "probe",
+              "type": "IRuntimeProcessPeerOptions['probe']",
+              "optional": true,
+              "description": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。",
+              "descriptionEn": "Every member receives the same source probe without cloning its handle.",
+              "descriptionZh": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+            },
+            {
+              "name": "size",
+              "type": "number",
+              "optional": false,
+              "description": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。",
+              "descriptionEn": "",
+              "descriptionZh": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+            },
+            {
+              "name": "maxQueue",
+              "type": "number",
+              "optional": true,
+              "description": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。",
+              "descriptionEn": "",
+              "descriptionZh": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+            },
+            {
+              "name": "idleTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。",
+              "descriptionEn": "",
+              "descriptionZh": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
+              "descriptionEn": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-pool-index--createProcessPool"
         },
         {
@@ -315,6 +402,7 @@
             "import { createThreadPool } from '@migaia/rpc-pool'\n\nconst pool = await createThreadPool<{ double(value: number): number }>({\n  spawn: new URL('./worker.js', import.meta.url),\n  size: 2\n})\ntry {\n  console.log(await Promise.all([pool.request('double', 21), pool.request('double', 10)]))\n  await pool.resize(3)\n  console.log(pool.stats())\n} finally {\n  await pool.close()\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createThreadPool<TRemote = Record<never, never>>(options: IThreadPoolOptions): Promise<IThreadPool<TRemote>>;"
@@ -363,11 +451,97 @@
               "content": "No additional advanced behavior is declared for createThreadPool."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "spawn",
+              "type": "NonNullable<IRuntimeThreadPeerOptions['spawn']>",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "probe",
+              "type": "IRuntimeThreadPeerOptions['probe']",
+              "optional": true,
+              "description": "Every member receives the same source probe without cloning its handle."
+            },
+            {
+              "name": "size",
+              "type": "number",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "maxQueue",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "idleTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy."
+            }
+          ],
           "identity": "packages/rpc-pool/dist/index.d.ts:createThreadPool:export declare function createThreadPool<TRemote = Record<never, never>>(options: IThreadPoolOptions): Promise<IThreadPool<TRemote>>;",
           "guidance": [],
           "usageScore": 38,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "spawn",
+              "type": "NonNullable<IRuntimeThreadPeerOptions['spawn']>",
+              "optional": false,
+              "description": "`spawn` 原样交给 `createThreadPeer`，支持 `true`、入口路径、URL 和现有配置。不同程序才需要入口。此例的两个文件由文档检查器构建并运行。",
+              "descriptionEn": "",
+              "descriptionZh": "`spawn` 原样交给 `createThreadPeer`，支持 `true`、入口路径、URL 和现有配置。不同程序才需要入口。此例的两个文件由文档检查器构建并运行。"
+            },
+            {
+              "name": "probe",
+              "type": "IRuntimeThreadPeerOptions['probe']",
+              "optional": true,
+              "description": "Every member receives the same source probe without cloning its handle.",
+              "descriptionEn": "Every member receives the same source probe without cloning its handle.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "size",
+              "type": "number",
+              "optional": false,
+              "description": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。",
+              "descriptionEn": "",
+              "descriptionZh": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+            },
+            {
+              "name": "maxQueue",
+              "type": "number",
+              "optional": true,
+              "description": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。",
+              "descriptionEn": "",
+              "descriptionZh": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+            },
+            {
+              "name": "idleTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。",
+              "descriptionEn": "",
+              "descriptionZh": "使用 `createProcessPool<T>({ spawn, size, maxQueue?, idleTimeoutMs?, probe? })`，同 README 的真实进程示例。不同程序可用 URL/路径；外语 JSON-RPC 使用原 `{ command, args, wire: 'jsonrpc', contract }`。通信本身不需要文件。此工厂保留 Process 的 call-options 类型，不提供 thread transfer。"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
+              "descriptionEn": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-pool-index--createThreadPool"
         },
         {
@@ -385,7 +559,75 @@
           "errors": ["No documented errors are declared for IProcessPool."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessPool.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "request",
+              "kind": "method",
+              "optional": false,
+              "signature": "request<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<IRuntimeResult<S[M]>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "M",
+                  "optional": false,
+                  "configurationType": "Extract"
+                },
+                {
+                  "name": "args",
+                  "type": "[...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]",
+                  "optional": false,
+                  "configurationType": "[...IRuntimePayload<S[Extract]>, options?: IRuntimeFamilyCallOptions<K>]"
+                }
+              ],
+              "returns": "Promise<IRuntimeResult<S[M]>>"
+            },
+            {
+              "name": "notify",
+              "kind": "method",
+              "optional": false,
+              "signature": "notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "M",
+                  "optional": false,
+                  "configurationType": "Extract"
+                },
+                {
+                  "name": "args",
+                  "type": "[...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]",
+                  "optional": false,
+                  "configurationType": "[...IRuntimePayload<S[Extract]>, options?: IRuntimeFamilyCallOptions<K>]"
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "stream",
+              "kind": "method",
+              "optional": false,
+              "signature": "stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): AsyncIterableIterator<IRuntimeYield<S[M]>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "M",
+                  "optional": false,
+                  "configurationType": "Extract"
+                },
+                {
+                  "name": "args",
+                  "type": "[...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]",
+                  "optional": false,
+                  "configurationType": "[...IRuntimePayload<S[Extract]>, options?: IRuntimeFamilyCallOptions<K>]"
+                }
+              ],
+              "returns": "AsyncIterableIterator<IRuntimeYield<S[M]>>"
+            }
+          ],
+          "composes": ["IRpcPoolControls"],
           "aliasOf": "IProcessPool",
           "exportPath": ".",
           "overloadSignatures": [
@@ -449,7 +691,63 @@
           "errors": ["No documented errors are declared for IProcessPoolOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessPoolOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "spawn",
+              "kind": "property",
+              "optional": false,
+              "signature": "spawn: NonNullable<IRuntimeProcessPeerOptions['spawn']>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "NonNullable<IRuntimeProcessPeerOptions['spawn']>"
+            },
+            {
+              "name": "probe",
+              "kind": "property",
+              "optional": true,
+              "signature": "probe?: IRuntimeProcessPeerOptions['probe'];",
+              "description": "Every member receives the same source probe without cloning its handle.",
+              "parameterDetails": [],
+              "returns": "IRuntimeProcessPeerOptions['probe']"
+            },
+            {
+              "name": "size",
+              "kind": "property",
+              "optional": false,
+              "signature": "size: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxQueue",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxQueue?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "idleTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "idleTimeoutMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IProcessPoolOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -513,7 +811,42 @@
           "errors": ["No documented errors are declared for IRpcPoolControls."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcPoolControls.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "stats",
+              "kind": "method",
+              "optional": false,
+              "signature": "stats(): IRpcPoolStats;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcPoolStats"
+            },
+            {
+              "name": "resize",
+              "kind": "method",
+              "optional": false,
+              "signature": "resize(size: number): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "size",
+                  "type": "number",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRpcPoolControls",
           "exportPath": ".",
           "overloadSignatures": [
@@ -578,6 +911,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcPoolErrorCode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IRpcPoolErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -641,7 +975,54 @@
           "errors": ["No documented errors are declared for IRpcPoolStats."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcPoolStats.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "targetSize",
+              "kind": "property",
+              "optional": false,
+              "signature": "targetSize: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "memberCount",
+              "kind": "property",
+              "optional": false,
+              "signature": "memberCount: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "inFlight",
+              "kind": "property",
+              "optional": false,
+              "signature": "inFlight: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "queued",
+              "kind": "property",
+              "optional": false,
+              "signature": "queued: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "state: RpcPoolState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "RpcPoolState"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRpcPoolStats",
           "exportPath": ".",
           "overloadSignatures": [
@@ -705,7 +1086,75 @@
           "errors": ["No documented errors are declared for IThreadPool."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadPool.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "request",
+              "kind": "method",
+              "optional": false,
+              "signature": "request<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<IRuntimeResult<S[M]>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "M",
+                  "optional": false,
+                  "configurationType": "Extract"
+                },
+                {
+                  "name": "args",
+                  "type": "[...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]",
+                  "optional": false,
+                  "configurationType": "[...IRuntimePayload<S[Extract]>, options?: IRuntimeFamilyCallOptions<K>]"
+                }
+              ],
+              "returns": "Promise<IRuntimeResult<S[M]>>"
+            },
+            {
+              "name": "notify",
+              "kind": "method",
+              "optional": false,
+              "signature": "notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "M",
+                  "optional": false,
+                  "configurationType": "Extract"
+                },
+                {
+                  "name": "args",
+                  "type": "[...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]",
+                  "optional": false,
+                  "configurationType": "[...IRuntimePayload<S[Extract]>, options?: IRuntimeFamilyCallOptions<K>]"
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "stream",
+              "kind": "method",
+              "optional": false,
+              "signature": "stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): AsyncIterableIterator<IRuntimeYield<S[M]>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "M",
+                  "optional": false,
+                  "configurationType": "Extract"
+                },
+                {
+                  "name": "args",
+                  "type": "[...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]",
+                  "optional": false,
+                  "configurationType": "[...IRuntimePayload<S[Extract]>, options?: IRuntimeFamilyCallOptions<K>]"
+                }
+              ],
+              "returns": "AsyncIterableIterator<IRuntimeYield<S[M]>>"
+            }
+          ],
+          "composes": ["IRpcPoolControls"],
           "aliasOf": "IThreadPool",
           "exportPath": ".",
           "overloadSignatures": [
@@ -769,7 +1218,63 @@
           "errors": ["No documented errors are declared for IThreadPoolOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadPoolOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "spawn",
+              "kind": "property",
+              "optional": false,
+              "signature": "spawn: NonNullable<IRuntimeThreadPeerOptions['spawn']>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "NonNullable<IRuntimeThreadPeerOptions['spawn']>"
+            },
+            {
+              "name": "probe",
+              "kind": "property",
+              "optional": true,
+              "signature": "probe?: IRuntimeThreadPeerOptions['probe'];",
+              "description": "Every member receives the same source probe without cloning its handle.",
+              "parameterDetails": [],
+              "returns": "IRuntimeThreadPeerOptions['probe']"
+            },
+            {
+              "name": "size",
+              "kind": "property",
+              "optional": false,
+              "signature": "size: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxQueue",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxQueue?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "idleTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "idleTimeoutMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Controls only pool idle retirement; native Peer lifetimes keep their own source policy.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IThreadPoolOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -834,6 +1339,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RPC_POOL_ERROR_SOURCE.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "RPC_POOL_ERROR_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
@@ -897,7 +1403,54 @@
           "errors": ["No documented errors are declared for RpcPoolErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcPoolErrorCode.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "invalidOptions",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOptions: \"INVALID_OPTIONS\";",
+              "description": "Invalid construction or resize arguments are rejected before any native acquisition.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTIONS\""
+            },
+            {
+              "name": "poolClosed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly poolClosed: \"POOL_CLOSED\";",
+              "description": "A closing pool rejects new work while draining operations already accepted.",
+              "parameterDetails": [],
+              "returns": "\"POOL_CLOSED\""
+            },
+            {
+              "name": "queueFull",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly queueFull: \"QUEUE_FULL\";",
+              "description": "A full bounded FIFO rejects the new operation without calling a Peer.",
+              "parameterDetails": [],
+              "returns": "\"QUEUE_FULL\""
+            },
+            {
+              "name": "callAborted",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly callAborted: \"CALL_ABORTED\";",
+              "description": "Cancellation removes only an operation still waiting in the pool FIFO.",
+              "parameterDetails": [],
+              "returns": "\"CALL_ABORTED\""
+            },
+            {
+              "name": "closeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closeFailed: \"CLOSE_FAILED\";",
+              "description": "All member closes were attempted and their original failures are collected.",
+              "parameterDetails": [],
+              "returns": "\"CLOSE_FAILED\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "RpcPoolErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -961,7 +1514,36 @@
           "errors": ["No documented errors are declared for RpcPoolState."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcPoolState.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "open",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly open: \"open\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"open\""
+            },
+            {
+              "name": "closing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closing: \"closing\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"closing\""
+            },
+            {
+              "name": "closed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closed: \"closed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"closed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "RpcPoolState",
           "exportPath": ".",
           "overloadSignatures": [

@@ -1256,6 +1256,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for asChangeFeedStore.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "asChangeFeedStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1330,6 +1331,7 @@
             "import { type IKeyValueStore, asRecordStore } from '@migaia/storage-contract';\n\nexport const persistBlob = async (store: IKeyValueStore, key: string, blob: Uint8Array) => {\n  if (store.capabilities.binary) {\n    await asRecordStore(store).setBytes(key, blob);\n    return;\n  }\n  // 退回文本通道，调用方自行做 base64 之类的编码\n  await store.set(key, btoa(String.fromCharCode(...blob)));\n};"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "asRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1455,6 +1457,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for asSecondaryIndexRecordStore.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "asSecondaryIndexRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1528,6 +1531,7 @@
             "import { assertCodec, type ICodec } from '@migaia/storage-contract';\n\nconst gzipJsonCodec: ICodec<unknown, Uint8Array> = {\n  name: 'gzip-json',\n  output: 'binary',\n  encode: async (value) => gzip(JSON.stringify(value)),\n  decode: async (raw) => JSON.parse(await gunzip(raw))\n};\nassertCodec(gzipJsonCodec); // 在注册前校验形状，坏实现尽早报错"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "assertCodec",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1604,6 +1608,7 @@
             "assertOperationContext(ctx); // 非法时抛错，合法时无返回"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "assertOperationContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1809,6 +1814,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStorageKey.",
           "examples": ["assertStorageKey(candidate, 'indexeddb');"],
           "members": [],
+          "composes": [],
           "aliasOf": "assertStorageKey",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1907,6 +1913,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStringStorageKey.",
           "examples": ["assertStringStorageKey(key, 'local');"],
           "members": [],
+          "composes": [],
           "aliasOf": "assertStringStorageKey",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1993,6 +2000,7 @@
             "assertSyncWriteOptions(options);"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "assertSyncWriteOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2186,6 +2194,7 @@
             "assertTransactionCallback(run, 'memory'); // 非函数抛 invalidArgument"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "assertTransactionCallback",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2253,6 +2262,7 @@
             "import {\n  COLLECTIONS_JSON_CODEC_NAME,\n  collectionsJsonCodec\n} from '@migaia/storage-contract';\n\nconst raw = await collectionsJsonCodec.encode(new Map([['theme', 'dark']]));\nconst restored = await collectionsJsonCodec.decode(raw); // Map 实例"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "COLLECTIONS_JSON_CODEC_NAME",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2320,6 +2330,7 @@
             "import {\n  COLLECTIONS_JSON_CODEC_NAME,\n  collectionsJsonCodec\n} from '@migaia/storage-contract';\n\nconst raw = await collectionsJsonCodec.encode(new Map([['theme', 'dark']]));\nconst restored = await collectionsJsonCodec.decode(raw); // Map 实例"
           ],
           "members": [],
+          "composes": ["ICodec"],
           "aliasOf": "collectionsJsonCodec",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2388,6 +2399,7 @@
             "[keyA, keyB].sort(compareStorageKeys);"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "compareStorageKeys",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2457,7 +2469,27 @@
             "ConflictPolicy.conflict; // 'conflict'\nConflictPolicy.replace; // 'replace'",
             "import {\n  ConflictPolicy,\n  type IRecordStore,\n  type ITransactionScope\n} from '@migaia/storage-contract';\n\ntype ICounter = { readonly value: number };\n\nexport const increment = (store: IRecordStore<ICounter>, key: string) =>\n  store.transaction(async (tx: ITransactionScope<ICounter>) => {\n    const current = await tx.get(key);\n    await tx.put({ value: (current?.value ?? 0) + 1 }, key, {\n      conflictPolicy: ConflictPolicy.replace\n    });\n  });"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "conflict",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly conflict: \"conflict\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"conflict\""
+            },
+            {
+              "name": "replace",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly replace: \"replace\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"replace\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "ConflictPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2656,6 +2688,7 @@
             "import {\n  snapshotStorageCapabilities,\n  isStorageCapabilities,\n  type IBackendKind,\n  type IStorageCapabilities\n} from '@migaia/storage-contract';"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IBackendKind",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2834,7 +2867,24 @@
           "errors": ["No documented errors are declared for IChangeFeedStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IChangeFeedStore.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "subscribeChanges",
+              "kind": "method",
+              "optional": false,
+              "signature": "subscribeChanges(listener: (change: IStorageChange) => void): () => void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "listener",
+                  "type": "(change: IStorageChange) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            }
+          ],
+          "composes": ["IKeyValueStore"],
           "aliasOf": "IChangeFeedStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2906,7 +2956,67 @@
             "assertCodec(candidate); // candidate 类型收窄为 ICodec",
             "import { assertCodec, type ICodec } from '@migaia/storage-contract';\n\nconst gzipJsonCodec: ICodec<unknown, Uint8Array> = {\n  name: 'gzip-json',\n  output: 'binary',\n  encode: async (value) => gzip(JSON.stringify(value)),\n  decode: async (raw) => JSON.parse(await gunzip(raw))\n};\nassertCodec(gzipJsonCodec); // 在注册前校验形状，坏实现尽早报错"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "output",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly output: ICodecOutput;",
+              "description": "Declares the output form used to select a route from the backend capabilities.",
+              "parameterDetails": [],
+              "returns": "ICodecOutput"
+            },
+            {
+              "name": "encode",
+              "kind": "method",
+              "optional": false,
+              "signature": "encode(value: T, ctx?: IOperationContext): Promise<TRaw>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<TRaw>"
+            },
+            {
+              "name": "decode",
+              "kind": "method",
+              "optional": false,
+              "signature": "decode(raw: TRaw, ctx?: IOperationContext): Promise<T>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "raw",
+                  "type": "TRaw",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<T>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ICodec",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2974,6 +3084,7 @@
             "import {\n  snapshotCodec,\n  assertCodec,\n  type ICodec,\n  type ICodecOutput\n} from '@migaia/storage-contract';"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "ICodecOutput",
           "exportPath": ".",
           "overloadSignatures": ["export type ICodecOutput = 'text' | 'binary' | 'structured';"],
@@ -3042,6 +3153,7 @@
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IConflictPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3235,7 +3347,45 @@
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';",
             "const range: IKeyRange = { lower: 'a', upper: 'z', upperOpen: true };"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "lower",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly lower?: TKey;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TKey"
+            },
+            {
+              "name": "lowerOpen",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly lowerOpen?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "upper",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly upper?: TKey;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TKey"
+            },
+            {
+              "name": "upperOpen",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly upperOpen?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IKeyRange",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3438,7 +3588,175 @@
             "import { type IKeyValueStore, asRecordStore } from '@migaia/storage-contract';\n\nexport const persistBlob = async (store: IKeyValueStore, key: string, blob: Uint8Array) => {\n  if (store.capabilities.binary) {\n    await asRecordStore(store).setBytes(key, blob);\n    return;\n  }\n  // 退回文本通道，调用方自行做 base64 之类的编码\n  await store.set(key, btoa(String.fromCharCode(...blob)));\n};",
             "import {\n  snapshotOperationContext,\n  type IKeyValueStore,\n  type IOperationContext\n} from '@migaia/storage-contract';\n\nexport const readWithBudget = async (\n  store: IKeyValueStore,\n  key: string,\n  ctx: IOperationContext\n) => {\n  const snapshot = snapshotOperationContext(ctx); // 提前校验，坏参数在发起 I/O 前就抛出\n  return store.get(key, snapshot);\n};"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "backend",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly backend: IBackendKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IBackendKind"
+            },
+            {
+              "name": "capabilities",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly capabilities: IStorageCapabilities;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStorageCapabilities"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(key: string, ctx?: IOperationContext): Promise<string | null>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<string | null>"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "optional": false,
+              "signature": "set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IWriteOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "remove",
+              "kind": "method",
+              "optional": false,
+              "signature": "remove(key: string, ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "optional": false,
+              "signature": "has(key: string, ctx?: IOperationContext): Promise<boolean>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<boolean>"
+            },
+            {
+              "name": "keys",
+              "kind": "method",
+              "optional": false,
+              "signature": "keys(ctx?: IOperationContext): Promise<string[]>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<string[]>"
+            },
+            {
+              "name": "clearValues",
+              "kind": "method",
+              "optional": false,
+              "signature": "clearValues(ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "clearAll",
+              "kind": "method",
+              "optional": false,
+              "signature": "clearAll(ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "sync",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly sync?: ISyncKeyValueStore;",
+              "description": "Exists only on synchronous backends. Asynchronous backends such as IndexedDB expose `undefined`.",
+              "parameterDetails": [],
+              "returns": "ISyncKeyValueStore"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IKeyValueStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3502,7 +3820,81 @@
           "errors": ["No documented errors are declared for IKeyValueStoreAdmission."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IKeyValueStoreAdmission.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "valid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly valid: true;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true"
+            },
+            {
+              "name": "store",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly store: IKeyValueStore;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IKeyValueStore"
+            },
+            {
+              "name": "backend",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly backend: IBackendKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IBackendKind"
+            },
+            {
+              "name": "capabilities",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly capabilities: IStorageCapabilities;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStorageCapabilities"
+            },
+            {
+              "name": "dispose",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly dispose: () => Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => Promise<void>"
+            },
+            {
+              "name": "receiver",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly receiver: object;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "object"
+            },
+            {
+              "name": "valid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly valid: false;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "false"
+            },
+            {
+              "name": "cause",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cause: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IKeyValueStoreAdmission",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3571,6 +3963,7 @@
             "intrinsicConstructorName(new Date()); // 'Date'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "intrinsicConstructorName",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3644,7 +4037,36 @@
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';",
             "import {\n  snapshotOperationContext,\n  type IKeyValueStore,\n  type IOperationContext\n} from '@migaia/storage-contract';\n\nexport const readWithBudget = async (\n  store: IKeyValueStore,\n  key: string,\n  ctx: IOperationContext\n) => {\n  const snapshot = snapshotOperationContext(ctx); // 提前校验，坏参数在发起 I/O 前就抛出\n  return store.get(key, snapshot);\n};"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly signal?: IAbortSignal;",
+              "description": "Requests cooperative cancellation. Backends can ignore work cancellation, while cancellation-aware operations stop waiting with the contract `ABORTED` error. Uses a structural signal without depending on the global `AbortSignal`.",
+              "parameterDetails": [],
+              "returns": "IAbortSignal"
+            },
+            {
+              "name": "timeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly timeoutMs?: number;",
+              "description": "Creates an internal timeout signal. When an external `signal` also exists, the first signal to fire wins.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "pageSize",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly pageSize?: number;",
+              "description": "IndexedDB iterator page size; bounded to protect cursor memory.",
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IOperationContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3836,7 +4258,18 @@
             "function snapshotOperationContext(\n  ctx: IOperationContext | undefined\n): IOperationContextSnapshot | undefined;",
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "conflictPolicy",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly conflictPolicy?: IConflictPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IConflictPolicy"
+            }
+          ],
+          "composes": ["IOperationContext"],
           "aliasOf": "IOperationContextSnapshot",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4025,7 +4458,45 @@
           "errors": ["No documented errors are declared for IRecordIndexDefinition."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRecordIndexDefinition.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "unique",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unique: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "multiEntry",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly multiEntry: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "revision",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly revision: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRecordIndexDefinition",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4089,7 +4560,36 @@
           "errors": ["No documented errors are declared for IRecordIndexHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRecordIndexHandle.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "scope",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scope: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly generation: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "fingerprint",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly fingerprint: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRecordIndexHandle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4154,6 +4654,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRecordIndexProjection.",
           "examples": [],
           "members": [],
+          "composes": ["Record"],
           "aliasOf": "IRecordIndexProjection",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4217,7 +4718,45 @@
           "errors": ["No documented errors are declared for IRecordIndexProjectionValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRecordIndexProjectionValue.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: 'single';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'single'"
+            },
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly key: IStorageKey;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStorageKey"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: 'multiple';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'multiple'"
+            },
+            {
+              "name": "keys",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly keys: readonly IStorageKey[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IStorageKey[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRecordIndexProjectionValue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4281,7 +4820,54 @@
           "errors": ["No documented errors are declared for IRecordIndexQuery."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRecordIndexQuery.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "handle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly handle: IRecordIndexHandle;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRecordIndexHandle"
+            },
+            {
+              "name": "index",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly index: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "range",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly range?: IKeyRange;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IKeyRange"
+            },
+            {
+              "name": "direction",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly direction?: 'next' | 'prev';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'next' | 'prev'"
+            },
+            {
+              "name": "limit",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly limit?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRecordIndexQuery",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4345,7 +4931,36 @@
           "errors": ["No documented errors are declared for IRecordIndexReadiness."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRecordIndexReadiness.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly status: 'pending' | 'running' | 'complete' | 'failed';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'pending' | 'running' | 'complete' | 'failed'"
+            },
+            {
+              "name": "scanned",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scanned: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "indexed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly indexed: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRecordIndexReadiness",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4415,7 +5030,213 @@
             "import {\n  isKeyValueStore,\n  asRecordStore,\n  isRecordStore,\n  type IKeyValueStore,\n  type ISyncKeyValueStore,\n  type IRecordStore,\n  type ISyncCapableStore\n} from '@migaia/storage-contract';",
             "import {\n  ConflictPolicy,\n  type IRecordStore,\n  type ITransactionScope\n} from '@migaia/storage-contract';\n\ntype ICounter = { readonly value: number };\n\nexport const increment = (store: IRecordStore<ICounter>, key: string) =>\n  store.transaction(async (tx: ITransactionScope<ICounter>) => {\n    const current = await tx.get(key);\n    await tx.put({ value: (current?.value ?? 0) + 1 }, key, {\n      conflictPolicy: ConflictPolicy.replace\n    });\n  });"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "getBytes",
+              "kind": "method",
+              "optional": false,
+              "signature": "getBytes(key: string, ctx?: IOperationContext): Promise<Uint8Array | null>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<Uint8Array | null>"
+            },
+            {
+              "name": "setBytes",
+              "kind": "method",
+              "optional": false,
+              "signature": "setBytes(key: string, value: Uint8Array, ctx?: IWriteOptions): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "Uint8Array",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IWriteOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "clearBytes",
+              "kind": "method",
+              "optional": false,
+              "signature": "clearBytes(ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "getRecord",
+              "kind": "method",
+              "optional": false,
+              "signature": "getRecord(key: IStorageKey, ctx?: IOperationContext): Promise<TValue | undefined>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<TValue | undefined>"
+            },
+            {
+              "name": "putRecord",
+              "kind": "method",
+              "optional": false,
+              "signature": "putRecord(value: TValue, key?: IStorageKey, ctx?: IWriteOptions): Promise<IStorageKey>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "TValue",
+                  "optional": false
+                },
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": true
+                },
+                {
+                  "name": "ctx",
+                  "type": "IWriteOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IStorageKey>"
+            },
+            {
+              "name": "deleteRecord",
+              "kind": "method",
+              "optional": false,
+              "signature": "deleteRecord(key: IStorageKey, ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "clearRecords",
+              "kind": "method",
+              "optional": false,
+              "signature": "clearRecords(ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "clearAll",
+              "kind": "method",
+              "optional": false,
+              "signature": "clearAll(ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "metadata",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly metadata?: { get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; };",
+              "description": "Optional backend-owned metadata channel used by resumable maintenance migrations.",
+              "parameterDetails": [],
+              "returns": "{ get(key: string, ctx?: IOperationContext): Promise<unknown | undefined>; set(key: string, value: unknown, ctx?: IWriteOptions): Promise<void>; delete(key: string, ctx?: IOperationContext): Promise<void>; }"
+            },
+            {
+              "name": "iterateRecords",
+              "kind": "method",
+              "optional": false,
+              "signature": "iterateRecords(range?: IKeyRange, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "range",
+                  "type": "IKeyRange",
+                  "optional": true
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "AsyncIterableIterator<[IStorageKey, TValue]>"
+            },
+            {
+              "name": "transaction",
+              "kind": "method",
+              "optional": false,
+              "signature": "transaction<T>(run: (tx: ITransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "run",
+                  "type": "(tx: ITransactionScope<TValue>) => Promise<T>",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<T>"
+            }
+          ],
+          "composes": ["IKeyValueStore"],
           "aliasOf": "IRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4465,6 +5286,75 @@
           "fragment": "storage-contract-index--IRecordStore"
         },
         {
+          "name": "isArrayBuffer",
+          "kind": "const",
+          "signature": "export declare const isArrayBuffer: (value: unknown) => value is ArrayBuffer;",
+          "declarationLine": 10,
+          "source": "packages/utils/dist/bytes.d.ts",
+          "purpose": "Recognizes ArrayBuffer internal slots across realms, including detached buffers, without accepting SharedArrayBuffer, proxies, or objects that imitate the public constructor shape.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isArrayBuffer.",
+          "advanced": "No additional advanced behavior is declared for isArrayBuffer.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for isArrayBuffer."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isArrayBuffer.",
+          "examples": [
+            "function isUint8Array(value: unknown): value is Uint8Array;\nfunction isArrayBuffer(value: unknown): value is ArrayBuffer;",
+            "import {\n  isArrayBuffer,\n  isUint8Array,\n  intrinsicConstructorName,\n  StorageContractConflictPolicy,\n  type IStorageContractConflictPolicy\n} from '@migaia/storage-contract';",
+            "isUint8Array(new Uint8Array()); // true\nisArrayBuffer(new ArrayBuffer(1)); // true"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "isArrayBuffer",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const isArrayBuffer: (value: unknown) => value is ArrayBuffer;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use isArrayBuffer when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when isArrayBuffer does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Recognizes ArrayBuffer internal slots across realms, including detached buffers, without accepting SharedArrayBuffer, proxies, or objects that imitate the public constructor shape."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import isArrayBuffer from @migaia/storage-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use isArrayBuffer when its const contract and declared inputs match the result you need. Choose a different public symbol when isArrayBuffer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isArrayBuffer."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for isArrayBuffer."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/storage-contract:packages/utils/dist/bytes.d.ts:isArrayBuffer:export declare const isArrayBuffer: (value: unknown) => value is ArrayBuffer;",
+          "guidance": [],
+          "usageScore": 22,
+          "configuration": [],
+          "fragment": "storage-contract-index--isArrayBuffer"
+        },
+        {
           "name": "isChangeFeedStore",
           "kind": "const",
           "signature": "export declare const isChangeFeedStore: (store: unknown) => store is IChangeFeedStore;",
@@ -4480,6 +5370,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isChangeFeedStore.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "isChangeFeedStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4543,7 +5434,134 @@
           "errors": ["No documented errors are declared for ISecondaryIndexRecordStore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISecondaryIndexRecordStore.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ensureRecordIndexes",
+              "kind": "method",
+              "optional": false,
+              "signature": "ensureRecordIndexes(scope: string, definitions: readonly IRecordIndexDefinition[], ctx?: IOperationContext): Promise<IRecordIndexHandle>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "scope",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "definitions",
+                  "type": "readonly IRecordIndexDefinition[]",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IRecordIndexHandle>"
+            },
+            {
+              "name": "getRecordIndexReadiness",
+              "kind": "method",
+              "optional": false,
+              "signature": "getRecordIndexReadiness(handle: IRecordIndexHandle, ctx?: IOperationContext): Promise<IRecordIndexReadiness>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "handle",
+                  "type": "IRecordIndexHandle",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IRecordIndexReadiness>"
+            },
+            {
+              "name": "putIndexedRecord",
+              "kind": "method",
+              "optional": false,
+              "signature": "putIndexedRecord(value: TValue, key: IStorageKey, handle: IRecordIndexHandle, projection: IRecordIndexProjection, ctx?: IWriteOptions): Promise<IStorageKey>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "TValue",
+                  "optional": false
+                },
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": false
+                },
+                {
+                  "name": "handle",
+                  "type": "IRecordIndexHandle",
+                  "optional": false
+                },
+                {
+                  "name": "projection",
+                  "type": "IRecordIndexProjection",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IWriteOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IStorageKey>"
+            },
+            {
+              "name": "iterateRecordIndex",
+              "kind": "method",
+              "optional": false,
+              "signature": "iterateRecordIndex(query: IRecordIndexQuery, ctx?: IOperationContext): AsyncIterableIterator<[IStorageKey, TValue]>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "query",
+                  "type": "IRecordIndexQuery",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "AsyncIterableIterator<[IStorageKey, TValue]>"
+            },
+            {
+              "name": "transactionIndexed",
+              "kind": "method",
+              "optional": false,
+              "signature": "transactionIndexed<T>(handle: IRecordIndexHandle, run: (tx: ISecondaryIndexTransactionScope<TValue>) => Promise<T>, ctx?: IOperationContext): Promise<T>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "handle",
+                  "type": "IRecordIndexHandle",
+                  "optional": false
+                },
+                {
+                  "name": "run",
+                  "type": "(tx: ISecondaryIndexTransactionScope<TValue>) => Promise<T>",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<T>"
+            }
+          ],
+          "composes": ["IRecordStore"],
           "aliasOf": "ISecondaryIndexRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4607,7 +5625,64 @@
           "errors": ["No documented errors are declared for ISecondaryIndexTransactionScope."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISecondaryIndexTransactionScope.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(key: IStorageKey): Promise<TValue | undefined>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<TValue | undefined>"
+            },
+            {
+              "name": "put",
+              "kind": "method",
+              "optional": false,
+              "signature": "put(value: TValue, key: IStorageKey, projection: IRecordIndexProjection): Promise<IStorageKey>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "TValue",
+                  "optional": false
+                },
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": false
+                },
+                {
+                  "name": "projection",
+                  "type": "IRecordIndexProjection",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IStorageKey>"
+            },
+            {
+              "name": "delete",
+              "kind": "method",
+              "optional": false,
+              "signature": "delete(key: IStorageKey): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ISecondaryIndexTransactionScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4676,6 +5751,7 @@
             "if (isKeyValueStore(candidate)) await candidate.set('k', 'v');"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "isKeyValueStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4746,6 +5822,7 @@
             "import { asRecordStore, isRecordStore, type IKeyValueStore } from '@migaia/storage-contract';\n\ntype IProfile = { readonly name: string };\n\nexport const saveProfile = async (store: IKeyValueStore, profile: IProfile): Promise<void> => {\n  if (!isRecordStore(store)) throw new Error('profile storage requires an L1-capable backend');\n  await asRecordStore<IProfile>(store).putRecord(profile, 'profile');\n};"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "isRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4871,6 +5948,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isSecondaryIndexRecordStore.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "isSecondaryIndexRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4939,6 +6017,7 @@
             "isStorageCapabilities(candidate); // boolean"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "isStorageCapabilities",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5007,6 +6086,7 @@
             "if (isStorageContractError(error)) console.log(error.code);"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "isStorageContractError",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5191,7 +6271,90 @@
             "function isStorageCapabilities(value: unknown): value is IStorageCapabilities;",
             "import {\n  snapshotStorageCapabilities,\n  isStorageCapabilities,\n  type IBackendKind,\n  type IStorageCapabilities\n} from '@migaia/storage-contract';"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "syncRead",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly syncRead: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "binary",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly binary: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "records",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly records: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "transactions",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly transactions: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "iteration",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly iteration: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "secondaryIndexes",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly secondaryIndexes: boolean;",
+              "description": "Whether backend exposes logical secondary-index operations. Missing legacy fields mean false.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "changeFeed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly changeFeed: boolean;",
+              "description": "Whether backend emits post-commit invalidation changes. Missing legacy fields mean false.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "maxValueBytes",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly maxValueBytes: number | undefined;",
+              "description": "Approximate per-value limit in bytes: about 4096 for cookies and 5 MB for localStorage. IndexedDB uses `undefined` because quota limits total storage.",
+              "parameterDetails": [],
+              "returns": "number | undefined"
+            },
+            {
+              "name": "opaqueEntries",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly opaqueEntries: boolean;",
+              "description": "Whether the backend can contain keys hidden from JavaScript, such as `HttpOnly` cookies.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStorageCapabilities",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5255,7 +6418,63 @@
           "errors": ["No documented errors are declared for IStorageChange."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageChange.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "sequence",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sequence: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "origin",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly origin: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "channel",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly channel: 'value' | 'bytes' | 'record' | 'all';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'value' | 'bytes' | 'record' | 'all'"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly kind: 'put' | 'remove' | 'clear' | 'batch' | 'migrate';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'put' | 'remove' | 'clear' | 'batch' | 'migrate'"
+            },
+            {
+              "name": "scope",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly scope?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "keys",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly keys?: readonly IStorageKey[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IStorageKey[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStorageChange",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5323,6 +6542,7 @@
             "import {\n  isArrayBuffer,\n  isUint8Array,\n  intrinsicConstructorName,\n  StorageContractConflictPolicy,\n  type IStorageContractConflictPolicy\n} from '@migaia/storage-contract';"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IStorageContractConflictPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5372,6 +6592,189 @@
           "fragment": "storage-contract-index--IStorageContractConflictPolicy"
         },
         {
+          "name": "IStorageContractErrorCode",
+          "kind": "type",
+          "signature": "export type IStorageContractErrorCode = (typeof StorageContractErrorCode)[keyof typeof StorageContractErrorCode];",
+          "declarationLine": 63,
+          "source": "packages/storage-contract/dist/error-code.d.ts",
+          "purpose": "IStorageContractErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageContractErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IStorageContractErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStorageContractErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorageContractErrorCode.",
+          "examples": [
+            "class StorageContractError extends Error {\n  readonly source: string; // 恒为 '@migaia/storage-contract'\n  readonly code: IStorageContractErrorCode;\n  readonly backend?: IBackendKind;\n  readonly key?: string | IStorageKey;\n  constructor(\n    code: IStorageContractErrorCode,\n    details?: {\n      readonly backend?: IBackendKind;\n      readonly key?: string | IStorageKey;\n      readonly cause?: unknown;\n    },\n    message?: string\n  );\n}",
+            "import {\n  StorageContractError,\n  StorageContractErrorCode,\n  STORAGE_CONTRACT_SOURCE,\n  isStorageContractError,\n  type IStorageContractErrorCode,\n  type IStorageContractErrorDetails\n} from '@migaia/storage-contract';"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IStorageContractErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStorageContractErrorCode = (typeof StorageContractErrorCode)[keyof typeof StorageContractErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStorageContractErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStorageContractErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IStorageContractErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStorageContractErrorCode from @migaia/storage-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStorageContractErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IStorageContractErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorageContractErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStorageContractErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-contract/dist/error-code.d.ts:IStorageContractErrorCode:export type IStorageContractErrorCode = (typeof StorageContractErrorCode)[keyof typeof StorageContractErrorCode];",
+          "guidance": [
+            {
+              "id": "errors-模块",
+              "heading": "errors 模块",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "class StorageContractError extends Error {\n  readonly source: string; // 恒为 '@migaia/storage-contract'\n  readonly code: IStorageContractErrorCode;\n  readonly backend?: IBackendKind;\n  readonly key?: string | IStorageKey;\n  constructor(\n    code: IStorageContractErrorCode,\n    details?: {\n      readonly backend?: IBackendKind;\n      readonly key?: string | IStorageKey;\n      readonly cause?: unknown;\n    },\n    message?: string\n  );\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造后立即 `Object.freeze`；不重写 `stack`；`cause` 通过标准 `Error` 机制可达（不被冻结阻断）。`message` 默认取 `` `[storage-contract] ${code}` ``。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const StorageContractErrorCode = {\n  invalidArgument: 'INVALID_ARGUMENT',\n  invalidKey: 'INVALID_KEY',\n  unsupported: 'UNSUPPORTED_CAPABILITY',\n  disposed: 'STORE_DISPOSED',\n  aborted: 'ABORTED'\n} as const;"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Code", "含义", "调用方应对"],
+                  "rows": [
+                    [
+                      "`INVALID_ARGUMENT`",
+                      "契约级入参/描述符结构校验失败（codec、capabilities、transaction 选项、operation context 等公共契约类型不符合声明形状）",
+                      "修正入参后重试；这是永久性传参错误，不是可重试的瞬时失败"
+                    ],
+                    [
+                      "`INVALID_KEY`",
+                      "`IStorageKey` 违反键域（类型非法、深度/节点/二进制字节超限、循环、空数组）",
+                      "修正键；永久性错误，不要重试同一键"
+                    ],
+                    [
+                      "`UNSUPPORTED_CAPABILITY`",
+                      "调用了当前后端不提供的能力（`asRecordStore` 收窄失败、structured codec 落到 text-only 后端）",
+                      "先用 `capabilities`/`isRecordStore` 分支，或换一个具备该能力的后端；不做静默降级"
+                    ],
+                    [
+                      "`STORE_DISPOSED`",
+                      "store 已 `dispose()` 后继续调用其任何方法",
+                      "新建 store，不要复用已关闭实例"
+                    ],
+                    [
+                      "`ABORTED`",
+                      "操作被 `signal` 取消或 `timeoutMs` 到期",
+                      "按取消处理；已进入原子提交的写按提交事实返回，不伪报回滚"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`code` 值是公开 API 的一部分，改名等同破坏性变更；`source` 恒为 `'@migaia/storage-contract'`，与实现包（如 `storage-web`）自己的错误 `source` 互不冲突，可用 `(source, code)` 二元组唯一定位错误来源。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const STORAGE_CONTRACT_SOURCE: '@migaia/storage-contract';\nfunction isStorageContractError(value: unknown): value is StorageContractError;"
+                }
+              ]
+            },
+            {
+              "id": "errors-模块",
+              "heading": "errors 模块",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StorageContractError,\n  StorageContractErrorCode,\n  STORAGE_CONTRACT_SOURCE,\n  isStorageContractError,\n  type IStorageContractErrorCode,\n  type IStorageContractErrorDetails\n} from '@migaia/storage-contract';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StorageContractError`｜5 秒上手 —— 本包统一抛出的错误类，构造后 `Object.freeze`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw new StorageContractError(StorageContractErrorCode.invalidKey, {\n  backend: 'memory',\n  key: badKey\n});"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造参数：`code: IStorageContractErrorCode`（必填）、`details?: IStorageContractErrorDetails`（默认 `{}`，字段：`backend?: IBackendKind`、`key?: string | IStorageKey`、`cause?: unknown`）、`message?: string`（默认 `` `[storage-contract] ${code}` ``）。实例字段：`source`（恒为 `'@migaia/storage-contract'`）、`code`、`backend?`、`key?`，均只读；`cause` 通过标准 `Error` 机制可达。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StorageContractErrorCode`｜3 秒上手 —— 稳定错误码表，常量对象："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (error.code === StorageContractErrorCode.aborted) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值：`invalidArgument`(`INVALID_ARGUMENT`，契约级入参/描述符结构校验失败)、`invalidKey`(`INVALID_KEY`，键违反键域)、`unsupported`(`UNSUPPORTED_CAPABILITY`，调用了当前后端不提供的能力)、`disposed`(`STORE_DISPOSED`，store 已 `dispose()` 后继续调用)、`aborted`(`ABORTED`，操作被 `signal`/`timeoutMs` 取消)。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORAGE_CONTRACT_SOURCE`｜3 秒上手 —— 常量字符串 `'@migaia/storage-contract'`，等同任意 `StorageContractError` 实例的 `source` 字段。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`isStorageContractError`｜3 秒上手 —— 类型守卫："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (isStorageContractError(error)) console.log(error.code);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "单参数 `value: unknown`（必填），无选项。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 24,
+          "configuration": [],
+          "fragment": "storage-contract-index--IStorageContractErrorCode"
+        },
+        {
           "name": "IStorageContractErrorDetails",
           "kind": "type",
           "signature": "export type IStorageContractErrorDetails = { readonly backend?: IBackendKind; readonly key?: string | IStorageKey; readonly cause?: unknown; };",
@@ -5388,7 +6791,36 @@
           "examples": [
             "import {\n  StorageContractError,\n  StorageContractErrorCode,\n  STORAGE_CONTRACT_SOURCE,\n  isStorageContractError,\n  type IStorageContractErrorCode,\n  type IStorageContractErrorDetails\n} from '@migaia/storage-contract';"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "backend",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly backend?: IBackendKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IBackendKind"
+            },
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly key?: string | IStorageKey;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string | IStorageKey"
+            },
+            {
+              "name": "cause",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly cause?: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStorageContractErrorDetails",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5517,6 +6949,7 @@
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IStorageKey",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5805,6 +7238,75 @@
           "fragment": "storage-contract-index--IStorageKey"
         },
         {
+          "name": "isUint8Array",
+          "kind": "const",
+          "signature": "export declare const isUint8Array: (value: unknown) => value is Uint8Array;",
+          "declarationLine": 5,
+          "source": "packages/utils/dist/bytes.d.ts",
+          "purpose": "Recognizes Uint8Array internal slots across realms and subclasses without trusting mutable prototypes, constructor names, or Symbol.toStringTag properties supplied by the value.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUint8Array.",
+          "advanced": "No additional advanced behavior is declared for isUint8Array.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for isUint8Array."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for isUint8Array.",
+          "examples": [
+            "function isUint8Array(value: unknown): value is Uint8Array;\nfunction isArrayBuffer(value: unknown): value is ArrayBuffer;",
+            "import {\n  isArrayBuffer,\n  isUint8Array,\n  intrinsicConstructorName,\n  StorageContractConflictPolicy,\n  type IStorageContractConflictPolicy\n} from '@migaia/storage-contract';",
+            "isUint8Array(new Uint8Array()); // true\nisArrayBuffer(new ArrayBuffer(1)); // true"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "isUint8Array",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const isUint8Array: (value: unknown) => value is Uint8Array;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use isUint8Array when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when isUint8Array does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Recognizes Uint8Array internal slots across realms and subclasses without trusting mutable prototypes, constructor names, or Symbol.toStringTag properties supplied by the value."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import isUint8Array from @migaia/storage-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use isUint8Array when its const contract and declared inputs match the result you need. Choose a different public symbol when isUint8Array does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for isUint8Array."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for isUint8Array."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "@migaia/storage-contract:packages/utils/dist/bytes.d.ts:isUint8Array:export declare const isUint8Array: (value: unknown) => value is Uint8Array;",
+          "guidance": [],
+          "usageScore": 22,
+          "configuration": [],
+          "fragment": "storage-contract-index--isUint8Array"
+        },
+        {
           "name": "ISyncCapableStore",
           "kind": "type",
           "signature": "export type ISyncCapableStore<TStore extends { readonly sync?: object; }> = TStore & { readonly sync: NonNullable<TStore['sync']>; };",
@@ -5823,7 +7325,18 @@
             "import {\n  isKeyValueStore,\n  asRecordStore,\n  isRecordStore,\n  type IKeyValueStore,\n  type ISyncKeyValueStore,\n  type IRecordStore,\n  type ISyncCapableStore\n} from '@migaia/storage-contract';",
             "declare function createMemoryStore(): ISyncCapableStore<IKeyValueStore>;\ncreateMemoryStore().sync.set('k', 'v'); // 无需 ?."
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "sync",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sync: NonNullable<TStore['sync']>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "NonNullable<TStore['sync']>"
+            }
+          ],
+          "composes": ["TStore"],
           "aliasOf": "ISyncCapableStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5890,7 +7403,97 @@
             "type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory';\n\ntype ISyncKeyValueStore = {\n  get(key: string): string | null;\n  set(key: string, value: string, options?: ISyncWriteOptions): void;\n  remove(key: string): void;\n  has(key: string): boolean;\n  keys(): string[];\n  clearValues(): void;\n};\n\ntype IKeyValueStore = {\n  readonly backend: IBackendKind;\n  readonly capabilities: IStorageCapabilities;\n  get(key: string, ctx?: IOperationContext): Promise<string | null>;\n  set(key: string, value: string, ctx?: IWriteOptions): Promise<void>;\n  remove(key: string, ctx?: IOperationContext): Promise<void>;\n  has(key: string, ctx?: IOperationContext): Promise<boolean>;\n  keys(ctx?: IOperationContext): Promise<string[]>;\n  clearValues(ctx?: IOperationContext): Promise<void>;\n  clearAll(ctx?: IOperationContext): Promise<void>;\n  dispose(): Promise<void>;\n  readonly sync?: ISyncKeyValueStore;\n};",
             "import {\n  isKeyValueStore,\n  asRecordStore,\n  isRecordStore,\n  type IKeyValueStore,\n  type ISyncKeyValueStore,\n  type IRecordStore,\n  type ISyncCapableStore\n} from '@migaia/storage-contract';"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(key: string): string | null;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "string | null"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "optional": false,
+              "signature": "set(key: string, value: string, options?: ISyncWriteOptions): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ISyncWriteOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "remove",
+              "kind": "method",
+              "optional": false,
+              "signature": "remove(key: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "optional": false,
+              "signature": "has(key: string): boolean;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "keys",
+              "kind": "method",
+              "optional": false,
+              "signature": "keys(): string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string[]"
+            },
+            {
+              "name": "clearValues",
+              "kind": "method",
+              "optional": false,
+              "signature": "clearValues(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ISyncKeyValueStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5958,7 +7561,18 @@
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "conflictPolicy",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly conflictPolicy?: IConflictPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IConflictPolicy"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ISyncWriteOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6153,7 +7767,64 @@
             "await store.transaction(async (tx: ITransactionScope<MyRecord>) => {\n  const current = await tx.get('k');\n  await tx.put({ ...current, count: (current?.count ?? 0) + 1 }, 'k');\n});",
             "import {\n  ConflictPolicy,\n  type IRecordStore,\n  type ITransactionScope\n} from '@migaia/storage-contract';\n\ntype ICounter = { readonly value: number };\n\nexport const increment = (store: IRecordStore<ICounter>, key: string) =>\n  store.transaction(async (tx: ITransactionScope<ICounter>) => {\n    const current = await tx.get(key);\n    await tx.put({ value: (current?.value ?? 0) + 1 }, key, {\n      conflictPolicy: ConflictPolicy.replace\n    });\n  });"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(key: IStorageKey): Promise<TValue | undefined>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<TValue | undefined>"
+            },
+            {
+              "name": "put",
+              "kind": "method",
+              "optional": false,
+              "signature": "put(value: TValue, key?: IStorageKey, options?: ITransactionWriteOptions): Promise<IStorageKey>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "TValue",
+                  "optional": false
+                },
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": true
+                },
+                {
+                  "name": "options",
+                  "type": "ITransactionWriteOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IStorageKey>"
+            },
+            {
+              "name": "delete",
+              "kind": "method",
+              "optional": false,
+              "signature": "delete(key: IStorageKey): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "IStorageKey",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITransactionScope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6220,7 +7891,18 @@
             "type ITransactionWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\ntype ITransactionScope<TValue = unknown> = {\n  get(key: IStorageKey): Promise<TValue | undefined>;\n  put(value: TValue, key?: IStorageKey, options?: ITransactionWriteOptions): Promise<IStorageKey>;\n  delete(key: IStorageKey): Promise<void>;\n};",
             "import {\n  assertTransactionCallback,\n  readTransactionConflictPolicy,\n  type ITransactionScope,\n  type ITransactionWriteOptions\n} from '@migaia/storage-contract';"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "conflictPolicy",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly conflictPolicy?: IConflictPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IConflictPolicy"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ITransactionWriteOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6289,7 +7971,18 @@
             "type IOperationContext = {\n  readonly signal?: IAbortSignal;\n  readonly timeoutMs?: number;\n  readonly pageSize?: number;\n};\ntype IWriteOptions = IOperationContext & { readonly conflictPolicy?: IConflictPolicy };\ntype ISyncWriteOptions = { readonly conflictPolicy?: IConflictPolicy };\nconst ConflictPolicy = { conflict: 'conflict', replace: 'replace' } as const;\ntype IConflictPolicy = 'conflict' | 'replace';\ntype IStorageKey = string | number | Date | ArrayBuffer | readonly IStorageKey[];\ntype IKeyRange = {\n  readonly lower?: IStorageKey;\n  readonly lowerOpen?: boolean;\n  readonly upper?: IStorageKey;\n  readonly upperOpen?: boolean;\n};",
             "import {\n  ConflictPolicy,\n  snapshotOperationContext,\n  assertOperationContext,\n  snapshotSyncWriteOptions,\n  assertSyncWriteOptions,\n  type IOperationContext,\n  type IWriteOptions,\n  type ISyncWriteOptions,\n  type IConflictPolicy,\n  type IStorageKey,\n  type IKeyRange,\n  type IOperationContextSnapshot\n} from '@migaia/storage-contract';"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "conflictPolicy",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly conflictPolicy?: IConflictPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IConflictPolicy"
+            }
+          ],
+          "composes": ["IOperationContext"],
           "aliasOf": "IWriteOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6482,7 +8175,36 @@
             "import {\n  KEY_DOMAIN_LIMITS,\n  assertStorageKey,\n  snapshotStorageKey,\n  assertStringStorageKey,\n  compareStorageKeys\n} from '@migaia/storage-contract';",
             "KEY_DOMAIN_LIMITS.maxDepth; // 32\nKEY_DOMAIN_LIMITS.maxNodes; // 4096\nKEY_DOMAIN_LIMITS.maxBinaryBytes; // 1048576（1 MiB）"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "maxDepth",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly maxDepth: 32;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "32"
+            },
+            {
+              "name": "maxNodes",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly maxNodes: 4096;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "4096"
+            },
+            {
+              "name": "maxBinaryBytes",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly maxBinaryBytes: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "KEY_DOMAIN_LIMITS",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6551,6 +8273,7 @@
             "const policy = readTransactionConflictPolicy(options, 'indexeddb'); // 'conflict' | 'replace'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "readTransactionConflictPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6619,6 +8342,7 @@
             "const codec = snapshotCodec(candidate); // 校验后原样返回（浅拷贝出的 4 字段对象）"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotCodec",
           "exportPath": ".",
           "overloadSignatures": ["export declare const snapshotCodec: (codec: unknown) => ICodec;"],
@@ -6681,6 +8405,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for snapshotKeyValueStore.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotKeyValueStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6745,6 +8470,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for snapshotKeyValueStoreDetailed.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotKeyValueStoreDetailed",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6815,6 +8541,7 @@
             "import {\n  snapshotOperationContext,\n  type IKeyValueStore,\n  type IOperationContext\n} from '@migaia/storage-contract';\n\nexport const readWithBudget = async (\n  store: IKeyValueStore,\n  key: string,\n  ctx: IOperationContext\n) => {\n  const snapshot = snapshotOperationContext(ctx); // 提前校验，坏参数在发起 I/O 前就抛出\n  return store.get(key, snapshot);\n};"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotOperationContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7004,6 +8731,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for snapshotRecordStore.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotRecordStore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7072,6 +8800,7 @@
             "const capabilities = snapshotStorageCapabilities(raw); // 合法则返回新对象快照，否则 undefined"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotStorageCapabilities",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7140,6 +8869,7 @@
             "const detachedKey = snapshotStorageKey(key, 'memory');"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotStorageKey",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7209,6 +8939,7 @@
             "snapshotSyncWriteOptions({ conflictPolicy: 'replace' }); // { conflictPolicy: 'replace' }\nsnapshotSyncWriteOptions({ timeoutMs: 100 }); // 抛错：同步写不支持 timeoutMs"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "snapshotSyncWriteOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7401,6 +9132,7 @@
             "import {\n  StorageContractError,\n  StorageContractErrorCode,\n  STORAGE_CONTRACT_SOURCE,\n  isStorageContractError,\n  type IStorageContractErrorCode,\n  type IStorageContractErrorDetails\n} from '@migaia/storage-contract';"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "STORAGE_CONTRACT_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7583,7 +9315,27 @@
             "import {\n  isArrayBuffer,\n  isUint8Array,\n  intrinsicConstructorName,\n  StorageContractConflictPolicy,\n  type IStorageContractConflictPolicy\n} from '@migaia/storage-contract';",
             "StorageContractConflictPolicy.replace; // 'replace'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "conflict",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly conflict: \"conflict\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"conflict\""
+            },
+            {
+              "name": "replace",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly replace: \"replace\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"replace\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "StorageContractConflictPolicy",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7673,6 +9425,7 @@
             {
               "name": "source",
               "kind": "property",
+              "optional": false,
               "signature": "readonly source: string;",
               "description": null,
               "parameterDetails": [],
@@ -7681,6 +9434,7 @@
             {
               "name": "code",
               "kind": "property",
+              "optional": false,
               "signature": "readonly code: IStorageContractErrorCode;",
               "description": null,
               "parameterDetails": [],
@@ -7689,6 +9443,7 @@
             {
               "name": "backend",
               "kind": "property",
+              "optional": true,
               "signature": "readonly backend?: IBackendKind;",
               "description": null,
               "parameterDetails": [],
@@ -7697,12 +9452,14 @@
             {
               "name": "key",
               "kind": "property",
+              "optional": true,
               "signature": "readonly key?: string | IStorageKey;",
               "description": null,
               "parameterDetails": [],
               "returns": "string | IStorageKey"
             }
           ],
+          "composes": ["Error"],
           "aliasOf": "StorageContractError",
           "exportPath": ".",
           "overloadSignatures": [
@@ -8007,6 +9764,237 @@
           "usageScore": 104,
           "configuration": [],
           "fragment": "storage-contract-index--StorageContractError"
+        },
+        {
+          "name": "StorageContractErrorCode",
+          "kind": "const",
+          "signature": "export declare const StorageContractErrorCode: Readonly<{ /** * A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes. */ readonly invalidArgument: \"INVALID_ARGUMENT\"; /** * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key. */ readonly invalidKey: \"INVALID_KEY\"; /** * An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back. */ readonly unsupported: \"UNSUPPORTED_CAPABILITY\"; /** * A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance. */ readonly disposed: \"STORE_DISPOSED\"; /** * `IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback. */ readonly aborted: \"ABORTED\"; }>;",
+          "declarationLine": 10,
+          "source": "packages/storage-contract/dist/error-code.d.ts",
+          "purpose": "Defines the error codes owned by `@migaia/storage-contract` in one place. The `(source, code)` pair uniquely identifies an error under `docs/contracts/error-codes.md`. `source` is always `@migaia/storage-contract`. Throw sites reference these constants rather than inline literals. Code values are public API, so renaming one is a breaking change.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StorageContractErrorCode.",
+          "advanced": "No additional advanced behavior is declared for StorageContractErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for StorageContractErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StorageContractErrorCode.",
+          "examples": [
+            "const StorageContractErrorCode = {\n  invalidArgument: 'INVALID_ARGUMENT',\n  invalidKey: 'INVALID_KEY',\n  unsupported: 'UNSUPPORTED_CAPABILITY',\n  disposed: 'STORE_DISPOSED',\n  aborted: 'ABORTED'\n} as const;",
+            "import {\n  StorageContractError,\n  StorageContractErrorCode,\n  STORAGE_CONTRACT_SOURCE,\n  isStorageContractError,\n  type IStorageContractErrorCode,\n  type IStorageContractErrorDetails\n} from '@migaia/storage-contract';",
+            "throw new StorageContractError(StorageContractErrorCode.invalidKey, {\n  backend: 'memory',\n  key: badKey\n});",
+            "if (error.code === StorageContractErrorCode.aborted) {\n  /* ... */\n}"
+          ],
+          "members": [
+            {
+              "name": "invalidArgument",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidArgument: \"INVALID_ARGUMENT\";",
+              "description": "A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_ARGUMENT\""
+            },
+            {
+              "name": "invalidKey",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidKey: \"INVALID_KEY\";",
+              "description": "An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_KEY\""
+            },
+            {
+              "name": "unsupported",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly unsupported: \"UNSUPPORTED_CAPABILITY\";",
+              "description": "An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back.",
+              "parameterDetails": [],
+              "returns": "\"UNSUPPORTED_CAPABILITY\""
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: \"STORE_DISPOSED\";",
+              "description": "A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance.",
+              "parameterDetails": [],
+              "returns": "\"STORE_DISPOSED\""
+            },
+            {
+              "name": "aborted",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly aborted: \"ABORTED\";",
+              "description": "`IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback.",
+              "parameterDetails": [],
+              "returns": "\"ABORTED\""
+            }
+          ],
+          "composes": [],
+          "aliasOf": "StorageContractErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const StorageContractErrorCode: Readonly<{ /** * A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes. */ readonly invalidArgument: \"INVALID_ARGUMENT\"; /** * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key. */ readonly invalidKey: \"INVALID_KEY\"; /** * An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back. */ readonly unsupported: \"UNSUPPORTED_CAPABILITY\"; /** * A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance. */ readonly disposed: \"STORE_DISPOSED\"; /** * `IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback. */ readonly aborted: \"ABORTED\"; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use StorageContractErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when StorageContractErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Defines the error codes owned by `@migaia/storage-contract` in one place. The `(source, code)` pair uniquely identifies an error under `docs/contracts/error-codes.md`. `source` is always `@migaia/storage-contract`. Throw sites reference these constants rather than inline literals. Code values are public API, so renaming one is a breaking change."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import StorageContractErrorCode from @migaia/storage-contract, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use StorageContractErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when StorageContractErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StorageContractErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for StorageContractErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-contract/dist/error-code.d.ts:StorageContractErrorCode:export declare const StorageContractErrorCode: Readonly<{ /** * A public argument or descriptor fails contract shape validation. Applies to codec descriptors, * capability descriptors, key domains, transaction options, and operation contexts. * * Enforces runtime public argument and contract shape validation in * `docs/store-persist/storage-web-integration.sdd.md` §4.2. Adapter-specific configuration * validation uses the web `INVALID_CONFIG` code instead. * * The caller corrects the argument before retrying. The failure persists until the argument * changes. */ readonly invalidArgument: \"INVALID_ARGUMENT\"; /** * An `IStorageKey` violates the key domain through an invalid type, excessive depth, node count * or binary bytes, a cycle, or an empty array. * * Enforces contract key validation in `docs/store-persist/storage-web-integration.sdd.md` §4.2. * * The caller corrects the key rather than retrying the same invalid key. */ readonly invalidKey: \"INVALID_KEY\"; /** * An operation requires a capability that the current backend does not provide. Examples include * failed `asRecordStore` narrowing and a structured codec on a text-only backend. * * Enforces contract capability narrowing in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller checks `capabilities` or `isRecordStore`, or selects a backend with the required * capability. The operation does not silently fall back. */ readonly unsupported: \"UNSUPPORTED_CAPABILITY\"; /** * A storage operation runs after the store is disposed, violating the lifecycle contract. * * Enforces contract lifecycle semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller creates a new store instead of reusing the closed instance. */ readonly disposed: \"STORE_DISPOSED\"; /** * `IOperationContext.signal` cancels an operation or `timeoutMs` expires. * * Enforces contract cancellation semantics in `docs/store-persist/storage-web-integration.sdd.md` * §4.2. * * The caller handles the result as cancellation. A write that has entered atomic commit reports * the actual commit result rather than claiming rollback. */ readonly aborted: \"ABORTED\"; }>;",
+          "guidance": [
+            {
+              "id": "errors-模块",
+              "heading": "errors 模块",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "class StorageContractError extends Error {\n  readonly source: string; // 恒为 '@migaia/storage-contract'\n  readonly code: IStorageContractErrorCode;\n  readonly backend?: IBackendKind;\n  readonly key?: string | IStorageKey;\n  constructor(\n    code: IStorageContractErrorCode,\n    details?: {\n      readonly backend?: IBackendKind;\n      readonly key?: string | IStorageKey;\n      readonly cause?: unknown;\n    },\n    message?: string\n  );\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造后立即 `Object.freeze`；不重写 `stack`；`cause` 通过标准 `Error` 机制可达（不被冻结阻断）。`message` 默认取 `` `[storage-contract] ${code}` ``。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const StorageContractErrorCode = {\n  invalidArgument: 'INVALID_ARGUMENT',\n  invalidKey: 'INVALID_KEY',\n  unsupported: 'UNSUPPORTED_CAPABILITY',\n  disposed: 'STORE_DISPOSED',\n  aborted: 'ABORTED'\n} as const;"
+                },
+                {
+                  "type": "table",
+                  "headers": ["Code", "含义", "调用方应对"],
+                  "rows": [
+                    [
+                      "`INVALID_ARGUMENT`",
+                      "契约级入参/描述符结构校验失败（codec、capabilities、transaction 选项、operation context 等公共契约类型不符合声明形状）",
+                      "修正入参后重试；这是永久性传参错误，不是可重试的瞬时失败"
+                    ],
+                    [
+                      "`INVALID_KEY`",
+                      "`IStorageKey` 违反键域（类型非法、深度/节点/二进制字节超限、循环、空数组）",
+                      "修正键；永久性错误，不要重试同一键"
+                    ],
+                    [
+                      "`UNSUPPORTED_CAPABILITY`",
+                      "调用了当前后端不提供的能力（`asRecordStore` 收窄失败、structured codec 落到 text-only 后端）",
+                      "先用 `capabilities`/`isRecordStore` 分支，或换一个具备该能力的后端；不做静默降级"
+                    ],
+                    [
+                      "`STORE_DISPOSED`",
+                      "store 已 `dispose()` 后继续调用其任何方法",
+                      "新建 store，不要复用已关闭实例"
+                    ],
+                    [
+                      "`ABORTED`",
+                      "操作被 `signal` 取消或 `timeoutMs` 到期",
+                      "按取消处理；已进入原子提交的写按提交事实返回，不伪报回滚"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`code` 值是公开 API 的一部分，改名等同破坏性变更；`source` 恒为 `'@migaia/storage-contract'`，与实现包（如 `storage-web`）自己的错误 `source` 互不冲突，可用 `(source, code)` 二元组唯一定位错误来源。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const STORAGE_CONTRACT_SOURCE: '@migaia/storage-contract';\nfunction isStorageContractError(value: unknown): value is StorageContractError;"
+                }
+              ]
+            },
+            {
+              "id": "errors-模块",
+              "heading": "errors 模块",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StorageContractError,\n  StorageContractErrorCode,\n  STORAGE_CONTRACT_SOURCE,\n  isStorageContractError,\n  type IStorageContractErrorCode,\n  type IStorageContractErrorDetails\n} from '@migaia/storage-contract';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StorageContractError`｜5 秒上手 —— 本包统一抛出的错误类，构造后 `Object.freeze`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw new StorageContractError(StorageContractErrorCode.invalidKey, {\n  backend: 'memory',\n  key: badKey\n});"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "构造参数：`code: IStorageContractErrorCode`（必填）、`details?: IStorageContractErrorDetails`（默认 `{}`，字段：`backend?: IBackendKind`、`key?: string | IStorageKey`、`cause?: unknown`）、`message?: string`（默认 `` `[storage-contract] ${code}` ``）。实例字段：`source`（恒为 `'@migaia/storage-contract'`）、`code`、`backend?`、`key?`，均只读；`cause` 通过标准 `Error` 机制可达。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StorageContractErrorCode`｜3 秒上手 —— 稳定错误码表，常量对象："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (error.code === StorageContractErrorCode.aborted) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值：`invalidArgument`(`INVALID_ARGUMENT`，契约级入参/描述符结构校验失败)、`invalidKey`(`INVALID_KEY`，键违反键域)、`unsupported`(`UNSUPPORTED_CAPABILITY`，调用了当前后端不提供的能力)、`disposed`(`STORE_DISPOSED`，store 已 `dispose()` 后继续调用)、`aborted`(`ABORTED`，操作被 `signal`/`timeoutMs` 取消)。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORAGE_CONTRACT_SOURCE`｜3 秒上手 —— 常量字符串 `'@migaia/storage-contract'`，等同任意 `StorageContractError` 实例的 `source` 字段。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`isStorageContractError`｜3 秒上手 —— 类型守卫："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (isStorageContractError(error)) console.log(error.code);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "单参数 `value: unknown`（必填），无选项。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 24,
+          "configuration": [],
+          "fragment": "storage-contract-index--StorageContractErrorCode"
         }
       ],
       "aliases": []

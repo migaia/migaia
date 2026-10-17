@@ -9261,6 +9261,12 @@
       "library": "serialize"
     },
     {
+      "path": "/en/docs/serialize/api/core/ISerializeErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
       "path": "/en/docs/serialize/api/core/ISerializeLifecycleError",
       "locale": "en",
       "domain": "docs",
@@ -9340,6 +9346,12 @@
     },
     {
       "path": "/en/docs/serialize/api/core/SerializeCodecError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/en/docs/serialize/api/core/SerializeErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "serialize"
@@ -9699,6 +9711,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/IStorageContractErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/IStorageContractErrorDetails",
       "locale": "en",
       "domain": "docs",
@@ -9766,6 +9784,12 @@
     },
     {
       "path": "/en/docs/storage-contract/api/StorageContractError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/StorageContractErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -9843,6 +9867,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/en/docs/storage-contract/api/isArrayBuffer",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/en/docs/storage-contract/api/isChangeFeedStore",
       "locale": "en",
       "domain": "docs",
@@ -9874,6 +9904,12 @@
     },
     {
       "path": "/en/docs/storage-contract/api/isStorageContractError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/en/docs/storage-contract/api/isUint8Array",
       "locale": "en",
       "domain": "docs",
       "library": "storage-contract"
@@ -10005,6 +10041,12 @@
       "library": "storage-web"
     },
     {
+      "path": "/en/docs/storage-web/api/IStorageErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
       "path": "/en/docs/storage-web/api/IStorageErrorDetails",
       "locale": "en",
       "domain": "docs",
@@ -10018,6 +10060,12 @@
     },
     {
       "path": "/en/docs/storage-web/api/StorageError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/api/StorageErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "storage-web"
@@ -10635,6 +10683,18 @@
       "library": "storage-web"
     },
     {
+      "path": "/en/docs/storage-web/api/serialize/ICodec",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/en/docs/storage-web/api/serialize/ICodecOutput",
+      "locale": "en",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
       "path": "/en/docs/storage-web/api/serialize/ISelectedCodec",
       "locale": "en",
       "domain": "docs",
@@ -10779,6 +10839,12 @@
       "library": "store-devtools"
     },
     {
+      "path": "/en/docs/store-devtools/api/IStoreDevtoolsErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
       "path": "/en/docs/store-devtools/api/IStoreHistoryEntry",
       "locale": "en",
       "domain": "docs",
@@ -10792,6 +10858,12 @@
     },
     {
       "path": "/en/docs/store-devtools/api/StoreDevtoolsCommand",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/en/docs/store-devtools/api/StoreDevtoolsErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-devtools"
@@ -10905,6 +10977,12 @@
       "library": "store-indexed"
     },
     {
+      "path": "/en/docs/store-indexed/api/IStoreIndexedErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
       "path": "/en/docs/store-indexed/api/IndexedOperation",
       "locale": "en",
       "domain": "docs",
@@ -10936,6 +11014,12 @@
     },
     {
       "path": "/en/docs/store-indexed/api/STORE_INDEXED_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/en/docs/store-indexed/api/StoreIndexedErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-indexed"
@@ -11097,6 +11181,12 @@
       "library": "store-keyed"
     },
     {
+      "path": "/en/docs/store-keyed/api/IStoreKeyedErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
       "path": "/en/docs/store-keyed/api/KeyedSplitCache",
       "locale": "en",
       "domain": "docs",
@@ -11104,6 +11194,12 @@
     },
     {
       "path": "/en/docs/store-keyed/api/STORE_KEYED_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/en/docs/store-keyed/api/StoreKeyedErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-keyed"
@@ -11577,6 +11673,12 @@
       "library": "store-light"
     },
     {
+      "path": "/en/docs/store-light/api/IStoreLightErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
       "path": "/en/docs/store-light/api/IStoreResource",
       "locale": "en",
       "domain": "docs",
@@ -11656,6 +11758,12 @@
     },
     {
       "path": "/en/docs/store-light/api/StoreFieldMode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/en/docs/store-light/api/StoreLightErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-light"
@@ -11865,6 +11973,18 @@
       "library": "store-middleware"
     },
     {
+      "path": "/en/docs/store-middleware/api/IMutationGuard",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/docs/store-middleware/api/IMutationPolicy",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
       "path": "/en/docs/store-middleware/api/IMutationPolicyMode",
       "locale": "en",
       "domain": "docs",
@@ -11902,6 +12022,12 @@
     },
     {
       "path": "/en/docs/store-middleware/api/IStoreMiddlewareCore",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/docs/store-middleware/api/IStoreMiddlewareErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-middleware"
@@ -11950,6 +12076,12 @@
     },
     {
       "path": "/en/docs/store-middleware/api/STORE_MIDDLEWARE_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/en/docs/store-middleware/api/StoreMiddlewareErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-middleware"
@@ -12159,6 +12291,12 @@
       "library": "store-persist"
     },
     {
+      "path": "/en/docs/store-persist/api/IStorePersistErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
       "path": "/en/docs/store-persist/api/IWriteStatus",
       "locale": "en",
       "domain": "docs",
@@ -12184,6 +12322,12 @@
     },
     {
       "path": "/en/docs/store-persist/api/STORE_PERSIST_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/en/docs/store-persist/api/StorePersistErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-persist"
@@ -12447,6 +12591,12 @@
       "library": "store-react"
     },
     {
+      "path": "/en/docs/store-react/api/IStoreReactErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
       "path": "/en/docs/store-react/api/IStoreReadyBarrier",
       "locale": "en",
       "domain": "docs",
@@ -12478,6 +12628,12 @@
     },
     {
       "path": "/en/docs/store-react/api/StoreProviderState",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
+      "path": "/en/docs/store-react/api/StoreReactErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-react"
@@ -12723,6 +12879,12 @@
       "library": "store-shared"
     },
     {
+      "path": "/en/docs/store-shared/api/IStoreSharedErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
       "path": "/en/docs/store-shared/api/STORE_SHARED_SOURCE",
       "locale": "en",
       "domain": "docs",
@@ -12742,6 +12904,12 @@
     },
     {
       "path": "/en/docs/store-shared/api/SharedWaitMode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/en/docs/store-shared/api/StoreSharedErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-shared"
@@ -12939,6 +13107,12 @@
       "library": "store-ssr"
     },
     {
+      "path": "/en/docs/store-ssr/api/IStoreSsrErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
       "path": "/en/docs/store-ssr/api/ITrustedSSRState",
       "locale": "en",
       "domain": "docs",
@@ -12964,6 +13138,12 @@
     },
     {
       "path": "/en/docs/store-ssr/api/SsrWorkOutcome",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/en/docs/store-ssr/api/StoreSsrErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-ssr"
@@ -13119,6 +13299,12 @@
       "library": "store-wasm"
     },
     {
+      "path": "/en/docs/store-wasm/api/IStoreWasmErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
       "path": "/en/docs/store-wasm/api/IWasmFieldMode",
       "locale": "en",
       "domain": "docs",
@@ -13132,6 +13318,12 @@
     },
     {
       "path": "/en/docs/store-wasm/api/STORE_WASM_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/en/docs/store-wasm/api/StoreWasmErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-wasm"
@@ -13299,6 +13491,12 @@
       "library": "store-worker"
     },
     {
+      "path": "/en/docs/store-worker/api/IStoreWorkerErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
       "path": "/en/docs/store-worker/api/IWorkerComputedOptions",
       "locale": "en",
       "domain": "docs",
@@ -13318,6 +13516,12 @@
     },
     {
       "path": "/en/docs/store-worker/api/STORE_WORKER_SOURCE",
+      "locale": "en",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/en/docs/store-worker/api/StoreWorkerErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "store-worker"
@@ -14206,6 +14410,12 @@
     },
     {
       "path": "/en/docs/tray/api/IAnyTrayHost",
+      "locale": "en",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/en/docs/tray/api/IGraphReadinessSnapshot",
       "locale": "en",
       "domain": "docs",
       "library": "tray"
@@ -15129,6 +15339,12 @@
       "library": "utils"
     },
     {
+      "path": "/en/docs/utils/api/error/IUtilsErrorCode",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/en/docs/utils/api/error/UtilsAbortError",
       "locale": "en",
       "domain": "docs",
@@ -15136,6 +15352,12 @@
     },
     {
       "path": "/en/docs/utils/api/error/UtilsError",
+      "locale": "en",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/en/docs/utils/api/error/UtilsErrorCode",
       "locale": "en",
       "domain": "docs",
       "library": "utils"
@@ -16024,6 +16246,12 @@
     },
     {
       "path": "/en/docs/wasm/api/SyncInitInput",
+      "locale": "en",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/en/docs/wasm/api/__wbg_init",
       "locale": "en",
       "domain": "docs",
       "library": "wasm"
@@ -25365,6 +25593,12 @@
       "library": "serialize"
     },
     {
+      "path": "/zh/docs/serialize/api/core/ISerializeErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
       "path": "/zh/docs/serialize/api/core/ISerializeLifecycleError",
       "locale": "zh",
       "domain": "docs",
@@ -25444,6 +25678,12 @@
     },
     {
       "path": "/zh/docs/serialize/api/core/SerializeCodecError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "serialize"
+    },
+    {
+      "path": "/zh/docs/serialize/api/core/SerializeErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "serialize"
@@ -25803,6 +26043,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/IStorageContractErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/IStorageContractErrorDetails",
       "locale": "zh",
       "domain": "docs",
@@ -25870,6 +26116,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/StorageContractError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/StorageContractErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -25947,6 +26199,12 @@
       "library": "storage-contract"
     },
     {
+      "path": "/zh/docs/storage-contract/api/isArrayBuffer",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
       "path": "/zh/docs/storage-contract/api/isChangeFeedStore",
       "locale": "zh",
       "domain": "docs",
@@ -25978,6 +26236,12 @@
     },
     {
       "path": "/zh/docs/storage-contract/api/isStorageContractError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-contract"
+    },
+    {
+      "path": "/zh/docs/storage-contract/api/isUint8Array",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-contract"
@@ -26109,6 +26373,12 @@
       "library": "storage-web"
     },
     {
+      "path": "/zh/docs/storage-web/api/IStorageErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
       "path": "/zh/docs/storage-web/api/IStorageErrorDetails",
       "locale": "zh",
       "domain": "docs",
@@ -26122,6 +26392,12 @@
     },
     {
       "path": "/zh/docs/storage-web/api/StorageError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/api/StorageErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "storage-web"
@@ -26739,6 +27015,18 @@
       "library": "storage-web"
     },
     {
+      "path": "/zh/docs/storage-web/api/serialize/ICodec",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
+      "path": "/zh/docs/storage-web/api/serialize/ICodecOutput",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "storage-web"
+    },
+    {
       "path": "/zh/docs/storage-web/api/serialize/ISelectedCodec",
       "locale": "zh",
       "domain": "docs",
@@ -26883,6 +27171,12 @@
       "library": "store-devtools"
     },
     {
+      "path": "/zh/docs/store-devtools/api/IStoreDevtoolsErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
       "path": "/zh/docs/store-devtools/api/IStoreHistoryEntry",
       "locale": "zh",
       "domain": "docs",
@@ -26896,6 +27190,12 @@
     },
     {
       "path": "/zh/docs/store-devtools/api/StoreDevtoolsCommand",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-devtools"
+    },
+    {
+      "path": "/zh/docs/store-devtools/api/StoreDevtoolsErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-devtools"
@@ -27009,6 +27309,12 @@
       "library": "store-indexed"
     },
     {
+      "path": "/zh/docs/store-indexed/api/IStoreIndexedErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
       "path": "/zh/docs/store-indexed/api/IndexedOperation",
       "locale": "zh",
       "domain": "docs",
@@ -27040,6 +27346,12 @@
     },
     {
       "path": "/zh/docs/store-indexed/api/STORE_INDEXED_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-indexed"
+    },
+    {
+      "path": "/zh/docs/store-indexed/api/StoreIndexedErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-indexed"
@@ -27201,6 +27513,12 @@
       "library": "store-keyed"
     },
     {
+      "path": "/zh/docs/store-keyed/api/IStoreKeyedErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
       "path": "/zh/docs/store-keyed/api/KeyedSplitCache",
       "locale": "zh",
       "domain": "docs",
@@ -27208,6 +27526,12 @@
     },
     {
       "path": "/zh/docs/store-keyed/api/STORE_KEYED_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-keyed"
+    },
+    {
+      "path": "/zh/docs/store-keyed/api/StoreKeyedErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-keyed"
@@ -27681,6 +28005,12 @@
       "library": "store-light"
     },
     {
+      "path": "/zh/docs/store-light/api/IStoreLightErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
       "path": "/zh/docs/store-light/api/IStoreResource",
       "locale": "zh",
       "domain": "docs",
@@ -27760,6 +28090,12 @@
     },
     {
       "path": "/zh/docs/store-light/api/StoreFieldMode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-light"
+    },
+    {
+      "path": "/zh/docs/store-light/api/StoreLightErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-light"
@@ -27969,6 +28305,18 @@
       "library": "store-middleware"
     },
     {
+      "path": "/zh/docs/store-middleware/api/IMutationGuard",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/docs/store-middleware/api/IMutationPolicy",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
       "path": "/zh/docs/store-middleware/api/IMutationPolicyMode",
       "locale": "zh",
       "domain": "docs",
@@ -28006,6 +28354,12 @@
     },
     {
       "path": "/zh/docs/store-middleware/api/IStoreMiddlewareCore",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/docs/store-middleware/api/IStoreMiddlewareErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-middleware"
@@ -28054,6 +28408,12 @@
     },
     {
       "path": "/zh/docs/store-middleware/api/STORE_MIDDLEWARE_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-middleware"
+    },
+    {
+      "path": "/zh/docs/store-middleware/api/StoreMiddlewareErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-middleware"
@@ -28263,6 +28623,12 @@
       "library": "store-persist"
     },
     {
+      "path": "/zh/docs/store-persist/api/IStorePersistErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
       "path": "/zh/docs/store-persist/api/IWriteStatus",
       "locale": "zh",
       "domain": "docs",
@@ -28288,6 +28654,12 @@
     },
     {
       "path": "/zh/docs/store-persist/api/STORE_PERSIST_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-persist"
+    },
+    {
+      "path": "/zh/docs/store-persist/api/StorePersistErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-persist"
@@ -28551,6 +28923,12 @@
       "library": "store-react"
     },
     {
+      "path": "/zh/docs/store-react/api/IStoreReactErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
       "path": "/zh/docs/store-react/api/IStoreReadyBarrier",
       "locale": "zh",
       "domain": "docs",
@@ -28582,6 +28960,12 @@
     },
     {
       "path": "/zh/docs/store-react/api/StoreProviderState",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-react"
+    },
+    {
+      "path": "/zh/docs/store-react/api/StoreReactErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-react"
@@ -28827,6 +29211,12 @@
       "library": "store-shared"
     },
     {
+      "path": "/zh/docs/store-shared/api/IStoreSharedErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
       "path": "/zh/docs/store-shared/api/STORE_SHARED_SOURCE",
       "locale": "zh",
       "domain": "docs",
@@ -28846,6 +29236,12 @@
     },
     {
       "path": "/zh/docs/store-shared/api/SharedWaitMode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-shared"
+    },
+    {
+      "path": "/zh/docs/store-shared/api/StoreSharedErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-shared"
@@ -29043,6 +29439,12 @@
       "library": "store-ssr"
     },
     {
+      "path": "/zh/docs/store-ssr/api/IStoreSsrErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
       "path": "/zh/docs/store-ssr/api/ITrustedSSRState",
       "locale": "zh",
       "domain": "docs",
@@ -29068,6 +29470,12 @@
     },
     {
       "path": "/zh/docs/store-ssr/api/SsrWorkOutcome",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-ssr"
+    },
+    {
+      "path": "/zh/docs/store-ssr/api/StoreSsrErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-ssr"
@@ -29223,6 +29631,12 @@
       "library": "store-wasm"
     },
     {
+      "path": "/zh/docs/store-wasm/api/IStoreWasmErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
       "path": "/zh/docs/store-wasm/api/IWasmFieldMode",
       "locale": "zh",
       "domain": "docs",
@@ -29236,6 +29650,12 @@
     },
     {
       "path": "/zh/docs/store-wasm/api/STORE_WASM_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-wasm"
+    },
+    {
+      "path": "/zh/docs/store-wasm/api/StoreWasmErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-wasm"
@@ -29403,6 +29823,12 @@
       "library": "store-worker"
     },
     {
+      "path": "/zh/docs/store-worker/api/IStoreWorkerErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
       "path": "/zh/docs/store-worker/api/IWorkerComputedOptions",
       "locale": "zh",
       "domain": "docs",
@@ -29422,6 +29848,12 @@
     },
     {
       "path": "/zh/docs/store-worker/api/STORE_WORKER_SOURCE",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "store-worker"
+    },
+    {
+      "path": "/zh/docs/store-worker/api/StoreWorkerErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "store-worker"
@@ -30310,6 +30742,12 @@
     },
     {
       "path": "/zh/docs/tray/api/IAnyTrayHost",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "tray"
+    },
+    {
+      "path": "/zh/docs/tray/api/IGraphReadinessSnapshot",
       "locale": "zh",
       "domain": "docs",
       "library": "tray"
@@ -31233,6 +31671,12 @@
       "library": "utils"
     },
     {
+      "path": "/zh/docs/utils/api/error/IUtilsErrorCode",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
       "path": "/zh/docs/utils/api/error/UtilsAbortError",
       "locale": "zh",
       "domain": "docs",
@@ -31240,6 +31684,12 @@
     },
     {
       "path": "/zh/docs/utils/api/error/UtilsError",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "utils"
+    },
+    {
+      "path": "/zh/docs/utils/api/error/UtilsErrorCode",
       "locale": "zh",
       "domain": "docs",
       "library": "utils"
@@ -32128,6 +32578,12 @@
     },
     {
       "path": "/zh/docs/wasm/api/SyncInitInput",
+      "locale": "zh",
+      "domain": "docs",
+      "library": "wasm"
+    },
+    {
+      "path": "/zh/docs/wasm/api/__wbg_init",
       "locale": "zh",
       "domain": "docs",
       "library": "wasm"

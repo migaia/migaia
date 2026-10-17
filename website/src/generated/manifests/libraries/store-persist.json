@@ -894,6 +894,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertEnvelope.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "assertEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1056,6 +1057,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStorePersistAbortError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStorePersistAbortError(code: IStorePersistErrorCode, message: string, cause?: unknown): Error;"
@@ -1222,6 +1224,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStorePersistAggregateError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStorePersistAggregateError(code: IStorePersistErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1388,6 +1391,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStorePersistError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStorePersistError(code: IStorePersistErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1446,7 +1450,14 @@
               "content": "No additional advanced behavior is declared for createStorePersistError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-persist/dist/errors.d.ts:createStorePersistError:export declare function createStorePersistError(code: IStorePersistErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
           "guidance": [
             {
@@ -1515,7 +1526,16 @@
             }
           ],
           "usageScore": 14,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "store-persist-index--createStorePersistError"
         },
         {
@@ -1554,6 +1574,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStorePersistTypeError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStorePersistTypeError(code: IStorePersistErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;"
@@ -1612,7 +1633,14 @@
               "content": "No additional advanced behavior is declared for createStorePersistTypeError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-persist/dist/errors.d.ts:createStorePersistTypeError:export declare function createStorePersistTypeError(code: IStorePersistErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;",
           "guidance": [
             {
@@ -1681,7 +1709,16 @@
             }
           ],
           "usageScore": 14,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "store-persist-index--createStorePersistTypeError"
         },
         {
@@ -1703,6 +1740,7 @@
             "const defaultJsonCodec: ICodec; // { name: 'json', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }"
           ],
           "members": [],
+          "composes": ["ICodec"],
           "aliasOf": "defaultJsonCodec",
           "exportPath": ".",
           "overloadSignatures": ["export declare const defaultJsonCodec: ICodec;"],
@@ -1923,7 +1961,27 @@
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
             "function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<TState>;\nclass PersistEnvelopeError extends TypeError {}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": false,
+              "signature": "version: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "state: TState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TState"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2053,6 +2111,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IHydrationStatus.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IHydrationStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2182,6 +2241,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistCodecOutput.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IPersistCodecOutput",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2250,7 +2310,135 @@
             "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};",
             "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\n// 与 persist()/persistCollection() 相同的 IPersistHandle（status、ready、flush、clear、dispose 等），外加当前值\ntype IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T };"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "status: IReactiveComputed<IPersistStatus>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReactiveComputed<IPersistStatus>"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "error: IReactiveComputed<unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReactiveComputed<unknown>"
+            },
+            {
+              "name": "hydrated",
+              "kind": "property",
+              "optional": false,
+              "signature": "hydrated: IReactiveComputed<boolean>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReactiveComputed<boolean>"
+            },
+            {
+              "name": "hydrationStatus",
+              "kind": "property",
+              "optional": false,
+              "signature": "hydrationStatus: IReadonlyPersistValue<IHydrationStatus>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReadonlyPersistValue<IHydrationStatus>"
+            },
+            {
+              "name": "hydrationError",
+              "kind": "property",
+              "optional": false,
+              "signature": "hydrationError: IReadonlyPersistValue<unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReadonlyPersistValue<unknown>"
+            },
+            {
+              "name": "writeStatus",
+              "kind": "property",
+              "optional": false,
+              "signature": "writeStatus: IReadonlyPersistValue<IWriteStatus>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReadonlyPersistValue<IWriteStatus>"
+            },
+            {
+              "name": "writeError",
+              "kind": "property",
+              "optional": false,
+              "signature": "writeError: IReadonlyPersistValue<unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReadonlyPersistValue<unknown>"
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "ready: Promise<void>;",
+              "description": "Resolves when hydration succeeds and rejects when hydration fails.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "settled",
+              "kind": "property",
+              "optional": false,
+              "signature": "settled: Promise<void>;",
+              "description": "Resolves after hydration, whether it succeeds or fails.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "retryHydrate",
+              "kind": "method",
+              "optional": false,
+              "signature": "retryHydrate(): Promise<void>;",
+              "description": "Reads the archive again after failure. Only successful hydration reopens the write gate.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "flush",
+              "kind": "method",
+              "optional": false,
+              "signature": "flush(): Promise<void>;",
+              "description": "Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with `AbortError`.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "optional": false,
+              "signature": "clear(): Promise<void>;",
+              "description": "Queues archive removal. Disposal during the wait ends it with `AbortError`.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IPersistHandle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2380,6 +2568,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistState.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IPersistState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2444,6 +2633,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPersistStatus.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IPersistStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2574,7 +2764,48 @@
           "examples": [
             "type IPersistUnit<TState> = {\n  snapshot(): TState; // 同步读当前可持久化状态\n  restore(state: TState): void; // 同步写回一份状态（hydrate 用）\n  subscribe(onChange: () => void): IDisposer; // 注册变化通知\n};\n\nfunction persistUnit<TState>(\n  unit: IPersistUnit<TState>,\n  options: IPersistUnitOptions<TState>\n): IPersistHandle;"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "snapshot(): TState;",
+              "description": "Reads the current persistable state synchronously.",
+              "parameterDetails": [],
+              "returns": "TState"
+            },
+            {
+              "name": "restore",
+              "kind": "method",
+              "optional": false,
+              "signature": "restore(state: TState): void;",
+              "description": "Restores state synchronously during hydration.",
+              "parameterDetails": [
+                {
+                  "name": "state",
+                  "type": "TState",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "subscribe",
+              "kind": "method",
+              "optional": false,
+              "signature": "subscribe(onChange: () => void): IDisposer;",
+              "description": "Registers change notifications and returns an unsubscribe function.",
+              "parameterDetails": [
+                {
+                  "name": "onChange",
+                  "type": "() => void",
+                  "optional": false
+                }
+              ],
+              "returns": "IDisposer"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IPersistUnit",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2705,7 +2936,108 @@
           "examples": [
             "type IPersistUnit<TState> = {\n  snapshot(): TState; // 同步读当前可持久化状态\n  restore(state: TState): void; // 同步写回一份状态（hydrate 用）\n  subscribe(onChange: () => void): IDisposer; // 注册变化通知\n};\n\nfunction persistUnit<TState>(\n  unit: IPersistUnit<TState>,\n  options: IPersistUnitOptions<TState>\n): IPersistHandle;"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "runtime: IRuntime;",
+              "description": "Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep them in one graph.",
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "storage",
+              "kind": "property",
+              "optional": false,
+              "signature": "storage: IPersistStorage;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPersistStorage"
+            },
+            {
+              "name": "codec",
+              "kind": "property",
+              "optional": true,
+              "signature": "codec?: ICodec;",
+              "description": "Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize on the state type.",
+              "parameterDetails": [],
+              "returns": "ICodec"
+            },
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": true,
+              "signature": "version?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "migrate",
+              "kind": "property",
+              "optional": true,
+              "signature": "migrate?: (persisted: TState, fromVersion: number) => TState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(persisted: TState, fromVersion: number) => TState"
+            },
+            {
+              "name": "partialize",
+              "kind": "property",
+              "optional": true,
+              "signature": "partialize?: (state: TState) => Partial<TState>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(state: TState) => Partial<TState>"
+            },
+            {
+              "name": "merge",
+              "kind": "property",
+              "optional": true,
+              "signature": "merge?: (persisted: Partial<TState>, current: TState) => TState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(persisted: Partial<TState>, current: TState) => TState"
+            },
+            {
+              "name": "debounceMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "debounceMs?: number;",
+              "description": "Quiet interval before enqueueing a write; zero writes without debounce.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxWaitMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxWaitMs?: number;",
+              "description": "Maximum debounce-window duration after hydration; does not bound storage or queue latency.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IPersistUnitOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2769,7 +3101,18 @@
           "errors": ["No documented errors are declared for IReadonlyPersistValue."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReadonlyPersistValue.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IReadonlyPersistValue",
           "exportPath": ".",
           "overloadSignatures": ["export type IReadonlyPersistValue<T> = { readonly value: T; };"],
@@ -2817,6 +3160,136 @@
           "fragment": "store-persist-index--IReadonlyPersistValue"
         },
         {
+          "name": "IStorePersistErrorCode",
+          "kind": "type",
+          "signature": "export type IStorePersistErrorCode = (typeof StorePersistErrorCode)[keyof typeof StorePersistErrorCode];",
+          "declarationLine": 67,
+          "source": "packages/store-persist/dist/error-code.d.ts",
+          "purpose": "IStorePersistErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorePersistErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IStorePersistErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStorePersistErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStorePersistErrorCode.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IStorePersistErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStorePersistErrorCode = (typeof StorePersistErrorCode)[keyof typeof StorePersistErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStorePersistErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStorePersistErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IStorePersistErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStorePersistErrorCode from @migaia/store-persist, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStorePersistErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IStorePersistErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStorePersistErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStorePersistErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-persist/dist/error-code.d.ts:IStorePersistErrorCode:export type IStorePersistErrorCode = (typeof StorePersistErrorCode)[keyof typeof StorePersistErrorCode];",
+          "guidance": [
+            {
+              "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
+              "heading": "10. 底层导出：envelope 工具、状态常量与错误构造函数",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "以下是 `persistUnit()`/`persist()`/`persistCollection()`/`persistKeyed()` 内部用来读写/编解码存档的底层函数与常量。它们都从包根（`.` 导出）导出，一般不需要在业务代码里直接调用——除非要接入一种全新的 store 形状（`persistUnit()` 之外的第四种适配），或需要绕开三个高层函数手动读写某个 key 的存档。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<TState>;\nclass PersistEnvelopeError extends TypeError {}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`assertEnvelope(value, key)` 校验 `value` 是 `{ version: number; state: unknown }` 形状的信封：`value` 非对象/是数组、`version` 不是安全非负整数、或缺失/`null`/`undefined` 的 `state`，都会抛出 `PersistEnvelopeError`（继承 `TypeError`，携带 `code: 'ENVELOPE_INVALID'`）。校验通过时返回收窄类型后的 `{ version, state: TState }`。`key` 只用于错误消息里标注是哪个存档。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const defaultJsonCodec: ICodec; // { name: 'json', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包自带的默认 codec 遵循 `@migaia/storage-contract` 的 `ICodec` 形状，额外原生支持 `Map`/`Set` 往返（编码成带 `__migaia_persist_map`/`migaia_persist_set__` 标签的普通对象，解码时还原成真正的 `Map`/`Set` 实例），避免 `JSON.stringify(new Map(.))` 静默丢空的问题。需要 storage-web 的 binary codec 时，从 `@migaia/storage-web/serialize` exact 子路径导入。`encode` 遇到不可序列化的值（如循环引用）抛 `TypeError`（`code: 'ENCODE_FAILED'`）；`decode` 收到非字符串输入抛 `TypeError`（`code: 'ENVELOPE_INVALID'`）。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
+                    "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
+                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                  ]
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const PersistState: { idle; active; loading; writing; ready; success; error; disposed }; // 见下\nconst PersistCodecOutput: { text: 'text'; structured: 'structured'; binary: 'binary' };"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`PersistState` 是本包内部状态机全部状态取值的唯一声明处，`IPersistHandle.status`/`hydrationStatus`/`writeStatus` 的类型都是它的子集（分别是 `IPersistStatus`/`IHydrationStatus`/`IWriteStatus`，见 §6）；诊断代码可以直接比较 `handle.status.value === PersistState.error` 而不必写字符串字面量。`PersistCodecOutput` 是 `ICodec.output` 的合法取值表，与 `@migaia/storage-web` 的编码通道一一对应。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const STORE_PERSIST_SOURCE: '@migaia/store-persist';\nfunction createStorePersistError(code, message, options?: { cause?: unknown }): Error;\nfunction createStorePersistAbortError(code, message, cause?: unknown): DOMException;\nfunction createStorePersistTypeError(code, message, options?: { cause?: unknown }): TypeError;\nfunction createStorePersistAggregateError(\n  code,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包构造全部错误时使用的同一套工厂函数，统一打上 `source: STORE_PERSIST_SOURCE` 与 `IStorePersistErrorCode` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）。`createStorePersistAbortError` 构造原生 `DOMException('.', 'AbortError')`，用于 `dispose()` 之后取消在途操作（保持 `name === 'AbortError'` 这一约定，见 §8）。日常业务代码通常不需要直接调用它们；导出给需要\"以 `@migaia/store-persist` 身份抛出自定义诊断错误\"的高级集成方，例如自定义 `IPersistUnit` 适配实现。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "store-persist-index--IStorePersistErrorCode"
+        },
+        {
           "name": "IWriteStatus",
           "kind": "type",
           "signature": "export type IWriteStatus = typeof PersistState.idle | typeof PersistState.writing | typeof PersistState.error | typeof PersistState.disposed;",
@@ -2832,6 +3305,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWriteStatus.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IWriteStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2963,7 +3437,36 @@
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
             "const PersistState: { idle; active; loading; writing; ready; success; error; disposed }; // 见下\nconst PersistCodecOutput: { text: 'text'; structured: 'structured'; binary: 'binary' };"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "text",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly text: \"text\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"text\""
+            },
+            {
+              "name": "structured",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly structured: \"structured\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"structured\""
+            },
+            {
+              "name": "binary",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly binary: \"binary\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"binary\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "PersistCodecOutput",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3099,6 +3602,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PersistEnvelopeError.",
           "examples": [],
           "members": [],
+          "composes": ["TypeError"],
           "aliasOf": "PersistEnvelopeError",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3329,7 +3833,81 @@
             "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';",
             "const PersistState: { idle; active; loading; writing; ready; success; error; disposed }; // 见下\nconst PersistCodecOutput: { text: 'text'; structured: 'structured'; binary: 'binary' };"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "idle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly idle: \"idle\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"idle\""
+            },
+            {
+              "name": "active",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly active: \"active\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"active\""
+            },
+            {
+              "name": "loading",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly loading: \"loading\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"loading\""
+            },
+            {
+              "name": "writing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly writing: \"writing\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"writing\""
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: \"ready\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"ready\""
+            },
+            {
+              "name": "success",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly success: \"success\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"success\""
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: \"error\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"error\""
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: \"disposed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"disposed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "PersistState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3470,6 +4048,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for persistUnit.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "persistUnit",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3524,7 +4103,74 @@
               "content": "No additional advanced behavior is declared for persistUnit."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "key",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": false,
+              "description": "Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep them in one graph."
+            },
+            {
+              "name": "storage",
+              "type": "IPersistStorage",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true,
+              "description": "Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize on the state type."
+            },
+            {
+              "name": "version",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "migrate",
+              "type": "(persisted: TState, fromVersion: number) => TState",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "partialize",
+              "type": "(state: TState) => Partial<TState>",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "merge",
+              "type": "(persisted: Partial<TState>, current: TState) => TState",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "debounceMs",
+              "type": "number",
+              "optional": true,
+              "description": "Quiet interval before enqueueing a write; zero writes without debounce."
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "Maximum debounce-window duration after hydration; does not bound storage or queue latency."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler."
+            }
+          ],
           "identity": "packages/store-persist/dist/core/persist-unit.d.ts:persistUnit:export declare function persistUnit<TState>(unit: IPersistUnit<TState>, options: IPersistUnitOptions<TState>): IPersistHandle;",
           "guidance": [
             {
@@ -3593,7 +4239,96 @@
             }
           ],
           "usageScore": 50,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "key",
+              "type": "string",
+              "optional": false,
+              "description": "`key` — `string` — 必填 — 无 — 存档在 storage 里的键",
+              "descriptionEn": "",
+              "descriptionZh": "`key` — `string` — 必填 — 无 — 存档在 storage 里的键"
+            },
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": false,
+              "description": "`runtime` — `IRuntime` — 必填 — 无 — `status`/`error`/`hydrated` 等信号挂在哪个 Runtime 上；三条适配路径都会自动传底层 store/collection/AtomStore 自己的 runtime",
+              "descriptionEn": "Owns the status signals. Use the underlying store, collection, or `AtomStore` runtime to keep them in one graph.",
+              "descriptionZh": "`runtime` — `IRuntime` — 必填 — 无 — `status`/`error`/`hydrated` 等信号挂在哪个 Runtime 上；三条适配路径都会自动传底层 store/collection/AtomStore 自己的 runtime"
+            },
+            {
+              "name": "storage",
+              "type": "IPersistStorage",
+              "optional": false,
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "descriptionEn": "",
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true,
+              "description": "`codec` — `ICodec` — 可选 — `defaultJsonCodec` — 见 §7",
+              "descriptionEn": "Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize on the state type.",
+              "descriptionZh": "`codec` — `ICodec` — 可选 — `defaultJsonCodec` — 见 §7"
+            },
+            {
+              "name": "version",
+              "type": "number",
+              "optional": true,
+              "description": "`version` — `number` — 可选 — `0` — schema 版本，必须是安全非负整数",
+              "descriptionEn": "",
+              "descriptionZh": "`version` — `number` — 可选 — `0` — schema 版本，必须是安全非负整数"
+            },
+            {
+              "name": "migrate",
+              "type": "(persisted: TState, fromVersion: number) => TState",
+              "optional": true,
+              "description": "`migrate` — `(persisted: TState, fromVersion: number) => TState` — 可选 — 无 — 见 §5",
+              "descriptionEn": "",
+              "descriptionZh": "`migrate` — `(persisted: TState, fromVersion: number) => TState` — 可选 — 无 — 见 §5"
+            },
+            {
+              "name": "partialize",
+              "type": "(state: TState) => Partial<TState>",
+              "optional": true,
+              "description": "`partialize` — `(state: TState) => Partial<TState>` — 可选 — 恒等函数 — 写入前裁剪",
+              "descriptionEn": "",
+              "descriptionZh": "`partialize` — `(state: TState) => Partial<TState>` — 可选 — 恒等函数 — 写入前裁剪"
+            },
+            {
+              "name": "merge",
+              "type": "(persisted: Partial<TState>, current: TState) => TState",
+              "optional": true,
+              "description": "`merge` — `(persisted: Partial<TState>, current: TState) => TState` — 可选 — 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 — 读取后合并回内存，见下方\"默认 merge 的语义\"",
+              "descriptionEn": "",
+              "descriptionZh": "`merge` — `(persisted: Partial<TState>, current: TState) => TState` — 可选 — 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 — 读取后合并回内存，见下方\"默认 merge 的语义\""
+            },
+            {
+              "name": "debounceMs",
+              "type": "number",
+              "optional": true,
+              "description": "`debounceMs` — `number` — 可选 — `0`（不防抖） — 变化后延迟多久发起写入",
+              "descriptionEn": "Quiet interval before enqueueing a write; zero writes without debounce.",
+              "descriptionZh": "`debounceMs` — `number` — 可选 — `0`（不防抖） — 变化后延迟多久发起写入"
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。",
+              "descriptionEn": "Maximum debounce-window duration after hydration; does not bound storage or queue latency.",
+              "descriptionZh": "防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。",
+              "descriptionEn": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler.",
+              "descriptionZh": "防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。"
+            }
+          ],
           "fragment": "store-persist-index--persistUnit"
         },
         {
@@ -3638,6 +4373,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readEnvelope.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "readEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3810,6 +4546,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for removeEnvelope.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "removeEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3960,6 +4697,7 @@
             "const STORE_PERSIST_SOURCE: '@migaia/store-persist';\nfunction createStorePersistError(code, message, options?: { cause?: unknown }): Error;\nfunction createStorePersistAbortError(code, message, cause?: unknown): DOMException;\nfunction createStorePersistTypeError(code, message, options?: { cause?: unknown }): TypeError;\nfunction createStorePersistAggregateError(\n  code,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_PERSIST_SOURCE = \"@migaia/store-persist\";"
@@ -4073,6 +4811,300 @@
           "fragment": "store-persist-index--STORE_PERSIST_SOURCE"
         },
         {
+          "name": "StorePersistErrorCode",
+          "kind": "const",
+          "signature": "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: \"CODEC_NOT_RESOLVED\"; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: \"CODEC_OUTPUT_MISMATCH\"; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: \"BACKEND_CAPABILITY\"; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, or its version different without a migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: \"ENVELOPE_INVALID\"; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: \"HYDRATE_AND_WRITE_FAILED\"; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: \"ABORTED_BY_DISPOSE\"; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "declarationLine": 11,
+          "source": "packages/store-persist/dist/error-code.d.ts",
+          "purpose": "Declares the public error codes for `@migaia/store-persist` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-persist'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2).",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StorePersistErrorCode.",
+          "advanced": "No additional advanced behavior is declared for StorePersistErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for StorePersistErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StorePersistErrorCode.",
+          "examples": [],
+          "members": [
+            {
+              "name": "codecNotResolved",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly codecNotResolved: \"CODEC_NOT_RESOLVED\";",
+              "description": "No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available.",
+              "parameterDetails": [],
+              "returns": "\"CODEC_NOT_RESOLVED\""
+            },
+            {
+              "name": "codecOutputMismatch",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly codecOutputMismatch: \"CODEC_OUTPUT_MISMATCH\";",
+              "description": "Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure.",
+              "parameterDetails": [],
+              "returns": "\"CODEC_OUTPUT_MISMATCH\""
+            },
+            {
+              "name": "backendCapability",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly backendCapability: \"BACKEND_CAPABILITY\";",
+              "description": "A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec.",
+              "parameterDetails": [],
+              "returns": "\"BACKEND_CAPABILITY\""
+            },
+            {
+              "name": "envelopeInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly envelopeInvalid: \"ENVELOPE_INVALID\";",
+              "description": "The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, or its version different without a migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch.",
+              "parameterDetails": [],
+              "returns": "\"ENVELOPE_INVALID\""
+            },
+            {
+              "name": "encodeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly encodeFailed: \"ENCODE_FAILED\";",
+              "description": "The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`.",
+              "parameterDetails": [],
+              "returns": "\"ENCODE_FAILED\""
+            },
+            {
+              "name": "hydrateAndWriteFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hydrateAndWriteFailed: \"HYDRATE_AND_WRITE_FAILED\";",
+              "description": "Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error.",
+              "parameterDetails": [],
+              "returns": "\"HYDRATE_AND_WRITE_FAILED\""
+            },
+            {
+              "name": "abortedByDispose",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly abortedByDispose: \"ABORTED_BY_DISPOSE\";",
+              "description": "A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete.",
+              "parameterDetails": [],
+              "returns": "\"ABORTED_BY_DISPOSE\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            }
+          ],
+          "composes": [],
+          "aliasOf": "StorePersistErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: \"CODEC_NOT_RESOLVED\"; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: \"CODEC_OUTPUT_MISMATCH\"; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: \"BACKEND_CAPABILITY\"; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, or its version different without a migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: \"ENVELOPE_INVALID\"; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: \"HYDRATE_AND_WRITE_FAILED\"; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: \"ABORTED_BY_DISPOSE\"; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: \"INVALID_OPTION\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use StorePersistErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when StorePersistErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Declares the public error codes for `@migaia/store-persist` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-persist'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2)."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import StorePersistErrorCode from @migaia/store-persist, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use StorePersistErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when StorePersistErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StorePersistErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for StorePersistErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-persist/dist/error-code.d.ts:StorePersistErrorCode:export declare const StorePersistErrorCode: { /** * No codec resolves for a storage key. * * Provide `codec` to `persist` or `persistUnit`, or confirm that the default codec is available. */ readonly codecNotResolved: \"CODEC_NOT_RESOLVED\"; /** * Codec output does not match the backend capabilities or contract. Examples include unsupported * structured output, non-byte binary output, and non-string text output. * * Check the codec `output` and backend `capabilities`. This is a configuration or implementation * mismatch, not a transient failure. */ readonly codecOutputMismatch: \"CODEC_OUTPUT_MISMATCH\"; /** * A binary codec requires `getBytes` and `setBytes`, but the storage backend lacks them. * * Use a record-capable backend such as memory or IndexedDB, or use a text codec. */ readonly backendCapability: \"BACKEND_CAPABILITY\"; /** * The saved envelope is invalid or incompatible with the current store version. Its state may be * missing, its version invalid, or its version different without a migration. * * Check the archive and configured `version`. Provide `migrate` for a version mismatch. */ readonly envelopeInvalid: \"ENVELOPE_INVALID\"; /** * The JSON codec fails to serialize a value. * * Check whether the value is JSON-serializable. The original exception remains in `cause`. */ readonly encodeFailed: \"ENCODE_FAILED\"; /** * Hydration and the subsequent write both fail. An `AggregateError` retains both causes in its * error chain. * * Inspect `error.errors` and handle each failure. This is a double failure, not one transient * error. */ readonly hydrateAndWriteFailed: \"HYDRATE_AND_WRITE_FAILED\"; /** * A persistence operation is aborted by `dispose()`. The error retains the name `AbortError`. * * Treat this as cancellation. Disposal stops scheduling new writes and requests cancellation of * active operations. An in-flight adapter may still complete. */ readonly abortedByDispose: \"ABORTED_BY_DISPOSE\"; /** * Persistence options are invalid, for example when `version` is not a safe non-negative integer. * * Correct the configuration before retrying. This is a permanent input error. */ readonly invalidOption: \"INVALID_OPTION\"; };",
+          "guidance": [
+            {
+              "id": "8-错误参考",
+              "heading": "8. 错误参考",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "所有包边界错误都带 `source: '@migaia/store-persist'` 与稳定 `code`。重点检查 `ENVELOPE_INVALID`、`ENCODE_FAILED`、`BACKEND_CAPABILITY`、`CODEC_OUTPUT_MISMATCH` 和 `ABORTED_BY_DISPOSE`；后者保留原生 `AbortError`。hydrate 失败会保留原始错误并阻塞 `flush()`/`clear()`，直到一次成功的 `retryHydrate()` 重新打开有序写入。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["`StorePersistErrorCode`", "码值", "触发条件 / 处理"],
+                  "rows": [
+                    [
+                      "`codecNotResolved`",
+                      "`CODEC_NOT_RESOLVED`",
+                      "没有为 key 解析到 codec；显式提供 codec 或修复默认解析"
+                    ],
+                    [
+                      "`codecOutputMismatch`",
+                      "`CODEC_OUTPUT_MISMATCH`",
+                      "codec output 与实际 payload/后端能力不一致；修正 codec 实现或选路"
+                    ],
+                    [
+                      "`backendCapability`",
+                      "`BACKEND_CAPABILITY`",
+                      "binary codec 缺 `getBytes`/`setBytes`；换后端或 text codec"
+                    ],
+                    [
+                      "`envelopeInvalid`",
+                      "`ENVELOPE_INVALID`",
+                      "存档 envelope/版本非法；修复数据或提供 migrate"
+                    ],
+                    ["`encodeFailed`", "`ENCODE_FAILED`", "值无法编码；检查 `cause` 与待存值"],
+                    [
+                      "`hydrateAndWriteFailed`",
+                      "`HYDRATE_AND_WRITE_FAILED`",
+                      "hydrate 与随后的写回都失败；展开 `AggregateError.errors`"
+                    ],
+                    [
+                      "`abortedByDispose`",
+                      "`ABORTED_BY_DISPOSE`",
+                      "dispose 中止操作；按原生 `AbortError` 处理，不重用 handle"
+                    ],
+                    ["`invalidOption`", "`INVALID_OPTION`", "version 等配置非法；修正后再构造"]
+                  ]
+                },
+                {
+                  "type": "table",
+                  "headers": ["触发条件", "错误类型", "说明"],
+                  "rows": [
+                    ["`version` 不是安全非负整数", "`TypeError`", "构造时同步抛出"],
+                    [
+                      "存档不是合法信封（不是对象/缺 `version`/缺 `state`）",
+                      "`PersistEnvelopeError`（继承 `TypeError`）",
+                      "hydrate 阶段，反映在 `hydrationError`/`ready` reject"
+                    ],
+                    [
+                      "hydrate 失败后调用 `flush()`/`clear()`",
+                      "原始 hydrate 错误",
+                      "写入保持阻塞并保留 dirty 状态；成功的 `retryHydrate()` 才恢复写入"
+                    ],
+                    [
+                      "`version` 与存档不一致且未提供 `migrate`",
+                      "`Error`",
+                      "消息含 `provide migrate()`"
+                    ],
+                    [
+                      "codec 编码失败（比如值包含循环引用）",
+                      "`TypeError`",
+                      "`defaultJsonCodec` 保留原始错误为 `cause` 并附加 `ENCODE_FAILED`"
+                    ],
+                    ["`codec.output === 'structured'` 但存储不支持", "`TypeError`", "见 §7"],
+                    [
+                      "`codec.output === 'binary'` 但存储没有 `getBytes`/`setBytes`",
+                      "`TypeError`",
+                      "同上"
+                    ],
+                    [
+                      "`persistKeyed()` 未传 `namespace`",
+                      "TypeScript 编译期错误",
+                      "`namespace` 是必填字段，不是运行时校验"
+                    ],
+                    [
+                      "`dispose()` 后调用 `flush()`/`clear()`",
+                      "`Error`（`name: 'AbortError'`）",
+                      "消息为 `[store] persist operation was aborted by dispose`"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "10-底层导出-envelope-工具-状态常量与错误构造函数",
+              "heading": "10. 底层导出：envelope 工具、状态常量与错误构造函数",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "以下是 `persistUnit()`/`persist()`/`persistCollection()`/`persistKeyed()` 内部用来读写/编解码存档的底层函数与常量。它们都从包根（`.` 导出）导出，一般不需要在业务代码里直接调用——除非要接入一种全新的 store 形状（`persistUnit()` 之外的第四种适配），或需要绕开三个高层函数手动读写某个 key 的存档。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  assertEnvelope,\n  PersistEnvelopeError,\n  type IEnvelope,\n  defaultJsonCodec,\n  writeEnvelope,\n  readEnvelope,\n  removeEnvelope,\n  PersistState,\n  PersistCodecOutput,\n  STORE_PERSIST_SOURCE,\n  createStorePersistError,\n  createStorePersistAbortError,\n  createStorePersistTypeError,\n  createStorePersistAggregateError\n} from '@migaia/store-persist';"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function assertEnvelope<TState>(value: unknown, key: string): IEnvelope<TState>;\nclass PersistEnvelopeError extends TypeError {}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`assertEnvelope(value, key)` 校验 `value` 是 `{ version: number; state: unknown }` 形状的信封：`value` 非对象/是数组、`version` 不是安全非负整数、或缺失/`null`/`undefined` 的 `state`，都会抛出 `PersistEnvelopeError`（继承 `TypeError`，携带 `code: 'ENVELOPE_INVALID'`）。校验通过时返回收窄类型后的 `{ version, state: TState }`。`key` 只用于错误消息里标注是哪个存档。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const defaultJsonCodec: ICodec; // { name: 'json', output: 'text', encode(value): Promise<string>, decode(raw): Promise<unknown> }"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包自带的默认 codec 遵循 `@migaia/storage-contract` 的 `ICodec` 形状，额外原生支持 `Map`/`Set` 往返（编码成带 `__migaia_persist_map`/`migaia_persist_set__` 标签的普通对象，解码时还原成真正的 `Map`/`Set` 实例），避免 `JSON.stringify(new Map(.))` 静默丢空的问题。需要 storage-web 的 binary codec 时，从 `@migaia/storage-web/serialize` exact 子路径导入。`encode` 遇到不可序列化的值（如循环引用）抛 `TypeError`（`code: 'ENCODE_FAILED'`）；`decode` 收到非字符串输入抛 `TypeError`（`code: 'ENVELOPE_INVALID'`）。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "function writeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  value: unknown,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;\nfunction readEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  codec: ICodec,\n  ctx: { signal?: AbortSignal }\n): Promise<unknown | undefined>;\nfunction removeEnvelope(\n  storage: IPersistStorage,\n  key: string,\n  ctx: { signal?: AbortSignal }\n): Promise<void>;"
+                },
+                {
+                  "type": "list",
+                  "items": [
+                    "`writeEnvelope`：按 `codec.output` 选路——`'structured'` 直接抛 `TypeError`（本包最小 storage 投影不支持 record 通道）；`'binary'` 且后端具备 `getBytes`/`setBytes` 时写字节通道（编码结果必须是 `Uint8Array`，否则抛错）；其余情况写文本通道（编码结果必须是 `string`）。",
+                    "`readEnvelope`：镜像 `writeEnvelope` 的选路逻辑读取；对应键在 storage 里不存在时返回 `undefined`（不是抛错）。",
+                    "`removeEnvelope`：委托 `storage.remove(key, ctx)`。"
+                  ]
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const PersistState: { idle; active; loading; writing; ready; success; error; disposed }; // 见下\nconst PersistCodecOutput: { text: 'text'; structured: 'structured'; binary: 'binary' };"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`PersistState` 是本包内部状态机全部状态取值的唯一声明处，`IPersistHandle.status`/`hydrationStatus`/`writeStatus` 的类型都是它的子集（分别是 `IPersistStatus`/`IHydrationStatus`/`IWriteStatus`，见 §6）；诊断代码可以直接比较 `handle.status.value === PersistState.error` 而不必写字符串字面量。`PersistCodecOutput` 是 `ICodec.output` 的合法取值表，与 `@migaia/storage-web` 的编码通道一一对应。"
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "const STORE_PERSIST_SOURCE: '@migaia/store-persist';\nfunction createStorePersistError(code, message, options?: { cause?: unknown }): Error;\nfunction createStorePersistAbortError(code, message, cause?: unknown): DOMException;\nfunction createStorePersistTypeError(code, message, options?: { cause?: unknown }): TypeError;\nfunction createStorePersistAggregateError(\n  code,\n  errors: readonly unknown[],\n  message: string\n): AggregateError;"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包构造全部错误时使用的同一套工厂函数，统一打上 `source: STORE_PERSIST_SOURCE` 与 `IStorePersistErrorCode` 身份（经 `@migaia/utils/error` 的 `attachErrorIdentity`）。`createStorePersistAbortError` 构造原生 `DOMException('.', 'AbortError')`，用于 `dispose()` 之后取消在途操作（保持 `name === 'AbortError'` 这一约定，见 §8）。日常业务代码通常不需要直接调用它们；导出给需要\"以 `@migaia/store-persist` 身份抛出自定义诊断错误\"的高级集成方，例如自定义 `IPersistUnit` 适配实现。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "store-persist-index--StorePersistErrorCode"
+        },
+        {
           "name": "writeEnvelope",
           "kind": "function",
           "signature": "export declare function writeEnvelope(storage: IPersistStorage, key: string, codec: ICodec, value: unknown, ctx: { signal?: IAbortSignal; }): Promise<void>;",
@@ -4120,6 +5152,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for writeEnvelope.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "writeEnvelope",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4297,7 +5330,42 @@
           "examples": [
             "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "snapshot(): TState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TState"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace(state: TState): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "state",
+                  "type": "TState",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IPersistableCollection",
           "exportPath": "./indexed",
           "overloadSignatures": [
@@ -4363,7 +5431,99 @@
           "examples": [
             "function persistCollection<TState>(\n  collection: IPersistableCollection<TState>,\n  options: IPersistCollectionOptions<TState>\n): IPersistHandle;\n\ntype IPersistableCollection<TState> = {\n  readonly runtime: IRuntime;\n  snapshot(): TState;\n  replace(state: TState): void;\n};\n\ntype IPersistCollectionOptions<TState> = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: TState, fromVersion: number) => TState;\n  partialize?: (state: TState) => Partial<TState>;\n  merge?: (persisted: Partial<TState>, current: TState) => TState;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "storage",
+              "kind": "property",
+              "optional": false,
+              "signature": "storage: IPersistStorage;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPersistStorage"
+            },
+            {
+              "name": "codec",
+              "kind": "property",
+              "optional": true,
+              "signature": "codec?: ICodec;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICodec"
+            },
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": true,
+              "signature": "version?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "migrate",
+              "kind": "property",
+              "optional": true,
+              "signature": "migrate?: (persisted: TState, fromVersion: number) => TState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(persisted: TState, fromVersion: number) => TState"
+            },
+            {
+              "name": "partialize",
+              "kind": "property",
+              "optional": true,
+              "signature": "partialize?: (state: TState) => Partial<TState>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(state: TState) => Partial<TState>"
+            },
+            {
+              "name": "merge",
+              "kind": "property",
+              "optional": true,
+              "signature": "merge?: (persisted: Partial<TState>, current: TState) => TState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(persisted: Partial<TState>, current: TState) => TState"
+            },
+            {
+              "name": "debounceMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "debounceMs?: number;",
+              "description": "Quiet interval before enqueueing a write; zero writes without debounce.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxWaitMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxWaitMs?: number;",
+              "description": "Maximum debounce-window duration after hydration; does not bound storage or queue latency.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IPersistCollectionOptions",
           "exportPath": "./indexed",
           "overloadSignatures": [
@@ -4449,6 +5609,7 @@
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "persistCollection",
           "exportPath": "./indexed",
           "overloadSignatures": [
@@ -4503,7 +5664,68 @@
               "content": "No additional advanced behavior is declared for persistCollection."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "key",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "storage",
+              "type": "IPersistStorage",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "version",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "migrate",
+              "type": "(persisted: TState, fromVersion: number) => TState",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "partialize",
+              "type": "(state: TState) => Partial<TState>",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "merge",
+              "type": "(persisted: Partial<TState>, current: TState) => TState",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "debounceMs",
+              "type": "number",
+              "optional": true,
+              "description": "Quiet interval before enqueueing a write; zero writes without debounce."
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "Maximum debounce-window duration after hydration; does not bound storage or queue latency."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler."
+            }
+          ],
           "identity": "packages/store-persist/dist/indexed/persist-collection.d.ts:persistCollection:export declare function persistCollection<TState>(collection: IPersistableCollection<TState>, options: IPersistCollectionOptions<TState>): IPersistHandle;",
           "guidance": [
             {
@@ -4572,7 +5794,88 @@
             }
           ],
           "usageScore": 136,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "key",
+              "type": "string",
+              "optional": false,
+              "description": "`key` — `string` — 必填 — 无 — 存档在 storage 里的键",
+              "descriptionEn": "",
+              "descriptionZh": "`key` — `string` — 必填 — 无 — 存档在 storage 里的键"
+            },
+            {
+              "name": "storage",
+              "type": "IPersistStorage",
+              "optional": false,
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "descriptionEn": "",
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true,
+              "description": "`codec` — `ICodec` — 可选 — `defaultJsonCodec` — 见 §7",
+              "descriptionEn": "Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize on the state type.",
+              "descriptionZh": "`codec` — `ICodec` — 可选 — `defaultJsonCodec` — 见 §7"
+            },
+            {
+              "name": "version",
+              "type": "number",
+              "optional": true,
+              "description": "`version` — `number` — 可选 — `0` — schema 版本，必须是安全非负整数",
+              "descriptionEn": "",
+              "descriptionZh": "`version` — `number` — 可选 — `0` — schema 版本，必须是安全非负整数"
+            },
+            {
+              "name": "migrate",
+              "type": "(persisted: TState, fromVersion: number) => TState",
+              "optional": true,
+              "description": "`migrate` — `(persisted: TState, fromVersion: number) => TState` — 可选 — 无 — 见 §5",
+              "descriptionEn": "",
+              "descriptionZh": "`migrate` — `(persisted: TState, fromVersion: number) => TState` — 可选 — 无 — 见 §5"
+            },
+            {
+              "name": "partialize",
+              "type": "(state: TState) => Partial<TState>",
+              "optional": true,
+              "description": "`partialize` — `(state: TState) => Partial<TState>` — 可选 — 恒等函数 — 写入前裁剪",
+              "descriptionEn": "",
+              "descriptionZh": "`partialize` — `(state: TState) => Partial<TState>` — 可选 — 恒等函数 — 写入前裁剪"
+            },
+            {
+              "name": "merge",
+              "type": "(persisted: Partial<TState>, current: TState) => TState",
+              "optional": true,
+              "description": "`merge` — `(persisted: Partial<TState>, current: TState) => TState` — 可选 — 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 — 读取后合并回内存，见下方\"默认 merge 的语义\"",
+              "descriptionEn": "",
+              "descriptionZh": "`merge` — `(persisted: Partial<TState>, current: TState) => TState` — 可选 — 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 — 读取后合并回内存，见下方\"默认 merge 的语义\""
+            },
+            {
+              "name": "debounceMs",
+              "type": "number",
+              "optional": true,
+              "description": "`debounceMs` — `number` — 可选 — `0`（不防抖） — 变化后延迟多久发起写入",
+              "descriptionEn": "Quiet interval before enqueueing a write; zero writes without debounce.",
+              "descriptionZh": "`debounceMs` — `number` — 可选 — `0`（不防抖） — 变化后延迟多久发起写入"
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "`key: string`（必填）、`storage: IPersistStorage`（必填）、`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）",
+              "descriptionEn": "Maximum debounce-window duration after hydration; does not bound storage or queue latency.",
+              "descriptionZh": "`key: string`（必填）、`storage: IPersistStorage`（必填）、`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "`key: string`（必填）、`storage: IPersistStorage`（必填）、`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）",
+              "descriptionEn": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler.",
+              "descriptionZh": "`key: string`（必填）、`storage: IPersistStorage`（必填）、`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）"
+            }
+          ],
           "fragment": "store-persist-indexed--persistCollection"
         }
       ],
@@ -4626,6 +5929,7 @@
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "clearFamily",
           "exportPath": "./keyed",
           "overloadSignatures": [
@@ -4704,7 +6008,144 @@
           "examples": [
             "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\n// 与 persist()/persistCollection() 相同的 IPersistHandle（status、ready、flush、clear、dispose 等），外加当前值\ntype IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T };"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "status: IReactiveComputed<IPersistStatus>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReactiveComputed<IPersistStatus>"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "error: IReactiveComputed<unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReactiveComputed<unknown>"
+            },
+            {
+              "name": "hydrated",
+              "kind": "property",
+              "optional": false,
+              "signature": "hydrated: IReactiveComputed<boolean>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReactiveComputed<boolean>"
+            },
+            {
+              "name": "hydrationStatus",
+              "kind": "property",
+              "optional": false,
+              "signature": "hydrationStatus: IReadonlyPersistValue<IHydrationStatus>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReadonlyPersistValue<IHydrationStatus>"
+            },
+            {
+              "name": "hydrationError",
+              "kind": "property",
+              "optional": false,
+              "signature": "hydrationError: IReadonlyPersistValue<unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReadonlyPersistValue<unknown>"
+            },
+            {
+              "name": "writeStatus",
+              "kind": "property",
+              "optional": false,
+              "signature": "writeStatus: IReadonlyPersistValue<IWriteStatus>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReadonlyPersistValue<IWriteStatus>"
+            },
+            {
+              "name": "writeError",
+              "kind": "property",
+              "optional": false,
+              "signature": "writeError: IReadonlyPersistValue<unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IReadonlyPersistValue<unknown>"
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "ready: Promise<void>;",
+              "description": "Resolves when hydration succeeds and rejects when hydration fails.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "settled",
+              "kind": "property",
+              "optional": false,
+              "signature": "settled: Promise<void>;",
+              "description": "Resolves after hydration, whether it succeeds or fails.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "retryHydrate",
+              "kind": "method",
+              "optional": false,
+              "signature": "retryHydrate(): Promise<void>;",
+              "description": "Reads the archive again after failure. Only successful hydration reopens the write gate.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "flush",
+              "kind": "method",
+              "optional": false,
+              "signature": "flush(): Promise<void>;",
+              "description": "Writes immediately and waits for all in-flight writes. Disposal during the wait ends it with `AbortError`.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "optional": false,
+              "signature": "clear(): Promise<void>;",
+              "description": "Queues archive removal. Disposal during the wait ends it with `AbortError`.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IPersistKeyedHandle",
           "exportPath": "./keyed",
           "overloadSignatures": [
@@ -4770,7 +6211,90 @@
           "examples": [
             "function persistKeyed<T>(\n  atomStore: IAtomStore,\n  def: IWritableAtomDefinition<T>,\n  id: string,\n  options: IPersistKeyedOptions<T>\n): IPersistKeyedHandle<T>;\nfunction clearFamily(storage: IKeyValueStore, namespace: string): Promise<number>;\n\ntype IPersistKeyedOptions<T> = {\n  namespace: string; // 必填——storage key 格式 `${namespace}:${id}`\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n  partialize?: (value: T) => Partial<T>;\n  merge?: (persisted: Partial<T>, current: T) => T;\n};\n\n// 与 persist()/persistCollection() 相同的 IPersistHandle（status、ready、flush、clear、dispose 等），外加当前值\ntype IPersistKeyedHandle<T> = IPersistHandle & { readonly value: T };"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "namespace",
+              "kind": "property",
+              "optional": false,
+              "signature": "namespace: string;",
+              "description": "Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the prefix.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "storage",
+              "kind": "property",
+              "optional": false,
+              "signature": "storage: IPersistStorage;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPersistStorage"
+            },
+            {
+              "name": "codec",
+              "kind": "property",
+              "optional": true,
+              "signature": "codec?: ICodec;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICodec"
+            },
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": true,
+              "signature": "version?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "partialize",
+              "kind": "property",
+              "optional": true,
+              "signature": "partialize?: (value: T) => Partial<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(value: T) => Partial<T>"
+            },
+            {
+              "name": "merge",
+              "kind": "property",
+              "optional": true,
+              "signature": "merge?: (persisted: Partial<T>, current: T) => T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(persisted: Partial<T>, current: T) => T"
+            },
+            {
+              "name": "debounceMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "debounceMs?: number;",
+              "description": "Quiet interval before enqueueing a write; zero writes without debounce.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxWaitMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxWaitMs?: number;",
+              "description": "Maximum debounce-window duration after hydration; does not bound storage or queue latency.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IPersistKeyedOptions",
           "exportPath": "./keyed",
           "overloadSignatures": [
@@ -4866,6 +6390,7 @@
             "import { createStore } from '@migaia/store-light';\nimport { createAtomStore, familyDef } from '@migaia/store-keyed';\nimport { observableSet } from '@migaia/store-indexed';\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db';\nimport { persist } from '@migaia/store-persist/light';\nimport { persistCollection } from '@migaia/store-persist/indexed';\nimport { persistKeyed, clearFamily } from '@migaia/store-persist/keyed';\nimport { createRuntime } from '@migaia/reactive';\n\nconst runtime = createRuntime();\nconst storage = indexedDbHost({ dbName: 'app' });\n\nconst settings = createStore({ theme: 'light' });\nconst settingsHandle = persist(settings, { key: 'settings', storage, version: 1 });\n\nconst recentlyViewed = observableSet<string>(undefined, {}, runtime);\nconst recentHandle = persistCollection(recentlyViewed, { key: 'recent', storage });\n\nconst atomStore = createAtomStore(runtime);\nconst session = familyDef(() => ({ accessToken: '', refreshToken: '' }));\nfunction getSession(userId: string) {\n  return persistKeyed(atomStore, session(userId), userId, {\n    namespace: 'sessions',\n    storage,\n    partialize: (v) => ({ refreshToken: v.refreshToken }),\n    merge: (persisted, current) => ({ ...current, ...persisted })\n  });\n}\n\nasync function logout(activeSession: { dispose(): void }) {\n  await Promise.all([settingsHandle.flush(), recentHandle.flush()]);\n  await clearFamily(storage, 'sessions');\n  activeSession.dispose();\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "persistKeyed",
           "exportPath": "./keyed",
           "overloadSignatures": [
@@ -4930,7 +6455,62 @@
               "content": "No additional advanced behavior is declared for persistKeyed."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "namespace",
+              "type": "string",
+              "optional": false,
+              "description": "Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the prefix."
+            },
+            {
+              "name": "storage",
+              "type": "IPersistStorage",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "version",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "partialize",
+              "type": "(value: T) => Partial<T>",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "merge",
+              "type": "(persisted: Partial<T>, current: T) => T",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "debounceMs",
+              "type": "number",
+              "optional": true,
+              "description": "Quiet interval before enqueueing a write; zero writes without debounce."
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "Maximum debounce-window duration after hydration; does not bound storage or queue latency."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler."
+            }
+          ],
           "identity": "packages/store-persist/dist/keyed/persist-keyed.d.ts:persistKeyed:export declare function persistKeyed<T>(atomStore: IAtomStore, def: IWritableAtomDefinition<T>, id: string, options: IPersistKeyedOptions<T>): IPersistKeyedHandle<T>;",
           "guidance": [
             {
@@ -5090,7 +6670,80 @@
             }
           ],
           "usageScore": 132,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "namespace",
+              "type": "string",
+              "optional": false,
+              "description": "`clearFamily(storage, namespace)` 绕开 `AtomStore`——直接从传入的 `@migaia/storage-contract` `IKeyValueStore` 读取该 storage 下全部 key（`await storage.keys()`），过滤出 `${namespace}:` 前缀的，逐个删除，返回删掉的条数。storage-web 的 exact backend 子路径只是该契约的一个实现来源。它不会、也不能顺带清理内存里已经实例化的 `AtomStore` 状态：调用方如果还持有对应的 `persistKeyed()` handle，那些 handle 的内存值不受影响，只是失去了持久化落地；下次这些 key 的值再变化，会重新写回一条新记录（因为它们各自的 `subscribe` 还挂着，跟 `clearFamily()` 无关）。",
+              "descriptionEn": "Required storage key prefix. Keys use `${namespace}:${id}`, and `clearFamily()` filters by the prefix.",
+              "descriptionZh": "`clearFamily(storage, namespace)` 绕开 `AtomStore`——直接从传入的 `@migaia/storage-contract` `IKeyValueStore` 读取该 storage 下全部 key（`await storage.keys()`），过滤出 `${namespace}:` 前缀的，逐个删除，返回删掉的条数。storage-web 的 exact backend 子路径只是该契约的一个实现来源。它不会、也不能顺带清理内存里已经实例化的 `AtomStore` 状态：调用方如果还持有对应的 `persistKeyed()` handle，那些 handle 的内存值不受影响，只是失去了持久化落地；下次这些 key 的值再变化，会重新写回一条新记录（因为它们各自的 `subscribe` 还挂着，跟 `clearFamily()` 无关）。"
+            },
+            {
+              "name": "storage",
+              "type": "IPersistStorage",
+              "optional": false,
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "descriptionEn": "",
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true,
+              "description": "`codec` — `ICodec` — 可选 — `defaultJsonCodec` — 见 §7",
+              "descriptionEn": "Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize on the state type.",
+              "descriptionZh": "`codec` — `ICodec` — 可选 — `defaultJsonCodec` — 见 §7"
+            },
+            {
+              "name": "version",
+              "type": "number",
+              "optional": true,
+              "description": "`version` — `number` — 可选 — `0` — schema 版本，必须是安全非负整数",
+              "descriptionEn": "",
+              "descriptionZh": "`version` — `number` — 可选 — `0` — schema 版本，必须是安全非负整数"
+            },
+            {
+              "name": "partialize",
+              "type": "(value: T) => Partial<T>",
+              "optional": true,
+              "description": "`partialize` — `(state: TState) => Partial<TState>` — 可选 — 恒等函数 — 写入前裁剪",
+              "descriptionEn": "",
+              "descriptionZh": "`partialize` — `(state: TState) => Partial<TState>` — 可选 — 恒等函数 — 写入前裁剪"
+            },
+            {
+              "name": "merge",
+              "type": "(persisted: Partial<T>, current: T) => T",
+              "optional": true,
+              "description": "`merge` — `(persisted: Partial<TState>, current: TState) => TState` — 可选 — 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 — 读取后合并回内存，见下方\"默认 merge 的语义\"",
+              "descriptionEn": "",
+              "descriptionZh": "`merge` — `(persisted: Partial<TState>, current: TState) => TState` — 可选 — 普通对象按启动快照做三向合并；数组/Map/Set 等非 plain shape 整体替换 — 读取后合并回内存，见下方\"默认 merge 的语义\""
+            },
+            {
+              "name": "debounceMs",
+              "type": "number",
+              "optional": true,
+              "description": "`debounceMs` — `number` — 可选 — `0`（不防抖） — 变化后延迟多久发起写入",
+              "descriptionEn": "Quiet interval before enqueueing a write; zero writes without debounce.",
+              "descriptionZh": "`debounceMs` — `number` — 可选 — `0`（不防抖） — 变化后延迟多久发起写入"
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）",
+              "descriptionEn": "Maximum debounce-window duration after hydration; does not bound storage or queue latency.",
+              "descriptionZh": "`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）",
+              "descriptionEn": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler.",
+              "descriptionZh": "`codec?: ICodec`（默认 `defaultJsonCodec`）、`version?: number`（默认 `0`）、`debounceMs?: number`（默认 `0`）、`maxWaitMs?: number`（可选）、`scheduler?: IScheduler`（可选）"
+            }
+          ],
           "fragment": "store-persist-keyed--persistKeyed"
         }
       ],
@@ -5129,7 +6782,67 @@
           "examples": [
             "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "$runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly $runtime: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "$plain",
+              "kind": "method",
+              "optional": false,
+              "signature": "$plain(): Record<string, unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Record<string, unknown>"
+            },
+            {
+              "name": "$subscribe",
+              "kind": "method",
+              "optional": false,
+              "signature": "$subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean; }): IDisposer;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "() => void",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "{ readonly fireImmediately?: boolean; }",
+                  "optional": true
+                }
+              ],
+              "returns": "IDisposer"
+            },
+            {
+              "name": "$hydrate",
+              "kind": "method",
+              "optional": false,
+              "signature": "$hydrate(partial: Record<string, unknown>, options?: { readonly unknown?: 'ignore' | 'report' | 'strict'; readonly onUnknown?: (key: string) => void; }): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "partial",
+                  "type": "Record<string, unknown>",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "{ readonly unknown?: 'ignore' | 'report' | 'strict'; readonly onUnknown?: (key: string) => void; }",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IPersistableStore",
           "exportPath": "./light",
           "overloadSignatures": [
@@ -5195,7 +6908,90 @@
           "examples": [
             "function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;\n\ntype IPersistableStore = {\n  readonly $runtime: IRuntime;\n  $plain(): Record<string, unknown>;\n  $subscribe(fn: () => void, options?: { readonly fireImmediately?: boolean }): IDisposer;\n  $hydrate(\n    partial: Record<string, unknown>,\n    options?: { unknown?: 'ignore' | 'report' | 'strict'; onUnknown?: (key: string) => void }\n  ): void;\n};\n\ntype IPersistOptions = {\n  key: string;\n  storage: IKeyValueStore;\n  codec?: ICodec;\n  version?: number;\n  migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;\n  partialize?: (state: Record<string, unknown>) => Record<string, unknown>;\n  debounceMs?: number;\n  maxWaitMs?: number;\n  scheduler?: import('@migaia/utils/scheduler').IScheduler;\n};"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "storage",
+              "kind": "property",
+              "optional": false,
+              "signature": "storage: IPersistStorage;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPersistStorage"
+            },
+            {
+              "name": "codec",
+              "kind": "property",
+              "optional": true,
+              "signature": "codec?: ICodec;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICodec"
+            },
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": true,
+              "signature": "version?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "migrate",
+              "kind": "property",
+              "optional": true,
+              "signature": "migrate?: (persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>"
+            },
+            {
+              "name": "partialize",
+              "kind": "property",
+              "optional": true,
+              "signature": "partialize?: (state: Record<string, unknown>) => Record<string, unknown>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(state: Record<string, unknown>) => Record<string, unknown>"
+            },
+            {
+              "name": "debounceMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "debounceMs?: number;",
+              "description": "Quiet interval before enqueueing a write; zero writes without debounce.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxWaitMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxWaitMs?: number;",
+              "description": "Maximum debounce-window duration after hydration; does not bound storage or queue latency.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IPersistOptions",
           "exportPath": "./light",
           "overloadSignatures": [
@@ -5278,6 +7074,7 @@
             "const handle = persist(store, {\n  key: 'settings',\n  storage,\n  version: 2,\n  migrate: (persisted, fromVersion) => {\n    if (fromVersion === 1)\n      return { ...persisted, fontSize: (persisted as { size?: number }).size ?? 14 };\n    return persisted;\n  }\n});"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "persist",
           "exportPath": "./light",
           "overloadSignatures": [
@@ -5332,7 +7129,62 @@
               "content": "No additional advanced behavior is declared for persist."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "key",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "storage",
+              "type": "IPersistStorage",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "version",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "migrate",
+              "type": "(persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "partialize",
+              "type": "(state: Record<string, unknown>) => Record<string, unknown>",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "debounceMs",
+              "type": "number",
+              "optional": true,
+              "description": "Quiet interval before enqueueing a write; zero writes without debounce."
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "Maximum debounce-window duration after hydration; does not bound storage or queue latency."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler."
+            }
+          ],
           "identity": "packages/store-persist/dist/light/persist.d.ts:persist:export declare function persist(store: IPersistableStore, options: IPersistOptions): IPersistHandle;",
           "guidance": [
             {
@@ -5492,7 +7344,80 @@
             }
           ],
           "usageScore": 292,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "key",
+              "type": "string",
+              "optional": false,
+              "description": "`key` — `string` — 必填 — 无 — 存档在 storage 里的键",
+              "descriptionEn": "",
+              "descriptionZh": "`key` — `string` — 必填 — 无 — 存档在 storage 里的键"
+            },
+            {
+              "name": "storage",
+              "type": "IPersistStorage",
+              "optional": false,
+              "description": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec",
+              "descriptionEn": "",
+              "descriptionZh": "`storage` — `{ capabilities, get, set, remove, keys }` — 必填 — 无 — 遵循 `@migaia/storage-contract` 的 `IKeyValueStore`；`@migaia/storage-web` exact backend 子路径提供实现，可选 `getBytes`/`setBytes` 启用 binary codec"
+            },
+            {
+              "name": "codec",
+              "type": "ICodec",
+              "optional": true,
+              "description": "`codec` — `ICodec` — 可选 — `defaultJsonCodec` — 见 §7",
+              "descriptionEn": "Encodes and decodes the complete `{ version, state }` envelope. The codec does not specialize on the state type.",
+              "descriptionZh": "`codec` — `ICodec` — 可选 — `defaultJsonCodec` — 见 §7"
+            },
+            {
+              "name": "version",
+              "type": "number",
+              "optional": true,
+              "description": "`version` — `number` — 可选 — `0` — schema 版本，必须是安全非负整数",
+              "descriptionEn": "",
+              "descriptionZh": "`version` — `number` — 可选 — `0` — schema 版本，必须是安全非负整数"
+            },
+            {
+              "name": "migrate",
+              "type": "(persisted: Record<string, unknown>, fromVersion: number) => Record<string, unknown>",
+              "optional": true,
+              "description": "`migrate` — `(persisted: TState, fromVersion: number) => TState` — 可选 — 无 — 见 §5",
+              "descriptionEn": "",
+              "descriptionZh": "`migrate` — `(persisted: TState, fromVersion: number) => TState` — 可选 — 无 — 见 §5"
+            },
+            {
+              "name": "partialize",
+              "type": "(state: Record<string, unknown>) => Record<string, unknown>",
+              "optional": true,
+              "description": "`partialize` — `(state: TState) => Partial<TState>` — 可选 — 恒等函数 — 写入前裁剪",
+              "descriptionEn": "",
+              "descriptionZh": "`partialize` — `(state: TState) => Partial<TState>` — 可选 — 恒等函数 — 写入前裁剪"
+            },
+            {
+              "name": "debounceMs",
+              "type": "number",
+              "optional": true,
+              "description": "`debounceMs` — `number` — 可选 — `0`（不防抖） — 变化后延迟多久发起写入",
+              "descriptionEn": "Quiet interval before enqueueing a write; zero writes without debounce.",
+              "descriptionZh": "`debounceMs` — `number` — 可选 — `0`（不防抖） — 变化后延迟多久发起写入"
+            },
+            {
+              "name": "maxWaitMs",
+              "type": "number",
+              "optional": true,
+              "description": "防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。",
+              "descriptionEn": "Maximum debounce-window duration after hydration; does not bound storage or queue latency.",
+              "descriptionZh": "防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。",
+              "descriptionEn": "Monotonic clock and cancellable timer owner; defaults to the canonical system scheduler.",
+              "descriptionZh": "防抖选项 `maxWaitMs` 与 `debounceMs` 一样接受 `[0, 2147483647]` 内有限数；省略保持仅安静间隔，0 表示首次变更后的 0ms 任务入队。上限从成功水合后的第一个变更开始，不限制串行队列或存储 IO 延迟。三种 facade 与 `persistUnit` 都接受同一可选 scheduler；其单调时钟和取消任务共同管理唯一计时窗口。flush、clear、dispose 清除该窗口，dispose 仍先捕获最后快照并发起最终写入，最终失败从 `writeError` 读取。"
+            }
+          ],
           "fragment": "store-persist-light--persist"
         }
       ],

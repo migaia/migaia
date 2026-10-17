@@ -1315,6 +1315,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for assertStoreFeature.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "assertStoreFeature",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1374,7 +1375,38 @@
               "content": "No additional advanced behavior is declared for assertStoreFeature."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "features",
+              "type": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "features.wasm",
+              "type": "boolean",
+              "optional": false,
+              "description": "Configures application features and readiness on `StoreProvider`. Provider registries and runtimes own the graph independently of this configuration. The configuration selects enhancements and whether readiness blocks the subtree. When `features.wasm === true`, supply `ready`, usually with `ensureWasm` from `@migaia/store-wasm`. Without a barrier, normalization creates a rejected readiness promise, and the provider reports the configuration error before rendering its subtree. / export type IStoreFeatureExperimental = Readonly<Record<string, boolean>> export type IStoreFeatures = { /** Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness barrier. When `true`, `ready` must complete initialization before the provider renders its subtree."
+            },
+            {
+              "name": "features.experimental",
+              "type": "Readonly<Record<string, boolean>>",
+              "optional": false,
+              "description": "Allows experimental features only when their entry is exactly `true`. Missing entries are disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`."
+            },
+            {
+              "name": "defaults",
+              "type": "IStoreProviderDefaults",
+              "optional": false,
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores."
+            },
+            {
+              "name": "ready",
+              "type": "ITrackedReady | null",
+              "optional": false,
+              "description": "Provides normalized readiness tracking, or `null` when no barrier exists."
+            }
+          ],
           "identity": "packages/store-react/dist/store-config.d.ts:assertStoreFeature:export declare function assertStoreFeature(config: IStoreConfigValue | null, path: IStoreFeaturePath, apiName?: string): void;",
           "guidance": [
             {
@@ -1534,7 +1566,48 @@
             }
           ],
           "usageScore": 30,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "features",
+              "type": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }",
+              "optional": false,
+              "description": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。",
+              "descriptionEn": "",
+              "descriptionZh": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。"
+            },
+            {
+              "name": "features.wasm",
+              "type": "boolean",
+              "optional": false,
+              "description": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。",
+              "descriptionEn": "Configures application features and readiness on `StoreProvider`. Provider registries and runtimes own the graph independently of this configuration. The configuration selects enhancements and whether readiness blocks the subtree. When `features.wasm === true`, supply `ready`, usually with `ensureWasm` from `@migaia/store-wasm`. Without a barrier, normalization creates a rejected readiness promise, and the provider reports the configuration error before rendering its subtree. / export type IStoreFeatureExperimental = Readonly<Record<string, boolean>> export type IStoreFeatures = { /** Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness barrier. When `true`, `ready` must complete initialization before the provider renders its subtree.",
+              "descriptionZh": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。"
+            },
+            {
+              "name": "features.experimental",
+              "type": "Readonly<Record<string, boolean>>",
+              "optional": false,
+              "description": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。",
+              "descriptionEn": "Allows experimental features only when their entry is exactly `true`. Missing entries are disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`.",
+              "descriptionZh": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。"
+            },
+            {
+              "name": "defaults",
+              "type": "IStoreProviderDefaults",
+              "optional": false,
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "descriptionEn": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "ready",
+              "type": "ITrackedReady | null",
+              "optional": false,
+              "description": "`normalizeStoreConfig(config?, barrierScope?)`：`StoreProvider` 内部用来把 `IStoreProviderConfig` 归一化成 `IStoreConfigValue`（`features` 补全默认值、`ready` 屏障数组转换成惰性求值+缓存的 `ITrackedReady`）的同一段逻辑，独立导出后可以在 Provider 之外复现相同的归一化行为；`barrierScope` 决定就绪 Promise 与工厂结果缓存的隔离边界——不同调用传不同的 `barrierScope` 对象，各自独立求值，不会共享缓存。`config.ready` 里出现既不是函数也不是 thenable 的元素会抛 `[store] config.ready must be an array of Promises or zero-argument functions`。",
+              "descriptionEn": "Provides normalized readiness tracking, or `null` when no barrier exists.",
+              "descriptionZh": "`normalizeStoreConfig(config?, barrierScope?)`：`StoreProvider` 内部用来把 `IStoreProviderConfig` 归一化成 `IStoreConfigValue`（`features` 补全默认值、`ready` 屏障数组转换成惰性求值+缓存的 `ITrackedReady`）的同一段逻辑，独立导出后可以在 Provider 之外复现相同的归一化行为；`barrierScope` 决定就绪 Promise 与工厂结果缓存的隔离边界——不同调用传不同的 `barrierScope` 对象，各自独立求值，不会共享缓存。`config.ready` 里出现既不是函数也不是 thenable 的元素会抛 `[store] config.ready must be an array of Promises or zero-argument functions`。"
+            }
+          ],
           "fragment": "store-react-index--assertStoreFeature"
         },
         {
@@ -1573,6 +1646,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreReactAggregateError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreReactAggregateError(code: IStoreReactErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1807,6 +1881,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreReactError.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreReactError(code: IStoreReactErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1865,7 +1940,14 @@
               "content": "No additional advanced behavior is declared for createStoreReactError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-react/dist/errors.d.ts:createStoreReactError:export declare function createStoreReactError(code: IStoreReactErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
           "guidance": [
             {
@@ -2002,7 +2084,16 @@
             }
           ],
           "usageScore": 4,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "根入口同时导出 `STORE_REACT_SOURCE`、`createStoreReactError(code, message, options?)` 与 `createStoreReactAggregateError(code, errors, message)`，供与本包契约集成的 adapter 保留一致错误身份。普通组件只需捕获 hook/Registry 抛出的错误；不要为了改写 message 再包装一次。工厂保留传入的 native error/aggregate 语义和 cause 链，错误分支应比较 `STORE_REACT_SOURCE` 与 `StoreReactErrorCode`。",
+              "descriptionEn": "",
+              "descriptionZh": "根入口同时导出 `STORE_REACT_SOURCE`、`createStoreReactError(code, message, options?)` 与 `createStoreReactAggregateError(code, errors, message)`，供与本包契约集成的 adapter 保留一致错误身份。普通组件只需捕获 hook/Registry 抛出的错误；不要为了改写 message 再包装一次。工厂保留传入的 native error/aggregate 语义和 cause 链，错误分支应比较 `STORE_REACT_SOURCE` 与 `StoreReactErrorCode`。"
+            }
+          ],
           "fragment": "store-react-index--createStoreReactError"
         },
         {
@@ -2030,6 +2121,7 @@
             "import { StoreProvider, createStoreRegistry } from '@migaia/store-react';\nimport { createRuntime } from '@migaia/reactive';\n\nasync function renderForRequest(children: React.ReactNode) {\n  const registry = createStoreRegistry(createRuntime()); // 每个请求独立一份\n  const html = renderToString(<StoreProvider registry={registry}>{children}</StoreProvider>); // disposeOnUnmount 默认 false：手动负责释放\n  await registry.disposeAsync();\n  return html;\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createStoreRegistry",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2108,6 +2200,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createStoreToken.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "createStoreToken",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2314,7 +2407,27 @@
           "examples": [
             "type IStableNode<T> = { readonly value: T; peek(): T };\nfunction useNodeValue<T>(node: IStableNode<T>, runtime: IRuntime, enabled?: boolean): T;"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "value",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly value: T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "optional": false,
+              "signature": "peek(): T;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "T"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStableNode",
           "exportPath": ".",
           "overloadSignatures": ["export type IStableNode<T> = { readonly value: T; peek(): T; };"],
@@ -2379,7 +2492,36 @@
             "function readStoreFeature(\n  config: IStoreConfigValue,\n  path: 'wasm' | `experimental.${string}`\n): boolean;\nfunction assertStoreFeature(\n  config: IStoreConfigValue | null,\n  path: 'wasm' | `experimental.${string}`,\n  apiName?: string // 默认 'this API'，出现在错误信息里\n): void;\nfunction normalizeStoreConfig(\n  config?: IStoreProviderConfig,\n  barrierScope?: object // 默认 {}；用于隔离不同调用方各自的 ready-barrier 缓存\n): IStoreConfigValue;",
             "function useStoreConfig(): IStoreConfigValue | null;\nfunction useStoreFeature(path: 'wasm' | `experimental.${string}`): boolean;\nfunction useAssertStoreFeature(path: 'wasm' | `experimental.${string}`, apiName?: string): void;"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "features",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly features: { readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }"
+            },
+            {
+              "name": "defaults",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly defaults: IStoreProviderDefaults;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStoreProviderDefaults"
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: ITrackedReady | null;",
+              "description": "Provides normalized readiness tracking, or `null` when no barrier exists.",
+              "parameterDetails": [],
+              "returns": "ITrackedReady | null"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreConfigValue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2487,6 +2629,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreFeatureExperimental.",
           "examples": [],
           "members": [],
+          "composes": ["Record"],
           "aliasOf": "IStoreFeatureExperimental",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2551,6 +2694,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreFeaturePath.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IStoreFeaturePath",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2614,7 +2758,27 @@
           "errors": ["No documented errors are declared for IStoreFeatures."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreFeatures.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "wasm",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly wasm?: boolean;",
+              "description": "Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness barrier. When `true`, `ready` must complete initialization before the provider renders its subtree.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "experimental",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly experimental?: IStoreFeatureExperimental;",
+              "description": "Allows experimental features only when their entry is exactly `true`. Missing entries are disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`.",
+              "parameterDetails": [],
+              "returns": "IStoreFeatureExperimental"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreFeatures",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2682,7 +2846,45 @@
             "type IStoreProviderConfig = {\n  readonly features?: {\n    readonly wasm?: boolean;\n    readonly experimental?: Readonly<Record<string, boolean>>;\n  };\n  readonly ready?: readonly (Promise<unknown> | (() => Promise<unknown> | unknown))[];\n  readonly fallback?: ReactNode;\n  readonly defaults?: { readonly warnAsyncActions?: boolean };\n};",
             "function readStoreFeature(\n  config: IStoreConfigValue,\n  path: 'wasm' | `experimental.${string}`\n): boolean;\nfunction assertStoreFeature(\n  config: IStoreConfigValue | null,\n  path: 'wasm' | `experimental.${string}`,\n  apiName?: string // 默认 'this API'，出现在错误信息里\n): void;\nfunction normalizeStoreConfig(\n  config?: IStoreProviderConfig,\n  barrierScope?: object // 默认 {}；用于隔离不同调用方各自的 ready-barrier 缓存\n): IStoreConfigValue;"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "features",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly features?: IStoreFeatures;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStoreFeatures"
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ready?: readonly IStoreReadyBarrier[];",
+              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
+              "parameterDetails": [],
+              "returns": "readonly IStoreReadyBarrier[]"
+            },
+            {
+              "name": "fallback",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly fallback?: ReactNode;",
+              "description": "Displays this fallback while readiness barriers are pending.",
+              "parameterDetails": [],
+              "returns": "ReactNode"
+            },
+            {
+              "name": "defaults",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly defaults?: IStoreProviderDefaults;",
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "parameterDetails": [],
+              "returns": "IStoreProviderDefaults"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreProviderConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2791,7 +2993,18 @@
           "errors": ["No documented errors are declared for IStoreProviderDefaults."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreProviderDefaults.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "warnAsyncActions",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly warnAsyncActions?: boolean;",
+              "description": "Exposes a default in the configuration snapshot for application code using `useStoreConfig`. It is not forwarded to `createStore`; set `options.warnAsyncActions` there explicitly.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreProviderDefaults",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2857,7 +3070,54 @@
           "examples": [
             "type IStoreProviderProps = {\n  readonly children: ReactNode;\n  readonly registry?: StoreRegistry;\n  readonly runtime?: IRuntime;\n  readonly disposeOnUnmount?: boolean;\n  readonly config?: IStoreProviderConfig;\n};"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "children",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly children: ReactNode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ReactNode"
+            },
+            {
+              "name": "registry",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly registry?: StoreRegistry;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "StoreRegistry"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly runtime?: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "disposeOnUnmount",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly disposeOnUnmount?: boolean;",
+              "description": "Internal registries dispose on unmount by default. External registries remain caller-owned unless this flag is explicitly true.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "config",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly config?: IStoreProviderConfig;",
+              "description": "Configures application features and readiness barriers. Omission keeps all features disabled and uses no barrier.",
+              "parameterDetails": [],
+              "returns": "IStoreProviderConfig"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreProviderProps",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2924,6 +3184,7 @@
             "const StoreProviderState = { pending: 'pending', ready: 'ready', error: 'error' } as const;\ntype IStoreProviderState = 'pending' | 'ready' | 'error';"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IStoreProviderState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2973,6 +3234,71 @@
           "fragment": "store-react-index--IStoreProviderState"
         },
         {
+          "name": "IStoreReactErrorCode",
+          "kind": "type",
+          "signature": "export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode];",
+          "declarationLine": 67,
+          "source": "packages/store-react/dist/error-code.d.ts",
+          "purpose": "IStoreReactErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreReactErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IStoreReactErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStoreReactErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreReactErrorCode.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IStoreReactErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStoreReactErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStoreReactErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IStoreReactErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStoreReactErrorCode from @migaia/store-react, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStoreReactErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreReactErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreReactErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStoreReactErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-react/dist/error-code.d.ts:IStoreReactErrorCode:export type IStoreReactErrorCode = (typeof StoreReactErrorCode)[keyof typeof StoreReactErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "store-react-index--IStoreReactErrorCode"
+        },
+        {
           "name": "IStoreReadyBarrier",
           "kind": "type",
           "signature": "export type IStoreReadyBarrier = Promise<unknown> | (() => Promise<unknown> | unknown);",
@@ -2988,6 +3314,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreReadyBarrier.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IStoreReadyBarrier",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3062,7 +3389,18 @@
           "errors": ["No documented errors are declared for IStoreRegistrationOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreRegistrationOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "owned",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly owned?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreRegistrationOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3126,7 +3464,27 @@
           "errors": ["No documented errors are declared for IStoreToken."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreToken.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: symbol;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "symbol"
+            },
+            {
+              "name": "debugName",
+              "kind": "property",
+              "optional": false,
+              "signature": "debugName: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IStoreToken",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3338,6 +3696,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for normalizeStoreConfig.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "normalizeStoreConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3403,7 +3762,7 @@
               "name": "ready",
               "type": "readonly IStoreReadyBarrier[]",
               "optional": true,
-              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`."
+              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`."
             },
             {
               "name": "fallback",
@@ -3415,7 +3774,7 @@
               "name": "defaults",
               "type": "IStoreProviderDefaults",
               "optional": true,
-              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores."
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores."
             }
           ],
           "identity": "packages/store-react/dist/store-config.d.ts:normalizeStoreConfig:export declare function normalizeStoreConfig(config?: IStoreProviderConfig, barrierScope?: object): IStoreConfigValue;",
@@ -3459,7 +3818,7 @@
               "type": "readonly IStoreReadyBarrier[]",
               "optional": true,
               "description": "`normalizeStoreConfig(config?, barrierScope?)`：`StoreProvider` 内部用来把 `IStoreProviderConfig` 归一化成 `IStoreConfigValue`（`features` 补全默认值、`ready` 屏障数组转换成惰性求值+缓存的 `ITrackedReady`）的同一段逻辑，独立导出后可以在 Provider 之外复现相同的归一化行为；`barrierScope` 决定就绪 Promise 与工厂结果缓存的隔离边界——不同调用传不同的 `barrierScope` 对象，各自独立求值，不会共享缓存。`config.ready` 里出现既不是函数也不是 thenable 的元素会抛 `[store] config.ready must be an array of Promises or zero-argument functions`。",
-              "descriptionEn": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: * [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
+              "descriptionEn": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
               "descriptionZh": "`normalizeStoreConfig(config?, barrierScope?)`：`StoreProvider` 内部用来把 `IStoreProviderConfig` 归一化成 `IStoreConfigValue`（`features` 补全默认值、`ready` 屏障数组转换成惰性求值+缓存的 `ITrackedReady`）的同一段逻辑，独立导出后可以在 Provider 之外复现相同的归一化行为；`barrierScope` 决定就绪 Promise 与工厂结果缓存的隔离边界——不同调用传不同的 `barrierScope` 对象，各自独立求值，不会共享缓存。`config.ready` 里出现既不是函数也不是 thenable 的元素会抛 `[store] config.ready must be an array of Promises or zero-argument functions`。"
             },
             {
@@ -3474,8 +3833,8 @@
               "name": "defaults",
               "type": "IStoreProviderDefaults",
               "optional": true,
-              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores.",
-              "descriptionEn": "Exposes a read-only snapshot of application defaults. The provider does not apply them to * individual stores.",
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "descriptionEn": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
               "descriptionZh": ""
             }
           ],
@@ -3508,6 +3867,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readStoreFeature.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "readStoreFeature",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3562,7 +3922,38 @@
               "content": "No additional advanced behavior is declared for readStoreFeature."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "features",
+              "type": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "features.wasm",
+              "type": "boolean",
+              "optional": false,
+              "description": "Configures application features and readiness on `StoreProvider`. Provider registries and runtimes own the graph independently of this configuration. The configuration selects enhancements and whether readiness blocks the subtree. When `features.wasm === true`, supply `ready`, usually with `ensureWasm` from `@migaia/store-wasm`. Without a barrier, normalization creates a rejected readiness promise, and the provider reports the configuration error before rendering its subtree. / export type IStoreFeatureExperimental = Readonly<Record<string, boolean>> export type IStoreFeatures = { /** Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness barrier. When `true`, `ready` must complete initialization before the provider renders its subtree."
+            },
+            {
+              "name": "features.experimental",
+              "type": "Readonly<Record<string, boolean>>",
+              "optional": false,
+              "description": "Allows experimental features only when their entry is exactly `true`. Missing entries are disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`."
+            },
+            {
+              "name": "defaults",
+              "type": "IStoreProviderDefaults",
+              "optional": false,
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores."
+            },
+            {
+              "name": "ready",
+              "type": "ITrackedReady | null",
+              "optional": false,
+              "description": "Provides normalized readiness tracking, or `null` when no barrier exists."
+            }
+          ],
           "identity": "packages/store-react/dist/store-config.d.ts:readStoreFeature:export declare function readStoreFeature(config: IStoreConfigValue, path: IStoreFeaturePath): boolean;",
           "guidance": [
             {
@@ -3590,7 +3981,48 @@
             }
           ],
           "usageScore": 34,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "features",
+              "type": "{ readonly wasm: boolean; readonly experimental: Readonly<Record<string, boolean>>; }",
+              "optional": false,
+              "description": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。",
+              "descriptionEn": "",
+              "descriptionZh": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。"
+            },
+            {
+              "name": "features.wasm",
+              "type": "boolean",
+              "optional": false,
+              "description": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。",
+              "descriptionEn": "Configures application features and readiness on `StoreProvider`. Provider registries and runtimes own the graph independently of this configuration. The configuration selects enhancements and whether readiness blocks the subtree. When `features.wasm === true`, supply `ready`, usually with `ensureWasm` from `@migaia/store-wasm`. Without a barrier, normalization creates a rejected readiness promise, and the provider reports the configuration error before rendering its subtree. / export type IStoreFeatureExperimental = Readonly<Record<string, boolean>> export type IStoreFeatures = { /** Declares that the subtree uses WASM fields. Defaults to `false`, which requires no readiness barrier. When `true`, `ready` must complete initialization before the provider renders its subtree.",
+              "descriptionZh": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。"
+            },
+            {
+              "name": "features.experimental",
+              "type": "Readonly<Record<string, boolean>>",
+              "optional": false,
+              "description": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。",
+              "descriptionEn": "Allows experimental features only when their entry is exactly `true`. Missing entries are disabled. Experimental APIs check `assertStoreFeature('experimental.xxx')`.",
+              "descriptionZh": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。"
+            },
+            {
+              "name": "defaults",
+              "type": "IStoreProviderDefaults",
+              "optional": false,
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "descriptionEn": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "ready",
+              "type": "ITrackedReady | null",
+              "optional": false,
+              "description": "`normalizeStoreConfig(config?, barrierScope?)`：`StoreProvider` 内部用来把 `IStoreProviderConfig` 归一化成 `IStoreConfigValue`（`features` 补全默认值、`ready` 屏障数组转换成惰性求值+缓存的 `ITrackedReady`）的同一段逻辑，独立导出后可以在 Provider 之外复现相同的归一化行为；`barrierScope` 决定就绪 Promise 与工厂结果缓存的隔离边界——不同调用传不同的 `barrierScope` 对象，各自独立求值，不会共享缓存。`config.ready` 里出现既不是函数也不是 thenable 的元素会抛 `[store] config.ready must be an array of Promises or zero-argument functions`。",
+              "descriptionEn": "Provides normalized readiness tracking, or `null` when no barrier exists.",
+              "descriptionZh": "`normalizeStoreConfig(config?, barrierScope?)`：`StoreProvider` 内部用来把 `IStoreProviderConfig` 归一化成 `IStoreConfigValue`（`features` 补全默认值、`ready` 屏障数组转换成惰性求值+缓存的 `ITrackedReady`）的同一段逻辑，独立导出后可以在 Provider 之外复现相同的归一化行为；`barrierScope` 决定就绪 Promise 与工厂结果缓存的隔离边界——不同调用传不同的 `barrierScope` 对象，各自独立求值，不会共享缓存。`config.ready` 里出现既不是函数也不是 thenable 的元素会抛 `[store] config.ready must be an array of Promises or zero-argument functions`。"
+            }
+          ],
           "fragment": "store-react-index--readStoreFeature"
         },
         {
@@ -3609,6 +4041,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_REACT_SOURCE.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_REACT_SOURCE = \"@migaia/store-react\";"
@@ -3798,13 +4231,11 @@
           "purpose": "StoreProvider is part of this module's public function contract.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreProvider.",
           "advanced": "No additional advanced behavior is declared for StoreProvider.",
-          "parameters": [
-            "{ children, registry, runtime, disposeOnUnmount, config }: IStoreProviderProps: unknown"
-          ],
+          "parameters": ["props: IStoreProviderProps"],
           "parameterDetails": [
             {
-              "name": "{ children, registry, runtime, disposeOnUnmount, config }: IStoreProviderProps",
-              "type": "unknown",
+              "name": "props",
+              "type": "IStoreProviderProps",
               "optional": false
             }
           ],
@@ -3813,6 +4244,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreProvider.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "StoreProvider",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3821,8 +4253,8 @@
           "overloadParameterDetails": [
             [
               {
-                "name": "{ children, registry, runtime, disposeOnUnmount, config }: IStoreProviderProps",
-                "type": "unknown",
+                "name": "props",
+                "type": "IStoreProviderProps",
                 "optional": false
               }
             ]
@@ -3862,7 +4294,62 @@
               "content": "No additional advanced behavior is declared for StoreProvider."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "children",
+              "type": "ReactNode",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "registry",
+              "type": "StoreRegistry",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "disposeOnUnmount",
+              "type": "boolean",
+              "optional": true,
+              "description": "Internal registries dispose on unmount by default. External registries remain caller-owned unless this flag is explicitly true."
+            },
+            {
+              "name": "config",
+              "type": "IStoreProviderConfig",
+              "optional": true,
+              "description": "Configures application features and readiness barriers. Omission keeps all features disabled and uses no barrier."
+            },
+            {
+              "name": "config.features",
+              "type": "IStoreFeatures",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "config.ready",
+              "type": "readonly IStoreReadyBarrier[]",
+              "optional": true,
+              "description": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`."
+            },
+            {
+              "name": "config.fallback",
+              "type": "ReactNode",
+              "optional": true,
+              "description": "Displays this fallback while readiness barriers are pending."
+            },
+            {
+              "name": "config.defaults",
+              "type": "IStoreProviderDefaults",
+              "optional": true,
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores."
+            }
+          ],
           "identity": "packages/store-react/dist/StoreProvider.d.ts:StoreProvider:export declare function StoreProvider({ children, registry, runtime, disposeOnUnmount, config }: IStoreProviderProps): import(\"react\").JSX.Element;",
           "guidance": [
             {
@@ -4141,7 +4628,80 @@
             }
           ],
           "usageScore": 342,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "children",
+              "type": "ReactNode",
+              "optional": false,
+              "description": "`StoreProvider` 的 `config.ready` 是一组 `IStoreReadyBarrier`（`Promise<unknown>` 或零参工厂 `() => Promise<unknown> | unknown`），子树渲染前必须全部 settle。内部用 `Promise.all` 归一化成一个 `ITrackedReady`：pending 时渲染 `config.fallback`（默认 `null`），全部成功后渲染 `children`，任意一个 reject 则在 `ReadyBoundary` 里 `throw`（交给上层 Error Boundary）。精确语义见 2.3。",
+              "descriptionEn": "",
+              "descriptionZh": "`StoreProvider` 的 `config.ready` 是一组 `IStoreReadyBarrier`（`Promise<unknown>` 或零参工厂 `() => Promise<unknown> | unknown`），子树渲染前必须全部 settle。内部用 `Promise.all` 归一化成一个 `ITrackedReady`：pending 时渲染 `config.fallback`（默认 `null`），全部成功后渲染 `children`，任意一个 reject 则在 `ReadyBoundary` 里 `throw`（交给上层 Error Boundary）。精确语义见 2.3。"
+            },
+            {
+              "name": "registry",
+              "type": "StoreRegistry",
+              "optional": true,
+              "description": "这个设计的意义是作用域化：同一份 `countDef` 在不同的 `AtomStore`（比如不同 `StoreProvider`、不同 SSR 请求）下各自独立实例化、互不污染。`useAtomDefinition`/`useSetAtomDefinition` 固定走 `StoreProvider` 自带的 `registry.atomStore`；`useAtomValue`/`useSetAtom`/`useAtom` 则是更通用的协议 hook，见 3.6。",
+              "descriptionEn": "",
+              "descriptionZh": "这个设计的意义是作用域化：同一份 `countDef` 在不同的 `AtomStore`（比如不同 `StoreProvider`、不同 SSR 请求）下各自独立实例化、互不污染。`useAtomDefinition`/`useSetAtomDefinition` 固定走 `StoreProvider` 自带的 `registry.atomStore`；`useAtomValue`/`useSetAtom`/`useAtom` 则是更通用的协议 hook，见 3.6。"
+            },
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": "大多数场景不需要手动创建 Runtime：不传 `runtime` 时，`StoreProvider` 会用 `createRuntime()` 新建一个；未套 `StoreProvider` 的 `useSignal`/`useTracked` 默认落到 `@migaia/reactive` 的 `defaultRuntime`。只有需要多份互相隔离的状态图（比如测试、SSR 多请求）时才需要显式传入。",
+              "descriptionEn": "",
+              "descriptionZh": "大多数场景不需要手动创建 Runtime：不传 `runtime` 时，`StoreProvider` 会用 `createRuntime()` 新建一个；未套 `StoreProvider` 的 `useSignal`/`useTracked` 默认落到 `@migaia/reactive` 的 `defaultRuntime`。只有需要多份互相隔离的状态图（比如测试、SSR 多请求）时才需要显式传入。"
+            },
+            {
+              "name": "disposeOnUnmount",
+              "type": "boolean",
+              "optional": true,
+              "description": "都不传：`StoreProvider` 内部 `createRuntime()` + `createStoreRegistry()`，自己创建、自己在 unmount 时释放（`disposeOnUnmount` 默认 `true`）。",
+              "descriptionEn": "Internal registries dispose on unmount by default. External registries remain caller-owned unless this flag is explicitly true.",
+              "descriptionZh": "都不传：`StoreProvider` 内部 `createRuntime()` + `createStoreRegistry()`，自己创建、自己在 unmount 时释放（`disposeOnUnmount` 默认 `true`）。"
+            },
+            {
+              "name": "config",
+              "type": "IStoreProviderConfig",
+              "optional": true,
+              "description": "`StoreProvider` 的 `config.ready` 是一组 `IStoreReadyBarrier`（`Promise<unknown>` 或零参工厂 `() => Promise<unknown> | unknown`），子树渲染前必须全部 settle。内部用 `Promise.all` 归一化成一个 `ITrackedReady`：pending 时渲染 `config.fallback`（默认 `null`），全部成功后渲染 `children`，任意一个 reject 则在 `ReadyBoundary` 里 `throw`（交给上层 Error Boundary）。精确语义见 2.3。",
+              "descriptionEn": "Configures application features and readiness barriers. Omission keeps all features disabled and uses no barrier.",
+              "descriptionZh": "`StoreProvider` 的 `config.ready` 是一组 `IStoreReadyBarrier`（`Promise<unknown>` 或零参工厂 `() => Promise<unknown> | unknown`），子树渲染前必须全部 settle。内部用 `Promise.all` 归一化成一个 `ITrackedReady`：pending 时渲染 `config.fallback`（默认 `null`），全部成功后渲染 `children`，任意一个 reject 则在 `ReadyBoundary` 里 `throw`（交给上层 Error Boundary）。精确语义见 2.3。"
+            },
+            {
+              "name": "config.features",
+              "type": "IStoreFeatures",
+              "optional": true,
+              "description": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。",
+              "descriptionEn": "",
+              "descriptionZh": "`readStoreFeature(config, path)`：纯查询，`path === 'wasm'` 直接读 `config.features.wasm`；`path` 形如 `` `experimental.${key}` `` 时读 `config.features.experimental[key] === true`；其他 `path` 一律返回 `false`。"
+            },
+            {
+              "name": "config.ready",
+              "type": "readonly IStoreReadyBarrier[]",
+              "optional": true,
+              "description": "`StoreProvider` 的 `config.ready` 是一组 `IStoreReadyBarrier`（`Promise<unknown>` 或零参工厂 `() => Promise<unknown> | unknown`），子树渲染前必须全部 settle。内部用 `Promise.all` 归一化成一个 `ITrackedReady`：pending 时渲染 `config.fallback`（默认 `null`），全部成功后渲染 `children`，任意一个 reject 则在 `ReadyBoundary` 里 `throw`（交给上层 Error Boundary）。精确语义见 2.3。",
+              "descriptionEn": "Requires all barriers to fulfill before the subtree renders. For example, use `ready: [ensureWasm]` with `ensureWasm` from `@migaia/store-wasm`.",
+              "descriptionZh": "`StoreProvider` 的 `config.ready` 是一组 `IStoreReadyBarrier`（`Promise<unknown>` 或零参工厂 `() => Promise<unknown> | unknown`），子树渲染前必须全部 settle。内部用 `Promise.all` 归一化成一个 `ITrackedReady`：pending 时渲染 `config.fallback`（默认 `null`），全部成功后渲染 `children`，任意一个 reject 则在 `ReadyBoundary` 里 `throw`（交给上层 Error Boundary）。精确语义见 2.3。"
+            },
+            {
+              "name": "config.fallback",
+              "type": "ReactNode",
+              "optional": true,
+              "description": "`StoreProvider` 的 `config.ready` 是一组 `IStoreReadyBarrier`（`Promise<unknown>` 或零参工厂 `() => Promise<unknown> | unknown`），子树渲染前必须全部 settle。内部用 `Promise.all` 归一化成一个 `ITrackedReady`：pending 时渲染 `config.fallback`（默认 `null`），全部成功后渲染 `children`，任意一个 reject 则在 `ReadyBoundary` 里 `throw`（交给上层 Error Boundary）。精确语义见 2.3。",
+              "descriptionEn": "Displays this fallback while readiness barriers are pending.",
+              "descriptionZh": "`StoreProvider` 的 `config.ready` 是一组 `IStoreReadyBarrier`（`Promise<unknown>` 或零参工厂 `() => Promise<unknown> | unknown`），子树渲染前必须全部 settle。内部用 `Promise.all` 归一化成一个 `ITrackedReady`：pending 时渲染 `config.fallback`（默认 `null`），全部成功后渲染 `children`，任意一个 reject 则在 `ReadyBoundary` 里 `throw`（交给上层 Error Boundary）。精确语义见 2.3。"
+            },
+            {
+              "name": "config.defaults",
+              "type": "IStoreProviderDefaults",
+              "optional": true,
+              "description": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "descriptionEn": "Exposes a read-only snapshot of application defaults. The provider does not apply them to individual stores.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "store-react-index--StoreProvider"
         },
         {
@@ -4163,7 +4723,36 @@
             "import {\n  useStoreConfig,\n  useStoreFeature,\n  useAssertStoreFeature,\n  StoreProviderState\n} from '@migaia/store-react';",
             "StoreProviderState.pending; // 'pending' | 'ready' | 'error' 之一"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "pending",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pending: \"pending\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"pending\""
+            },
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: \"ready\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"ready\""
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: \"error\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"error\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "StoreProviderState",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4264,6 +4853,286 @@
           "fragment": "store-react-index--StoreProviderState"
         },
         {
+          "name": "StoreReactErrorCode",
+          "kind": "const",
+          "signature": "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * Provider registry disposal fails and exposes an `AggregateError`. * * Inspect each entry in `error.errors`. This failure is unrecoverable within the disposal path. */ readonly registryDisposalFailed: \"REGISTRY_DISPOSAL_FAILED\"; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: \"PROVIDER_REQUIRED\"; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: \"FEATURE_DISABLED\"; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: \"STORE_MISSING\"; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: \"STORE_DUPLICATE\"; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: \"READY_REJECTED\"; };",
+          "declarationLine": 11,
+          "source": "packages/store-react/dist/error-code.d.ts",
+          "purpose": "Declares the public error codes for `@migaia/store-react` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-react'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2).",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreReactErrorCode.",
+          "advanced": "No additional advanced behavior is declared for StoreReactErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for StoreReactErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreReactErrorCode.",
+          "examples": [],
+          "members": [
+            {
+              "name": "registryDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly registryDisposed: \"REGISTRY_DISPOSED\";",
+              "description": "A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance.",
+              "parameterDetails": [],
+              "returns": "\"REGISTRY_DISPOSED\""
+            },
+            {
+              "name": "registryDisposalFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly registryDisposalFailed: \"REGISTRY_DISPOSAL_FAILED\";",
+              "description": "Provider registry disposal fails and exposes an `AggregateError`. * * Inspect each entry in `error.errors`. This failure is unrecoverable within the disposal path.",
+              "parameterDetails": [],
+              "returns": "\"REGISTRY_DISPOSAL_FAILED\""
+            },
+            {
+              "name": "providerRequired",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly providerRequired: \"PROVIDER_REQUIRED\";",
+              "description": "A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider.",
+              "parameterDetails": [],
+              "returns": "\"PROVIDER_REQUIRED\""
+            },
+            {
+              "name": "featureDisabled",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly featureDisabled: \"FEATURE_DISABLED\";",
+              "description": "An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration.",
+              "parameterDetails": [],
+              "returns": "\"FEATURE_DISABLED\""
+            },
+            {
+              "name": "storeMissing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly storeMissing: \"STORE_MISSING\";",
+              "description": "The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token.",
+              "parameterDetails": [],
+              "returns": "\"STORE_MISSING\""
+            },
+            {
+              "name": "storeDuplicate",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly storeDuplicate: \"STORE_DUPLICATE\";",
+              "description": "The same token is registered twice. * * Remove duplicate registration or give each provider its own registry.",
+              "parameterDetails": [],
+              "returns": "\"STORE_DUPLICATE\""
+            },
+            {
+              "name": "crossRuntime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly crossRuntime: \"CROSS_RUNTIME\";",
+              "description": "A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected.",
+              "parameterDetails": [],
+              "returns": "\"CROSS_RUNTIME\""
+            },
+            {
+              "name": "invalidConfig",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidConfig: \"INVALID_CONFIG\";",
+              "description": "Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_CONFIG\""
+            },
+            {
+              "name": "readyRejected",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly readyRejected: \"READY_REJECTED\";",
+              "description": "The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure.",
+              "parameterDetails": [],
+              "returns": "\"READY_REJECTED\""
+            }
+          ],
+          "composes": [],
+          "aliasOf": "StoreReactErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * Provider registry disposal fails and exposes an `AggregateError`. * * Inspect each entry in `error.errors`. This failure is unrecoverable within the disposal path. */ readonly registryDisposalFailed: \"REGISTRY_DISPOSAL_FAILED\"; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: \"PROVIDER_REQUIRED\"; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: \"FEATURE_DISABLED\"; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: \"STORE_MISSING\"; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: \"STORE_DUPLICATE\"; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: \"READY_REJECTED\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use StoreReactErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when StoreReactErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Declares the public error codes for `@migaia/store-react` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-react'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2)."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import StoreReactErrorCode from @migaia/store-react, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use StoreReactErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when StoreReactErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreReactErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for StoreReactErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-react/dist/error-code.d.ts:StoreReactErrorCode:export declare const StoreReactErrorCode: { /** * A provider registry is registered with or read after `dispose()`. * * Create a new registry instead of reusing the disposed instance. */ readonly registryDisposed: \"REGISTRY_DISPOSED\"; /** * Provider registry disposal fails and exposes an `AggregateError`. * * Inspect each entry in `error.errors`. This failure is unrecoverable within the disposal path. */ readonly registryDisposalFailed: \"REGISTRY_DISPOSAL_FAILED\"; /** * A hook is called without `StoreProvider`. * * Wrap the subtree in `StoreProvider` or use a protocol hook that does not require a provider. */ readonly providerRequired: \"PROVIDER_REQUIRED\"; /** * An API requires a feature that is not explicitly enabled in the provider configuration. * * Enable that path in the `StoreProvider` `features` configuration. */ readonly featureDisabled: \"FEATURE_DISABLED\"; /** * The registry has no store for the requested token. * * Confirm that the store is registered and uses the same token. */ readonly storeMissing: \"STORE_MISSING\"; /** * The same token is registered twice. * * Remove duplicate registration or give each provider its own registry. */ readonly storeDuplicate: \"STORE_DUPLICATE\"; /** * A provider store belongs to another `Runtime`. * * Use the same `Runtime` for the store and registry. Cross-runtime injection is rejected. */ readonly crossRuntime: \"CROSS_RUNTIME\"; /** * Provider or token configuration is invalid, for example a missing debug name or incompatible * `features.wasm` and `ready`. * * Correct the configuration before retrying. This is a permanent configuration error. */ readonly invalidConfig: \"INVALID_CONFIG\"; /** * The provider readiness barrier rejected before rendering could continue. The caller should * inspect `cause` and fix the underlying store/resource failure. */ readonly readyRejected: \"READY_REJECTED\"; };",
+          "guidance": [
+            {
+              "id": "5-错误处理完整参考",
+              "heading": "5. 错误处理完整参考",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "所有本包错误都带 `source: '@migaia/store-react'` 与稳定 `code`："
+                },
+                {
+                  "type": "paragraph",
+                  "text": "根入口同时导出 `STORE_REACT_SOURCE`、`createStoreReactError(code, message, options?)` 与 `createStoreReactAggregateError(code, errors, message)`，供与本包契约集成的 adapter 保留一致错误身份。普通组件只需捕获 hook/Registry 抛出的错误；不要为了改写 message 再包装一次。工厂保留传入的 native error/aggregate 语义和 cause 链，错误分支应比较 `STORE_REACT_SOURCE` 与 `StoreReactErrorCode`。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["`StoreReactErrorCode`", "码值", "触发条件 / 处理"],
+                  "rows": [
+                    [
+                      "`registryDisposed`",
+                      "`REGISTRY_DISPOSED`",
+                      "Registry 终结后继续读写；创建新 Registry"
+                    ],
+                    [
+                      "`registryDisposalFailed`",
+                      "`REGISTRY_DISPOSAL_FAILED`",
+                      "owned 实体释放失败；展开 `AggregateError.errors`"
+                    ],
+                    [
+                      "`providerRequired`",
+                      "`PROVIDER_REQUIRED`",
+                      "Provider-only hook 缺少 `StoreProvider`；补 Provider"
+                    ],
+                    [
+                      "`featureDisabled`",
+                      "`FEATURE_DISABLED`",
+                      "所需 feature 未显式开启；修正 `config.features`"
+                    ],
+                    ["`storeMissing`", "`STORE_MISSING`", "token 尚未注册；修正注册顺序或 token"],
+                    [
+                      "`storeDuplicate`",
+                      "`STORE_DUPLICATE`",
+                      "同 token 重复注册；改用 `replace()` 或拆分 Registry"
+                    ],
+                    [
+                      "`crossRuntime`",
+                      "`CROSS_RUNTIME`",
+                      "Store 与 Registry 不属于同一 Runtime；统一所有权"
+                    ],
+                    [
+                      "`invalidConfig`",
+                      "`INVALID_CONFIG`",
+                      "token/Provider/features 配置非法；按 message 修正"
+                    ],
+                    [
+                      "`readyRejected`",
+                      "`READY_REJECTED`",
+                      "readiness barrier reject；检查保留在 `cause` 的底层失败"
+                    ]
+                  ]
+                },
+                {
+                  "type": "table",
+                  "headers": ["消息", "触发条件", "处理方式"],
+                  "rows": [
+                    [
+                      "`[store] StoreProvider registry/runtime ownership mismatch`",
+                      "同时传 `registry` 与 `runtime` 且二者不属于同一 Runtime",
+                      "只传其中一个，或保证 `registry.runtime === runtime`"
+                    ],
+                    [
+                      "`[store] StoreProvider ready barriers changed identity; ...`（console.warn/console.error，不抛）",
+                      "`config.ready` 数组在挂载后按元素比较发生了变化",
+                      "用 `useMemo`/模块级常量稳住 `ready` 数组与元素引用"
+                    ],
+                    [
+                      "`[store] features.wasm is true but config.ready is empty; pass ensureWasm from @migaia/store-wasm (e.g. ready: [ensureWasm])`",
+                      "`features.wasm: true` 但没提供 `ready`",
+                      "传入 `ready: [ensureWasm]`（来自 `@migaia/store-wasm`）或其它就绪 Promise"
+                    ],
+                    [
+                      "`[store] ready barrier rejected`（原因在 `cause`）",
+                      "某个 `ready` 屏障 reject 且原因不是 `Error` 实例",
+                      "检查具体屏障的失败原因；这个 Error 会从 `ReadyBoundary` 的 render 抛出，需要外层 Error Boundary 捕获"
+                    ],
+                    [
+                      "`[store] hook requires a StoreProvider`",
+                      "`useStoreRegistry`/`useStoreRuntime`/`useStoreFromProvider`/`useProvidedStore`/`useAtomDefinition`/`useSetAtomDefinition` 在没有 `StoreProvider` 的树里调用",
+                      "在组件树更靠上的位置套一层 `<StoreProvider>`"
+                    ],
+                    [
+                      "`[store] ${apiName} requires a StoreProvider (feature \"X\")`",
+                      "`useAssertStoreFeature`/`assertStoreFeature` 在没有 Provider 的树里调用",
+                      "套 `StoreProvider`"
+                    ],
+                    [
+                      "`[store] ${apiName} requires feature \"X\" to be explicitly enabled on StoreProvider config`",
+                      "有 Provider，但对应 feature 未在 `config.features` 里显式置 `true`",
+                      "在 `StoreProvider` 的 `config.features` 里显式开启"
+                    ],
+                    [
+                      "`[store] provider registry is disposed`",
+                      "Registry 已 `dispose()`/`disposeAsync()` 后，仍调用 `register`/`replace`/`get`/`require`/`has`/`remove`",
+                      "检查是否有代码在组件卸载后仍持有并调用 registry 引用"
+                    ],
+                    [
+                      "`[store] duplicate provider store token: X`",
+                      "同一个 `StoreToken` 被 `register` 两次",
+                      "改用 `replace`，或确认没有重复挂载注册逻辑"
+                    ],
+                    [
+                      "`[store] missing provider store: X`",
+                      "`require(token)`/`useStoreFromProvider(token)` 在对应实例注册之前调用",
+                      "确认注册逻辑先于消费者渲染执行；或先用 `has`/`get` 判断"
+                    ],
+                    [
+                      "`[store] provider store \"X\" belongs to a different Runtime`",
+                      "注册进 Registry 的值所属 Runtime 与 `registry.runtime` 不同",
+                      "用同一个 Runtime 创建要注册的实例，或换一个 Registry"
+                    ],
+                    [
+                      "`[store] IStoreToken requires a debug name`",
+                      "`createStoreToken('')`",
+                      "传一个非空的调试名"
+                    ],
+                    [
+                      "`AggregateError('[store] provider registry disposal failed')`",
+                      "`dispose()`/`disposeAsync()` 时多个 owned 实体的释放各自抛错",
+                      "展开 `error.errors` 逐个排查；单个实体报错时会直接抛出那个原始 error，不包一层"
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          "usageScore": 8,
+          "configuration": [],
+          "fragment": "store-react-index--StoreReactErrorCode"
+        },
+        {
           "name": "StoreRegistry",
           "kind": "class",
           "signature": "export declare class StoreRegistry implements IDisposable { #private; readonly runtime: IRuntime; /** Provider-local atom state/override boundary. Same Runtime may host many registries. */ readonly atomStore: IAtomStore; constructor(runtime?: IRuntime); /** Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`). */ get lifecycle(): ILifecycleState; /** * Resolves once this registry (and any thenable disposer results) has actually finished tearing * down. */ whenTerminal(): Promise<void>; get disposed(): boolean; register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer; replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void; get<T>(token: IStoreToken<T>): T | undefined; require<T>(token: IStoreToken<T>): T; has<T>(token: IStoreToken<T>): boolean; remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean; /** * React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an * internally-owned registry between those two phases. */ retain(disposeOnRelease: boolean, _deferTask?: boolean): IDisposer; /** * Retained for source compatibility, but deliberately does not reclaim a render candidate. React * exposes no reliable abandoned-render signal; any timer, including one armed after a readiness * promise settles, can dispose a valid render before its effect commits. Candidate reclamation * belongs to an observable owner or a future GC-backed mechanism. */ prepareForRender(after?: Promise<void>): void; /** * Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this * cannot block on it (it's sync) — the thenable is tracked and observed (never left as an * unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving * early just because `dispose()` already ran (see `disposeAsync()`). `lifecycle` only reaches * `terminal` once every tracked thenable has actually settled. */ dispose(): void; /** * Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each * racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does * not resolve early — it waits for whatever thenable disposer results that `dispose()` started * but could not block on (tracked by the lifecycle disposal ledger). */ disposeAsync(): Promise<void>; }",
@@ -4288,6 +5157,7 @@
             {
               "name": "runtime",
               "kind": "property",
+              "optional": false,
               "signature": "readonly runtime: IRuntime;",
               "description": null,
               "parameterDetails": [],
@@ -4296,6 +5166,7 @@
             {
               "name": "atomStore",
               "kind": "property",
+              "optional": false,
               "signature": "readonly atomStore: IAtomStore;",
               "description": "Provider-local atom state/override boundary. Same Runtime may host many registries.",
               "parameterDetails": [],
@@ -4304,6 +5175,7 @@
             {
               "name": "lifecycle",
               "kind": "get",
+              "optional": false,
               "signature": "get lifecycle(): ILifecycleState;",
               "description": "Part of the project's unified lifecycle shape (see `@migaia/lifecycle`'s `ILifecycleState`).",
               "parameterDetails": [],
@@ -4312,6 +5184,7 @@
             {
               "name": "whenTerminal",
               "kind": "method",
+              "optional": false,
               "signature": "whenTerminal(): Promise<void>;",
               "description": "Resolves once this registry (and any thenable disposer results) has actually finished tearing down.",
               "parameterDetails": [],
@@ -4320,6 +5193,7 @@
             {
               "name": "disposed",
               "kind": "get",
+              "optional": false,
               "signature": "get disposed(): boolean;",
               "description": null,
               "parameterDetails": [],
@@ -4328,6 +5202,7 @@
             {
               "name": "register",
               "kind": "method",
+              "optional": false,
               "signature": "register<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): IDisposer;",
               "description": null,
               "parameterDetails": [
@@ -4352,6 +5227,7 @@
             {
               "name": "replace",
               "kind": "method",
+              "optional": false,
               "signature": "replace<T>(token: IStoreToken<T>, value: T, options?: IStoreRegistrationOptions): void;",
               "description": null,
               "parameterDetails": [
@@ -4376,6 +5252,7 @@
             {
               "name": "get",
               "kind": "method",
+              "optional": false,
               "signature": "get<T>(token: IStoreToken<T>): T | undefined;",
               "description": null,
               "parameterDetails": [
@@ -4390,6 +5267,7 @@
             {
               "name": "require",
               "kind": "method",
+              "optional": false,
               "signature": "require<T>(token: IStoreToken<T>): T;",
               "description": null,
               "parameterDetails": [
@@ -4404,6 +5282,7 @@
             {
               "name": "has",
               "kind": "method",
+              "optional": false,
               "signature": "has<T>(token: IStoreToken<T>): boolean;",
               "description": null,
               "parameterDetails": [
@@ -4418,6 +5297,7 @@
             {
               "name": "remove",
               "kind": "method",
+              "optional": false,
               "signature": "remove<T>(token: IStoreToken<T>, disposeOwned?: boolean): boolean;",
               "description": null,
               "parameterDetails": [
@@ -4437,6 +5317,7 @@
             {
               "name": "retain",
               "kind": "method",
+              "optional": false,
               "signature": "retain(disposeOnRelease: boolean, _deferTask?: boolean): IDisposer;",
               "description": "React StrictMode probes effect cleanup/setup. Delayed release avoids disposing an internally-owned registry between those two phases.",
               "parameterDetails": [
@@ -4456,6 +5337,7 @@
             {
               "name": "prepareForRender",
               "kind": "method",
+              "optional": false,
               "signature": "prepareForRender(after?: Promise<void>): void;",
               "description": "Retained for source compatibility, but deliberately does not reclaim a render candidate. React exposes no reliable abandoned-render signal; any timer, including one armed after a readiness promise settles, can dispose a valid render before its effect commits. Candidate reclamation belongs to an observable owner or a future GC-backed mechanism.",
               "parameterDetails": [
@@ -4470,6 +5352,7 @@
             {
               "name": "dispose",
               "kind": "method",
+              "optional": false,
               "signature": "dispose(): void;",
               "description": "Idempotent, immediately enters `closing`. If an owned value's disposer returns a thenable, this cannot block on it (it's sync) — the thenable is tracked and observed (never left as an unhandled rejection) so a later `disposeAsync()` call still waits for it instead of resolving early just because `dispose()` already ran (see `disposeAsync()`). `lifecycle` only reaches `terminal` once every tracked thenable has actually settled.",
               "parameterDetails": [],
@@ -4478,12 +5361,14 @@
             {
               "name": "disposeAsync",
               "kind": "method",
+              "optional": false,
               "signature": "disposeAsync(): Promise<void>;",
               "description": "Awaitable counterpart. Single-flight: concurrent calls share one completion instead of each racing their own pass over `#entries`. Calling this after a prior synchronous `dispose()` does not resolve early — it waits for whatever thenable disposer results that `dispose()` started but could not block on (tracked by the lifecycle disposal ledger).",
               "parameterDetails": [],
               "returns": "Promise<void>"
             }
           ],
+          "composes": [],
           "aliasOf": "StoreRegistry",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4721,6 +5606,7 @@
             "if (useStoreFeature('experimental.charts')) {\n  /* 渲染实验特性 */\n}\nuseAssertStoreFeature('wasm', 'myWasmApi'); // 未开启（含无 Provider）直接抛错"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "useAssertStoreFeature",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5031,6 +5917,7 @@
             "const value = useAsyncAtomValue(asyncAtom); // 内部即 useResourceValue(atom.resource)"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useAsyncAtomValue<T>(atom: IAsyncAtom<T>): T;"
@@ -5100,7 +5987,8 @@
             {
               "name": "atom",
               "type": "IWritableAtom<T, Args, Result>",
-              "optional": false
+              "optional": false,
+              "configurationType": "IWritableAtom<T, readonly, Result>"
             }
           ],
           "returns": "readonly [T, (...args: Args) => Result]",
@@ -5110,6 +5998,7 @@
             "const value = useAtomValue(myAtom);\nconst write = useSetAtom(myWritableAtom);\nconst [value2, write2] = useAtom(myWritableAtom);"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useAtom<T, Args extends readonly unknown[], Result>(atom: IWritableAtom<T, Args, Result>): readonly [T, (...args: Args) => Result];"
@@ -5119,7 +6008,8 @@
               {
                 "name": "atom",
                 "type": "IWritableAtom<T, Args, Result>",
-                "optional": false
+                "optional": false,
+                "configurationType": "IWritableAtom<T, readonly, Result>"
               }
             ]
           ],
@@ -5323,6 +6213,7 @@
             "import { StoreProvider, useAtomDefinition, useSetAtomDefinition } from '@migaia/store-react';\nimport { atomDef, writableDef } from '@migaia/store-keyed/atom/definition';\n\nconst countDef = atomDef(0);\nconst incrementDef = writableDef(\n  (get) => get(countDef),\n  (get, set) => set(countDef, get(countDef) + 1)\n);\n\nfunction Counter() {\n  const count = useAtomDefinition(countDef);\n  const increment = useSetAtomDefinition(incrementDef);\n  return <button onClick={() => increment()}>count: {count}</button>;\n}\n\nfunction App() {\n  return (\n    <StoreProvider>\n      <Counter />\n    </StoreProvider>\n  );\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "useAtomDefinition",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5536,6 +6427,7 @@
             "const value = useAtomValue(myAtom);\nconst write = useSetAtom(myWritableAtom);\nconst [value2, write2] = useAtom(myWritableAtom);"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useAtomValue<T>(atom: IReadableAtom<T>): T;"
@@ -5627,6 +6519,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for useNodeValue.",
           "examples": ["const value = useNodeValue(mySignal, runtime);"],
           "members": [],
+          "composes": [],
           "aliasOf": "useNodeValue",
           "exportPath": ".",
           "overloadSignatures": [
@@ -5711,12 +6604,14 @@
             {
               "name": "token",
               "type": "IStoreToken<IReactiveStore<S>>",
-              "optional": false
+              "optional": false,
+              "configurationType": "IStoreToken<IReactiveStore<Record>>"
             },
             {
               "name": "selector",
               "type": "(state: IStoreShape<S>) => Result",
-              "optional": false
+              "optional": false,
+              "configurationType": "(state: IStoreShape<Record>) => Result"
             },
             {
               "name": "isEqual",
@@ -5733,6 +6628,7 @@
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore, type IReactiveStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken<IReactiveStore<{ userId: string }>>('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useProvidedStore<S extends Record<string, unknown>, Result>(token: IStoreToken<IReactiveStore<S>>, selector: (state: IStoreShape<S>) => Result, isEqual?: (left: Result, right: Result) => boolean): Result;"
@@ -5742,12 +6638,14 @@
               {
                 "name": "token",
                 "type": "IStoreToken<IReactiveStore<S>>",
-                "optional": false
+                "optional": false,
+                "configurationType": "IStoreToken<IReactiveStore<Record>>"
               },
               {
                 "name": "selector",
                 "type": "(state: IStoreShape<S>) => Result",
-                "optional": false
+                "optional": false,
+                "configurationType": "(state: IStoreShape<Record>) => Result"
               },
               {
                 "name": "isEqual",
@@ -5955,6 +6853,7 @@
             "const state = useResource(profileResource); // { status: 'idle'|'pending'|'success'|'error'|'cancelled', ... }\nconst profile = useResourceValue(profileResource); // 成功返回 data；pending/idle 时 throw promise；error/cancelled 时 throw error"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useResource<T>(res: Resource<T>): IResourceState<T>;"
@@ -6037,6 +6936,7 @@
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore, type IReactiveStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken<IReactiveStore<{ userId: string }>>('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useResourceValue<T>(resource: Resource<T>): T;"
@@ -6106,7 +7006,8 @@
             {
               "name": "atom",
               "type": "IWritableAtom<T, Args, Result>",
-              "optional": false
+              "optional": false,
+              "configurationType": "IWritableAtom<T, readonly, Result>"
             }
           ],
           "returns": "(...args: Args) => Result",
@@ -6116,6 +7017,7 @@
             "const value = useAtomValue(myAtom);\nconst write = useSetAtom(myWritableAtom);\nconst [value2, write2] = useAtom(myWritableAtom);"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useSetAtom<T, Args extends readonly unknown[], Result>(atom: IWritableAtom<T, Args, Result>): (...args: Args) => Result;"
@@ -6125,7 +7027,8 @@
               {
                 "name": "atom",
                 "type": "IWritableAtom<T, Args, Result>",
-                "optional": false
+                "optional": false,
+                "configurationType": "IWritableAtom<T, readonly, Result>"
               }
             ]
           ],
@@ -6318,7 +7221,8 @@
             {
               "name": "definition",
               "type": "IWritableAtomDefinition<T, Args, Result>",
-              "optional": false
+              "optional": false,
+              "configurationType": "IWritableAtomDefinition<T, readonly, Result>"
             }
           ],
           "returns": "(...args: Args) => Result",
@@ -6329,6 +7233,7 @@
             "import { StoreProvider, useAtomDefinition, useSetAtomDefinition } from '@migaia/store-react';\nimport { atomDef, writableDef } from '@migaia/store-keyed/atom/definition';\n\nconst countDef = atomDef(0);\nconst incrementDef = writableDef(\n  (get) => get(countDef),\n  (get, set) => set(countDef, get(countDef) + 1)\n);\n\nfunction Counter() {\n  const count = useAtomDefinition(countDef);\n  const increment = useSetAtomDefinition(incrementDef);\n  return <button onClick={() => increment()}>count: {count}</button>;\n}\n\nfunction App() {\n  return (\n    <StoreProvider>\n      <Counter />\n    </StoreProvider>\n  );\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "useSetAtomDefinition",
           "exportPath": ".",
           "overloadSignatures": [
@@ -6339,7 +7244,8 @@
               {
                 "name": "definition",
                 "type": "IWritableAtomDefinition<T, Args, Result>",
-                "optional": false
+                "optional": false,
+                "configurationType": "IWritableAtomDefinition<T, readonly, Result>"
               }
             ]
           ],
@@ -6540,6 +7446,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for useSignal.",
           "examples": ["const [name, setName] = useSignal(nameSignal);"],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useSignal<T>(s: IReactiveSignal<T>): readonly [T, (next: T) => void];"
@@ -6613,12 +7520,14 @@
             {
               "name": "store",
               "type": "IReactiveStore<S>",
-              "optional": false
+              "optional": false,
+              "configurationType": "IReactiveStore<Record>"
             },
             {
               "name": "selector",
               "type": "(state: IStoreShape<S>) => R",
-              "optional": false
+              "optional": false,
+              "configurationType": "(state: IStoreShape<Record>) => R"
             },
             {
               "name": "isEqual",
@@ -6634,6 +7543,7 @@
             "const count = useStore(counterStore, (state) => state.count);"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useStore<S extends Record<string, unknown>, R>(store: IReactiveStore<S>, selector: (state: IStoreShape<S>) => R, isEqual?: (a: R, b: R) => boolean): R;"
@@ -6643,12 +7553,14 @@
               {
                 "name": "store",
                 "type": "IReactiveStore<S>",
-                "optional": false
+                "optional": false,
+                "configurationType": "IReactiveStore<Record>"
               },
               {
                 "name": "selector",
                 "type": "(state: IStoreShape<S>) => R",
-                "optional": false
+                "optional": false,
+                "configurationType": "(state: IStoreShape<Record>) => R"
               },
               {
                 "name": "isEqual",
@@ -6961,6 +7873,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for useStoreConfig.",
           "examples": ["const config = useStoreConfig(); // 无 Provider 时返回 null"],
           "members": [],
+          "composes": [],
           "aliasOf": "useStoreConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7149,6 +8062,7 @@
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore, type IReactiveStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken<IReactiveStore<{ userId: string }>>('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "useStoreFeature",
           "exportPath": ".",
           "overloadSignatures": [
@@ -7322,6 +8236,7 @@
             "const sessionStore = useStoreFromProvider(sessionToken);\nconst userId = useProvidedStore(sessionToken, (s) => s.userId);"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useStoreFromProvider<T>(token: IStoreToken<T>): T;"
@@ -7531,6 +8446,7 @@
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore, type IReactiveStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken<IReactiveStore<{ userId: string }>>('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useStoreRegistry(): import(\"./provider-registry.js\").StoreRegistry;"
@@ -7752,6 +8668,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for useStoreResource.",
           "examples": ["const value = useStoreResource(store.someAsyncField);"],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useStoreResource<T>(resource: IStoreResource<T>): T;"
@@ -7827,6 +8744,7 @@
             "import { Suspense, useEffect, useMemo } from 'react';\nimport {\n  StoreProvider,\n  createStoreToken,\n  useProvidedStore,\n  useResourceValue,\n  useStoreFeature,\n  useStoreRegistry,\n  useStoreRuntime\n} from '@migaia/store-react';\nimport { createStore, type IReactiveStore } from '@migaia/store-light';\nimport { Resource } from '@migaia/resource';\n\nconst sessionToken = createStoreToken<IReactiveStore<{ userId: string }>>('session');\n\nfunction App() {\n  const ready = useMemo(() => [() => Promise.resolve()], []); // 引用必须稳定\n  const sessionStore = useMemo(() => createStore({ userId: '' }), []);\n\n  return (\n    <StoreProvider config={{ ready, fallback: <div>加载中…</div> }}>\n      <SessionInjector store={sessionStore}>\n        <Suspense fallback={<div>加载中…</div>}>\n          <Dashboard />\n        </Suspense>\n      </SessionInjector>\n    </StoreProvider>\n  );\n}\n\nfunction SessionInjector({ store, children }) {\n  const registry = useStoreRegistry();\n  useEffect(() => registry.register(sessionToken, store, { owned: false }), [registry, store]);\n  return children;\n}\n\nfunction Dashboard() {\n  const userId = useProvidedStore(sessionToken, (s) => s.userId);\n  const runtime = useStoreRuntime();\n  const showCharts = useStoreFeature('experimental.charts');\n  const profile = useResourceValue(new Resource(async () => ({ name: userId }), runtime));\n  return (\n    <p>\n      {profile.name}\n      {showCharts ? ' · 图表已开启' : ''}\n    </p>\n  );\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": ["export declare function useStoreRuntime(): IRuntime;"],
           "overloadParameterDetails": [[]],
@@ -8044,6 +8962,7 @@
             "import { useTracked } from '@migaia/store-react';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst priceSignal = defaultRuntime.signal(10);\nconst qtySignal = defaultRuntime.signal(2);\n\nfunction Total() {\n  const total = useTracked(() => priceSignal.value * qtySignal.value);\n  return <span>合计：{total}</span>;\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function useTracked<T>(read: () => T, isEqual?: (a: T, b: T) => boolean, runtime?: IRuntime): T;"

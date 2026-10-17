@@ -461,6 +461,7 @@
             "import { createRpcDevtools } from '@migaia/rpc-devtools'\n\n/** 默认订阅 message 与 peer，只采集元数据；调用方拥有 collector 生命周期。 */\nconst devtools = createRpcDevtools({ maxEvents: 1_000 })\n/** 需要物理载体诊断时，显式扩展当前订阅；内容捕获仍关闭。 */\ndevtools.setStages(['message', 'peer', 'carrier'])\n/** 独立录制环不受主查询环的淘汰影响。 */\nconst recording = devtools.record({ maxEvents: 100 })\ndevtools.pause()\nconsole.log(devtools.describe().paused) // true\ndevtools.resume()\nconsole.log(devtools.query().events.length, devtools.stats().methods.length) // 0 0\nconsole.log(devtools.importRecord(devtools.exportRecord(recording.stop())).header.version) // 1\ndevtools.close()"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createRpcDevtools",
           "exportPath": ".",
           "overloadSignatures": [
@@ -510,11 +511,153 @@
               "content": "No additional advanced behavior is declared for createRpcDevtools."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "stages",
+              "type": "readonly IRpcProbeStageName[]",
+              "optional": true,
+              "description": "Defaults to message and peer; pass physical stages here or use setStages() to enable them."
+            },
+            {
+              "name": "capture",
+              "type": "readonly IRpcProbeStageName[]",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "redact",
+              "type": "(stage: RpcProbeStage, content: unknown) => unknown",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "methods",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "sample",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "maxEvents",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "maxContentBytes",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "maxInterned",
+              "type": "number",
+              "optional": true,
+              "description": "Bounds the reader name table; ingestion retains raw string references without interning."
+            },
+            {
+              "name": "exposeContent",
+              "type": "boolean",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "onError",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-devtools/dist/collector/devtools.d.ts:createRpcDevtools:export declare function createRpcDevtools(options?: IRpcDevtoolsOptions): IRpcDevtools;",
           "guidance": [],
           "usageScore": 64,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "stages",
+              "type": "readonly IRpcProbeStageName[]",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "Defaults to message and peer; pass physical stages here or use setStages() to enable them.",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            },
+            {
+              "name": "capture",
+              "type": "readonly IRpcProbeStageName[]",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            },
+            {
+              "name": "redact",
+              "type": "(stage: RpcProbeStage, content: unknown) => unknown",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            },
+            {
+              "name": "methods",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            },
+            {
+              "name": "sample",
+              "type": "number",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            },
+            {
+              "name": "maxEvents",
+              "type": "number",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            },
+            {
+              "name": "maxContentBytes",
+              "type": "number",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            },
+            {
+              "name": "maxInterned",
+              "type": "number",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "Bounds the reader name table; ingestion retains raw string references without interning.",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            },
+            {
+              "name": "exposeContent",
+              "type": "boolean",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            },
+            {
+              "name": "onError",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。",
+              "descriptionEn": "Receives logger or formatting failures without changing the business flow.",
+              "descriptionZh": "选项包括 `stages`（默认 `['message', 'peer']`）、`capture`（默认无内容）、`redact`、`methods`、`sample`、`maxEvents`（默认 10,000）、`maxContentBytes`（默认 8 MiB）、`maxInterned`（默认 65,536）、`exposeContent`（默认 false）与 `onError`。`methods` 只过滤携带 method 的 message/envelope；没有 method 的 variation 通过该过滤，仍受 sample 约束。`sample` 在构造时编译。无效配置抛出带 `INVALID_OPTION` 的 TypeError。"
+            }
+          ],
           "fragment": "rpc-devtools-index--createRpcDevtools"
         },
         {
@@ -532,7 +675,162 @@
           "errors": ["No documented errors are declared for IRpcDevtools."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtools.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "emit",
+              "kind": "method",
+              "optional": false,
+              "signature": "emit(view: IRpcProbeEventView): void;",
+              "description": "Collector-owned ingestion exists before host-form defineProbe attaches the compiled fields.",
+              "parameterDetails": [
+                {
+                  "name": "view",
+                  "type": "IRpcProbeEventView",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "query",
+              "kind": "method",
+              "optional": false,
+              "signature": "query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "input",
+                  "type": "IRpcDevtoolsQuery",
+                  "optional": true
+                }
+              ],
+              "returns": "IRpcDevtoolsPage"
+            },
+            {
+              "name": "watch",
+              "kind": "method",
+              "optional": false,
+              "signature": "watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "input",
+                  "type": "Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>",
+                  "optional": true
+                }
+              ],
+              "returns": "AsyncGenerator<IRpcDevtoolsWatchBatch>"
+            },
+            {
+              "name": "stats",
+              "kind": "method",
+              "optional": false,
+              "signature": "stats(): IRpcDevtoolsStats;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcDevtoolsStats"
+            },
+            {
+              "name": "describe",
+              "kind": "method",
+              "optional": false,
+              "signature": "describe(): IRpcDevtoolsDescribe;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcDevtoolsDescribe"
+            },
+            {
+              "name": "record",
+              "kind": "method",
+              "optional": false,
+              "signature": "record(options?: Readonly<{ maxEvents?: number; }>): Readonly<{ stop(): IRpcDevtoolsRecord; }>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "Readonly<{ maxEvents?: number; }>",
+                  "optional": true
+                }
+              ],
+              "returns": "Readonly<{ stop(): IRpcDevtoolsRecord; }>"
+            },
+            {
+              "name": "exportRecord",
+              "kind": "method",
+              "optional": false,
+              "signature": "exportRecord(record: IRpcDevtoolsRecord): string;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "record",
+                  "type": "IRpcDevtoolsRecord",
+                  "optional": false
+                }
+              ],
+              "returns": "string"
+            },
+            {
+              "name": "importRecord",
+              "kind": "method",
+              "optional": false,
+              "signature": "importRecord(text: string): IRpcDevtoolsRecord;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "IRpcDevtoolsRecord"
+            },
+            {
+              "name": "pause",
+              "kind": "method",
+              "optional": false,
+              "signature": "pause(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "resume",
+              "kind": "method",
+              "optional": false,
+              "signature": "resume(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "optional": false,
+              "signature": "clear(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "service",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly service: IRuntimePeerProvide;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerProvide"
+            }
+          ],
+          "composes": ["IRpcProbe"],
           "aliasOf": "IRpcDevtools",
           "exportPath": ".",
           "overloadSignatures": [
@@ -596,7 +894,116 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "stages",
+              "kind": "property",
+              "optional": true,
+              "signature": "stages?: readonly IRpcProbeStageName[];",
+              "description": "Defaults to message and peer; pass physical stages here or use setStages() to enable them.",
+              "parameterDetails": [],
+              "returns": "readonly IRpcProbeStageName[]"
+            },
+            {
+              "name": "capture",
+              "kind": "property",
+              "optional": true,
+              "signature": "capture?: readonly IRpcProbeStageName[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRpcProbeStageName[]"
+            },
+            {
+              "name": "redact",
+              "kind": "method",
+              "optional": true,
+              "signature": "redact?(stage: RpcProbeStage, content: unknown): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "stage",
+                  "type": "RpcProbeStage",
+                  "optional": false
+                },
+                {
+                  "name": "content",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "methods",
+              "kind": "property",
+              "optional": true,
+              "signature": "methods?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "sample",
+              "kind": "property",
+              "optional": true,
+              "signature": "sample?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxEvents",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxEvents?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxContentBytes",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxContentBytes?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxInterned",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxInterned?: number;",
+              "description": "Bounds the reader name table; ingestion retains raw string references without interning.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "exposeContent",
+              "kind": "property",
+              "optional": true,
+              "signature": "exposeContent?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "onError",
+              "kind": "method",
+              "optional": true,
+              "signature": "onError?(error: unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRpcDevtoolsOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -720,6 +1127,7 @@
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "decodeRpcDevtoolsRecord",
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -802,6 +1210,7 @@
             "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "encodeRpcDevtoolsRecord",
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -873,7 +1282,72 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsCounters."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsCounters.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "evicted",
+              "kind": "property",
+              "optional": false,
+              "signature": "evicted: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "contentDropped",
+              "kind": "property",
+              "optional": false,
+              "signature": "contentDropped: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "droppedReentrant",
+              "kind": "property",
+              "optional": false,
+              "signature": "droppedReentrant: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "sampledOut",
+              "kind": "property",
+              "optional": false,
+              "signature": "sampledOut: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "ignoredWhilePaused",
+              "kind": "property",
+              "optional": false,
+              "signature": "ignoredWhilePaused: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "ignoredAfterClose",
+              "kind": "property",
+              "optional": false,
+              "signature": "ignoredAfterClose: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "internOverflow",
+              "kind": "property",
+              "optional": false,
+              "signature": "internOverflow: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": "./contract",
           "overloadSignatures": [
             "export type IRpcDevtoolsCounters = Readonly<{ evicted: number; contentDropped: number; droppedReentrant: number; sampledOut: number; ignoredWhilePaused: number; ignoredAfterClose: number; internOverflow: number; }>;"
@@ -936,7 +1410,63 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsDescribe."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsDescribe.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": false,
+              "signature": "version: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "now",
+              "kind": "property",
+              "optional": false,
+              "signature": "now: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "paused",
+              "kind": "property",
+              "optional": false,
+              "signature": "paused: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "descriptors",
+              "kind": "property",
+              "optional": false,
+              "signature": "descriptors: readonly IRpcProbeDescriptor[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRpcProbeDescriptor[]"
+            },
+            {
+              "name": "limits",
+              "kind": "property",
+              "optional": false,
+              "signature": "limits: Readonly<{ maxEvents: number; maxContentBytes: number; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ maxEvents: number; maxContentBytes: number; }>"
+            },
+            {
+              "name": "counters",
+              "kind": "property",
+              "optional": false,
+              "signature": "counters: IRpcDevtoolsCounters;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcDevtoolsCounters"
+            }
+          ],
+          "composes": [],
           "exportPath": "./contract",
           "overloadSignatures": [
             "export type IRpcDevtoolsDescribe = Readonly<{ version: string; now: number; paused: boolean; descriptors: readonly IRpcProbeDescriptor[]; limits: Readonly<{ maxEvents: number; maxContentBytes: number; }>; counters: IRpcDevtoolsCounters; }>;"
@@ -1000,6 +1530,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsErrorCode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IRpcDevtoolsErrorCode",
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -1063,7 +1594,36 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsPage."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsPage.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "events",
+              "kind": "property",
+              "optional": false,
+              "signature": "events: readonly IRpcDevtoolsWireEvent[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRpcDevtoolsWireEvent[]"
+            },
+            {
+              "name": "nextSeq",
+              "kind": "property",
+              "optional": false,
+              "signature": "nextSeq: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "counters",
+              "kind": "property",
+              "optional": false,
+              "signature": "counters: IRpcDevtoolsCounters;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcDevtoolsCounters"
+            }
+          ],
+          "composes": [],
           "exportPath": "./contract",
           "overloadSignatures": [
             "export type IRpcDevtoolsPage = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; nextSeq: number; counters: IRpcDevtoolsCounters; }>;"
@@ -1126,7 +1686,72 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsQuery."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsQuery.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "afterSeq",
+              "kind": "property",
+              "optional": true,
+              "signature": "afterSeq?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "limit",
+              "kind": "property",
+              "optional": true,
+              "signature": "limit?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "stages",
+              "kind": "property",
+              "optional": true,
+              "signature": "stages?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "outcomes",
+              "kind": "property",
+              "optional": true,
+              "signature": "outcomes?: readonly string[];",
+              "description": "Selects canonical outcome names before the numeric event scan or watch ingestion.",
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "methods",
+              "kind": "property",
+              "optional": true,
+              "signature": "methods?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "trace",
+              "kind": "property",
+              "optional": true,
+              "signature": "trace?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "endpointIds",
+              "kind": "property",
+              "optional": true,
+              "signature": "endpointIds?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            }
+          ],
+          "composes": [],
           "exportPath": "./contract",
           "overloadSignatures": [
             "export type IRpcDevtoolsQuery = Readonly<{ afterSeq?: number; limit?: number; stages?: readonly string[]; /** Selects canonical outcome names before the numeric event scan or watch ingestion. */ outcomes?: readonly string[]; methods?: readonly string[]; trace?: string; endpointIds?: readonly string[]; }>;"
@@ -1192,7 +1817,27 @@
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** 业务内容只有显式捕获后才会出现在事件中。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 0,\n      endpointId: 'client',\n      stage: 'message',\n      direction: 'outbound',\n      kind: 'request',\n      method: '读取',\n      content: new Uint8Array([1, 2, 3])\n    }\n  ]\n}\n/** 同一 codec 可供 collector 导出和 hub 离线导入使用。 */\nconst decoded = decodeRpcDevtoolsRecord(encodeRpcDevtoolsRecord(record))\nconsole.log(decoded.events[0]?.method)",
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "header",
+              "kind": "property",
+              "optional": false,
+              "signature": "header: IRpcDevtoolsRecordHeader;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcDevtoolsRecordHeader"
+            },
+            {
+              "name": "events",
+              "kind": "property",
+              "optional": false,
+              "signature": "events: readonly IRpcDevtoolsRecordEvent[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRpcDevtoolsRecordEvent[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRpcDevtoolsRecord",
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -1256,7 +1901,252 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsRecordEvent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsRecordEvent.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": true,
+              "signature": "error?: Error | IRpcWireError;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Error | IRpcWireError"
+            },
+            {
+              "name": "target",
+              "kind": "property",
+              "optional": true,
+              "signature": "target?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "seq",
+              "kind": "property",
+              "optional": false,
+              "signature": "seq: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "carrierSeq",
+              "kind": "property",
+              "optional": true,
+              "signature": "carrierSeq?: number;",
+              "description": "Collector-domain sequence of the originating inbound carrier event, when retained.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "at",
+              "kind": "property",
+              "optional": false,
+              "signature": "at: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "endpointId",
+              "kind": "property",
+              "optional": false,
+              "signature": "endpointId: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "stage",
+              "kind": "property",
+              "optional": false,
+              "signature": "stage: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "direction",
+              "kind": "property",
+              "optional": false,
+              "signature": "direction: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": true,
+              "signature": "kind?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "outcome",
+              "kind": "property",
+              "optional": true,
+              "signature": "outcome?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "messageId",
+              "kind": "property",
+              "optional": true,
+              "signature": "messageId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "method",
+              "kind": "property",
+              "optional": true,
+              "signature": "method?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "variation",
+              "kind": "property",
+              "optional": true,
+              "signature": "variation?: string;",
+              "description": "Original variation route name retained by message/envelope events and offline records.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "senderId",
+              "kind": "property",
+              "optional": true,
+              "signature": "senderId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "targetId",
+              "kind": "property",
+              "optional": true,
+              "signature": "targetId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "receiverId",
+              "kind": "property",
+              "optional": true,
+              "signature": "receiverId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "peerId",
+              "kind": "property",
+              "optional": true,
+              "signature": "peerId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "trace",
+              "kind": "property",
+              "optional": true,
+              "signature": "trace?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "sizeBytes",
+              "kind": "property",
+              "optional": true,
+              "signature": "sizeBytes?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "chunk",
+              "kind": "property",
+              "optional": true,
+              "signature": "chunk?: Readonly<{ index: number; count: number; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ index: number; count: number; }>"
+            },
+            {
+              "name": "members",
+              "kind": "property",
+              "optional": true,
+              "signature": "members?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "durationMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "durationMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "rejection",
+              "kind": "property",
+              "optional": true,
+              "signature": "rejection?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "lifecycle",
+              "kind": "property",
+              "optional": true,
+              "signature": "lifecycle?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "carrier",
+              "kind": "property",
+              "optional": true,
+              "signature": "carrier?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "detail",
+              "kind": "property",
+              "optional": true,
+              "signature": "detail?: Readonly<Record<string, string | number | boolean>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, string | number | boolean>>"
+            },
+            {
+              "name": "content",
+              "kind": "property",
+              "optional": true,
+              "signature": "content?: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRpcDevtoolsRecordEvent",
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -1320,7 +2210,27 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsRecordHeader."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsRecordHeader.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "format",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly format: \"migaia-rpc-devtools\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"migaia-rpc-devtools\""
+            },
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly version: 1;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "1"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRpcDevtoolsRecordHeader",
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -1386,7 +2296,93 @@
           "examples": [
             "import { createRpcDevtools } from '@migaia/rpc-devtools'\nimport type { IRpcDevtoolsServiceApi } from '@migaia/rpc-devtools/contract'\nimport { createPeerPair } from '@migaia/rpc-core/testing'\n\n/** Service 专用 Peer 不安装 collector 作为 probe，避免观察自己的查询流量。 */\nconst devtools = createRpcDevtools({ maxEvents: 32 })\n/** 这里的类型断言公开冻结的 service 契约，供 typed Peer 推断方法。 */\nconst pair = await createPeerPair({\n  a: { provide: {} },\n  b: { provide: { devtools: devtools.service as IRpcDevtoolsServiceApi } }\n})\ntry {\n  console.log((await pair.a.request('devtools.describe')).limits.maxEvents) // 32\n  console.log((await pair.a.request('devtools.query', { stages: ['message'] })).events.length)\n  await pair.a.request('devtools.record.start', { maxEvents: 8 })\n  console.log(devtools.importRecord(await pair.a.request('devtools.record.stop')).header.version)\n  await pair.a.request('devtools.pause')\n  await pair.a.request('devtools.resume')\n} finally {\n  await Promise.all([pair.a.close(), pair.b.close()])\n  devtools.close()\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "describe",
+              "kind": "method",
+              "optional": false,
+              "signature": "describe(): IRpcDevtoolsDescribe;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcDevtoolsDescribe"
+            },
+            {
+              "name": "query",
+              "kind": "method",
+              "optional": false,
+              "signature": "query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "input",
+                  "type": "IRpcDevtoolsQuery",
+                  "optional": true
+                }
+              ],
+              "returns": "IRpcDevtoolsPage"
+            },
+            {
+              "name": "watch",
+              "kind": "method",
+              "optional": false,
+              "signature": "watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "input",
+                  "type": "Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>",
+                  "optional": true
+                }
+              ],
+              "returns": "AsyncGenerator<IRpcDevtoolsWatchBatch>"
+            },
+            {
+              "name": "stats",
+              "kind": "method",
+              "optional": false,
+              "signature": "stats(): IRpcDevtoolsStats;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcDevtoolsStats"
+            },
+            {
+              "name": "record",
+              "kind": "property",
+              "optional": false,
+              "signature": "record: { start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; }"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "optional": false,
+              "signature": "clear(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "pause",
+              "kind": "method",
+              "optional": false,
+              "signature": "pause(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "resume",
+              "kind": "method",
+              "optional": false,
+              "signature": "resume(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./contract",
           "overloadSignatures": [
             "export type IRpcDevtoolsServiceApi = { describe(): IRpcDevtoolsDescribe; query(input?: IRpcDevtoolsQuery): IRpcDevtoolsPage; watch(input?: Omit<IRpcDevtoolsQuery, 'afterSeq' | 'limit'>): AsyncGenerator<IRpcDevtoolsWatchBatch>; stats(): IRpcDevtoolsStats; record: { start(input?: Readonly<{ maxEvents?: number; }>): void; stop(): string; }; clear(): void; pause(): void; resume(): void; };"
@@ -1449,7 +2445,27 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsStats."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsStats.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "since",
+              "kind": "property",
+              "optional": false,
+              "signature": "since: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "methods",
+              "kind": "property",
+              "optional": false,
+              "signature": "methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; /** The final bucket has no upper bound; this value is its exclusive lower boundary. */ latencyOverflowFromMs?: number; /** Observed maximum bounds interpolation honestly, including the open terminal bucket. */ latencyMaxMs?: number; p50Ms: number; p95Ms: number; p99Ms: number; }>[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; /** The final bucket has no upper bound; this value is its exclusive lower boundary. */ latencyOverflowFromMs?: number; /** Observed maximum bounds interpolation honestly, including the open terminal bucket. */ latencyMaxMs?: number; p50Ms: number; p95Ms: number; p99Ms: number; }>[]"
+            }
+          ],
+          "composes": [],
           "exportPath": "./contract",
           "overloadSignatures": [
             "export type IRpcDevtoolsStats = Readonly<{ since: number; methods: readonly Readonly<{ endpointId: string; method: string; calls: number; failed: number; rejected: number; timedOut: number; aborted: number; latencyBucketsMs: readonly number[]; latencyCounts: readonly number[]; /** The final bucket has no upper bound; this value is its exclusive lower boundary. */ latencyOverflowFromMs?: number; /** Observed maximum bounds interpolation honestly, including the open terminal bucket. */ latencyMaxMs?: number; p50Ms: number; p95Ms: number; p99Ms: number; }>[]; }>;"
@@ -1512,7 +2528,27 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsWatchBatch."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsWatchBatch.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "events",
+              "kind": "property",
+              "optional": false,
+              "signature": "events: readonly IRpcDevtoolsWireEvent[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRpcDevtoolsWireEvent[]"
+            },
+            {
+              "name": "dropped",
+              "kind": "property",
+              "optional": false,
+              "signature": "dropped: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": "./contract",
           "overloadSignatures": [
             "export type IRpcDevtoolsWatchBatch = Readonly<{ events: readonly IRpcDevtoolsWireEvent[]; dropped: number; }>;"
@@ -1575,7 +2611,252 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsWireEvent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsWireEvent.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "target",
+              "kind": "property",
+              "optional": true,
+              "signature": "target?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "seq",
+              "kind": "property",
+              "optional": false,
+              "signature": "seq: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "carrierSeq",
+              "kind": "property",
+              "optional": true,
+              "signature": "carrierSeq?: number;",
+              "description": "Collector-domain sequence of the originating inbound carrier event, when retained.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "at",
+              "kind": "property",
+              "optional": false,
+              "signature": "at: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "endpointId",
+              "kind": "property",
+              "optional": false,
+              "signature": "endpointId: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "stage",
+              "kind": "property",
+              "optional": false,
+              "signature": "stage: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "direction",
+              "kind": "property",
+              "optional": false,
+              "signature": "direction: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": true,
+              "signature": "kind?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "outcome",
+              "kind": "property",
+              "optional": true,
+              "signature": "outcome?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "messageId",
+              "kind": "property",
+              "optional": true,
+              "signature": "messageId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "method",
+              "kind": "property",
+              "optional": true,
+              "signature": "method?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "variation",
+              "kind": "property",
+              "optional": true,
+              "signature": "variation?: string;",
+              "description": "Original variation route name retained by message/envelope events and offline records.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "senderId",
+              "kind": "property",
+              "optional": true,
+              "signature": "senderId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "targetId",
+              "kind": "property",
+              "optional": true,
+              "signature": "targetId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "receiverId",
+              "kind": "property",
+              "optional": true,
+              "signature": "receiverId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "peerId",
+              "kind": "property",
+              "optional": true,
+              "signature": "peerId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "trace",
+              "kind": "property",
+              "optional": true,
+              "signature": "trace?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "sizeBytes",
+              "kind": "property",
+              "optional": true,
+              "signature": "sizeBytes?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "chunk",
+              "kind": "property",
+              "optional": true,
+              "signature": "chunk?: Readonly<{ index: number; count: number; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ index: number; count: number; }>"
+            },
+            {
+              "name": "members",
+              "kind": "property",
+              "optional": true,
+              "signature": "members?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "durationMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "durationMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "rejection",
+              "kind": "property",
+              "optional": true,
+              "signature": "rejection?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "lifecycle",
+              "kind": "property",
+              "optional": true,
+              "signature": "lifecycle?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": true,
+              "signature": "error?: IRpcWireError;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcWireError"
+            },
+            {
+              "name": "carrier",
+              "kind": "property",
+              "optional": true,
+              "signature": "carrier?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "detail",
+              "kind": "property",
+              "optional": true,
+              "signature": "detail?: Readonly<Record<string, string | number | boolean>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, string | number | boolean>>"
+            },
+            {
+              "name": "content",
+              "kind": "property",
+              "optional": true,
+              "signature": "content?: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
           "exportPath": "./contract",
           "overloadSignatures": [
             "export type IRpcDevtoolsWireEvent = Readonly<{ target?: string; seq: number; /** Collector-domain sequence of the originating inbound carrier event, when retained. */ carrierSeq?: number; at: number; endpointId: string; stage: string; direction: string; kind?: string; outcome?: string; messageId?: string; method?: string; /** Original variation route name retained by message/envelope events and offline records. */ variation?: string; senderId?: string; targetId?: string; receiverId?: string; peerId?: string; trace?: string; sizeBytes?: number; chunk?: Readonly<{ index: number; count: number; }>; members?: number; durationMs?: number; rejection?: string; lifecycle?: string; error?: IRpcWireError; carrier?: string; detail?: Readonly<Record<string, string | number | boolean>>; content?: unknown; }>;"
@@ -1639,6 +2920,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcWireError.",
           "examples": [],
           "members": [],
+          "composes": ["IRpcSerializedError"],
           "exportPath": "./contract",
           "overloadSignatures": ["export type IRpcWireError = IRpcSerializedError;"],
           "overloadParameterDetails": [[]],
@@ -1700,6 +2982,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RPC_DEVTOOLS_SOURCE.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ERROR_SOURCE",
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -1774,7 +3057,90 @@
           "errors": ["No documented errors are declared for RpcDevtoolsErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcDevtoolsErrorCode.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "serviceResultInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly serviceResultInvalid: \"SERVICE_RESULT_INVALID\";",
+              "description": "Captured service data cannot be encoded (closure R5); inspect cause or disable content * exposure.",
+              "parameterDetails": [],
+              "returns": "\"SERVICE_RESULT_INVALID\""
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Collector/hub options violate their supported domain; fix the option before construction (R5).",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            },
+            {
+              "name": "closed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closed: \"CLOSED\";",
+              "description": "Runtime is absent or the instance is closed; install the runtime or create a live instance * (R5).",
+              "parameterDetails": [],
+              "returns": "\"CLOSED\""
+            },
+            {
+              "name": "recordActive",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly recordActive: \"RECORD_ACTIVE\";",
+              "description": "A recording already owns the collector; stop it before starting another (collector R3).",
+              "parameterDetails": [],
+              "returns": "\"RECORD_ACTIVE\""
+            },
+            {
+              "name": "recordNotActive",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly recordNotActive: \"RECORD_NOT_ACTIVE\";",
+              "description": "No recording remains active; start one before stopping it (collector R3).",
+              "parameterDetails": [],
+              "returns": "\"RECORD_NOT_ACTIVE\""
+            },
+            {
+              "name": "recordFormatInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly recordFormatInvalid: \"RECORD_FORMAT_INVALID\";",
+              "description": "Record header or NDJSON is invalid; inspect cause and supply a version-1 record (contract R4).",
+              "parameterDetails": [],
+              "returns": "\"RECORD_FORMAT_INVALID\""
+            },
+            {
+              "name": "redactFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly redactFailed: \"REDACT_FAILED\";",
+              "description": "Redaction failed; report the original cause and discard content (collector §5).",
+              "parameterDetails": [],
+              "returns": "\"REDACT_FAILED\""
+            },
+            {
+              "name": "targetDuplicate",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly targetDuplicate: \"TARGET_DUPLICATE\";",
+              "description": "A hub target name is registered; remove it before replacement (hub R1).",
+              "parameterDetails": [],
+              "returns": "\"TARGET_DUPLICATE\""
+            },
+            {
+              "name": "targetUnknown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly targetUnknown: \"TARGET_UNKNOWN\";",
+              "description": "A hub operation names an unknown target; register it before use (hub R1).",
+              "parameterDetails": [],
+              "returns": "\"TARGET_UNKNOWN\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "RpcDevtoolsErrorCode",
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -1853,7 +3219,27 @@
             "import {\n  RpcDevtoolsRecordFormat,\n  encodeRpcDevtoolsRecord,\n  decodeRpcDevtoolsRecord,\n  type IRpcDevtoolsRecord\n} from '@migaia/rpc-devtools/contract'\n\n/** Header 的格式名与版本由 contract 常量统一维护。 */\nconst record: IRpcDevtoolsRecord = {\n  header: RpcDevtoolsRecordFormat,\n  events: []\n}\n/** Codec 不创建 transport、Peer 或持久化资源。 */\nconst text = encodeRpcDevtoolsRecord(record)\nconsole.log(decodeRpcDevtoolsRecord(text).header.version) // 1",
             "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "format",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly format: \"migaia-rpc-devtools\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"migaia-rpc-devtools\""
+            },
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly version: 1;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "1"
+            }
+          ],
+          "composes": [],
           "aliasOf": "RpcDevtoolsRecordFormat",
           "exportPath": "./contract",
           "overloadSignatures": [
@@ -1946,6 +3332,7 @@
             "import { createRpcDevtoolsHub } from '@migaia/rpc-devtools/hub'\nimport { RpcDevtoolsRecordFormat, encodeRpcDevtoolsRecord } from '@migaia/rpc-devtools/contract'\n\n/** 离线录制复用 contract codec，不依赖实时 collector。 */\nconst text = encodeRpcDevtoolsRecord({\n  header: RpcDevtoolsRecordFormat,\n  events: [\n    {\n      seq: 1,\n      at: 100,\n      endpointId: 'parent',\n      stage: 'message',\n      direction: 'outbound',\n      senderId: 'parent',\n      messageId: 'm1',\n      method: 'read',\n      trace: 'T1'\n    }\n  ]\n})\n/** 每个 target 最多保留 50,000 个事件；关闭由调用方负责。 */\nconst hub = createRpcDevtoolsHub({ maxEvents: 50_000 })\ntry {\n  hub.importRecord('recording', text)\n  console.log(hub.status('recording')) // offline\n  console.log(hub.timeline({ trace: 'T1' })[0]?.alignedAt) // 100\n  console.log(hub.interactions('T1')[0]?.oneSided) // true\n} finally {\n  await hub.close()\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./hub",
           "overloadSignatures": [
             "export declare function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;"
@@ -1994,11 +3381,55 @@
               "content": "No additional advanced behavior is declared for createRpcDevtoolsHub."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "maxEvents",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "realignMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "onError",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-devtools/dist/hub/index.d.ts:createRpcDevtoolsHub:export declare function createRpcDevtoolsHub(options?: IRpcDevtoolsHubOptions): IRpcDevtoolsHub;",
           "guidance": [],
           "usageScore": 30,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "maxEvents",
+              "type": "number",
+              "optional": true,
+              "description": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。`maxEvents` 是每个 target 的保留上限，默认 50,000；超出后淘汰最旧事件，并从 interaction 索引移除。周期对齐使用 `realignMs`；旧设计文字中的 `realign` 不是另一个选项。",
+              "descriptionEn": "",
+              "descriptionZh": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。`maxEvents` 是每个 target 的保留上限，默认 50,000；超出后淘汰最旧事件，并从 interaction 索引移除。周期对齐使用 `realignMs`；旧设计文字中的 `realign` 不是另一个选项。"
+            },
+            {
+              "name": "realignMs",
+              "type": "number",
+              "optional": true,
+              "description": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。`maxEvents` 是每个 target 的保留上限，默认 50,000；超出后淘汰最旧事件，并从 interaction 索引移除。周期对齐使用 `realignMs`；旧设计文字中的 `realign` 不是另一个选项。",
+              "descriptionEn": "",
+              "descriptionZh": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。`maxEvents` 是每个 target 的保留上限，默认 50,000；超出后淘汰最旧事件，并从 interaction 索引移除。周期对齐使用 `realignMs`；旧设计文字中的 `realign` 不是另一个选项。"
+            },
+            {
+              "name": "onError",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。`maxEvents` 是每个 target 的保留上限，默认 50,000；超出后淘汰最旧事件，并从 interaction 索引移除。周期对齐使用 `realignMs`；旧设计文字中的 `realign` 不是另一个选项。",
+              "descriptionEn": "Receives logger or formatting failures without changing the business flow.",
+              "descriptionZh": "`createRpcDevtoolsHub(options)` 的选项为 `maxEvents`、`realignMs` 与 `onError`。`maxEvents` 是每个 target 的保留上限，默认 50,000；超出后淘汰最旧事件，并从 interaction 索引移除。周期对齐使用 `realignMs`；旧设计文字中的 `realign` 不是另一个选项。"
+            }
+          ],
           "fragment": "rpc-devtools-hub--createRpcDevtoolsHub"
         },
         {
@@ -2016,7 +3447,173 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsHub."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsHub.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "addTarget",
+              "kind": "method",
+              "optional": false,
+              "signature": "addTarget(name: string, client: IRpcDevtoolsTargetClient): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "client",
+                  "type": "IRpcDevtoolsTargetClient",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "removeTarget",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeTarget(name: string): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "importRecord",
+              "kind": "method",
+              "optional": false,
+              "signature": "importRecord(name: string, text: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "status",
+              "kind": "method",
+              "optional": false,
+              "signature": "status(name?: string): RpcDevtoolsTargetStatus | ReadonlyMap<string, RpcDevtoolsTargetStatus>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true
+                }
+              ],
+              "returns": "RpcDevtoolsTargetStatus | ReadonlyMap<string, RpcDevtoolsTargetStatus>"
+            },
+            {
+              "name": "timeline",
+              "kind": "method",
+              "optional": false,
+              "signature": "timeline(query?: IRpcDevtoolsTimelineQuery): readonly IRpcDevtoolsTimelineEvent[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "query",
+                  "type": "IRpcDevtoolsTimelineQuery",
+                  "optional": true
+                }
+              ],
+              "returns": "readonly IRpcDevtoolsTimelineEvent[]"
+            },
+            {
+              "name": "interactions",
+              "kind": "method",
+              "optional": false,
+              "signature": "interactions(trace?: string): readonly IRpcDevtoolsInteraction[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "trace",
+                  "type": "string",
+                  "optional": true
+                }
+              ],
+              "returns": "readonly IRpcDevtoolsInteraction[]"
+            },
+            {
+              "name": "stats",
+              "kind": "method",
+              "optional": false,
+              "signature": "stats(name?: string): Promise<IRpcDevtoolsStats>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IRpcDevtoolsStats>"
+            },
+            {
+              "name": "on",
+              "kind": "method",
+              "optional": false,
+              "signature": "on(event: 'status', listener: (name: string, status: RpcDevtoolsTargetStatus) => void): () => void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "'status'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(name: string, status: RpcDevtoolsTargetStatus) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "on",
+              "kind": "method",
+              "optional": false,
+              "signature": "on(event: 'event', listener: (event: IRpcDevtoolsTimelineEvent) => void): () => void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "'event'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: IRpcDevtoolsTimelineEvent) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./hub",
           "overloadSignatures": [
             "export type IRpcDevtoolsHub = Readonly<{ addTarget(name: string, client: IRpcDevtoolsTargetClient): Promise<void>; removeTarget(name: string): Promise<void>; importRecord(name: string, text: string): void; status(name?: string): RpcDevtoolsTargetStatus | ReadonlyMap<string, RpcDevtoolsTargetStatus>; timeline(query?: IRpcDevtoolsTimelineQuery): readonly IRpcDevtoolsTimelineEvent[]; interactions(trace?: string): readonly IRpcDevtoolsInteraction[]; stats(name?: string): Promise<IRpcDevtoolsStats>; on(event: 'status', listener: (name: string, status: RpcDevtoolsTargetStatus) => void): () => void; on(event: 'event', listener: (event: IRpcDevtoolsTimelineEvent) => void): () => void; close(): Promise<void>; }>;"
@@ -2079,7 +3676,42 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsHubOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsHubOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "maxEvents",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxEvents?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "realignMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "realignMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "onError",
+              "kind": "method",
+              "optional": true,
+              "signature": "onError?(error: unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "exportPath": "./hub",
           "overloadSignatures": [
             "export type IRpcDevtoolsHubOptions = Readonly<{ maxEvents?: number; realignMs?: number; onError?(error: unknown): void; }>;"
@@ -2142,7 +3774,63 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsInteraction."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsInteraction.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "key",
+              "kind": "property",
+              "optional": false,
+              "signature": "key: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "trace",
+              "kind": "property",
+              "optional": true,
+              "signature": "trace?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "method",
+              "kind": "property",
+              "optional": true,
+              "signature": "method?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "oneSided",
+              "kind": "property",
+              "optional": false,
+              "signature": "oneSided: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "targets",
+              "kind": "property",
+              "optional": false,
+              "signature": "targets: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "events",
+              "kind": "property",
+              "optional": false,
+              "signature": "events: readonly IRpcDevtoolsTimelineEvent[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRpcDevtoolsTimelineEvent[]"
+            }
+          ],
+          "composes": [],
           "exportPath": "./hub",
           "overloadSignatures": [
             "export type IRpcDevtoolsInteraction = Readonly<{ key: string; trace?: string; method?: string; oneSided: boolean; targets: readonly string[]; events: readonly IRpcDevtoolsTimelineEvent[]; }>;"
@@ -2207,7 +3895,49 @@
           "examples": [
             "import { createRpcDevtoolsHub, type IRpcDevtoolsTargetClient } from '@migaia/rpc-devtools/hub'\n\n/** 聚合调用方已经建立的两个 devtools service client。 */\nexport async function inspectHosts(\n  parentClient: IRpcDevtoolsTargetClient,\n  workerClient: IRpcDevtoolsTargetClient\n) {\n  /** onError 接收原始运行时失败；hub 不创建这些连接。 */\n  const hub = createRpcDevtoolsHub({\n    maxEvents: 50_000,\n    realignMs: 30_000,\n    onError: (error) => console.error(error)\n  })\n  /** 订阅函数返回解除监听的函数。 */\n  const unsubscribe = hub.on('status', (name, status) => console.log(name, status))\n  try {\n    await hub.addTarget('parent', parentClient)\n    await hub.addTarget('worker', workerClient)\n    console.log(hub.timeline({ trace: 'T1', limit: 100 }))\n    console.log(hub.interactions('T1'))\n    console.log(await hub.stats())\n    await hub.removeTarget('worker')\n  } finally {\n    unsubscribe()\n    await hub.close()\n  }\n}"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "request",
+              "kind": "method",
+              "optional": false,
+              "signature": "request(method: string, payload?: unknown): Promise<unknown>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "payload",
+                  "type": "unknown",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<unknown>"
+            },
+            {
+              "name": "stream",
+              "kind": "method",
+              "optional": false,
+              "signature": "stream(method: string, payload?: unknown): AsyncIterable<unknown>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "payload",
+                  "type": "unknown",
+                  "optional": true
+                }
+              ],
+              "returns": "AsyncIterable<unknown>"
+            }
+          ],
+          "composes": [],
           "exportPath": "./hub",
           "overloadSignatures": [
             "export type IRpcDevtoolsTargetClient = Readonly<{ request(method: string, payload?: unknown): Promise<unknown>; stream(method: string, payload?: unknown): AsyncIterable<unknown>; }>;"
@@ -2270,7 +4000,63 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsTimelineEvent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsTimelineEvent.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "target",
+              "kind": "property",
+              "optional": false,
+              "signature": "target: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "alignedAt",
+              "kind": "property",
+              "optional": false,
+              "signature": "alignedAt: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "uncertaintyMs",
+              "kind": "property",
+              "optional": false,
+              "signature": "uncertaintyMs: number | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | undefined"
+            },
+            {
+              "name": "interaction",
+              "kind": "property",
+              "optional": true,
+              "signature": "interaction?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "trace",
+              "kind": "property",
+              "optional": true,
+              "signature": "trace?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "event",
+              "kind": "property",
+              "optional": false,
+              "signature": "event: IRpcDevtoolsWireEvent;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcDevtoolsWireEvent"
+            }
+          ],
+          "composes": [],
           "exportPath": "./hub",
           "overloadSignatures": [
             "export type IRpcDevtoolsTimelineEvent = Readonly<{ target: string; alignedAt: number; uncertaintyMs: number | undefined; interaction?: string; trace?: string; event: IRpcDevtoolsWireEvent; }>;"
@@ -2333,7 +4119,72 @@
           "errors": ["No documented errors are declared for IRpcDevtoolsTimelineQuery."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcDevtoolsTimelineQuery.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "targets",
+              "kind": "property",
+              "optional": true,
+              "signature": "targets?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "stages",
+              "kind": "property",
+              "optional": true,
+              "signature": "stages?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "trace",
+              "kind": "property",
+              "optional": true,
+              "signature": "trace?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "method",
+              "kind": "property",
+              "optional": true,
+              "signature": "method?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "from",
+              "kind": "property",
+              "optional": true,
+              "signature": "from?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "to",
+              "kind": "property",
+              "optional": true,
+              "signature": "to?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "limit",
+              "kind": "property",
+              "optional": true,
+              "signature": "limit?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "exportPath": "./hub",
           "overloadSignatures": [
             "export type IRpcDevtoolsTimelineQuery = Readonly<{ targets?: readonly string[]; stages?: readonly string[]; trace?: string; method?: string; from?: number; to?: number; limit?: number; }>;"
@@ -2396,7 +4247,54 @@
           "errors": ["No documented errors are declared for RpcDevtoolsTargetStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RpcDevtoolsTargetStatus.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "connecting",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly connecting: \"connecting\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"connecting\""
+            },
+            {
+              "name": "connected",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly connected: \"connected\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"connected\""
+            },
+            {
+              "name": "disconnected",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disconnected: \"disconnected\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"disconnected\""
+            },
+            {
+              "name": "offline",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly offline: \"offline\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"offline\""
+            },
+            {
+              "name": "removed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly removed: \"removed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"removed\""
+            }
+          ],
+          "composes": [],
           "exportPath": "./hub",
           "overloadSignatures": [
             "export declare const RpcDevtoolsTargetStatus: { readonly connecting: \"connecting\"; readonly connected: \"connected\"; readonly disconnected: \"disconnected\"; readonly offline: \"offline\"; readonly removed: \"removed\"; };",
@@ -2493,6 +4391,7 @@
             "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, level } from '@migaia/logger/plugins'\nimport { file } from '@migaia/logger/plugins/file'\nimport { createRpcLogProbe } from '@migaia/rpc-devtools/log'\n\n/** 示例用内存代替文件 I/O；生产 fs 能力仍由 Logger 拥有。 */\nconst lines: string[] = []\n/** 注入拥有独立恢复句柄，关闭 Logger 后归还环境。 */\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => 'doc-log',\n  defer: (task) => queueMicrotask(task),\n  write: () => undefined,\n  fs: {\n    async append(_path, text) {\n      lines.push(text)\n    }\n  }\n})\n/** level 方法只入队，batch/file 接管输出与收尾。 */\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'debug', asyncOutput: true }),\n    batch({ maxSize: 20, maxWaitMs: 1_000, asyncOutput: true }),\n    file({ path: 'logs/rpc.jsonl' })\n  ]\n})\ntry {\n  /** 传给已有 Peer 的 probe；本例只展示 logger 配置。 */\n  const probe = createRpcLogProbe(logger, { slowMs: 200 })\n  console.log(probe.stageMask)\n  logger.info('RPC logger ready', { slowMs: 200 })\n  await logger.flush()\n  console.log(lines.length > 0) // true\n} finally {\n  await logger.shutdown('manual')\n  restore()\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createRpcLogProbe",
           "exportPath": "./log",
           "overloadSignatures": [
@@ -2547,11 +4446,153 @@
               "content": "No additional advanced behavior is declared for createRpcLogProbe."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "slowMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "sample",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "methods",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "stages",
+              "type": "readonly ('message' | 'peer')[]",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "content",
+              "type": "boolean",
+              "optional": true,
+              "description": "Opts subscribed stages into capture; emit receives already-redacted caller-owned content."
+            },
+            {
+              "name": "capture",
+              "type": "IRpcProbeDefinition['capture']",
+              "optional": true,
+              "description": "Explicit subscribed stages whose captured content may be passed to the logger."
+            },
+            {
+              "name": "redact",
+              "type": "IRpcProbeDefinition['redact']",
+              "optional": true,
+              "description": "Redacts captured content at the canonical emitter before logger fields are constructed."
+            },
+            {
+              "name": "levels",
+              "type": "Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "message",
+              "type": "(view: IRpcProbeEventView) => string",
+              "optional": true,
+              "description": "Called synchronously for qualifying events; the reusable view must never be retained."
+            },
+            {
+              "name": "onError",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "Receives logger or formatting failures without changing the business flow."
+            }
+          ],
           "identity": "packages/rpc-devtools/dist/log/log-probe.d.ts:createRpcLogProbe:export declare function createRpcLogProbe(logger: IRpcLogSink, options?: IRpcLogProbeOptions): IRpcProbe;",
           "guidance": [],
           "usageScore": 22,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "slowMs",
+              "type": "number",
+              "optional": true,
+              "description": "默认订阅 message/peer：failed 为 error，rejected、timeout、abort 为 warn，peer 生命周期为 info。正常 settled 不记录；设置 `slowMs` 后，durationMs 达到阈值的 settled 记 warn。",
+              "descriptionEn": "",
+              "descriptionZh": "默认订阅 message/peer：failed 为 error，rejected、timeout、abort 为 warn，peer 生命周期为 info。正常 settled 不记录；设置 `slowMs` 后，durationMs 达到阈值的 settled 记 warn。"
+            },
+            {
+              "name": "sample",
+              "type": "number",
+              "optional": true,
+              "description": "`levels` 可按 failed/rejected/timeout/aborted/slow/lifecycle 覆盖级别，`off` 禁用对应日志；`methods`、`sample`、`stages` 在构造时编译。",
+              "descriptionEn": "",
+              "descriptionZh": "`levels` 可按 failed/rejected/timeout/aborted/slow/lifecycle 覆盖级别，`off` 禁用对应日志；`methods`、`sample`、`stages` 在构造时编译。"
+            },
+            {
+              "name": "methods",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "`levels` 可按 failed/rejected/timeout/aborted/slow/lifecycle 覆盖级别，`off` 禁用对应日志；`methods`、`sample`、`stages` 在构造时编译。",
+              "descriptionEn": "",
+              "descriptionZh": "`levels` 可按 failed/rejected/timeout/aborted/slow/lifecycle 覆盖级别，`off` 禁用对应日志；`methods`、`sample`、`stages` 在构造时编译。"
+            },
+            {
+              "name": "stages",
+              "type": "readonly ('message' | 'peer')[]",
+              "optional": true,
+              "description": "`levels` 可按 failed/rejected/timeout/aborted/slow/lifecycle 覆盖级别，`off` 禁用对应日志；`methods`、`sample`、`stages` 在构造时编译。",
+              "descriptionEn": "",
+              "descriptionZh": "`levels` 可按 failed/rejected/timeout/aborted/slow/lifecycle 覆盖级别，`off` 禁用对应日志；`methods`、`sample`、`stages` 在构造时编译。"
+            },
+            {
+              "name": "content",
+              "type": "boolean",
+              "optional": true,
+              "description": "不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。`capture` 与 `redact` 原样传给 defineProbe；`content: true` 保留旧便利选项。",
+              "descriptionEn": "Opts subscribed stages into capture; emit receives already-redacted caller-owned content.",
+              "descriptionZh": "不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。`capture` 与 `redact` 原样传给 defineProbe；`content: true` 保留旧便利选项。"
+            },
+            {
+              "name": "capture",
+              "type": "IRpcProbeDefinition['capture']",
+              "optional": true,
+              "description": "不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。`capture` 与 `redact` 原样传给 defineProbe；`content: true` 保留旧便利选项。",
+              "descriptionEn": "Explicit subscribed stages whose captured content may be passed to the logger.",
+              "descriptionZh": "不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。`capture` 与 `redact` 原样传给 defineProbe；`content: true` 保留旧便利选项。"
+            },
+            {
+              "name": "redact",
+              "type": "IRpcProbeDefinition['redact']",
+              "optional": true,
+              "description": "不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。`capture` 与 `redact` 原样传给 defineProbe；`content: true` 保留旧便利选项。",
+              "descriptionEn": "Redacts captured content at the canonical emitter before logger fields are constructed.",
+              "descriptionZh": "不要在自定义 `emit` 中把 `view` 本身放进异步 logger。View 只在同步 emit 期间有效，异步输出时常已变成下一事件。Log probe 先按整数 outcome/kind 做决定，再同步提取 method、messageId、senderId、targetId、trace、durationMs、outcome、kind、rejection、lifecycle、peerId 与 error。字段对象不随 view 复用变化；error 保留原实例，content 默认不记录。`content: true` 为订阅阶段请求捕获；view 的 content 来自 emitter 已完成的捕获/脱敏路径，嵌套引用仍可能被调用方修改。`capture` 与 `redact` 原样传给 defineProbe；`content: true` 保留旧便利选项。"
+            },
+            {
+              "name": "levels",
+              "type": "Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>",
+              "optional": true,
+              "description": "`levels` 可按 failed/rejected/timeout/aborted/slow/lifecycle 覆盖级别，`off` 禁用对应日志；`methods`、`sample`、`stages` 在构造时编译。",
+              "descriptionEn": "",
+              "descriptionZh": "`levels` 可按 failed/rejected/timeout/aborted/slow/lifecycle 覆盖级别，`off` 禁用对应日志；`methods`、`sample`、`stages` 在构造时编译。"
+            },
+            {
+              "name": "message",
+              "type": "(view: IRpcProbeEventView) => string",
+              "optional": true,
+              "description": "`createRpcLogProbe(logger, options?)` 在 `@migaia/rpc-devtools/log`。Logger 只需提供 `debug`、`info`、`warn`、`error(message: string, fields: object)`；无需使用 `@migaia/logger`。",
+              "descriptionEn": "Called synchronously for qualifying events; the reusable view must never be retained.",
+              "descriptionZh": "`createRpcLogProbe(logger, options?)` 在 `@migaia/rpc-devtools/log`。Logger 只需提供 `debug`、`info`、`warn`、`error(message: string, fields: object)`；无需使用 `@migaia/logger`。"
+            },
+            {
+              "name": "onError",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "Logger 方法必须不阻塞，只把日志交给现有缓冲。同步文件写入会把 I/O 放到 RPC 调用路径。Log probe 每个合格事件只同步调用一次 logger；不另建缓冲、分块、锁、文件写入、轮转或 flush。Logger 抛错或返回 rejected thenable 时，错误进入 `onError`，不会改变业务结果；未配置 reporter 时使用 host reporter。`onError` 自身失败仍交给 host reporter。",
+              "descriptionEn": "Receives logger or formatting failures without changing the business flow.",
+              "descriptionZh": "Logger 方法必须不阻塞，只把日志交给现有缓冲。同步文件写入会把 I/O 放到 RPC 调用路径。Log probe 每个合格事件只同步调用一次 logger；不另建缓冲、分块、锁、文件写入、轮转或 flush。Logger 抛错或返回 rejected thenable 时，错误进入 `onError`，不会改变业务结果；未配置 reporter 时使用 host reporter。`onError` 自身失败仍交给 host reporter。"
+            }
+          ],
           "fragment": "rpc-devtools-log--createRpcLogProbe"
         },
         {
@@ -2569,7 +4610,111 @@
           "errors": ["No documented errors are declared for IRpcLogProbeOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcLogProbeOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "slowMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "slowMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "sample",
+              "kind": "property",
+              "optional": true,
+              "signature": "sample?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "methods",
+              "kind": "property",
+              "optional": true,
+              "signature": "methods?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "stages",
+              "kind": "property",
+              "optional": true,
+              "signature": "stages?: readonly ('message' | 'peer')[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly ('message' | 'peer')[]"
+            },
+            {
+              "name": "content",
+              "kind": "property",
+              "optional": true,
+              "signature": "content?: boolean;",
+              "description": "Opts subscribed stages into capture; emit receives already-redacted caller-owned content.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "capture",
+              "kind": "property",
+              "optional": true,
+              "signature": "capture?: IRpcProbeDefinition['capture'];",
+              "description": "Explicit subscribed stages whose captured content may be passed to the logger.",
+              "parameterDetails": [],
+              "returns": "IRpcProbeDefinition['capture']"
+            },
+            {
+              "name": "redact",
+              "kind": "property",
+              "optional": true,
+              "signature": "redact?: IRpcProbeDefinition['redact'];",
+              "description": "Redacts captured content at the canonical emitter before logger fields are constructed.",
+              "parameterDetails": [],
+              "returns": "IRpcProbeDefinition['redact']"
+            },
+            {
+              "name": "levels",
+              "kind": "property",
+              "optional": true,
+              "signature": "levels?: Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Partial<Record<RpcLogCategory, RpcLogLevel>>>"
+            },
+            {
+              "name": "message",
+              "kind": "method",
+              "optional": true,
+              "signature": "message?(view: IRpcProbeEventView): string;",
+              "description": "Called synchronously for qualifying events; the reusable view must never be retained.",
+              "parameterDetails": [
+                {
+                  "name": "view",
+                  "type": "IRpcProbeEventView",
+                  "optional": false
+                }
+              ],
+              "returns": "string"
+            },
+            {
+              "name": "onError",
+              "kind": "method",
+              "optional": true,
+              "signature": "onError?(error: unknown): void;",
+              "description": "Receives logger or formatting failures without changing the business flow.",
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRpcLogProbeOptions",
           "exportPath": "./log",
           "overloadSignatures": [
@@ -2633,7 +4778,89 @@
           "errors": ["No documented errors are declared for IRpcLogSink."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcLogSink.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "debug",
+              "kind": "method",
+              "optional": false,
+              "signature": "debug(message: string, fields: object): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "fields",
+                  "type": "object",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "info",
+              "kind": "method",
+              "optional": false,
+              "signature": "info(message: string, fields: object): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "fields",
+                  "type": "object",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "warn",
+              "kind": "method",
+              "optional": false,
+              "signature": "warn(message: string, fields: object): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "fields",
+                  "type": "object",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "error",
+              "kind": "method",
+              "optional": false,
+              "signature": "error(message: string, fields: object): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "fields",
+                  "type": "object",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRpcLogSink",
           "exportPath": "./log",
           "overloadSignatures": [

@@ -1296,6 +1296,7 @@
             "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n})\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore() // 恢复到替换之前的 runtime manager\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "getLoggerRuntimeManager",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1360,6 +1361,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IDimFn.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IDimFn",
           "exportPath": ".",
           "overloadSignatures": ["export type IDimFn = (text: string) => string;"],
@@ -1421,7 +1423,45 @@
           "errors": ["No documented errors are declared for IErrorInfo."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IErrorInfo.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "message",
+              "kind": "property",
+              "optional": false,
+              "signature": "message: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "stack",
+              "kind": "property",
+              "optional": true,
+              "signature": "stack?: string | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string | undefined"
+            },
+            {
+              "name": "raw",
+              "kind": "property",
+              "optional": false,
+              "signature": "raw: Error;",
+              "description": "Reference to the original error, never a reconstructed object. JSON serialization does not preserve the native error type or its non-enumerable built-in fields. A plain error normally becomes `{}` under `raw`; enumerable custom properties can be serialized. Console and custom sinks use this reference for native stack inspection or APIs such as `Sentry.captureException()`. The `message` and `stack` fields are serializable projections instead of the original error.",
+              "parameterDetails": [],
+              "returns": "Error"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IErrorInfo",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1486,6 +1526,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFlusher.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IFlusher",
           "exportPath": ".",
           "overloadSignatures": ["export type IFlusher = () => void | Promise<void>;"],
@@ -1547,7 +1588,18 @@
           "errors": ["No documented errors are declared for ILogDispatchOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogDispatchOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "asyncOutput",
+              "kind": "property",
+              "optional": true,
+              "signature": "asyncOutput?: boolean | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean | undefined"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILogDispatchOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1611,7 +1663,90 @@
           "errors": ["No documented errors are declared for ILogEntry."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogEntry.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "tag",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly tag: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "time",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly time: Date;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Date"
+            },
+            {
+              "name": "message",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly message: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "args",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly args: readonly unknown[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly unknown[]"
+            },
+            {
+              "name": "meta",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly meta?: Record<string, unknown> | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Record<string, unknown> | undefined"
+            },
+            {
+              "name": "context",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly context: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly error?: IErrorInfo | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IErrorInfo | undefined"
+            },
+            {
+              "name": "data",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly data: Record<string, unknown>;",
+              "description": "Plugin-owned data area that avoids replacing each other's entry fields. For example, reasoning sets `data.silent = true` to tell the ansis console sink to skip printing. HTTP and batch sinks can still consume the entry.",
+              "parameterDetails": [],
+              "returns": "Record<string, unknown>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILogEntry",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1675,7 +1810,27 @@
           "errors": ["No documented errors are declared for ILogFailure."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogFailure.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly source: 'defer' | 'hook' | 'sink' | 'pipeline' | 'flush' | 'forward' | 'shutdown';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'defer' | 'hook' | 'sink' | 'pipeline' | 'flush' | 'forward' | 'shutdown'"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILogFailure",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1740,6 +1895,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogFailureHook.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILogFailureHook",
           "exportPath": ".",
           "overloadSignatures": ["export type ILogFailureHook = (failure: ILogFailure) => void;"],
@@ -1802,6 +1958,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogFilter.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILogFilter",
           "exportPath": ".",
           "overloadSignatures": ["export type ILogFilter = (entry: ILogEntry) => boolean;"],
@@ -1906,6 +2063,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerColorMode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILoggerColorMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1969,7 +2127,45 @@
           "errors": ["No documented errors are declared for ILoggerConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(path: string): unknown | undefined;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "path",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown | undefined"
+            },
+            {
+              "name": "update",
+              "kind": "method",
+              "optional": false,
+              "signature": "update<T extends IPluginConfig = IPluginConfig>(name: string, recipe: (previous: Readonly<T>) => Partial<T>): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "recipe",
+                  "type": "(previous: Readonly<T>) => Partial<T>",
+                  "optional": false,
+                  "configurationType": "(previous: Readonly<IPluginConfig>) => Partial<IPluginConfig>"
+                }
+              ],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2033,7 +2229,63 @@
           "errors": ["No documented errors are declared for ILoggerContext."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerContext.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: string;",
+              "description": "Stable logger identity generated at construction and retained for the instance lifetime. `extends()` detects cycles through this ID rather than topic names, which can be empty or duplicated.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "options",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly options: Readonly<Record<string, unknown>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, unknown>>"
+            },
+            {
+              "name": "path",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly path: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "topic",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly topic: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "createdAt",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly createdAt: Date;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Date"
+            },
+            {
+              "name": "env",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly env: ILoggerEnv;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ILoggerEnv"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerContext",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2097,7 +2349,346 @@
           "errors": ["No documented errors are declared for ILoggerCore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerCore.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "config",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly config: ILoggerPluginConfig;",
+              "description": "Plugins read their own configuration through `core.config.get<TConfig>()`, not `this.config`. This scoped reader exposes the host-owned snapshot without a plugin-name argument. Keeping reads at the core boundary makes plugin configuration available to host diagnostics.",
+              "parameterDetails": [],
+              "returns": "ILoggerPluginConfig"
+            },
+            {
+              "name": "ctx",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ctx: ILoggerContext;",
+              "description": "Read-only context containers. See `ILoggerContext` for the mutability boundary.",
+              "parameterDetails": [],
+              "returns": "ILoggerContext"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scheduler: IScheduler;",
+              "description": "The logger's monotonic clock source (R-9). `flush`, `shutdown`, batch deadlines, and `boundedWait` use this scheduler. Defaults to lifecycle `systemScheduler`. Plugins use it to share the host's clock domain.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "runtimeManager",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtimeManager: ILoggerRuntimeManager;",
+              "description": "Host capabilities captured by this logger; plugins share the same instance owner.",
+              "parameterDetails": [],
+              "returns": "ILoggerRuntimeManager"
+            },
+            {
+              "name": "log",
+              "kind": "method",
+              "optional": false,
+              "signature": "log(tag: string, message: string, ...args: unknown[]): void;",
+              "description": "Synchronously constructs and dispatches an entry. Use `dispatchRaw` scheduling options for asynchronous output.",
+              "parameterDetails": [
+                {
+                  "name": "tag",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "message",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "args",
+                  "type": "unknown[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "dispatchRaw",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispatchRaw(input: IRawEntryInput, options?: ILogDispatchOptions): void;",
+              "description": "Dispatches explicit entry fields such as `meta`, `data`, and `context`.",
+              "parameterDetails": [
+                {
+                  "name": "input",
+                  "type": "IRawEntryInput",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ILogDispatchOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "usePipeline",
+              "kind": "property",
+              "optional": false,
+              "signature": "usePipeline: (stage: IPipelineStage) => ILoggerCore<TMode>;",
+              "description": "Registers a pipeline stage that can transform an entry, forward it with `next`, or drop it by omitting `next`. Supported methods follow the middleware-pipeline promotion table. Sync stages run in any mode. Generator stages also promote to `async-generator`. Other stages require their matching mode. An unresolved mode union retains all methods and leaves validation to runtime admission.",
+              "parameterDetails": [],
+              "returns": "(stage: IPipelineStage) => ILoggerCore<TMode>"
+            },
+            {
+              "name": "useAsyncPipeline",
+              "kind": "property",
+              "optional": false,
+              "signature": "useAsyncPipeline: [TMode] extends ['async'] ? (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "[TMode] extends ['async'] ? (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>"
+            },
+            {
+              "name": "useGeneratorPipeline",
+              "kind": "property",
+              "optional": false,
+              "signature": "useGeneratorPipeline: [TMode] extends ['generator' | 'async-generator'] ? (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] ? never : (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "[TMode] extends ['generator' | 'async-generator'] ? (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] ? never : (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>"
+            },
+            {
+              "name": "useAsyncGeneratorPipeline",
+              "kind": "property",
+              "optional": false,
+              "signature": "useAsyncGeneratorPipeline: [TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "[TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>"
+            },
+            {
+              "name": "useSink",
+              "kind": "method",
+              "optional": false,
+              "signature": "useSink(sink: ISink): IOff;",
+              "description": "Registers a sink. Every registered sink processes entries that pass the full pipeline, such as console and HTTP sinks together.",
+              "parameterDetails": [
+                {
+                  "name": "sink",
+                  "type": "ISink",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "hook",
+              "kind": "method",
+              "optional": false,
+              "signature": "hook(name: string, fn: ILogHookFn): () => void;",
+              "description": "Registers a named lifecycle hook. Built-in names are `before`, `after`, `before:${tag}`, and `after:${tag}`. Plugins can also define their own hook names.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "fn",
+                  "type": "ILogHookFn",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "fireHook",
+              "kind": "method",
+              "optional": false,
+              "signature": "fireHook(name: string, entry: ILogEntry): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "entry",
+                  "type": "ILogEntry",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "onFailure",
+              "kind": "method",
+              "optional": false,
+              "signature": "onFailure(fn: ILogFailureHook): IOff;",
+              "description": "Observes asynchronous output failures without changing normal log-call control flow.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "ILogFailureHook",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "defer",
+              "kind": "method",
+              "optional": false,
+              "signature": "defer(task: () => void | Promise<void>): void;",
+              "description": "Schedules work outside the current synchronous stack through the runtime manager. `flush` and `shutdown` wait for this work. Plugins configured for async output use this path for rendering, stdout writes, or network requests.",
+              "parameterDetails": [
+                {
+                  "name": "task",
+                  "type": "() => void | Promise<void>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "onFlush",
+              "kind": "method",
+              "optional": false,
+              "signature": "onFlush(fn: IFlusher): IOff;",
+              "description": "Registers a callback to empty a buffer during `flush()`. The core invokes these callbacks and also waits for unfinished `defer()` tasks and Promises returned by sinks. For example, an HTTP sink without batching still keeps each pending request in the drain wait.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "IFlusher",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "flush",
+              "kind": "method",
+              "optional": false,
+              "signature": "flush(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "onShutdown",
+              "kind": "method",
+              "optional": false,
+              "signature": "onShutdown(fn: IShutdownHandler): IOff;",
+              "description": "Shutdown disposes installed plugins after draining; subsequent log calls are ignored.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "IShutdownHandler",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "shutdown",
+              "kind": "method",
+              "optional": false,
+              "signature": "shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "reason",
+                  "type": "IShutdownReason",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IPluginHostDisposalResult>"
+            },
+            {
+              "name": "use",
+              "kind": "method",
+              "optional": false,
+              "signature": "use<const NewP extends readonly ILoggerPluginConstraint[]>(...plugins: NewP): Promise<IPluginHandleTuple<NewP>>;",
+              "description": "Installs plugins on an existing logger through the same host admission path used by constructor installation. Duplicate plugin names, extension conflicts, and dependency cycles are rejected by that host. Providers declare Feature names. Returns a Promise of plugin handles, preserving each plugin's extension types on its handle. The existing logger variable does not gain new TypeScript methods.",
+              "parameterDetails": [
+                {
+                  "name": "plugins",
+                  "type": "NewP",
+                  "optional": false,
+                  "configurationType": "readonly"
+                }
+              ],
+              "returns": "Promise<IPluginHandleTuple<NewP>>"
+            },
+            {
+              "name": "unUse",
+              "kind": "method",
+              "optional": false,
+              "signature": "unUse(name: string): Promise<void>;",
+              "description": "Removes an installed plugin by name through the owning host and releases its registered resources. This includes pipeline stages, sinks, hooks, flush callbacks, shutdown callbacks, and plugin extensions. Missing plugin names reject with `PLUGIN_NOT_INSTALLED`. Required Feature dependents can block removal.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "raw",
+              "kind": "method",
+              "optional": false,
+              "signature": "raw(text: string, options?: ILogDispatchOptions): void;",
+              "description": "Writes raw text to stdout without passing through the pipeline or sinks. `asyncOutput: true` schedules the write through `defer`. Streaming plugins such as reasoning use this for token output without a complete log format per token.",
+              "parameterDetails": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ILogDispatchOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "extends",
+              "kind": "method",
+              "optional": false,
+              "signature": "extends(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): ILoggerCore<TMode, TShared>;",
+              "description": "Forwards entries to the full pipelines and sinks of each target after the current logger processes them. After `log1.extends(log2, log3)`, target level thresholds and filters still apply to forwarded entries. Each forwarding hop records its topic in internal forwarding state carried in `entry.data`. Registration detects cycles using logger context IDs. Runtime forwarding also skips IDs already present in the internal forwarding path. This composes forwarding behavior, not plugin extension types. The returned logger keeps the current logger's TypeScript capabilities; target-only methods are not added.",
+              "parameterDetails": [
+                {
+                  "name": "others",
+                  "type": "readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]",
+                  "optional": false
+                }
+              ],
+              "returns": "ILoggerCore<TMode, TShared>"
+            },
+            {
+              "name": "unextend",
+              "kind": "method",
+              "optional": false,
+              "signature": "unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean;",
+              "description": "Removes named extension edges; returns true when at least one edge was removed.",
+              "parameterDetails": [
+                {
+                  "name": "others",
+                  "type": "readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerCore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2161,7 +2752,270 @@
           "errors": ["No documented errors are declared for ILoggerDomainCore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerDomainCore.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ctx",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ctx: ILoggerContext;",
+              "description": "Read-only context containers. See `ILoggerContext` for the mutability boundary.",
+              "parameterDetails": [],
+              "returns": "ILoggerContext"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scheduler: IScheduler;",
+              "description": "The logger's monotonic clock source (R-9). `flush`, `shutdown`, batch deadlines, and `boundedWait` use this scheduler. Defaults to lifecycle `systemScheduler`. Plugins use it to share the host's clock domain.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "runtimeManager",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtimeManager: ILoggerRuntimeManager;",
+              "description": "Host capabilities captured by this logger; plugins share the same instance owner.",
+              "parameterDetails": [],
+              "returns": "ILoggerRuntimeManager"
+            },
+            {
+              "name": "log",
+              "kind": "method",
+              "optional": false,
+              "signature": "log(tag: string, message: string, ...args: unknown[]): void;",
+              "description": "Synchronously constructs and dispatches an entry. Use `dispatchRaw` scheduling options for asynchronous output.",
+              "parameterDetails": [
+                {
+                  "name": "tag",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "message",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "args",
+                  "type": "unknown[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "dispatchRaw",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispatchRaw(input: IRawEntryInput, options?: ILogDispatchOptions): void;",
+              "description": "Dispatches explicit entry fields such as `meta`, `data`, and `context`.",
+              "parameterDetails": [
+                {
+                  "name": "input",
+                  "type": "IRawEntryInput",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ILogDispatchOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "useSink",
+              "kind": "method",
+              "optional": false,
+              "signature": "useSink(sink: ISink): IOff;",
+              "description": "Registers a sink. Every registered sink processes entries that pass the full pipeline, such as console and HTTP sinks together.",
+              "parameterDetails": [
+                {
+                  "name": "sink",
+                  "type": "ISink",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "hook",
+              "kind": "method",
+              "optional": false,
+              "signature": "hook(name: string, fn: ILogHookFn): () => void;",
+              "description": "Registers a named lifecycle hook. Built-in names are `before`, `after`, `before:${tag}`, and `after:${tag}`. Plugins can also define their own hook names.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "fn",
+                  "type": "ILogHookFn",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "fireHook",
+              "kind": "method",
+              "optional": false,
+              "signature": "fireHook(name: string, entry: ILogEntry): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "entry",
+                  "type": "ILogEntry",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "onFailure",
+              "kind": "method",
+              "optional": false,
+              "signature": "onFailure(fn: ILogFailureHook): IOff;",
+              "description": "Observes asynchronous output failures without changing normal log-call control flow.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "ILogFailureHook",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "defer",
+              "kind": "method",
+              "optional": false,
+              "signature": "defer(task: () => void | Promise<void>): void;",
+              "description": "Schedules work outside the current synchronous stack through the runtime manager. `flush` and `shutdown` wait for this work. Plugins configured for async output use this path for rendering, stdout writes, or network requests.",
+              "parameterDetails": [
+                {
+                  "name": "task",
+                  "type": "() => void | Promise<void>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "onFlush",
+              "kind": "method",
+              "optional": false,
+              "signature": "onFlush(fn: IFlusher): IOff;",
+              "description": "Registers a callback to empty a buffer during `flush()`. The core invokes these callbacks and also waits for unfinished `defer()` tasks and Promises returned by sinks. For example, an HTTP sink without batching still keeps each pending request in the drain wait.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "IFlusher",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "flush",
+              "kind": "method",
+              "optional": false,
+              "signature": "flush(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "onShutdown",
+              "kind": "method",
+              "optional": false,
+              "signature": "onShutdown(fn: IShutdownHandler): IOff;",
+              "description": "Shutdown disposes installed plugins after draining; subsequent log calls are ignored.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "IShutdownHandler",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "shutdown",
+              "kind": "method",
+              "optional": false,
+              "signature": "shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "reason",
+                  "type": "IShutdownReason",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IPluginHostDisposalResult>"
+            },
+            {
+              "name": "raw",
+              "kind": "method",
+              "optional": false,
+              "signature": "raw(text: string, options?: ILogDispatchOptions): void;",
+              "description": "Writes raw text to stdout without passing through the pipeline or sinks. `asyncOutput: true` schedules the write through `defer`. Streaming plugins such as reasoning use this for token output without a complete log format per token.",
+              "parameterDetails": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ILogDispatchOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "extends",
+              "kind": "method",
+              "optional": false,
+              "signature": "extends(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): ILoggerCore<TMode, TShared>;",
+              "description": "Forwards entries to the full pipelines and sinks of each target after the current logger processes them. After `log1.extends(log2, log3)`, target level thresholds and filters still apply to forwarded entries. Each forwarding hop records its topic in internal forwarding state carried in `entry.data`. Registration detects cycles using logger context IDs. Runtime forwarding also skips IDs already present in the internal forwarding path. This composes forwarding behavior, not plugin extension types. The returned logger keeps the current logger's TypeScript capabilities; target-only methods are not added.",
+              "parameterDetails": [
+                {
+                  "name": "others",
+                  "type": "readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]",
+                  "optional": false
+                }
+              ],
+              "returns": "ILoggerCore<TMode, TShared>"
+            },
+            {
+              "name": "unextend",
+              "kind": "method",
+              "optional": false,
+              "signature": "unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean;",
+              "description": "Removes named extension edges; returns true when at least one edge was removed.",
+              "parameterDetails": [
+                {
+                  "name": "others",
+                  "type": "readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerDomainCore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2225,7 +3079,27 @@
           "errors": ["No documented errors are declared for ILoggerEnv."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerEnv.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "isTTY",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly isTTY: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "isCI",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly isCI: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerEnv",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2290,6 +3164,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerErrorCode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILoggerErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2354,6 +3229,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerLevel.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILoggerLevel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2417,7 +3293,90 @@
           "errors": ["No documented errors are declared for ILoggerOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "execution",
+              "kind": "property",
+              "optional": false,
+              "signature": "execution: IPluginHostOptions['execution'];",
+              "description": "Explicit PluginHost operation and drain budgets; `false` opts into unbounded waiting.",
+              "parameterDetails": [],
+              "returns": "IPluginHostOptions['execution']"
+            },
+            {
+              "name": "runtimeManager",
+              "kind": "property",
+              "optional": true,
+              "signature": "runtimeManager?: ILoggerRuntimeManager;",
+              "description": "Host capability owner; omitted means capture the current module default at construction.",
+              "parameterDetails": [],
+              "returns": "ILoggerRuntimeManager"
+            },
+            {
+              "name": "context",
+              "kind": "property",
+              "optional": true,
+              "signature": "context?: string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string[]"
+            },
+            {
+              "name": "topic",
+              "kind": "property",
+              "optional": true,
+              "signature": "topic?: string;",
+              "description": "Topic for this logger's internal `extends()` forwarding bookkeeping.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "on",
+              "kind": "property",
+              "optional": true,
+              "signature": "on?: Record<string, ILogHookFn>;",
+              "description": "Registers constructor hooks, equivalent to calling `core.hook(name, fn)` for each entry.",
+              "parameterDetails": [],
+              "returns": "Record<string, ILogHookFn>"
+            },
+            {
+              "name": "plugins",
+              "kind": "property",
+              "optional": true,
+              "signature": "plugins?: P;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "P"
+            },
+            {
+              "name": "options",
+              "kind": "property",
+              "optional": true,
+              "signature": "options?: Record<string, unknown>;",
+              "description": "Custom application options exposed through `core.ctx.options` to every plugin. Framework fields such as `context`, `on`, and `plugins` have separate roles and are not included here.",
+              "parameterDetails": [],
+              "returns": "Record<string, unknown>"
+            },
+            {
+              "name": "pipeline",
+              "kind": "property",
+              "optional": true,
+              "signature": "pipeline?: IPluginHostOptions['pipeline'] & { mode?: TMode; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPluginHostOptions['pipeline'] & { mode?: TMode; }"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Defaults to lifecycle `systemScheduler`. Flush, shutdown, and batch deadlines share its clock domain (R-9).",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2482,6 +3441,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerPlugin.",
           "examples": [],
           "members": [],
+          "composes": ["IPlugin"],
           "aliasOf": "ILoggerPlugin",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2545,7 +3505,18 @@
           "errors": ["No documented errors are declared for ILoggerPluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerPluginConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get<T extends IPluginConfig = IPluginConfig>(): Readonly<T>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<T>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerPluginConfig",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2609,7 +3580,330 @@
           "errors": ["No documented errors are declared for ILoggerPluginCore."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerPluginCore.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "onDispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "onDispose(resource: import('@migaia/plugin-host').IPluginResource): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "resource",
+                  "type": "import('@migaia/plugin-host').IPluginResource",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "config",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly config: ILoggerPluginConfig;",
+              "description": "Plugins read their own configuration through `core.config.get<TConfig>()`, not `this.config`. This scoped reader exposes the host-owned snapshot without a plugin-name argument. Keeping reads at the core boundary makes plugin configuration available to host diagnostics.",
+              "parameterDetails": [],
+              "returns": "ILoggerPluginConfig"
+            },
+            {
+              "name": "ctx",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ctx: ILoggerContext;",
+              "description": "Read-only context containers. See `ILoggerContext` for the mutability boundary.",
+              "parameterDetails": [],
+              "returns": "ILoggerContext"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly scheduler: IScheduler;",
+              "description": "The logger's monotonic clock source (R-9). `flush`, `shutdown`, batch deadlines, and `boundedWait` use this scheduler. Defaults to lifecycle `systemScheduler`. Plugins use it to share the host's clock domain.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "runtimeManager",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtimeManager: ILoggerRuntimeManager;",
+              "description": "Host capabilities captured by this logger; plugins share the same instance owner.",
+              "parameterDetails": [],
+              "returns": "ILoggerRuntimeManager"
+            },
+            {
+              "name": "log",
+              "kind": "method",
+              "optional": false,
+              "signature": "log(tag: string, message: string, ...args: unknown[]): void;",
+              "description": "Synchronously constructs and dispatches an entry. Use `dispatchRaw` scheduling options for asynchronous output.",
+              "parameterDetails": [
+                {
+                  "name": "tag",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "message",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "args",
+                  "type": "unknown[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "dispatchRaw",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispatchRaw(input: IRawEntryInput, options?: ILogDispatchOptions): void;",
+              "description": "Dispatches explicit entry fields such as `meta`, `data`, and `context`.",
+              "parameterDetails": [
+                {
+                  "name": "input",
+                  "type": "IRawEntryInput",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ILogDispatchOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "usePipeline",
+              "kind": "property",
+              "optional": false,
+              "signature": "usePipeline: (stage: IPipelineStage) => ILoggerCore<TMode>;",
+              "description": "Registers a pipeline stage that can transform an entry, forward it with `next`, or drop it by omitting `next`. Supported methods follow the middleware-pipeline promotion table. Sync stages run in any mode. Generator stages also promote to `async-generator`. Other stages require their matching mode. An unresolved mode union retains all methods and leaves validation to runtime admission.",
+              "parameterDetails": [],
+              "returns": "(stage: IPipelineStage) => ILoggerCore<TMode>"
+            },
+            {
+              "name": "useAsyncPipeline",
+              "kind": "property",
+              "optional": false,
+              "signature": "useAsyncPipeline: [TMode] extends ['async'] ? (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "[TMode] extends ['async'] ? (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['generator'] | ['async-generator'] ? never : (stage: IAsyncMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>"
+            },
+            {
+              "name": "useGeneratorPipeline",
+              "kind": "property",
+              "optional": false,
+              "signature": "useGeneratorPipeline: [TMode] extends ['generator' | 'async-generator'] ? (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] ? never : (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "[TMode] extends ['generator' | 'async-generator'] ? (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] ? never : (stage: IGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>"
+            },
+            {
+              "name": "useAsyncGeneratorPipeline",
+              "kind": "property",
+              "optional": false,
+              "signature": "useAsyncGeneratorPipeline: [TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "[TMode] extends ['async-generator'] ? (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode> : [TMode] extends ['sync'] | ['async'] | ['generator'] ? never : (stage: IAsyncGeneratorMiddlewareStage<ILogEntry>) => ILoggerCore<TMode>"
+            },
+            {
+              "name": "useSink",
+              "kind": "method",
+              "optional": false,
+              "signature": "useSink(sink: ISink): IOff;",
+              "description": "Registers a sink. Every registered sink processes entries that pass the full pipeline, such as console and HTTP sinks together.",
+              "parameterDetails": [
+                {
+                  "name": "sink",
+                  "type": "ISink",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "hook",
+              "kind": "method",
+              "optional": false,
+              "signature": "hook(name: string, fn: ILogHookFn): () => void;",
+              "description": "Registers a named lifecycle hook. Built-in names are `before`, `after`, `before:${tag}`, and `after:${tag}`. Plugins can also define their own hook names.",
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "fn",
+                  "type": "ILogHookFn",
+                  "optional": false
+                }
+              ],
+              "returns": "() => void"
+            },
+            {
+              "name": "fireHook",
+              "kind": "method",
+              "optional": false,
+              "signature": "fireHook(name: string, entry: ILogEntry): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "name",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "entry",
+                  "type": "ILogEntry",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "onFailure",
+              "kind": "method",
+              "optional": false,
+              "signature": "onFailure(fn: ILogFailureHook): IOff;",
+              "description": "Observes asynchronous output failures without changing normal log-call control flow.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "ILogFailureHook",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "defer",
+              "kind": "method",
+              "optional": false,
+              "signature": "defer(task: () => void | Promise<void>): void;",
+              "description": "Schedules work outside the current synchronous stack through the runtime manager. `flush` and `shutdown` wait for this work. Plugins configured for async output use this path for rendering, stdout writes, or network requests.",
+              "parameterDetails": [
+                {
+                  "name": "task",
+                  "type": "() => void | Promise<void>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "onFlush",
+              "kind": "method",
+              "optional": false,
+              "signature": "onFlush(fn: IFlusher): IOff;",
+              "description": "Registers a callback to empty a buffer during `flush()`. The core invokes these callbacks and also waits for unfinished `defer()` tasks and Promises returned by sinks. For example, an HTTP sink without batching still keeps each pending request in the drain wait.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "IFlusher",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "flush",
+              "kind": "method",
+              "optional": false,
+              "signature": "flush(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "onShutdown",
+              "kind": "method",
+              "optional": false,
+              "signature": "onShutdown(fn: IShutdownHandler): IOff;",
+              "description": "Shutdown disposes installed plugins after draining; subsequent log calls are ignored.",
+              "parameterDetails": [
+                {
+                  "name": "fn",
+                  "type": "IShutdownHandler",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "shutdown",
+              "kind": "method",
+              "optional": false,
+              "signature": "shutdown(reason: IShutdownReason): Promise<IPluginHostDisposalResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "reason",
+                  "type": "IShutdownReason",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IPluginHostDisposalResult>"
+            },
+            {
+              "name": "raw",
+              "kind": "method",
+              "optional": false,
+              "signature": "raw(text: string, options?: ILogDispatchOptions): void;",
+              "description": "Writes raw text to stdout without passing through the pipeline or sinks. `asyncOutput: true` schedules the write through `defer`. Streaming plugins such as reasoning use this for token output without a complete log format per token.",
+              "parameterDetails": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "ILogDispatchOptions",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "extends",
+              "kind": "method",
+              "optional": false,
+              "signature": "extends(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): ILoggerCore<TMode, TShared>;",
+              "description": "Forwards entries to the full pipelines and sinks of each target after the current logger processes them. After `log1.extends(log2, log3)`, target level thresholds and filters still apply to forwarded entries. Each forwarding hop records its topic in internal forwarding state carried in `entry.data`. Registration detects cycles using logger context IDs. Runtime forwarding also skips IDs already present in the internal forwarding path. This composes forwarding behavior, not plugin extension types. The returned logger keeps the current logger's TypeScript capabilities; target-only methods are not added.",
+              "parameterDetails": [
+                {
+                  "name": "others",
+                  "type": "readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]",
+                  "optional": false
+                }
+              ],
+              "returns": "ILoggerCore<TMode, TShared>"
+            },
+            {
+              "name": "unextend",
+              "kind": "method",
+              "optional": false,
+              "signature": "unextend(...others: readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]): boolean;",
+              "description": "Removes named extension edges; returns true when at least one edge was removed.",
+              "parameterDetails": [
+                {
+                  "name": "others",
+                  "type": "readonly Omit<ILoggerCore<TMode, TShared>, 'config' | 'onDispose'>[]",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerPluginCore",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2673,7 +3967,76 @@
           "errors": ["No documented errors are declared for ILoggerProcess."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerProcess.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "env",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly env: Readonly<Record<string, string | undefined>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<Record<string, string | undefined>>"
+            },
+            {
+              "name": "stdout",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly stdout: { readonly isTTY?: boolean; write(value: string): unknown; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly isTTY?: boolean; write(value: string): unknown; }"
+            },
+            {
+              "name": "on",
+              "kind": "method",
+              "optional": false,
+              "signature": "on(event: string, listener: (...args: any[]) => void): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(...args: any[]) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "removeListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeListener(event: string, listener: (...args: any[]) => void): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(...args: any[]) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "exit",
+              "kind": "property",
+              "optional": false,
+              "signature": "exit: (code?: number) => never;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(code?: number) => never"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerProcess",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2738,6 +4101,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerReasoningPhase.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILoggerReasoningPhase",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2801,7 +4165,93 @@
           "errors": ["No documented errors are declared for ILoggerRuntimeManager."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerRuntimeManager.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "process",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly process?: ILoggerProcess;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ILoggerProcess"
+            },
+            {
+              "name": "fs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly fs?: { append(path: string, text: string): Promise<void>; rotate?(path: string): Promise<void>; };",
+              "description": "Optional injected file sink; absent by default in every runtime.",
+              "parameterDetails": [],
+              "returns": "{ append(path: string, text: string): Promise<void>; rotate?(path: string): Promise<void>; }"
+            },
+            {
+              "name": "createAbortController",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly createAbortController?: () => AbortController;",
+              "description": "Optional host cancellation factory for alternate AbortSignal implementations; native fallback when absent.",
+              "parameterDetails": [],
+              "returns": "() => AbortController"
+            },
+            {
+              "name": "randomUUID",
+              "kind": "method",
+              "optional": false,
+              "signature": "randomUUID(): string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "defer",
+              "kind": "method",
+              "optional": false,
+              "signature": "defer(task: () => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "task",
+                  "type": "() => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "write",
+              "kind": "method",
+              "optional": false,
+              "signature": "write(text: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "console",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly console?: { log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ log(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void; }"
+            },
+            {
+              "name": "fetch",
+              "kind": "property",
+              "optional": true,
+              "signature": "fetch?: (input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal; }) => Promise<{ readonly ok: boolean; readonly status: number; readonly headers: { get(name: string): string | null; }; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(input: string, init: { method: string; headers: Record<string, string>; body: string; signal?: AbortSignal; }) => Promise<{ readonly ok: boolean; readonly status: number; readonly headers: { get(name: string): string | null; }; }>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILoggerRuntimeManager",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2866,6 +4316,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILoggerStatus.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILoggerStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2930,6 +4381,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogHookFn.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILogHookFn",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2994,6 +4446,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IOff.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IOff",
           "exportPath": ".",
           "overloadSignatures": ["export type IOff = () => void;"],
@@ -3056,6 +4509,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPaintFn.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IPaintFn",
           "exportPath": ".",
           "overloadSignatures": ["export type IPaintFn = (tag: string, text: string) => string;"],
@@ -3118,6 +4572,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IPipelineStage.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IPipelineStage",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3181,7 +4636,99 @@
           "errors": ["No documented errors are declared for IRawEntryInput."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRawEntryInput.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "tag",
+              "kind": "property",
+              "optional": false,
+              "signature": "tag: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "message",
+              "kind": "property",
+              "optional": false,
+              "signature": "message: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "tag",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly tag: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "time",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly time: Date;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Date"
+            },
+            {
+              "name": "message",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly message: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "args",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly args: readonly unknown[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly unknown[]"
+            },
+            {
+              "name": "meta",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly meta?: Record<string, unknown> | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Record<string, unknown> | undefined"
+            },
+            {
+              "name": "context",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly context: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly error?: IErrorInfo | undefined;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IErrorInfo | undefined"
+            },
+            {
+              "name": "data",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly data: Record<string, unknown>;",
+              "description": "Plugin-owned data area that avoids replacing each other's entry fields. For example, reasoning sets `data.silent = true` to tell the ansis console sink to skip printing. HTTP and batch sinks can still consume the entry.",
+              "parameterDetails": [],
+              "returns": "Record<string, unknown>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRawEntryInput",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3246,6 +4793,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IShutdownHandler.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IShutdownHandler",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3310,6 +4858,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IShutdownReason.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IShutdownReason",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3374,6 +4923,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ISink.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ISink",
           "exportPath": ".",
           "overloadSignatures": ["export type ISink = (entry: ILogEntry) => void | Promise<void>;"],
@@ -3436,6 +4986,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStaticLoggerCtor.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IStaticLoggerCtor",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3510,6 +5061,7 @@
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
           "members": [],
+          "composes": ["IStaticLoggerCtor"],
           "aliasOf": "Logger",
           "exportPath": ".",
           "overloadSignatures": ["export declare const Logger: IStaticLoggerCtor;"],
@@ -3724,6 +5276,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LOGGER_SOURCE.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "LOGGER_SOURCE",
           "exportPath": ".",
           "overloadSignatures": ["export declare const LOGGER_SOURCE = \"@migaia/logger\";"],
@@ -3785,7 +5338,36 @@
           "errors": ["No documented errors are declared for LoggerColorMode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LoggerColorMode.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "auto",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly auto: \"auto\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"auto\""
+            },
+            {
+              "name": "always",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly always: \"always\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"always\""
+            },
+            {
+              "name": "never",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly never: \"never\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"never\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LoggerColorMode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3849,7 +5431,162 @@
           "errors": ["No documented errors are declared for LoggerErrorCode."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LoggerErrorCode.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Logger construction received an unreadable or structurally invalid public option. The caller * must fix the option; the native `TypeError` keeps the original accessor failure in `cause` when * one exists.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            },
+            {
+              "name": "pipelineEntryInvalid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pipelineEntryInvalid: \"PIPELINE_ENTRY_INVALID\";",
+              "description": "A pipeline supplied a replacement without a current-realm Date time. Dispatch reports this * native TypeError and keeps delivering the original entry; the plugin must preserve its Date.",
+              "parameterDetails": [],
+              "returns": "\"PIPELINE_ENTRY_INVALID\""
+            },
+            {
+              "name": "runtimeShuttingDown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtimeShuttingDown: \"RUNTIME_SHUTTING_DOWN\";",
+              "description": "Process plugin/logger installation is attempted while runtime shutdown is already in progress. * Enforces logger SDD §4.3 and §5.1: shutdown admission is terminal for that runtime. The caller * must wait for shutdown to settle or install the logger without the process plugin.",
+              "parameterDetails": [],
+              "returns": "\"RUNTIME_SHUTTING_DOWN\""
+            },
+            {
+              "name": "pluginConfigConflict",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pluginConfigConflict: \"PLUGIN_CONFIG_CONFLICT\";",
+              "description": "Thrown when the process plugin is installed again with a different configuration. * * Use the same configuration or uninstall the plugin before reinstalling.",
+              "parameterDetails": [],
+              "returns": "\"PLUGIN_CONFIG_CONFLICT\""
+            },
+            {
+              "name": "transportUnavailable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly transportUnavailable: \"TRANSPORT_UNAVAILABLE\";",
+              "description": "Thrown when the host runtime has no HTTP transport (`fetch`). * * Supply a runtime manager with `fetch` or use the HTTP plugin on a host that supports fetch.",
+              "parameterDetails": [],
+              "returns": "\"TRANSPORT_UNAVAILABLE\""
+            },
+            {
+              "name": "serializeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly serializeFailed: \"SERIALIZE_FAILED\";",
+              "description": "Thrown when serializing HTTP log entries fails. * * `cause` retains the original serialization error. Inspect the logged payload.",
+              "parameterDetails": [],
+              "returns": "\"SERIALIZE_FAILED\""
+            },
+            {
+              "name": "deliveryFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly deliveryFailed: \"DELIVERY_FAILED\";",
+              "description": "HTTP delivery receives a non-success response or exhausts retryable transport attempts. * Enforces logger SDD §4.5 and §5.3 (LG-R6-4/LG-R18); callers must inspect the endpoint/transport * and apply their own delivery remediation while logger failure policy contains the sink * failure.",
+              "parameterDetails": [],
+              "returns": "\"DELIVERY_FAILED\""
+            },
+            {
+              "name": "invalidRetryCount",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidRetryCount: \"INVALID_RETRY_COUNT\";",
+              "description": "HTTP plugin construction receives a retry count that is not a finite non-negative integer. * Enforces logger SDD §4.5 (LG-R6-8); callers must correct the plugin configuration before * constructing or installing the logger.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_RETRY_COUNT\""
+            },
+            {
+              "name": "lifecycleDeadline",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly lifecycleDeadline: \"LIFECYCLE_DEADLINE\";",
+              "description": "A bounded logger flush or shutdown phase reaches its absolute deadline with work unfinished. * Enforces logger SDD §4.2 and §5.2 (LG-R6-5); callers must treat delivery as degraded and * inspect the reported pending work instead of assuming every entry was delivered.",
+              "parameterDetails": [],
+              "returns": "\"LIFECYCLE_DEADLINE\""
+            },
+            {
+              "name": "processInstallRollbackFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly processInstallRollbackFailed: \"PROCESS_INSTALL_ROLLBACK_FAILED\";",
+              "description": "Process plugin installation fails and listener rollback reports one or more additional errors. * Enforces logger SDD §4.3 and §5.3 (LG-R11); callers must inspect `AggregateError.errors`, fix * the primary installation failure, and verify runtime listeners before retrying installation.",
+              "parameterDetails": [],
+              "returns": "\"PROCESS_INSTALL_ROLLBACK_FAILED\""
+            },
+            {
+              "name": "pluginUninstallCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pluginUninstallCleanupFailed: \"PLUGIN_UNINSTALL_CLEANUP_FAILED\";",
+              "description": "Logger plugin final uninstall cleanup attempted every registered action but one or more actions * failed. Enforces logger SDD LG-R23/LG-R24 and §5.5; callers must inspect the cause or * `AggregateError.errors` and may create a fresh plugin instance after runtime state resets. A * batcher whose final drain left entries undelivered reports this code with `detail.dropped`.",
+              "parameterDetails": [],
+              "returns": "\"PLUGIN_UNINSTALL_CLEANUP_FAILED\""
+            },
+            {
+              "name": "pluginShutdownCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pluginShutdownCleanupFailed: \"PLUGIN_SHUTDOWN_CLEANUP_FAILED\";",
+              "description": "Logger shutdown cleanup failed while cancelling a deadline task or invoking the captured exit * path. Enforces logger SDD LG-R24 and §5.5; callers must inspect the primary and cleanup errors * before deciding whether the process can continue.",
+              "parameterDetails": [],
+              "returns": "\"PLUGIN_SHUTDOWN_CLEANUP_FAILED\""
+            },
+            {
+              "name": "hookFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly hookFailed: \"HOOK_FAILED\";",
+              "description": "Diagnostic code reported when a failure hook throws. It is not thrown itself. * * The reporter uses only `runtime.console.error` or `runtime.write`, preventing recursive failure * reporting.",
+              "parameterDetails": [],
+              "returns": "\"HOOK_FAILED\""
+            },
+            {
+              "name": "extendsSelf",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly extendsSelf: \"EXTENDS_SELF\";",
+              "description": "Thrown when `extends()` receives the current logger itself. * * Do not add a logger to its own forwarding targets.",
+              "parameterDetails": [],
+              "returns": "\"EXTENDS_SELF\""
+            },
+            {
+              "name": "extendsCycle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly extendsCycle: \"EXTENDS_CYCLE\";",
+              "description": "Thrown when `extends()` would create a forwarding cycle. The target logger can already forward * through its own targets back to the current logger. * * Inspect the forwarding graph and remove the cycle.",
+              "parameterDetails": [],
+              "returns": "\"EXTENDS_CYCLE\""
+            },
+            {
+              "name": "batchOverflow",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly batchOverflow: \"BATCH_OVERFLOW\";",
+              "description": "A bounded batch/direct-HTTP owner had no admission slot for another full batch, so it dropped * the oldest queued batch (or the incoming one when every pending batch is in flight). Reported * through the logger failure path, not thrown to the producer; `detail.dropped` is the dropped * entry count. Callers should raise `maxPendingBatches` or relieve the slow batch callback.",
+              "parameterDetails": [],
+              "returns": "\"BATCH_OVERFLOW\""
+            },
+            {
+              "name": "fileSinkUnavailable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly fileSinkUnavailable: \"FILE_SINK_UNAVAILABLE\";",
+              "description": "File plugin installation found neither an injected file-system capability nor the supported * Node default. Enforces R1 BZ35; callers must inject `fs` or use the Node condition.",
+              "parameterDetails": [],
+              "returns": "\"FILE_SINK_UNAVAILABLE\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LoggerErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4002,7 +5739,54 @@
           "errors": ["No documented errors are declared for LoggerLevel."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LoggerLevel.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "debug",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly debug: \"debug\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"debug\""
+            },
+            {
+              "name": "info",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly info: \"info\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"info\""
+            },
+            {
+              "name": "warn",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly warn: \"warn\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"warn\""
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly error: \"error\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"error\""
+            },
+            {
+              "name": "fatal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly fatal: \"fatal\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"fatal\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LoggerLevel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4066,7 +5850,36 @@
           "errors": ["No documented errors are declared for LoggerReasoningPhase."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LoggerReasoningPhase.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "idle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly idle: \"idle\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"idle\""
+            },
+            {
+              "name": "thinking",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly thinking: \"thinking\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"thinking\""
+            },
+            {
+              "name": "responding",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly responding: \"responding\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"responding\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LoggerReasoningPhase",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4130,7 +5943,45 @@
           "errors": ["No documented errors are declared for LoggerStatus."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LoggerStatus.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "active",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly active: \"active\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"active\""
+            },
+            {
+              "name": "flushing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly flushing: \"flushing\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"flushing\""
+            },
+            {
+              "name": "shuttingDown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly shuttingDown: \"shutting-down\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"shutting-down\""
+            },
+            {
+              "name": "closed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closed: \"closed\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"closed\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "LoggerStatus",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4203,6 +6054,7 @@
             "import { getLoggerRuntimeManager, setLoggerRuntimeManager } from '@migaia/logger'\n\nconst previous = getLoggerRuntimeManager()\nconst restore = setLoggerRuntimeManager({\n  randomUUID: () => crypto.randomUUID(),\n  defer: (task) => queueMicrotask(task),\n  write: (text) => console.log(text),\n  fetch: (url, init) => fetch(url, init)\n})\n\ntry {\n  // 在这段作用域内创建和使用的 Logger 都会用上面这份能力\n} finally {\n  restore() // 恢复到替换之前的 runtime manager\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "setLoggerRuntimeManager",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4294,6 +6146,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ANSIS_PLUGIN_NAME.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ANSIS_PLUGIN_NAME",
           "exportPath": "./plugins",
           "overloadSignatures": ["export declare const ANSIS_PLUGIN_NAME: \"ansis\";"],
@@ -4362,6 +6215,7 @@
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "batch",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -4426,19 +6280,19 @@
               "name": "maxPendingBatches",
               "type": "number",
               "optional": true,
-              "description": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops * the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`."
+              "description": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`."
             },
             {
               "name": "flushTimeoutMs",
               "type": "number",
               "optional": true,
-              "description": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults * to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported."
+              "description": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported."
             },
             {
               "name": "asyncOutput",
               "type": "boolean",
               "optional": true,
-              "description": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; * timer-triggered callbacks are already asynchronous."
+              "description": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; timer-triggered callbacks are already asynchronous."
             }
           ],
           "identity": "packages/logger/dist/plugins/batch.d.ts:batch:export declare const batch: (config?: IBatchPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IBatchPluginConfig, IMiddlewarePipelineMode, { readonly batch: typeof loggerBatchFeature; }, IBatchShared>;",
@@ -4670,15 +6524,15 @@
               "type": "number",
               "optional": true,
               "description": "`maxPendingBatches` — `number` — 可选 — `1024` — 排队中与执行中的批次总上限；满载时以 `BATCH_OVERFLOW` 失败，不静默丢弃。",
-              "descriptionEn": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops * the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`.",
+              "descriptionEn": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`.",
               "descriptionZh": "`maxPendingBatches` — `number` — 可选 — `1024` — 排队中与执行中的批次总上限；满载时以 `BATCH_OVERFLOW` 失败，不静默丢弃。"
             },
             {
               "name": "flushTimeoutMs",
               "type": "number",
               "optional": true,
-              "description": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults * to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.",
-              "descriptionEn": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults * to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.",
+              "description": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.",
+              "descriptionEn": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.",
               "descriptionZh": ""
             },
             {
@@ -4686,7 +6540,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`asyncOutput` — `boolean` — 可选 — `true` — 满批次的回调是否走 `defer` 调度。",
-              "descriptionEn": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; * timer-triggered callbacks are already asynchronous.",
+              "descriptionEn": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; timer-triggered callbacks are already asynchronous.",
               "descriptionZh": "`asyncOutput` — `boolean` — 可选 — `true` — 满批次的回调是否走 `defer` 调度。"
             }
           ],
@@ -4708,6 +6562,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for BATCH_PLUGIN_NAME.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "BATCH_PLUGIN_NAME",
           "exportPath": "./plugins",
           "overloadSignatures": ["export declare const BATCH_PLUGIN_NAME: \"batch\";"],
@@ -4775,6 +6630,7 @@
             "import { Logger } from '@migaia/logger'\nimport { color, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['api'],\n  plugins: [level({ level: 'info' }), color({ format: 'pretty', color: 'auto' })]\n})\n\nlog.info('server listening on %d', 3000)\nlog.error('request failed', new Error('timeout'))\n\nawait log.flush() // 确保上面这些日志真正落地了再退出/继续"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "color",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -4839,13 +6695,13 @@
               "name": "colorMessage",
               "type": "'head' | 'tail' | 'head-tail' | 'all' | 'none'",
               "optional": true,
-              "description": "Message argument coloring range. Defaults to `none`, leaving the message and its arguments * uncolored."
+              "description": "Message argument coloring range. Defaults to `none`, leaving the message and its arguments uncolored."
             },
             {
               "name": "colorMap",
               "type": "Record<string, (text: string) => string>",
               "optional": true,
-              "description": "Maps custom tags to paint functions. Tags without a built-in or custom mapping remain * unchanged, allowing non-level tags such as reasoning tags to receive color."
+              "description": "Maps custom tags to paint functions. Tags without a built-in or custom mapping remain unchanged, allowing non-level tags such as reasoning tags to receive color."
             }
           ],
           "identity": "packages/logger/dist/plugins/color.d.ts:color:export declare const color: (config?: IColorPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IColorPluginConfig, IMiddlewarePipelineMode, { readonly color: typeof loggerColorFeature; }, IColorShared>;",
@@ -5003,7 +6859,7 @@
               "type": "'head' | 'tail' | 'head-tail' | 'all' | 'none'",
               "optional": true,
               "description": "`colorMessage` — `'head' \\ — 'tail' \\ — 'head-tail' \\ — 'all' \\ — 'none'` — 可选 — `'none'` — message/args 的染色范围。",
-              "descriptionEn": "Message argument coloring range. Defaults to `none`, leaving the message and its arguments * uncolored.",
+              "descriptionEn": "Message argument coloring range. Defaults to `none`, leaving the message and its arguments uncolored.",
               "descriptionZh": "`colorMessage` — `'head' \\ — 'tail' \\ — 'head-tail' \\ — 'all' \\ — 'none'` — 可选 — `'none'` — message/args 的染色范围。"
             },
             {
@@ -5011,7 +6867,7 @@
               "type": "Record<string, (text: string) => string>",
               "optional": true,
               "description": "`colorMap` — `Record<string, (text) => string>` — 可选 — 内置 level 映射 — 自定义 tag 对应的染色函数。",
-              "descriptionEn": "Maps custom tags to paint functions. Tags without a built-in or custom mapping remain * unchanged, allowing non-level tags such as reasoning tags to receive color.",
+              "descriptionEn": "Maps custom tags to paint functions. Tags without a built-in or custom mapping remain unchanged, allowing non-level tags such as reasoning tags to receive color.",
               "descriptionZh": "`colorMap` — `Record<string, (text) => string>` — 可选 — 内置 level 映射 — 自定义 tag 对应的染色函数。"
             }
           ],
@@ -5038,6 +6894,7 @@
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "http",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -5468,6 +7325,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for HTTP_PLUGIN_NAME.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "HTTP_PLUGIN_NAME",
           "exportPath": "./plugins",
           "overloadSignatures": ["export declare const HTTP_PLUGIN_NAME: \"http\";"],
@@ -5529,7 +7387,33 @@
           "errors": ["No documented errors are declared for IBatcher."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IBatcher.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "push",
+              "kind": "method",
+              "optional": false,
+              "signature": "push(item: T): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "item",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "flush",
+              "kind": "method",
+              "optional": false,
+              "signature": "flush(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IBatcher",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -5593,7 +7477,63 @@
           "errors": ["No documented errors are declared for IBatchPluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IBatchPluginConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "maxSize",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxSize?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxWaitMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxWaitMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxConcurrentBatches",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxConcurrentBatches?: number;",
+              "description": "Maximum number of batches executing at once. Defaults to one for lossless delivery.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxPendingBatches",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxPendingBatches?: number;",
+              "description": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "flushTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "flushTimeoutMs?: number;",
+              "description": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "asyncOutput",
+              "kind": "property",
+              "optional": true,
+              "signature": "asyncOutput?: boolean;",
+              "description": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; timer-triggered callbacks are already asynchronous.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IBatchPluginConfig",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -5657,7 +7597,18 @@
           "errors": ["No documented errors are declared for IBatchShared."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IBatchShared.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "createBatcher",
+              "kind": "property",
+              "optional": false,
+              "signature": "createBatcher: ICreateBatcher;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ICreateBatcher"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IBatchShared",
           "exportPath": "./plugins",
           "overloadSignatures": ["export type IBatchShared = { createBatcher: ICreateBatcher; };"],
@@ -5720,6 +7671,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IColorMode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IColorMode",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -5783,7 +7735,54 @@
           "errors": ["No documented errors are declared for IColorPluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IColorPluginConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "color",
+              "kind": "property",
+              "optional": true,
+              "signature": "color?: IColorMode;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IColorMode"
+            },
+            {
+              "name": "format",
+              "kind": "property",
+              "optional": true,
+              "signature": "format?: IOutputFormat;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IOutputFormat"
+            },
+            {
+              "name": "timestamp",
+              "kind": "property",
+              "optional": true,
+              "signature": "timestamp?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "colorMessage",
+              "kind": "property",
+              "optional": true,
+              "signature": "colorMessage?: 'head' | 'tail' | 'head-tail' | 'all' | 'none';",
+              "description": "Message argument coloring range. Defaults to `none`, leaving the message and its arguments uncolored.",
+              "parameterDetails": [],
+              "returns": "'head' | 'tail' | 'head-tail' | 'all' | 'none'"
+            },
+            {
+              "name": "colorMap",
+              "kind": "property",
+              "optional": true,
+              "signature": "colorMap?: Record<string, (text: string) => string>;",
+              "description": "Maps custom tags to paint functions. Tags without a built-in or custom mapping remain unchanged, allowing non-level tags such as reasoning tags to receive color.",
+              "parameterDetails": [],
+              "returns": "Record<string, (text: string) => string>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IColorPluginConfig",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -5848,6 +7847,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ICreateBatcher.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ICreateBatcher",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -5911,7 +7911,72 @@
           "errors": ["No documented errors are declared for IHttpPluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IHttpPluginConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "url",
+              "kind": "property",
+              "optional": false,
+              "signature": "url: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "authToken",
+              "kind": "property",
+              "optional": true,
+              "signature": "authToken?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "headers",
+              "kind": "property",
+              "optional": true,
+              "signature": "headers?: Record<string, string>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Record<string, string>"
+            },
+            {
+              "name": "retries",
+              "kind": "property",
+              "optional": true,
+              "signature": "retries?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "requestTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "requestTimeoutMs?: number;",
+              "description": "Maximum wait for one HTTP request. Defaults to 10,000 ms.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "batch",
+              "kind": "property",
+              "optional": true,
+              "signature": "batch?: { /** Flushes a batch when it reaches this many entries. */ maxSize?: number; /** Flushes a non-empty batch after this many milliseconds. */ maxWaitMs?: number; /** Bounds the number of batch callbacks executing concurrently. */ maxConcurrentBatches?: number; /** Bounds queued plus executing batches so sustained overload cannot grow memory without limit. */ maxPendingBatches?: number; /** Schedules size-triggered output asynchronously instead of running it in the caller stack. */ asyncOutput?: boolean; };",
+              "description": "Uses the batch plugin when installed. Without it, each log entry is sent separately.",
+              "parameterDetails": [],
+              "returns": "{ /** Flushes a batch when it reaches this many entries. */ maxSize?: number; /** Flushes a non-empty batch after this many milliseconds. */ maxWaitMs?: number; /** Bounds the number of batch callbacks executing concurrently. */ maxConcurrentBatches?: number; /** Bounds queued plus executing batches so sustained overload cannot grow memory without limit. */ maxPendingBatches?: number; /** Schedules size-triggered output asynchronously instead of running it in the caller stack. */ asyncOutput?: boolean; }"
+            },
+            {
+              "name": "maxRetryAfterMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxRetryAfterMs?: number;",
+              "description": "Maximum valid Retry-After delay; valid excess is clamped. Defaults to 30000ms.",
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IHttpPluginConfig",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -5975,7 +8040,36 @@
           "errors": ["No documented errors are declared for ILevelPluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILevelPluginConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "level",
+              "kind": "property",
+              "optional": true,
+              "signature": "level?: ILogLevel;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ILogLevel"
+            },
+            {
+              "name": "filters",
+              "kind": "property",
+              "optional": true,
+              "signature": "filters?: ILogFilter[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ILogFilter[]"
+            },
+            {
+              "name": "asyncOutput",
+              "kind": "property",
+              "optional": true,
+              "signature": "asyncOutput?: boolean;",
+              "description": "Defers entries from this plugin until after the current synchronous stack. Defaults to `false`.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILevelPluginConfig",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -6039,7 +8133,129 @@
           "errors": ["No documented errors are declared for ILevelPluginExt."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILevelPluginExt.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "debug",
+              "kind": "method",
+              "optional": false,
+              "signature": "debug(...args: unknown[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "args",
+                  "type": "unknown[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "info",
+              "kind": "method",
+              "optional": false,
+              "signature": "info(...args: unknown[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "args",
+                  "type": "unknown[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "warn",
+              "kind": "method",
+              "optional": false,
+              "signature": "warn(...args: unknown[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "args",
+                  "type": "unknown[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "error",
+              "kind": "method",
+              "optional": false,
+              "signature": "error(...args: unknown[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "args",
+                  "type": "unknown[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "fatal",
+              "kind": "method",
+              "optional": false,
+              "signature": "fatal(...args: unknown[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "args",
+                  "type": "unknown[]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "setLevel",
+              "kind": "method",
+              "optional": false,
+              "signature": "setLevel(level: ILogLevel): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "level",
+                  "type": "ILogLevel",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "addFilter",
+              "kind": "method",
+              "optional": false,
+              "signature": "addFilter(filter: ILogFilter): IOff;",
+              "description": "Adds a filter and returns an idempotent removal handle.",
+              "parameterDetails": [
+                {
+                  "name": "filter",
+                  "type": "ILogFilter",
+                  "optional": false
+                }
+              ],
+              "returns": "IOff"
+            },
+            {
+              "name": "removeFilter",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeFilter(filter: ILogFilter): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "filter",
+                  "type": "ILogFilter",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "ILevelPluginExt",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -6104,6 +8320,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for ILogLevel.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "ILogLevel",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -6168,6 +8385,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IOutputFormat.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IOutputFormat",
           "exportPath": "./plugins",
           "overloadSignatures": ["export type IOutputFormat = 'auto' | 'pretty' | 'json';"],
@@ -6229,7 +8447,36 @@
           "errors": ["No documented errors are declared for IProcessPluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IProcessPluginConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "captureCrashes",
+              "kind": "property",
+              "optional": true,
+              "signature": "captureCrashes?: boolean;",
+              "description": "Logs `uncaughtException` and `unhandledRejection` events as fatal entries when enabled. Defaults to `true`.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "shutdownTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "shutdownTimeoutMs?: number;",
+              "description": "Maximum graceful-shutdown wait in milliseconds before forced exit. Defaults to 3000.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "interceptProcessExit",
+              "kind": "property",
+              "optional": true,
+              "signature": "interceptProcessExit?: boolean;",
+              "description": "Intercepts `process.exit()` so application calls wait for flushing before exit. Disabled by default because exit becomes asynchronous instead of terminating immediately. Evaluate this change before enabling it when application code relies on synchronous termination.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IProcessPluginConfig",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -6293,7 +8540,27 @@
           "errors": ["No documented errors are declared for IReasoningPluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReasoningPluginConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "labels",
+              "kind": "property",
+              "optional": true,
+              "signature": "labels?: { thinking?: string; response?: string; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ thinking?: string; response?: string; }"
+            },
+            {
+              "name": "asyncOutput",
+              "kind": "property",
+              "optional": true,
+              "signature": "asyncOutput?: boolean;",
+              "description": "Schedules this plugin's streaming and complete entry output asynchronously when enabled. Defaults to `false`.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IReasoningPluginConfig",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -6357,7 +8624,87 @@
           "errors": ["No documented errors are declared for IReasoningPluginExt."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IReasoningPluginExt.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "startThinking",
+              "kind": "method",
+              "optional": false,
+              "signature": "startThinking(label?: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "label",
+                  "type": "string",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "thinking",
+              "kind": "method",
+              "optional": false,
+              "signature": "thinking(delta: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "delta",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "endThinking",
+              "kind": "method",
+              "optional": false,
+              "signature": "endThinking(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "startResponse",
+              "kind": "method",
+              "optional": false,
+              "signature": "startResponse(label?: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "label",
+                  "type": "string",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "response",
+              "kind": "method",
+              "optional": false,
+              "signature": "response(delta: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "delta",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "endResponse",
+              "kind": "method",
+              "optional": false,
+              "signature": "endResponse(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IReasoningPluginExt",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -6421,7 +8768,18 @@
           "errors": ["No documented errors are declared for IUuidPluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IUuidPluginConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "display",
+              "kind": "property",
+              "optional": true,
+              "signature": "display?: boolean;",
+              "description": "Shows the UUID in rendered output, such as the pretty prefix or the JSON `uuid` field. Defaults to `false`. The plugin always writes the UUID to `entry.data.uuid`, regardless of display settings. HTTP and batch sinks can still use it for tracing or deduplication when rendered display is disabled.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IUuidPluginConfig",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -6493,6 +8851,7 @@
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: 5_000 },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1_000 }),\n    http({ url: 'https://logs.example/v1/entries' })\n  ]\n})\n\nconst stopFailureObservation = log.onFailure(({ source, error }) => {\n  console.error(`[logger:${source}]`, error)\n})\n\ntry {\n  log.info('checkout completed: %s', 'order-42')\n  await log.flush()\n} finally {\n  stopFailureObservation()\n  await log.shutdown('manual')\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "level",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -6720,6 +9079,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for LEVEL_PLUGIN_NAME.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "LEVEL_PLUGIN_NAME",
           "exportPath": "./plugins",
           "overloadSignatures": ["export declare const LEVEL_PLUGIN_NAME: \"level\";"],
@@ -6786,6 +9146,7 @@
             "import { Logger } from '@migaia/logger'\nimport { batch, http, level, process } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [\n    level({ level: 'info' }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    process() // 进程退出/崩溃前自动 flush\n  ]\n})\n\nlog.onFailure(({ source, error }) => console.error(`[logger] ${source} failed`, error))"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "process",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -6832,7 +9193,7 @@
               "name": "captureCrashes",
               "type": "boolean",
               "optional": true,
-              "description": "Logs `uncaughtException` and `unhandledRejection` events as fatal entries when enabled. * Defaults to `true`."
+              "description": "Logs `uncaughtException` and `unhandledRejection` events as fatal entries when enabled. Defaults to `true`."
             },
             {
               "name": "shutdownTimeoutMs",
@@ -6844,7 +9205,7 @@
               "name": "interceptProcessExit",
               "type": "boolean",
               "optional": true,
-              "description": "Intercepts `process.exit()` so application calls wait for flushing before exit. Disabled by * default because exit becomes asynchronous instead of terminating immediately. Evaluate this * change before enabling it when application code relies on synchronous termination."
+              "description": "Intercepts `process.exit()` so application calls wait for flushing before exit. Disabled by default because exit becomes asynchronous instead of terminating immediately. Evaluate this change before enabling it when application code relies on synchronous termination."
             }
           ],
           "identity": "packages/logger/dist/plugins/process.d.ts:process:export declare const process: (config?: IProcessPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IProcessPluginConfig>;",
@@ -6986,7 +9347,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`captureCrashes` — `boolean` — 可选 — `true` — 捕获 `uncaughtException`/`unhandledRejection` 并记录为 fatal 日志。",
-              "descriptionEn": "Logs `uncaughtException` and `unhandledRejection` events as fatal entries when enabled. * Defaults to `true`.",
+              "descriptionEn": "Logs `uncaughtException` and `unhandledRejection` events as fatal entries when enabled. Defaults to `true`.",
               "descriptionZh": "`captureCrashes` — `boolean` — 可选 — `true` — 捕获 `uncaughtException`/`unhandledRejection` 并记录为 fatal 日志。"
             },
             {
@@ -7002,7 +9363,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`interceptProcessExit` — `boolean` — 可选 — `false` — 在 `process.exit()` 真正执行前发起一次 flush；这会改变 `process.exit()` 原本同步立即退出的语义，谨慎开启。",
-              "descriptionEn": "Intercepts `process.exit()` so application calls wait for flushing before exit. Disabled by * default because exit becomes asynchronous instead of terminating immediately. Evaluate this * change before enabling it when application code relies on synchronous termination.",
+              "descriptionEn": "Intercepts `process.exit()` so application calls wait for flushing before exit. Disabled by default because exit becomes asynchronous instead of terminating immediately. Evaluate this change before enabling it when application code relies on synchronous termination.",
               "descriptionZh": "`interceptProcessExit` — `boolean` — 可选 — `false` — 在 `process.exit()` 真正执行前发起一次 flush；这会改变 `process.exit()` 原本同步立即退出的语义，谨慎开启。"
             }
           ],
@@ -7024,6 +9385,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for PROCESS_PLUGIN_NAME.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "PROCESS_PLUGIN_NAME",
           "exportPath": "./plugins",
           "overloadSignatures": ["export declare const PROCESS_PLUGIN_NAME: \"process\";"],
@@ -7088,6 +9450,7 @@
             "import { Logger, setLoggerRuntimeManager } from '@migaia/logger'\nimport { batch, color, http, level, process, reasoning, uuid } from '@migaia/logger/plugins'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "reasoning",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -7152,7 +9515,7 @@
               "name": "asyncOutput",
               "type": "boolean",
               "optional": true,
-              "description": "Schedules this plugin's streaming and complete entry output asynchronously when enabled. * Defaults to `false`."
+              "description": "Schedules this plugin's streaming and complete entry output asynchronously when enabled. Defaults to `false`."
             }
           ],
           "identity": "packages/logger/dist/plugins/reasoning.d.ts:reasoning:export declare const reasoning: (config?: IReasoningPluginConfig) => ILoggerPlugin<IReasoningPluginExt, IReasoningPluginConfig, IMiddlewarePipelineMode, { readonly dependencies: typeof reasoningDependenciesFeature; }>;",
@@ -7224,7 +9587,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`asyncOutput` — `boolean` — 可选 — `false` — 流式输出与收尾完整 entry 是否走异步调度。",
-              "descriptionEn": "Schedules this plugin's streaming and complete entry output asynchronously when enabled. * Defaults to `false`.",
+              "descriptionEn": "Schedules this plugin's streaming and complete entry output asynchronously when enabled. Defaults to `false`.",
               "descriptionZh": "`asyncOutput` — `boolean` — 可选 — `false` — 流式输出与收尾完整 entry 是否走异步调度。"
             }
           ],
@@ -7246,6 +9609,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for REASONING_PLUGIN_NAME.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "REASONING_PLUGIN_NAME",
           "exportPath": "./plugins",
           "overloadSignatures": ["export declare const REASONING_PLUGIN_NAME: \"reasoning\";"],
@@ -7311,6 +9675,7 @@
             "import { Logger } from '@migaia/logger'\nimport { batch, color, http, level, process, uuid } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  context: ['worker'],\n  plugins: [\n    level({ level: 'info' }),\n    uuid({ display: true }),\n    batch({ maxSize: 50, maxWaitMs: 1000 }),\n    http({ url: 'https://logs.example/v1/entries', batch: { maxSize: 50 } }),\n    color({ format: 'pretty' }),\n    process()\n  ]\n})\n\nlog.onFailure(({ source, error }) => reportLoggerFailure(source, error))\nlog.info('job started', { jobId: 'j_1' })\nawait log.flush()"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "uuid",
           "exportPath": "./plugins",
           "overloadSignatures": [
@@ -7357,7 +9722,7 @@
               "name": "display",
               "type": "boolean",
               "optional": true,
-              "description": "Shows the UUID in rendered output, such as the pretty prefix or the JSON `uuid` field. Defaults * to `false`. The plugin always writes the UUID to `entry.data.uuid`, regardless of display * settings. HTTP and batch sinks can still use it for tracing or deduplication when rendered * display is disabled."
+              "description": "Shows the UUID in rendered output, such as the pretty prefix or the JSON `uuid` field. Defaults to `false`. The plugin always writes the UUID to `entry.data.uuid`, regardless of display settings. HTTP and batch sinks can still use it for tracing or deduplication when rendered display is disabled."
             }
           ],
           "identity": "packages/logger/dist/plugins/uuid.d.ts:uuid:export declare const uuid: (config?: IUuidPluginConfig) => ILoggerPlugin<IEmptyPluginExt, IUuidPluginConfig>;",
@@ -7393,7 +9758,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`display` — `boolean` — 可选 — `false` — 是否让 `color()` 的 pretty/JSON 输出里展示这个 UUID。",
-              "descriptionEn": "Shows the UUID in rendered output, such as the pretty prefix or the JSON `uuid` field. Defaults * to `false`. The plugin always writes the UUID to `entry.data.uuid`, regardless of display * settings. HTTP and batch sinks can still use it for tracing or deduplication when rendered * display is disabled.",
+              "descriptionEn": "Shows the UUID in rendered output, such as the pretty prefix or the JSON `uuid` field. Defaults to `false`. The plugin always writes the UUID to `entry.data.uuid`, regardless of display settings. HTTP and batch sinks can still use it for tracing or deduplication when rendered display is disabled.",
               "descriptionZh": "`display` — `boolean` — 可选 — `false` — 是否让 `color()` 的 pretty/JSON 输出里展示这个 UUID。"
             }
           ],
@@ -7415,6 +9780,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for UUID_PLUGIN_NAME.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "UUID_PLUGIN_NAME",
           "exportPath": "./plugins",
           "overloadSignatures": ["export declare const UUID_PLUGIN_NAME: \"uuid\";"],
@@ -7498,6 +9864,7 @@
             "import { Logger } from '@migaia/logger'\nimport { file } from '@migaia/logger/plugins/file'\n\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [file({ path: 'logs/app.jsonl', batch: { maxSize: 20 } })]\n})\nlogger.log('info', 'ready')\nawait logger.flush()\nawait logger.shutdown('manual')"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./plugins/file",
           "overloadSignatures": [
             "export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/middleware-pipeline\").IMiddlewarePipelineMode, { readonly dependencies: Readonly<{ readonly __feature: { readonly expose: Record<never, never>; readonly output: Readonly<{ readonly batch: import(\"./batch.js\").IBatchShared | undefined; }>; readonly dependencies: { readonly batch: typeof import(\"./batch.js\").optionalBatchFeature; }; }; }>; }>;"
@@ -7552,24 +9919,6 @@
               "description": ""
             },
             {
-              "name": "rotate",
-              "type": "{ /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }",
-              "optional": true,
-              "description": "Per-batch rotation threshold; injected fs supplies the rotation operation."
-            },
-            {
-              "name": "rotate.maxBytes",
-              "type": "number",
-              "optional": true,
-              "description": "Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit."
-            },
-            {
-              "name": "rotate.maxEntries",
-              "type": "number",
-              "optional": true,
-              "description": "Rotate before a write when the buffered diagnostic count reaches this limit."
-            },
-            {
               "name": "batch.maxSize",
               "type": "number",
               "optional": true,
@@ -7591,19 +9940,37 @@
               "name": "batch.maxPendingBatches",
               "type": "number",
               "optional": true,
-              "description": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops * the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`."
+              "description": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`."
             },
             {
               "name": "batch.flushTimeoutMs",
               "type": "number",
               "optional": true,
-              "description": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults * to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported."
+              "description": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported."
             },
             {
               "name": "batch.asyncOutput",
               "type": "boolean",
               "optional": true,
-              "description": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; * timer-triggered callbacks are already asynchronous."
+              "description": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; timer-triggered callbacks are already asynchronous."
+            },
+            {
+              "name": "rotate",
+              "type": "{ /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }",
+              "optional": true,
+              "description": "Per-batch rotation threshold; injected fs supplies the rotation operation."
+            },
+            {
+              "name": "rotate.maxBytes",
+              "type": "number",
+              "optional": true,
+              "description": "Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit."
+            },
+            {
+              "name": "rotate.maxEntries",
+              "type": "number",
+              "optional": true,
+              "description": "Rotate before a write when the buffered diagnostic count reaches this limit."
             }
           ],
           "identity": "packages/logger/dist/plugins/file.d.ts:file:export declare const file: (config: IFilePluginConfig) => import(\"../typing.js\").ILoggerPlugin<import(\"../typing.js\").IEmptyPluginExt, IFilePluginConfig, import(\"@migaia/middleware-pipeline\").IMiddlewarePipelineMode, { readonly dependencies: Readonly<{ readonly __feature: { readonly expose: Record<never, never>; readonly output: Readonly<{ readonly batch: import(\"./batch.js\").IBatchShared | undefined; }>; readonly dependencies: { readonly batch: typeof import(\"./batch.js\").optionalBatchFeature; }; }; }>; }>;",
@@ -7716,30 +10083,6 @@
               "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
             },
             {
-              "name": "rotate",
-              "type": "{ /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }",
-              "optional": true,
-              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
-              "descriptionEn": "Per-batch rotation threshold; injected fs supplies the rotation operation.",
-              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
-            },
-            {
-              "name": "rotate.maxBytes",
-              "type": "number",
-              "optional": true,
-              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
-              "descriptionEn": "Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit.",
-              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
-            },
-            {
-              "name": "rotate.maxEntries",
-              "type": "number",
-              "optional": true,
-              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
-              "descriptionEn": "Rotate before a write when the buffered diagnostic count reaches this limit.",
-              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
-            },
-            {
               "name": "batch.maxSize",
               "type": "number",
               "optional": true,
@@ -7767,25 +10110,49 @@
               "name": "batch.maxPendingBatches",
               "type": "number",
               "optional": true,
-              "description": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops * the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`.",
-              "descriptionEn": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops * the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`.",
+              "description": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`.",
+              "descriptionEn": "Maximum number of queued or executing batches. Defaults to 1024. A full batch beyond it drops the oldest queued batch and reports `BATCH_OVERFLOW` with `detail.dropped`.",
               "descriptionZh": ""
             },
             {
               "name": "batch.flushTimeoutMs",
               "type": "number",
               "optional": true,
-              "description": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults * to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.",
-              "descriptionEn": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults * to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.",
+              "description": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.",
+              "descriptionEn": "Time budget in milliseconds for one `flush()` drain, including the drain on dispose. Defaults to 3000. Entries still buffered or queued when dispose reaches it are dropped and reported.",
               "descriptionZh": ""
             },
             {
               "name": "batch.asyncOutput",
               "type": "boolean",
               "optional": true,
-              "description": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; * timer-triggered callbacks are already asynchronous.",
-              "descriptionEn": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; * timer-triggered callbacks are already asynchronous.",
+              "description": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; timer-triggered callbacks are already asynchronous.",
+              "descriptionEn": "Schedules a full-batch callback asynchronously when enabled. Defaults to `true`; timer-triggered callbacks are already asynchronous.",
               "descriptionZh": ""
+            },
+            {
+              "name": "rotate",
+              "type": "{ /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }",
+              "optional": true,
+              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
+              "descriptionEn": "Per-batch rotation threshold; injected fs supplies the rotation operation.",
+              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
+            },
+            {
+              "name": "rotate.maxBytes",
+              "type": "number",
+              "optional": true,
+              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
+              "descriptionEn": "Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit.",
+              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
+            },
+            {
+              "name": "rotate.maxEntries",
+              "type": "number",
+              "optional": true,
+              "description": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。",
+              "descriptionEn": "Rotate before a write when the buffered diagnostic count reaches this limit.",
+              "descriptionZh": "`file` 只从 `@migaia/logger/plugins/file` 导入，不经根入口。它把每批 entry 写成逐行 JSON；`batch` 复用现有批处理器配置，`rotate.maxEntries`/`rotate.maxBytes` 在单批达到阈值时调用可选的 `fs.rotate(path)`。Node 条件默认动态加载 `node:fs/promises` 做 append；浏览器/default 条件只接受 `setLoggerRuntimeManager()` 注入的 `fs.append(path, text)`，没有能力时安装失败，原始 `FILE_SINK_UNAVAILABLE` 可从 PluginHost 安装错误的 `cause` 读取。写入失败走 `onFailure()`，不会从普通 `log()` 调用栈抛出。"
             }
           ],
           "fragment": "logger-plugins/file--file"
@@ -7806,6 +10173,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for FILE_PLUGIN_NAME.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "FILE_PLUGIN_NAME",
           "exportPath": "./plugins/file",
           "overloadSignatures": ["export declare const FILE_PLUGIN_NAME: \"file\";"],
@@ -7867,7 +10235,36 @@
           "errors": ["No documented errors are declared for IFilePluginConfig."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IFilePluginConfig.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "path",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly path: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "batch",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly batch?: IBatchPluginConfig;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IBatchPluginConfig"
+            },
+            {
+              "name": "rotate",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly rotate?: { /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; };",
+              "description": "Per-batch rotation threshold; injected fs supplies the rotation operation.",
+              "parameterDetails": [],
+              "returns": "{ /** Rotate before a write when the UTF-8 diagnostic buffer reaches this byte limit. */ readonly maxBytes?: number; /** Rotate before a write when the buffered diagnostic count reaches this limit. */ readonly maxEntries?: number; }"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IFilePluginConfig",
           "exportPath": "./plugins/file",
           "overloadSignatures": [

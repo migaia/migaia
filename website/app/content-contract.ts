@@ -97,6 +97,11 @@ export type IApiSymbol = {
     readonly optional: boolean
   }[]
   readonly members: readonly IApiMember[]
+  /**
+   * Named types this declaration extends or intersects (`A & { ... }`, `extends A`); their members
+   * belong to the same instance surface. Absent on compact navigation projections.
+   */
+  readonly composes?: readonly string[]
   readonly examples: readonly string[]
   readonly guidance: readonly {
     readonly id: string

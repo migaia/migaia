@@ -817,6 +817,7 @@
             {
               "name": "open",
               "kind": "method",
+              "optional": false,
               "signature": "open(peerId: string, options: IThreadChannelOptions): import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult;",
               "description": "Borrow this held parent resource through the synchronous fixed Thread profile.",
               "parameterDetails": [
@@ -834,6 +835,7 @@
               "returns": "import(\"@migaia/rpc-core/remote\").IRuntimePeerSourceResult"
             }
           ],
+          "composes": [],
           "aliasOf": "AdapterNodeThreadParentChannel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -920,6 +922,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAdapterNodeThreadLauncher.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "createAdapterNodeThreadLauncher",
           "exportPath": ".",
           "overloadSignatures": [
@@ -974,11 +977,41 @@
               "content": "No additional advanced behavior is declared for createAdapterNodeThreadLauncher."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "execArgv",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Omission retains native inheritance; short different entries supply filtered runtime flags."
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/node-launcher.d.ts:createAdapterNodeThreadLauncher:export declare function createAdapterNodeThreadLauncher(runtime: IThreadRuntimeResource, options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; /** Omission retains native inheritance; short different entries supply filtered runtime flags. */ execArgv?: readonly string[]; }>): IThreadLauncher<IAdapterNodeThreadHandle>;",
           "guidance": [],
           "usageScore": 4,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "execArgv",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Omission retains native inheritance; short different entries supply filtered runtime flags.",
+              "descriptionEn": "Omission retains native inheritance; short different entries supply filtered runtime flags.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-index--createAdapterNodeThreadLauncher"
         },
         {
@@ -1017,6 +1050,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createAdapterNodeThreadPeer.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "createAdapterNodeThreadPeer",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1076,11 +1110,209 @@
               "content": "No additional advanced behavior is declared for createAdapterNodeThreadPeer."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "spawn",
+              "type": "IRuntimePeerSource | IRuntimeThreadSpawn<THandle> | IRuntimeThreadShortSpawn<THandle> | true | IUrlLike",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "endpointFactory",
+              "type": "(channel: IRemoteChannelResources, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>",
+              "optional": true,
+              "description": "A custom runtime assembly receives only the operations held by this channel view."
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "provide",
+              "type": "IRuntimePeerProvide",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "connect",
+              "type": "IRuntimePeerSource",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "listen",
+              "type": "IRuntimePeerSource",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint."
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection."
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Only request/stream inherit this positive default in their original timeout scope."
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner."
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/node-peer.d.ts:createAdapterNodeThreadPeer:export declare function createAdapterNodeThreadPeer(options: IRuntimeThreadPeerOptions, parentPort: IThreadParentPort | null, workerData: unknown): Promise<IRuntimePeer>;",
           "guidance": [],
           "usageScore": 4,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）",
+              "descriptionEn": "",
+              "descriptionZh": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）"
+            },
+            {
+              "name": "spawn",
+              "type": "IRuntimePeerSource | IRuntimeThreadSpawn<THandle> | IRuntimeThreadShortSpawn<THandle> | true | IUrlLike",
+              "optional": true,
+              "description": "普通 TS Worker 只需根入口；短 `spawn` 会延迟加载当前运行时的 adapter。自定义完整 source 时，只导入当前平台的 `./adapters/*` 子路径（第 8 节）。",
+              "descriptionEn": "",
+              "descriptionZh": "普通 TS Worker 只需根入口；短 `spawn` 会延迟加载当前运行时的 adapter。自定义完整 source 时，只导入当前平台的 `./adapters/*` 子路径（第 8 节）。"
+            },
+            {
+              "name": "endpointFactory",
+              "type": "(channel: IRemoteChannelResources, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>",
+              "optional": true,
+              "description": "A custom runtime assembly receives only the operations held by this channel view.",
+              "descriptionEn": "A custom runtime assembly receives only the operations held by this channel view.",
+              "descriptionZh": "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。"
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": "保存为 `self.ts`，编译为 `self.js` 后运行。整个模块会在 Worker 中再次执行；所有只属于主线程的副作用都应放在 `else` 分支：",
+              "descriptionEn": "",
+              "descriptionZh": "保存为 `self.ts`，编译为 `self.js` 后运行。整个模块会在 Worker 中再次执行；所有只属于主线程的副作用都应放在 `else` 分支："
+            },
+            {
+              "name": "provide",
+              "type": "IRuntimePeerProvide",
+              "optional": true,
+              "description": "`provide` 的规则与进程版相同：只读取对象自身的可枚举数据属性，嵌套对象生成点分路径；返回 iterable 或 async iterable 的方法通过 `stream` 调用。",
+              "descriptionEn": "",
+              "descriptionZh": "`provide` 的规则与进程版相同：只读取对象自身的可枚举数据属性，嵌套对象生成点分路径；返回 iterable 或 async iterable 的方法通过 `stream` 调用。"
+            },
+            {
+              "name": "connect",
+              "type": "IRuntimePeerSource",
+              "optional": true,
+              "description": "已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接：",
+              "descriptionEn": "",
+              "descriptionZh": "已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接："
+            },
+            {
+              "name": "listen",
+              "type": "IRuntimePeerSource",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "descriptionEn": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "descriptionZh": "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。"
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "descriptionEn": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Only request/stream inherit this positive default in their original timeout scope.",
+              "descriptionEn": "Only request/stream inherit this positive default in their original timeout scope.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionEn": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。",
+              "descriptionEn": "",
+              "descriptionZh": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。"
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。",
+              "descriptionEn": "",
+              "descriptionZh": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。"
+            }
+          ],
           "fragment": "rpc-threads-index--createAdapterNodeThreadPeer"
         },
         {
@@ -1127,6 +1359,7 @@
             "import { MessageChannel } from 'node:worker_threads'\nimport { createNodeThreadChannel, createThreadPeer } from '@migaia/rpc-threads'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\nconst { port1, port2 } = new MessageChannel()\nconst report = (error: unknown) => console.error(error)\nconst [left, right] = await Promise.all([\n  createThreadPeer({\n    self: { name: 'left', instanceId: 'left-1' },\n    provide: { greet: (name: string) => `hello ${name}` },\n    connect: async (context) => createNodeThreadChannel(port1, 'right-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  }),\n  createThreadPeer<{ greet(name: string): string }>({\n    self: { name: 'right', instanceId: 'right-1' },\n    connect: async (context) => createNodeThreadChannel(port2, 'left-1', {\n      scheduler: systemScheduler,\n      capabilities: context.capabilities\n    }),\n    report\n  })\n])\ntry {\n  console.log(await right.request('greet', 'world')) // hello world\n} finally {\n  await Promise.all([left.close(), right.close()])\n  port1.close()\n  port2.close()\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createNodeThreadChannel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1207,11 +1440,41 @@
               "content": "No additional advanced behavior is declared for createNodeThreadChannel."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createNodeThreadChannel:export declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;\nexport declare function createNodeThreadChannel(port: INodeMessagePortLike, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
           "guidance": [],
           "usageScore": 26,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接：",
+              "descriptionEn": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionZh": "已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接："
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。",
+              "descriptionEn": "",
+              "descriptionZh": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。"
+            }
+          ],
           "fragment": "rpc-threads-index--createNodeThreadChannel"
         },
         {
@@ -1256,6 +1519,7 @@
             "// main.ts：先保存本节的 signing.ts 和 worker.ts，并编译为同目录的 .js。\nimport { createThreadPeer } from '@migaia/rpc-threads'\nimport { randomBytes } from 'node:crypto'\n\n/** 本地示例生成演示密钥；部署时应由双方配置提供 RPC_SIGNING_KEY。 */\nprocess.env.RPC_SIGNING_KEY ??= randomBytes(32).toString('hex')\n/** 设置环境后才加载签名模块，实际 Worker 继承同一环境。 */\nconst { authentication } = await import('./signing.js')\n\ntype IBytesApi = {\n  bytes: { inspect(buffer: ArrayBuffer): { length: number; first: number } }\n}\n/** 短 source 保留同一签名与原生 transfer owner，无需重复 Worker wiring。 */\nconst worker = await createThreadPeer<IBytesApi>({\n  spawn: new URL('./worker.js', import.meta.url),\n  authentication\n})\ntry {\n  const buffer = new Uint8Array([7, 8, 9]).buffer\n  console.log(await worker.request('bytes.inspect', buffer, { transfer: [buffer] }))\n  // { length: 3, first: 7 }\n  console.log(buffer.byteLength) // 0：已转移，原 buffer 失效\n} finally {\n  await worker.close()\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "createThreadPeer",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1310,11 +1574,209 @@
               "content": "No additional advanced behavior is declared for createThreadPeer."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "spawn",
+              "type": "IRuntimePeerSource | IRuntimeThreadSpawn<THandle> | IRuntimeThreadShortSpawn<THandle> | true | IUrlLike",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "endpointFactory",
+              "type": "(channel: IRemoteChannelResources, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>",
+              "optional": true,
+              "description": "A custom runtime assembly receives only the operations held by this channel view."
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "provide",
+              "type": "IRuntimePeerProvide",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "connect",
+              "type": "IRuntimePeerSource",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "listen",
+              "type": "IRuntimePeerSource",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint."
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection."
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Only request/stream inherit this positive default in their original timeout scope."
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner."
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/peer.d.ts:createThreadPeer:export declare function createThreadPeer<TRemote = Record<never, never>>(options: IRuntimeThreadPeerOptions, runtime?: IThreadRuntimeResource): Promise<IRuntimeTypedPeer<TRemote>>;",
           "guidance": [],
           "usageScore": 174,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "把下面两个文件编译为同目录的 `worker.js` 与 `main.js`，然后运行 `main.js`。默认 `report` 为 `console.error`。",
+              "descriptionEn": "",
+              "descriptionZh": "把下面两个文件编译为同目录的 `worker.js` 与 `main.js`，然后运行 `main.js`。默认 `report` 为 `console.error`。"
+            },
+            {
+              "name": "spawn",
+              "type": "IRuntimePeerSource | IRuntimeThreadSpawn<THandle> | IRuntimeThreadShortSpawn<THandle> | true | IUrlLike",
+              "optional": true,
+              "description": "普通 TS Worker 只需根入口；短 `spawn` 会延迟加载当前运行时的 adapter。自定义完整 source 时，只导入当前平台的 `./adapters/*` 子路径（第 8 节）。",
+              "descriptionEn": "",
+              "descriptionZh": "普通 TS Worker 只需根入口；短 `spawn` 会延迟加载当前运行时的 adapter。自定义完整 source 时，只导入当前平台的 `./adapters/*` 子路径（第 8 节）。"
+            },
+            {
+              "name": "endpointFactory",
+              "type": "(channel: IRemoteChannelResources, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>",
+              "optional": true,
+              "description": "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。",
+              "descriptionEn": "A custom runtime assembly receives only the operations held by this channel view.",
+              "descriptionZh": "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。"
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": "保存为 `self.ts`，编译为 `self.js` 后运行。整个模块会在 Worker 中再次执行；所有只属于主线程的副作用都应放在 `else` 分支：",
+              "descriptionEn": "",
+              "descriptionZh": "保存为 `self.ts`，编译为 `self.js` 后运行。整个模块会在 Worker 中再次执行；所有只属于主线程的副作用都应放在 `else` 分支："
+            },
+            {
+              "name": "provide",
+              "type": "IRuntimePeerProvide",
+              "optional": true,
+              "description": "`provide` 的规则与进程版相同：只读取对象自身的可枚举数据属性，嵌套对象生成点分路径；返回 iterable 或 async iterable 的方法通过 `stream` 调用。",
+              "descriptionEn": "",
+              "descriptionZh": "`provide` 的规则与进程版相同：只读取对象自身的可枚举数据属性，嵌套对象生成点分路径；返回 iterable 或 async iterable 的方法通过 `stream` 调用。"
+            },
+            {
+              "name": "connect",
+              "type": "IRuntimePeerSource",
+              "optional": true,
+              "description": "已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接：",
+              "descriptionEn": "",
+              "descriptionZh": "已有 `MessagePort` 可以作为 `connect` 来源。双方把 Core 提供的 `context.capabilities` 交给 channel；Core 在实际端口上交换 ACK，只有双方都提供的能力才会启用。双方应同时开始连接："
+            },
+            {
+              "name": "listen",
+              "type": "IRuntimePeerSource",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。",
+              "descriptionEn": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "descriptionZh": "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。"
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "descriptionEn": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Only request/stream inherit this positive default in their original timeout scope.",
+              "descriptionEn": "Only request/stream inherit this positive default in their original timeout scope.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionEn": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。",
+              "descriptionEn": "",
+              "descriptionZh": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。"
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。",
+              "descriptionEn": "",
+              "descriptionZh": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。"
+            }
+          ],
           "fragment": "rpc-threads-index--createThreadPeer"
         },
         {
@@ -1326,19 +1788,29 @@
           "purpose": "Install a symmetric connection into the original canonical thread slot.",
           "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for createThreadPlugin.",
           "advanced": "No additional advanced behavior is declared for createThreadPlugin.",
-          "parameters": ["'@migaia/rpc-core/remote': unknown"],
+          "parameters": [
+            "options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>",
+            "runtime: IThreadRuntimeResource (optional)"
+          ],
           "parameterDetails": [
             {
-              "name": "'@migaia/rpc-core/remote'",
-              "type": "unknown",
-              "optional": false
+              "name": "options",
+              "type": "Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>",
+              "optional": false,
+              "configurationType": "Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: string; provide?: import; expose?: readonly & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>"
+            },
+            {
+              "name": "runtime",
+              "type": "IThreadRuntimeResource",
+              "optional": true
             }
           ],
-          "returns": ".IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>, runtime?: IThreadRuntimeResource): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>",
+          "returns": "ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>",
           "errors": ["No documented errors are declared for createThreadPlugin."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createThreadPlugin.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "createThreadPlugin",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1347,14 +1819,20 @@
           "overloadParameterDetails": [
             [
               {
-                "name": "'@migaia/rpc-core/remote'",
-                "type": "unknown",
-                "optional": false
+                "name": "options",
+                "type": "Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>",
+                "optional": false,
+                "configurationType": "Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: string; provide?: import; expose?: readonly & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>"
+              },
+              {
+                "name": "runtime",
+                "type": "IThreadRuntimeResource",
+                "optional": true
               }
             ]
           ],
           "overloadReturns": [
-            ".IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>, runtime?: IThreadRuntimeResource): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>"
+            "ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>"
           ],
           "whenToUse": "Use createThreadPlugin when its function contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when createThreadPlugin does not match the required inputs or return contract.",
@@ -1390,11 +1868,279 @@
               "content": "No additional advanced behavior is declared for createThreadPlugin."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "name",
+              "type": "string",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "provide",
+              "type": "import",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "expose",
+              "type": "readonly & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[])",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "spawn",
+              "type": "TSpawn",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "connect",
+              "type": "TConnect",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "listen",
+              "type": "TListen",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "host",
+              "type": "IRemoteHostControlOptions['host']",
+              "optional": true,
+              "description": "Existing Host-control configuration is used only when host is explicitly exposed."
+            },
+            {
+              "name": "catalog",
+              "type": "IRemoteHostControlOptions['catalog']",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "resolvePlugin",
+              "type": "IRemoteHostControlOptions['resolvePlugin']",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "endpointFactory",
+              "type": "(channel: IRemoteChannelResources, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>",
+              "optional": true,
+              "description": "A custom runtime assembly receives only the operations held by this channel view."
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint."
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection."
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Only request/stream inherit this positive default in their original timeout scope."
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner."
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/plugin.d.ts:createThreadPlugin:export declare function createThreadPlugin<TRemote = Record<never, never>, const TProvide extends import('@migaia/rpc-core/remote').IRuntimePeerProvide = Record<never, never>, const TName extends string = string, const TExpose extends readonly string[] = readonly [], THost = unknown>(options: Omit<IRuntimeThreadPluginOptions, 'name' | 'provide' | 'expose'> & Readonly<{ name: TName; provide?: TProvide; expose?: TExpose & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[]); }>, runtime?: IThreadRuntimeResource): ReturnType<typeof createRuntimePlugin> & IRuntimePluginTyping<TRemote, TProvide, TName, TExpose, 'thread'>;",
           "guidance": [],
           "usageScore": 72,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "name",
+              "type": "string",
+              "optional": false,
+              "description": "`{ entry: './worker.js', base: import.meta.url, name: 'math' }` — 显式选择当前模块为相对解析基准，并覆盖 Worker 名字。",
+              "descriptionEn": "",
+              "descriptionZh": "`{ entry: './worker.js', base: import.meta.url, name: 'math' }` — 显式选择当前模块为相对解析基准，并覆盖 Worker 名字。"
+            },
+            {
+              "name": "provide",
+              "type": "import",
+              "optional": true,
+              "description": "`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的短 `spawn`、完整 source、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。下面两个文件编译后，由 Host 持有 Worker，并经 `host.thread` 出口调用：",
+              "descriptionEn": "",
+              "descriptionZh": "`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的短 `spawn`、完整 source、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。下面两个文件编译后，由 Host 持有 Worker，并经 `host.thread` 出口调用："
+            },
+            {
+              "name": "expose",
+              "type": "readonly & (unknown extends THost ? unknown : readonly IRuntimeExpose<IRuntimeRegistry<THost>>[])",
+              "optional": true,
+              "description": "`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的短 `spawn`、完整 source、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。下面两个文件编译后，由 Host 持有 Worker，并经 `host.thread` 出口调用：",
+              "descriptionEn": "",
+              "descriptionZh": "`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的短 `spawn`、完整 source、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。下面两个文件编译后，由 Host 持有 Worker，并经 `host.thread` 出口调用："
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": true,
+              "description": "`report` — `console.error`；可换成应用的错误收集函数。",
+              "descriptionEn": "",
+              "descriptionZh": "`report` — `console.error`；可换成应用的错误收集函数。"
+            },
+            {
+              "name": "spawn",
+              "type": "TSpawn",
+              "optional": true,
+              "description": "普通 TS Worker 只需根入口；短 `spawn` 会延迟加载当前运行时的 adapter。自定义完整 source 时，只导入当前平台的 `./adapters/*` 子路径（第 8 节）。",
+              "descriptionEn": "",
+              "descriptionZh": "普通 TS Worker 只需根入口；短 `spawn` 会延迟加载当前运行时的 adapter。自定义完整 source 时，只导入当前平台的 `./adapters/*` 子路径（第 8 节）。"
+            },
+            {
+              "name": "connect",
+              "type": "TConnect",
+              "optional": true,
+              "description": "能在两个已有的 `MessagePort` 之间直接建立 Peer 吗？ 可以。双方的 `connect` 使用 `createNodeThreadChannel` 或 `createWebThreadChannel`，并传入 `context.capabilities`（第 3 节末尾）。双方同时启动，能力确认由 Core 在实际端口上完成。",
+              "descriptionEn": "",
+              "descriptionZh": "能在两个已有的 `MessagePort` 之间直接建立 Peer 吗？ 可以。双方的 `connect` 使用 `createNodeThreadChannel` 或 `createWebThreadChannel`，并传入 `context.capabilities`（第 3 节末尾）。双方同时启动，能力确认由 Core 在实际端口上完成。"
+            },
+            {
+              "name": "listen",
+              "type": "TListen",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "host",
+              "type": "IRemoteHostControlOptions['host']",
+              "optional": true,
+              "description": "`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的短 `spawn`、完整 source、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。下面两个文件编译后，由 Host 持有 Worker，并经 `host.thread` 出口调用：",
+              "descriptionEn": "Existing Host-control configuration is used only when host is explicitly exposed.",
+              "descriptionZh": "`createThreadPlugin(options, runtime?)` 接受与 `createThreadPeer` 相同的短 `spawn`、完整 source、`provide`，另加 `name`（Host 内的连接名）与可选的 `expose`。下面两个文件编译后，由 Host 持有 Worker，并经 `host.thread` 出口调用："
+            },
+            {
+              "name": "catalog",
+              "type": "IRemoteHostControlOptions['catalog']",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "resolvePlugin",
+              "type": "IRemoteHostControlOptions['resolvePlugin']",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "endpointFactory",
+              "type": "(channel: IRemoteChannelResources, signal: INativeAbortSignal) => Promise<IRemoteServeEndpoint>",
+              "optional": true,
+              "description": "A custom runtime assembly receives only the operations held by this channel view.",
+              "descriptionEn": "A custom runtime assembly receives only the operations held by this channel view.",
+              "descriptionZh": "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。"
+            },
+            {
+              "name": "self",
+              "type": "IRuntimePeerIdentity",
+              "optional": true,
+              "description": "保存为 `self.ts`，编译为 `self.js` 后运行。整个模块会在 Worker 中再次执行；所有只属于主线程的副作用都应放在 `else` 分支：",
+              "descriptionEn": "",
+              "descriptionZh": "保存为 `self.ts`，编译为 `self.js` 后运行。整个模块会在 Worker 中再次执行；所有只属于主线程的副作用都应放在 `else` 分支："
+            },
+            {
+              "name": "providerLimits",
+              "type": "IRpcProviderLimits",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "authentication",
+              "type": "IRpcAuthenticationConfig",
+              "optional": true,
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "descriptionEn": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "descriptionZh": "双方的 `createThreadPeer` 配置 `authentication: { sign, verify }` 即可使用普通 factory；无需自定义 `endpointFactory`。原生二进制 profile 要求签名而不加密，且 `encodedType` 为默认的 `any`。库在实际端口上协商能力，由现有认证中间件建立信任事实。未配置签名时仍拒绝 transfer。"
+            },
+            {
+              "name": "probe",
+              "type": "IRpcProbe | readonly IRpcProbe[]",
+              "optional": true,
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "descriptionEn": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Only request/stream inherit this positive default in their original timeout scope.",
+              "descriptionEn": "Only request/stream inherit this positive default in their original timeout scope.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "contract",
+              "type": "IRemoteContract",
+              "optional": true,
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionEn": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "keyFactory",
+              "type": "() => string",
+              "optional": true,
+              "description": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。",
+              "descriptionEn": "",
+              "descriptionZh": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。"
+            },
+            {
+              "name": "retryPort",
+              "type": "IRemoteRetryPort",
+              "optional": true,
+              "description": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。",
+              "descriptionEn": "",
+              "descriptionZh": "`keyFactory`、`retryPort` — 可选，复用完整 source 的幂等键生成与重试配置；顶层同名选项优先。"
+            }
+          ],
           "fragment": "rpc-threads-index--createThreadPlugin"
         },
         {
@@ -1439,6 +2185,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebThreadChannel.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "createWebThreadChannel",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1519,11 +2266,41 @@
               "content": "No additional advanced behavior is declared for createWebThreadChannel."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/channel.d.ts:createWebThreadChannel:export declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions & Readonly<{ capabilities?: readonly (typeof RpcCapability.stream | typeof RpcCapability.batch)[]; }>): IRuntimePeerSourceResult;\nexport declare function createWebThreadChannel(port: IThreadWebPort, peerId: string, options: IThreadChannelOptions): IRuntimePeerSourceResult | Promise<IRuntimePeerSourceResult>;",
           "guidance": [],
           "usageScore": 8,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "`createNodeThreadChannel`、`createWebThreadChannel` — 在借用端口上构造通道；固定基础能力同步返回，扩展 `capabilities` 等待 Core 双边 ACK",
+              "descriptionEn": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionZh": "`createNodeThreadChannel`、`createWebThreadChannel` — 在借用端口上构造通道；固定基础能力同步返回，扩展 `capabilities` 等待 Core 双边 ACK"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": "`createWebThreadChannelFactory({ scheduler })` — 与上面的 launcher 配套",
+              "descriptionEn": "",
+              "descriptionZh": "`createWebThreadChannelFactory({ scheduler })` — 与上面的 launcher 配套"
+            }
+          ],
           "fragment": "rpc-threads-index--createWebThreadChannel"
         },
         {
@@ -1548,6 +2325,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebThreadChannelFactory.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "createAdapterWebThreadChannelFactory",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1597,11 +2375,41 @@
               "content": "No additional advanced behavior is declared for createWebThreadChannelFactory."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:createWebThreadChannelFactory:export declare function createWebThreadChannelFactory(options: IThreadChannelOptions): IThreadChannelFactory<IWebThreadHandle>;",
           "guidance": [],
           "usageScore": 4,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": "`createWebThreadChannelFactory({ scheduler })` — 与上面的 launcher 配套",
+              "descriptionEn": "",
+              "descriptionZh": "`createWebThreadChannelFactory({ scheduler })` — 与上面的 launcher 配套"
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "`createNodeThreadChannel`、`createWebThreadChannel` — 在借用端口上构造通道；固定基础能力同步返回，扩展 `capabilities` 等待 Core 双边 ACK",
+              "descriptionEn": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionZh": "`createNodeThreadChannel`、`createWebThreadChannel` — 在借用端口上构造通道；固定基础能力同步返回，扩展 `capabilities` 等待 Core 双边 ACK"
+            }
+          ],
           "fragment": "rpc-threads-index--createWebThreadChannelFactory"
         },
         {
@@ -1626,6 +2434,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createWebThreadLauncher.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "createAdapterWebThreadLauncher",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1675,11 +2484,55 @@
               "content": "No additional advanced behavior is declared for createWebThreadLauncher."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/web-launcher.d.ts:createWebThreadLauncher:export declare function createWebThreadLauncher(options: IWebThreadLauncherOptions): IThreadLauncher<IAdapterWebThreadHandle>;",
           "guidance": [],
           "usageScore": 4,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）",
+              "descriptionEn": "",
+              "descriptionZh": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）"
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）",
+              "descriptionEn": "",
+              "descriptionZh": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）"
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-index--createWebThreadLauncher"
         },
         {
@@ -1697,7 +2550,38 @@
           "errors": ["No documented errors are declared for IAdapterNodeThreadHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAdapterNodeThreadHandle.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "open",
+              "kind": "method",
+              "optional": false,
+              "signature": "open(signal: IAbortSignal, options: IThreadChannelOptions): Promise<IRuntimePeerSourceResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "signal",
+                  "type": "IAbortSignal",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IThreadChannelOptions",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IRuntimePeerSourceResult>"
+            },
+            {
+              "name": "port",
+              "kind": "property",
+              "optional": false,
+              "signature": "port: INodeMessagePortLike;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INodeMessagePortLike"
+            }
+          ],
+          "composes": ["IThreadHandle"],
           "aliasOf": "IAdapterNodeThreadHandle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1761,7 +2645,47 @@
           "errors": ["No documented errors are declared for IAdapterWebThreadHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IAdapterWebThreadHandle.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "open",
+              "kind": "method",
+              "optional": false,
+              "signature": "open(signal: IAbortSignal, options: IThreadChannelOptions): Promise<IRuntimePeerSourceResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "signal",
+                  "type": "IAbortSignal",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IThreadChannelOptions",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IRuntimePeerSourceResult>"
+            },
+            {
+              "name": "port",
+              "kind": "property",
+              "optional": false,
+              "signature": "port: IThreadWebPort;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadWebPort"
+            },
+            {
+              "name": "prepared",
+              "kind": "property",
+              "optional": false,
+              "signature": "prepared: Promise<void | readonly string[]>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void | readonly string[]>"
+            }
+          ],
+          "composes": ["IThreadHandle"],
           "aliasOf": "IAdapterWebThreadHandle",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1826,6 +2750,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRpcThreadErrorCode.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IRpcThreadErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1889,7 +2814,135 @@
           "errors": ["No documented errors are declared for IRuntimeConnectionDetail."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeConnectionDetail.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "identity",
+              "kind": "property",
+              "optional": false,
+              "signature": "identity: IRuntimePeerIdentity | IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity | IRuntimeUnavailable"
+            },
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": false,
+              "signature": "generation: IRpcRuntimeGeneration | IRuntimeUnavailable;",
+              "description": "Accepted remote identity is distinct from the local supervisor's physical attempt number.",
+              "parameterDetails": [],
+              "returns": "IRpcRuntimeGeneration | IRuntimeUnavailable"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "kind: RuntimeSourceKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "RuntimeSourceKind"
+            },
+            {
+              "name": "direction",
+              "kind": "property",
+              "optional": false,
+              "signature": "direction: RuntimeConnectionDirection;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "RuntimeConnectionDirection"
+            },
+            {
+              "name": "carrier",
+              "kind": "property",
+              "optional": false,
+              "signature": "carrier: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "connection",
+              "kind": "property",
+              "optional": false,
+              "signature": "connection: Readonly<{ status: string | IRuntimeUnavailable; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ status: string | IRuntimeUnavailable; }>"
+            },
+            {
+              "name": "unit",
+              "kind": "property",
+              "optional": false,
+              "signature": "unit: IRuntimeUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | Readonly<{ kind: string; state: string; generation: number; degraded: readonly string[]; }>"
+            },
+            {
+              "name": "health",
+              "kind": "property",
+              "optional": false,
+              "signature": "health: IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number; }>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | IRuntimeMetric<Readonly<{ state: string; failures: number; }>>"
+            },
+            {
+              "name": "restartCount",
+              "kind": "property",
+              "optional": false,
+              "signature": "restartCount: IRuntimeUnavailable | IRuntimeMetric;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | IRuntimeMetric"
+            },
+            {
+              "name": "methods",
+              "kind": "property",
+              "optional": false,
+              "signature": "methods: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "counters",
+              "kind": "property",
+              "optional": false,
+              "signature": "counters: IRuntimeUnavailable | IRuntimeCounters;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | IRuntimeCounters"
+            },
+            {
+              "name": "resources",
+              "kind": "property",
+              "optional": false,
+              "signature": "resources: IRuntimeUnavailable | IRuntimeResources;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | IRuntimeResources"
+            },
+            {
+              "name": "recent",
+              "kind": "property",
+              "optional": false,
+              "signature": "recent: readonly IRuntimeRecent[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRuntimeRecent[]"
+            },
+            {
+              "name": "lastExit",
+              "kind": "property",
+              "optional": false,
+              "signature": "lastExit: IRuntimeUnavailable | Readonly<{ generation: number; reason: string; code: number | IRuntimeUnavailable; signal: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | Readonly<{ generation: number; reason: string; code: number | IRuntimeUnavailable; signal: string | IRuntimeUnavailable; error?: Readonly<{ source?: string; code?: string; }>; observedAt?: number; }>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeConnectionDetail",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1953,7 +3006,108 @@
           "errors": ["No documented errors are declared for IRuntimeDetail."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeDetail.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "identity",
+              "kind": "property",
+              "optional": false,
+              "signature": "identity: IRuntimePeerIdentity;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity"
+            },
+            {
+              "name": "self",
+              "kind": "property",
+              "optional": false,
+              "signature": "self: IRuntimePeerIdentity;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity"
+            },
+            {
+              "name": "methods",
+              "kind": "property",
+              "optional": false,
+              "signature": "methods: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "provide",
+              "kind": "property",
+              "optional": false,
+              "signature": "provide: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "connections",
+              "kind": "property",
+              "optional": false,
+              "signature": "connections: readonly IRuntimeConnectionDetail[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRuntimeConnectionDetail[]"
+            },
+            {
+              "name": "unit",
+              "kind": "property",
+              "optional": false,
+              "signature": "unit: IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable"
+            },
+            {
+              "name": "health",
+              "kind": "property",
+              "optional": false,
+              "signature": "health: IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable"
+            },
+            {
+              "name": "restartCount",
+              "kind": "property",
+              "optional": false,
+              "signature": "restartCount: IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable"
+            },
+            {
+              "name": "counters",
+              "kind": "property",
+              "optional": false,
+              "signature": "counters: IRuntimeUnavailable | IRuntimeCounters;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable | IRuntimeCounters"
+            },
+            {
+              "name": "resources",
+              "kind": "property",
+              "optional": false,
+              "signature": "resources: IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeUnavailable"
+            },
+            {
+              "name": "recent",
+              "kind": "property",
+              "optional": false,
+              "signature": "recent: readonly IRuntimeRecent[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRuntimeRecent[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeDetail",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2018,6 +3172,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeDynamicSurface.",
           "examples": [],
           "members": [],
+          "composes": ["Record"],
           "aliasOf": "IRuntimeDynamicSurface",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2081,7 +3236,117 @@
           "errors": ["No documented errors are declared for IRuntimeEvent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeEvent.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "type",
+              "kind": "property",
+              "optional": false,
+              "signature": "type: RuntimeEventName;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "RuntimeEventName"
+            },
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "instanceId",
+              "kind": "property",
+              "optional": false,
+              "signature": "instanceId: string | IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string | IRuntimeUnavailable"
+            },
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": false,
+              "signature": "generation: number | IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | IRuntimeUnavailable"
+            },
+            {
+              "name": "timestamp",
+              "kind": "property",
+              "optional": false,
+              "signature": "timestamp: number | IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | IRuntimeUnavailable"
+            },
+            {
+              "name": "clock",
+              "kind": "property",
+              "optional": false,
+              "signature": "clock: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "reason",
+              "kind": "property",
+              "optional": true,
+              "signature": "reason?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "code",
+              "kind": "property",
+              "optional": true,
+              "signature": "code?: number | IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | IRuntimeUnavailable"
+            },
+            {
+              "name": "signal",
+              "kind": "property",
+              "optional": true,
+              "signature": "signal?: string | IRuntimeUnavailable;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string | IRuntimeUnavailable"
+            },
+            {
+              "name": "error",
+              "kind": "property",
+              "optional": true,
+              "signature": "error?: Readonly<{ source?: string; code?: string; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ source?: string; code?: string; }>"
+            },
+            {
+              "name": "count",
+              "kind": "property",
+              "optional": true,
+              "signature": "count?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "degraded",
+              "kind": "property",
+              "optional": true,
+              "signature": "degraded?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeEvent",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2145,7 +3410,45 @@
           "errors": ["No documented errors are declared for IRuntimeListFilter."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeListFilter.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": true,
+              "signature": "state?: SupervisorState;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "SupervisorState"
+            },
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": true,
+              "signature": "name?: Readonly<{ exact: string; prefix?: never; }> | Readonly<{ prefix: string; exact?: never; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ exact: string; prefix?: never; }> | Readonly<{ prefix: string; exact?: never; }>"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": true,
+              "signature": "kind?: RuntimeSourceKind;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "RuntimeSourceKind"
+            },
+            {
+              "name": "direction",
+              "kind": "property",
+              "optional": true,
+              "signature": "direction?: RuntimeConnectionDirection;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "RuntimeConnectionDirection"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeListFilter",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2209,7 +3512,18 @@
           "errors": ["No documented errors are declared for IRuntimeListOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeListOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "filter",
+              "kind": "property",
+              "optional": true,
+              "signature": "filter?: IRuntimeListFilter;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeListFilter"
+            }
+          ],
+          "composes": ["IRuntimeQueryOptions"],
           "aliasOf": "IRuntimeListOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2273,7 +3587,27 @@
           "errors": ["No documented errors are declared for IRuntimeOverview."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeOverview.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "self",
+              "kind": "property",
+              "optional": false,
+              "signature": "self: IRuntimePeerIdentity;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity"
+            },
+            {
+              "name": "connections",
+              "kind": "property",
+              "optional": false,
+              "signature": "connections: readonly IRuntimeConnectionDetail[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly IRuntimeConnectionDetail[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeOverview",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2337,7 +3671,18 @@
           "errors": ["No documented errors are declared for IRuntimeQueryOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeQueryOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "format",
+              "kind": "property",
+              "optional": true,
+              "signature": "format?: ISerializeTextFormat;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ISerializeTextFormat"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeQueryOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2401,7 +3746,72 @@
           "errors": ["No documented errors are declared for IRuntimeRecent."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeRecent.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "generation",
+              "kind": "property",
+              "optional": false,
+              "signature": "generation: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "timestamp",
+              "kind": "property",
+              "optional": false,
+              "signature": "timestamp: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "clock",
+              "kind": "property",
+              "optional": false,
+              "signature": "clock: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "kind",
+              "kind": "property",
+              "optional": false,
+              "signature": "kind: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "identity",
+              "kind": "property",
+              "optional": true,
+              "signature": "identity?: IRuntimePeerIdentity;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity"
+            },
+            {
+              "name": "source",
+              "kind": "property",
+              "optional": true,
+              "signature": "source?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "code",
+              "kind": "property",
+              "optional": true,
+              "signature": "code?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeRecent",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2466,6 +3876,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeSurface.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "IRuntimeSurface",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2529,7 +3940,146 @@
           "errors": ["No documented errors are declared for IRuntimeThreadPeerOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeThreadPeerOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": true,
+              "signature": "report?: (error: unknown) => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            },
+            {
+              "name": "spawn",
+              "kind": "property",
+              "optional": true,
+              "signature": "spawn?: IRuntimePeerSource | IRuntimeThreadSpawn<THandle> | IRuntimeThreadShortSpawn<THandle> | true | IUrlLike;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerSource | IRuntimeThreadSpawn<THandle> | IRuntimeThreadShortSpawn<THandle> | true | IUrlLike"
+            },
+            {
+              "name": "endpointFactory",
+              "kind": "method",
+              "optional": true,
+              "signature": "endpointFactory?(channel: IRemoteChannelResources, signal: INativeAbortSignal): Promise<IRemoteServeEndpoint>;",
+              "description": "A custom runtime assembly receives only the operations held by this channel view.",
+              "parameterDetails": [
+                {
+                  "name": "channel",
+                  "type": "IRemoteChannelResources",
+                  "optional": false
+                },
+                {
+                  "name": "signal",
+                  "type": "INativeAbortSignal",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IRemoteServeEndpoint>"
+            },
+            {
+              "name": "self",
+              "kind": "property",
+              "optional": true,
+              "signature": "self?: IRuntimePeerIdentity;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity"
+            },
+            {
+              "name": "provide",
+              "kind": "property",
+              "optional": true,
+              "signature": "provide?: IRuntimePeerProvide;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerProvide"
+            },
+            {
+              "name": "connect",
+              "kind": "property",
+              "optional": true,
+              "signature": "connect?: IRuntimePeerSource;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerSource"
+            },
+            {
+              "name": "listen",
+              "kind": "property",
+              "optional": true,
+              "signature": "listen?: IRuntimePeerSource;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerSource"
+            },
+            {
+              "name": "providerLimits",
+              "kind": "property",
+              "optional": true,
+              "signature": "providerLimits?: IRpcProviderLimits;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcProviderLimits"
+            },
+            {
+              "name": "authentication",
+              "kind": "property",
+              "optional": true,
+              "signature": "authentication?: IRpcAuthenticationConfig;",
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "parameterDetails": [],
+              "returns": "IRpcAuthenticationConfig"
+            },
+            {
+              "name": "probe",
+              "kind": "property",
+              "optional": true,
+              "signature": "probe?: IRpcProbe | readonly IRpcProbe[];",
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "parameterDetails": [],
+              "returns": "IRpcProbe | readonly IRpcProbe[]"
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "defaultTimeoutMs?: number;",
+              "description": "Only request/stream inherit this positive default in their original timeout scope.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "contract",
+              "kind": "property",
+              "optional": true,
+              "signature": "contract?: IRemoteContract;",
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "parameterDetails": [],
+              "returns": "IRemoteContract"
+            },
+            {
+              "name": "keyFactory",
+              "kind": "property",
+              "optional": true,
+              "signature": "keyFactory?: () => string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => string"
+            },
+            {
+              "name": "retryPort",
+              "kind": "property",
+              "optional": true,
+              "signature": "retryPort?: IRemoteRetryPort;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRemoteRetryPort"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeThreadPeerOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2593,7 +4143,191 @@
           "errors": ["No documented errors are declared for IRuntimeThreadPluginOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeThreadPluginOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "report",
+              "kind": "property",
+              "optional": true,
+              "signature": "report?: (error: unknown) => void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(error: unknown) => void"
+            },
+            {
+              "name": "spawn",
+              "kind": "property",
+              "optional": true,
+              "signature": "spawn?: TSpawn;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TSpawn"
+            },
+            {
+              "name": "connect",
+              "kind": "property",
+              "optional": true,
+              "signature": "connect?: TConnect;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TConnect"
+            },
+            {
+              "name": "listen",
+              "kind": "property",
+              "optional": true,
+              "signature": "listen?: TListen;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TListen"
+            },
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": false,
+              "signature": "name: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "expose",
+              "kind": "property",
+              "optional": true,
+              "signature": "expose?: readonly string[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            },
+            {
+              "name": "host",
+              "kind": "property",
+              "optional": true,
+              "signature": "host?: IRemoteHostControlOptions['host'];",
+              "description": "Existing Host-control configuration is used only when host is explicitly exposed.",
+              "parameterDetails": [],
+              "returns": "IRemoteHostControlOptions['host']"
+            },
+            {
+              "name": "catalog",
+              "kind": "property",
+              "optional": true,
+              "signature": "catalog?: IRemoteHostControlOptions['catalog'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRemoteHostControlOptions['catalog']"
+            },
+            {
+              "name": "resolvePlugin",
+              "kind": "property",
+              "optional": true,
+              "signature": "resolvePlugin?: IRemoteHostControlOptions['resolvePlugin'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRemoteHostControlOptions['resolvePlugin']"
+            },
+            {
+              "name": "endpointFactory",
+              "kind": "method",
+              "optional": true,
+              "signature": "endpointFactory?(channel: IRemoteChannelResources, signal: INativeAbortSignal): Promise<IRemoteServeEndpoint>;",
+              "description": "A custom runtime assembly receives only the operations held by this channel view.",
+              "parameterDetails": [
+                {
+                  "name": "channel",
+                  "type": "IRemoteChannelResources",
+                  "optional": false
+                },
+                {
+                  "name": "signal",
+                  "type": "INativeAbortSignal",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IRemoteServeEndpoint>"
+            },
+            {
+              "name": "self",
+              "kind": "property",
+              "optional": true,
+              "signature": "self?: IRuntimePeerIdentity;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity"
+            },
+            {
+              "name": "provide",
+              "kind": "property",
+              "optional": true,
+              "signature": "provide?: IRuntimePeerProvide;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerProvide"
+            },
+            {
+              "name": "providerLimits",
+              "kind": "property",
+              "optional": true,
+              "signature": "providerLimits?: IRpcProviderLimits;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcProviderLimits"
+            },
+            {
+              "name": "authentication",
+              "kind": "property",
+              "optional": true,
+              "signature": "authentication?: IRpcAuthenticationConfig;",
+              "description": "Existing per-frame credentials enable signed native transfer without a custom endpoint.",
+              "parameterDetails": [],
+              "returns": "IRpcAuthenticationConfig"
+            },
+            {
+              "name": "probe",
+              "kind": "property",
+              "optional": true,
+              "signature": "probe?: IRpcProbe | readonly IRpcProbe[];",
+              "description": "Installs an endpoint-local synchronous observer without changing pipeline selection.",
+              "parameterDetails": [],
+              "returns": "IRpcProbe | readonly IRpcProbe[]"
+            },
+            {
+              "name": "defaultTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "defaultTimeoutMs?: number;",
+              "description": "Only request/stream inherit this positive default in their original timeout scope.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "contract",
+              "kind": "property",
+              "optional": true,
+              "signature": "contract?: IRemoteContract;",
+              "description": "Explicit advanced schema, modes and idempotency retain their original contract owner.",
+              "parameterDetails": [],
+              "returns": "IRemoteContract"
+            },
+            {
+              "name": "keyFactory",
+              "kind": "property",
+              "optional": true,
+              "signature": "keyFactory?: () => string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => string"
+            },
+            {
+              "name": "retryPort",
+              "kind": "property",
+              "optional": true,
+              "signature": "retryPort?: IRemoteRetryPort;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRemoteRetryPort"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeThreadPluginOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2657,7 +4391,141 @@
           "errors": ["No documented errors are declared for IRuntimeThreadShortSpawn."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeThreadShortSpawn.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "entry",
+              "kind": "property",
+              "optional": false,
+              "signature": "entry: true | IUrlLike;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "true | IUrlLike"
+            },
+            {
+              "name": "base",
+              "kind": "property",
+              "optional": true,
+              "signature": "base?: IUrlLike;",
+              "description": "Explicit module URL or URL string changes only relative entry resolution.",
+              "parameterDetails": [],
+              "returns": "IUrlLike"
+            },
+            {
+              "name": "name",
+              "kind": "property",
+              "optional": true,
+              "signature": "name?: IThreadSpec['name'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSpec['name']"
+            },
+            {
+              "name": "data",
+              "kind": "property",
+              "optional": true,
+              "signature": "data?: IThreadSpec['data'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSpec['data']"
+            },
+            {
+              "name": "limits",
+              "kind": "property",
+              "optional": true,
+              "signature": "limits?: IThreadSpec['limits'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSpec['limits']"
+            },
+            {
+              "name": "launcher",
+              "kind": "property",
+              "optional": true,
+              "signature": "launcher: IThreadSupervisorOptions<THandle>['launcher'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSupervisorOptions<THandle>['launcher']"
+            },
+            {
+              "name": "budget",
+              "kind": "property",
+              "optional": true,
+              "signature": "budget: IThreadSupervisorOptions<THandle>['budget'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSupervisorOptions<THandle>['budget']"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler: IScheduler;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "channelFactory",
+              "kind": "property",
+              "optional": true,
+              "signature": "channelFactory: IThreadChannelFactory<THandle>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadChannelFactory<THandle>"
+            },
+            {
+              "name": "report",
+              "kind": "method",
+              "optional": true,
+              "signature": "report(error: unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "health",
+              "kind": "property",
+              "optional": true,
+              "signature": "health?: IThreadSupervisorOptions<THandle>['health'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSupervisorOptions<THandle>['health']"
+            },
+            {
+              "name": "supervisor",
+              "kind": "property",
+              "optional": true,
+              "signature": "supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>"
+            },
+            {
+              "name": "keyFactory",
+              "kind": "property",
+              "optional": true,
+              "signature": "keyFactory?: () => string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => string"
+            },
+            {
+              "name": "retryPort",
+              "kind": "property",
+              "optional": true,
+              "signature": "retryPort?: IRemoteRetryPort;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRemoteRetryPort"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeThreadShortSpawn",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2721,7 +4589,105 @@
           "errors": ["No documented errors are declared for IRuntimeThreadSpawn."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeThreadSpawn.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "spec",
+              "kind": "property",
+              "optional": false,
+              "signature": "spec: IThreadSpec;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSpec"
+            },
+            {
+              "name": "launcher",
+              "kind": "property",
+              "optional": false,
+              "signature": "launcher: IThreadSupervisorOptions<THandle>['launcher'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSupervisorOptions<THandle>['launcher']"
+            },
+            {
+              "name": "budget",
+              "kind": "property",
+              "optional": false,
+              "signature": "budget: IThreadSupervisorOptions<THandle>['budget'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSupervisorOptions<THandle>['budget']"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": false,
+              "signature": "scheduler: IScheduler;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "channelFactory",
+              "kind": "property",
+              "optional": false,
+              "signature": "channelFactory: IThreadChannelFactory<THandle>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadChannelFactory<THandle>"
+            },
+            {
+              "name": "report",
+              "kind": "method",
+              "optional": false,
+              "signature": "report(error: unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "health",
+              "kind": "property",
+              "optional": true,
+              "signature": "health?: IThreadSupervisorOptions<THandle>['health'];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadSupervisorOptions<THandle>['health']"
+            },
+            {
+              "name": "supervisor",
+              "kind": "property",
+              "optional": true,
+              "signature": "supervisor?: Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Partial<Pick<IThreadSupervisorOptions<THandle>, 'id' | 'ready' | 'startupTimeoutMs' | 'restart' | 'terminalPolicy' | 'stop' | 'isolation'>>"
+            },
+            {
+              "name": "keyFactory",
+              "kind": "property",
+              "optional": true,
+              "signature": "keyFactory?: () => string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => string"
+            },
+            {
+              "name": "retryPort",
+              "kind": "property",
+              "optional": true,
+              "signature": "retryPort?: IRemoteRetryPort;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRemoteRetryPort"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeThreadSpawn",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2785,7 +4751,18 @@
           "errors": ["No documented errors are declared for IRuntimeThreadStopOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeThreadStopOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "graceMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "graceMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeThreadStopOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2849,7 +4826,156 @@
           "errors": ["No documented errors are declared for IRuntimeTypedPeer."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeTypedPeer.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "group",
+              "kind": "method",
+              "optional": false,
+              "signature": "group<Steps extends readonly IRuntimeGroupStep<S>[]>(steps: Steps, options?: IRuntimeFamilyGroupOptions<K>): Promise<readonly IRpcRuntimeStepOutcome[]>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "steps",
+                  "type": "Steps",
+                  "optional": false,
+                  "configurationType": "readonly"
+                },
+                {
+                  "name": "options",
+                  "type": "IRuntimeFamilyGroupOptions<K>",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<readonly IRpcRuntimeStepOutcome[]>"
+            },
+            {
+              "name": "request",
+              "kind": "method",
+              "optional": false,
+              "signature": "request<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<IRuntimeResult<S[M]>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "M",
+                  "optional": false,
+                  "configurationType": "Extract"
+                },
+                {
+                  "name": "args",
+                  "type": "[...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]",
+                  "optional": false,
+                  "configurationType": "[...IRuntimePayload<S[Extract]>, options?: IRuntimeFamilyCallOptions<K>]"
+                }
+              ],
+              "returns": "Promise<IRuntimeResult<S[M]>>"
+            },
+            {
+              "name": "notify",
+              "kind": "method",
+              "optional": false,
+              "signature": "notify<M extends Extract<IRuntimeScalarKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "M",
+                  "optional": false,
+                  "configurationType": "Extract"
+                },
+                {
+                  "name": "args",
+                  "type": "[...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]",
+                  "optional": false,
+                  "configurationType": "[...IRuntimePayload<S[Extract]>, options?: IRuntimeFamilyCallOptions<K>]"
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "stream",
+              "kind": "method",
+              "optional": false,
+              "signature": "stream<M extends Extract<IRuntimeStreamKeys<S>, string>>(method: M, ...args: [...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]): AsyncIterableIterator<IRuntimeYield<S[M]>>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "method",
+                  "type": "M",
+                  "optional": false,
+                  "configurationType": "Extract"
+                },
+                {
+                  "name": "args",
+                  "type": "[...IRuntimePayload<S[M]>, options?: IRuntimeFamilyCallOptions<K>]",
+                  "optional": false,
+                  "configurationType": "[...IRuntimePayload<S[Extract]>, options?: IRuntimeFamilyCallOptions<K>]"
+                }
+              ],
+              "returns": "AsyncIterableIterator<IRuntimeYield<S[M]>>"
+            },
+            {
+              "name": "self",
+              "kind": "property",
+              "optional": false,
+              "signature": "self: IRuntimePeerIdentity;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerIdentity"
+            },
+            {
+              "name": "outcome",
+              "kind": "method",
+              "optional": false,
+              "signature": "outcome(idempotencyKey: string): Promise<IRpcRuntimeOutcomeResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "idempotencyKey",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IRpcRuntimeOutcomeResult>"
+            },
+            {
+              "name": "describe",
+              "kind": "property",
+              "optional": false,
+              "signature": "describe: IRuntimeQuery<IRuntimeDetail>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimeQuery<IRuntimeDetail>"
+            },
+            {
+              "name": "on",
+              "kind": "property",
+              "optional": false,
+              "signature": "on: IRuntimeEventPublisher['on'];",
+              "description": "Subscribe from now on; factory resolution already represents initial accepted readiness.",
+              "parameterDetails": [],
+              "returns": "IRuntimeEventPublisher['on']"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): Promise<void>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "[Symbol.asyncDispose]",
+              "kind": "method",
+              "optional": false,
+              "signature": "[Symbol.asyncDispose](): Promise<void>;",
+              "description": "Scoped cleanup is the exact original close operation, including its Promise identity.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeTypedPeer",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2913,7 +5039,27 @@
           "errors": ["No documented errors are declared for IRuntimeUnavailable."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IRuntimeUnavailable.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "status",
+              "kind": "property",
+              "optional": false,
+              "signature": "status: 'unavailable';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'unavailable'"
+            },
+            {
+              "name": "reason",
+              "kind": "property",
+              "optional": false,
+              "signature": "reason: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IRuntimeUnavailable",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2981,6 +5127,7 @@
             "import { createThreadPeer, isThreadChild } from '@migaia/rpc-threads'\n\ntype IMathApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createThreadPeer({ provide: { double: (value: number) => value * 2 } })\n} else {\n  /** 当前主入口的副本提供计算方法。 */\n  const worker = await createThreadPeer<IMathApi>({ spawn: true })\n  try {\n    console.log(await worker.request('double', 21)) // 42\n  } finally {\n    await worker.close()\n  }\n}"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "isThreadChild",
           "exportPath": ".",
           "overloadSignatures": ["export declare function isThreadChild(): Promise<boolean>;"],
@@ -3042,7 +5189,27 @@
           "errors": ["No documented errors are declared for IThreadBootstrapData."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadBootstrapData.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "peerId",
+              "kind": "property",
+              "optional": false,
+              "signature": "peerId: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "data",
+              "kind": "property",
+              "optional": true,
+              "signature": "data?: IRpcPortableValue;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcPortableValue"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IThreadBootstrapData",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3106,7 +5273,29 @@
           "errors": ["No documented errors are declared for IThreadChannelFactory."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadChannelFactory.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "open",
+              "kind": "method",
+              "optional": false,
+              "signature": "open(handle: THandle, signal: IAbortSignal): Promise<IRemoteChannel>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "handle",
+                  "type": "THandle",
+                  "optional": false
+                },
+                {
+                  "name": "signal",
+                  "type": "IAbortSignal",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<IRemoteChannel>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IThreadChannelFactory",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3170,7 +5359,27 @@
           "errors": ["No documented errors are declared for IThreadChannelOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadChannelOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": false,
+              "signature": "scheduler: IScheduler;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            },
+            {
+              "name": "capabilities",
+              "kind": "property",
+              "optional": true,
+              "signature": "capabilities?: readonly string[];",
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "parameterDetails": [],
+              "returns": "readonly string[]"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IThreadChannelOptions",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3234,7 +5443,36 @@
           "errors": ["No documented errors are declared for IThreadNativeRuntimeModule."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadNativeRuntimeModule.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "Worker",
+              "kind": "property",
+              "optional": false,
+              "signature": "Worker: IThreadNativeWorkerConstructor;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadNativeWorkerConstructor"
+            },
+            {
+              "name": "parentPort",
+              "kind": "property",
+              "optional": false,
+              "signature": "parentPort: IThreadParentPort | null;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadParentPort | null"
+            },
+            {
+              "name": "workerData",
+              "kind": "property",
+              "optional": false,
+              "signature": "workerData: unknown;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "unknown"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IThreadNativeRuntimeModule",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3298,7 +5536,149 @@
           "errors": ["No documented errors are declared for IThreadNativeWorker."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadNativeWorker.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "threadId",
+              "kind": "property",
+              "optional": false,
+              "signature": "threadId: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "postMessage",
+              "kind": "method",
+              "optional": false,
+              "signature": "postMessage(message: unknown, transfer?: readonly unknown[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "transfer",
+                  "type": "readonly unknown[]",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "on",
+              "kind": "method",
+              "optional": false,
+              "signature": "on(event: string, listener: (...args: any[]) => void): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(...args: any[]) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "off",
+              "kind": "method",
+              "optional": false,
+              "signature": "off(event: string, listener: (...args: any[]) => void): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(...args: any[]) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "once",
+              "kind": "method",
+              "optional": false,
+              "signature": "once(event: 'exit', listener: (code: number) => void): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "'exit'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(code: number) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "listenerCount",
+              "kind": "method",
+              "optional": false,
+              "signature": "listenerCount(event: 'message'): number;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "'message'",
+                  "optional": false
+                }
+              ],
+              "returns": "number"
+            },
+            {
+              "name": "terminate",
+              "kind": "method",
+              "optional": false,
+              "signature": "terminate(): Promise<number>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<number>"
+            },
+            {
+              "name": "getHeapStatistics",
+              "kind": "property",
+              "optional": true,
+              "signature": "getHeapStatistics?: () => Promise<{ used_heap_size: number; total_heap_size: number; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => Promise<{ used_heap_size: number; total_heap_size: number; }>"
+            },
+            {
+              "name": "cpuUsage",
+              "kind": "property",
+              "optional": true,
+              "signature": "cpuUsage?: () => Promise<{ user: number; system: number; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "() => Promise<{ user: number; system: number; }>"
+            },
+            {
+              "name": "performance",
+              "kind": "property",
+              "optional": true,
+              "signature": "performance?: Readonly<{ eventLoopUtilization(): { active: number; idle: number; utilization: number; }; }>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Readonly<{ eventLoopUtilization(): { active: number; idle: number; utilization: number; }; }>"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IThreadNativeWorker",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3363,6 +5743,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadNativeWorkerConstructor.",
           "examples": [],
           "members": [],
+          "composes": ["IThreadNativeWorker"],
           "aliasOf": "IThreadNativeWorkerConstructor",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3426,7 +5807,44 @@
           "errors": ["No documented errors are declared for IThreadParentPort."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadParentPort.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "once",
+              "kind": "method",
+              "optional": false,
+              "signature": "once(event: 'close', listener: () => void): unknown;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "'close'",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "() => void",
+                  "optional": false
+                }
+              ],
+              "returns": "unknown"
+            },
+            {
+              "name": "listenerCount",
+              "kind": "method",
+              "optional": false,
+              "signature": "listenerCount(event: 'message'): number;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "event",
+                  "type": "'message'",
+                  "optional": false
+                }
+              ],
+              "returns": "number"
+            }
+          ],
+          "composes": ["INodeMessagePortLike"],
           "aliasOf": "IThreadParentPort",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3490,7 +5908,27 @@
           "errors": ["No documented errors are declared for IThreadRuntimeResource."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadRuntimeResource.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "load",
+              "kind": "method",
+              "optional": false,
+              "signature": "load(): Promise<IThreadNativeRuntimeModule>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<IThreadNativeRuntimeModule>"
+            },
+            {
+              "name": "pid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pid: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IThreadRuntimeResource",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3554,7 +5992,69 @@
           "errors": ["No documented errors are declared for IThreadWebPort."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IThreadWebPort.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "postMessage",
+              "kind": "method",
+              "optional": false,
+              "signature": "postMessage(message: unknown, transfer?: readonly unknown[]): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "message",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "transfer",
+                  "type": "readonly unknown[]",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: string, listener: (event: any) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: string, listener: (event: any) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IThreadWebPort",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3618,7 +6118,18 @@
           "errors": ["No documented errors are declared for IWebThreadWorker."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebThreadWorker.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "terminate",
+              "kind": "method",
+              "optional": false,
+              "signature": "terminate(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": ["IThreadWebPort"],
           "aliasOf": "IWebThreadWorker",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3689,6 +6200,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for readThreadBootstrap.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "readThreadBootstrap",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3775,6 +6287,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for receiveThreadData.",
           "examples": [],
           "members": [],
+          "composes": [],
           "aliasOf": "receiveThreadData",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3854,6 +6367,7 @@
             "import {\n  createThreadPeer,\n  createThreadPlugin,\n  isThreadChild,\n  RpcThreadErrorCode,\n  RPC_THREAD_ERROR_SOURCE\n} from '@migaia/rpc-threads'"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "ERROR_SOURCE",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3919,7 +6433,18 @@
           "examples": [
             "import {\n  createThreadPeer,\n  createThreadPlugin,\n  isThreadChild,\n  RpcThreadErrorCode,\n  RPC_THREAD_ERROR_SOURCE\n} from '@migaia/rpc-threads'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "usageSampleFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly usageSampleFailed: \"THREAD_USAGE_SAMPLE_FAILED\";",
+              "description": "D23: native Worker sampling failed; retain its cause and display unavailable.",
+              "parameterDetails": [],
+              "returns": "\"THREAD_USAGE_SAMPLE_FAILED\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "RpcThreadErrorCode",
           "exportPath": ".",
           "overloadSignatures": [
@@ -3983,7 +6508,63 @@
           "errors": ["No documented errors are declared for RuntimeEventName."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for RuntimeEventName.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "ready",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly ready: \"ready\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"ready\""
+            },
+            {
+              "name": "exit",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly exit: \"exit\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"exit\""
+            },
+            {
+              "name": "degraded",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly degraded: \"degraded\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"degraded\""
+            },
+            {
+              "name": "restart",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly restart: \"restart\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"restart\""
+            },
+            {
+              "name": "terminal",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly terminal: \"terminal\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"terminal\""
+            },
+            {
+              "name": "liquidated",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly liquidated: \"liquidated\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"liquidated\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "RuntimeEventName",
           "exportPath": ".",
           "overloadSignatures": [
@@ -4105,6 +6686,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBrowserThreadChannelFactory.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/browser",
           "overloadSignatures": [
             "export declare function createBrowserThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./web.js\").IWebThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
@@ -4155,11 +6737,41 @@
               "content": "No additional advanced behavior is declared for createBrowserThreadChannelFactory."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/browser.d.ts:createBrowserThreadChannelFactory:export declare function createBrowserThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./web.js\").IWebThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。",
+              "descriptionEn": "",
+              "descriptionZh": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。"
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionEn": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/browser--createBrowserThreadChannelFactory"
         },
         {
@@ -4184,6 +6796,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBrowserThreadLauncher.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/browser",
           "overloadSignatures": [
             "export declare function createBrowserThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../web-launcher.js\").IAdapterWebThreadHandle>;"
@@ -4234,11 +6847,55 @@
               "content": "No additional advanced behavior is declared for createBrowserThreadLauncher."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/browser.d.ts:createBrowserThreadLauncher:export declare function createBrowserThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../web-launcher.js\").IAdapterWebThreadHandle>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）",
+              "descriptionEn": "",
+              "descriptionZh": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）"
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": "`report` — 必填，接收后台错误。",
+              "descriptionEn": "",
+              "descriptionZh": "`report` — 必填，接收后台错误。"
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/browser--createBrowserThreadLauncher"
         },
         {
@@ -4256,7 +6913,27 @@
           "errors": ["No documented errors are declared for IWebThreadHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebThreadHandle.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "port",
+              "kind": "property",
+              "optional": false,
+              "signature": "port: IThreadWebPort;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IThreadWebPort"
+            },
+            {
+              "name": "prepared",
+              "kind": "property",
+              "optional": false,
+              "signature": "prepared: Promise<void | readonly string[]>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "Promise<void | readonly string[]>"
+            }
+          ],
+          "composes": ["IThreadHandle"],
           "aliasOf": "IWebThreadHandle",
           "exportPath": "./adapters/browser",
           "overloadSignatures": [
@@ -4320,7 +6997,42 @@
           "errors": ["No documented errors are declared for IWebThreadLauncherOptions."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWebThreadLauncherOptions.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "Worker",
+              "kind": "property",
+              "optional": true,
+              "signature": "Worker?: new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker"
+            },
+            {
+              "name": "report",
+              "kind": "method",
+              "optional": false,
+              "signature": "report(error: unknown): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "error",
+                  "type": "unknown",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "runtimeApi",
+              "kind": "property",
+              "optional": true,
+              "signature": "runtimeApi?: IRuntimePeerSourceContext;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntimePeerSourceContext"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IWebThreadLauncherOptions",
           "exportPath": "./adapters/browser",
           "overloadSignatures": [
@@ -4410,6 +7122,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBunThreadChannelFactory.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/bun",
           "overloadSignatures": [
             "export declare function createBunThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./web.js\").IWebThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
@@ -4460,11 +7173,41 @@
               "content": "No additional advanced behavior is declared for createBunThreadChannelFactory."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/bun.d.ts:createBunThreadChannelFactory:export declare function createBunThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./web.js\").IWebThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。",
+              "descriptionEn": "",
+              "descriptionZh": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。"
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionEn": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/bun--createBunThreadChannelFactory"
         },
         {
@@ -4489,6 +7232,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createBunThreadLauncher.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/bun",
           "overloadSignatures": [
             "export declare function createBunThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../web-launcher.js\").IAdapterWebThreadHandle>;"
@@ -4539,11 +7283,55 @@
               "content": "No additional advanced behavior is declared for createBunThreadLauncher."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/bun.d.ts:createBunThreadLauncher:export declare function createBunThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../web-launcher.js\").IAdapterWebThreadHandle>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）",
+              "descriptionEn": "",
+              "descriptionZh": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）"
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": "`report` — 必填，接收后台错误。",
+              "descriptionEn": "",
+              "descriptionZh": "`report` — 必填，接收后台错误。"
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/bun--createBunThreadLauncher"
         }
       ],
@@ -4608,6 +7396,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createDenoThreadChannelFactory.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/deno",
           "overloadSignatures": [
             "export declare function createDenoThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./web.js\").IWebThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
@@ -4658,11 +7447,41 @@
               "content": "No additional advanced behavior is declared for createDenoThreadChannelFactory."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/deno.d.ts:createDenoThreadChannelFactory:export declare function createDenoThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./web.js\").IWebThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。",
+              "descriptionEn": "",
+              "descriptionZh": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。"
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionEn": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/deno--createDenoThreadChannelFactory"
         },
         {
@@ -4687,6 +7506,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createDenoThreadLauncher.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/deno",
           "overloadSignatures": [
             "export declare function createDenoThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../web-launcher.js\").IAdapterWebThreadHandle>;"
@@ -4737,11 +7557,55 @@
               "content": "No additional advanced behavior is declared for createDenoThreadLauncher."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/deno.d.ts:createDenoThreadLauncher:export declare function createDenoThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../web-launcher.js\").IAdapterWebThreadHandle>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）",
+              "descriptionEn": "",
+              "descriptionZh": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）"
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": "`report` — 必填，接收后台错误。",
+              "descriptionEn": "",
+              "descriptionZh": "`report` — 必填，接收后台错误。"
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/deno--createDenoThreadLauncher"
         }
       ],
@@ -4808,6 +7672,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createElectronMainThreadChannelFactory.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/electron-main",
           "overloadSignatures": [
             "export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./node.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
@@ -4858,11 +7723,41 @@
               "content": "No additional advanced behavior is declared for createElectronMainThreadChannelFactory."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/electron-main.d.ts:createElectronMainThreadChannelFactory:export declare function createElectronMainThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./node.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。",
+              "descriptionEn": "",
+              "descriptionZh": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。"
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionEn": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/electron-main--createElectronMainThreadChannelFactory"
         },
         {
@@ -4881,6 +7776,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createElectronMainThreadLauncher.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/electron-main",
           "overloadSignatures": [
             "export declare function createElectronMainThreadLauncher(): { capabilities: { readonly termination: \"unsupported\"; readonly 'exit-observation': \"unsupported\"; readonly 'heap-limit': \"unsupported\"; }; launch(spec: import(\"@migaia/supervision/threads\").IThreadSpec, context: import(\"@migaia/supervision\").ILaunchContext): Promise<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>; };"
@@ -4945,7 +7841,18 @@
           "errors": ["No documented errors are declared for INodeThreadHandle."],
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for INodeThreadHandle.",
           "examples": [],
-          "members": [],
+          "members": [
+            {
+              "name": "port",
+              "kind": "property",
+              "optional": false,
+              "signature": "port: INodeMessagePortLike;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "INodeMessagePortLike"
+            }
+          ],
+          "composes": ["IThreadHandle"],
           "aliasOf": "INodeThreadHandle",
           "exportPath": "./adapters/electron-main",
           "overloadSignatures": [
@@ -5037,6 +7944,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createElectronRendererThreadChannelFactory.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/electron-renderer",
           "overloadSignatures": [
             "export declare function createElectronRendererThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./web.js\").IWebThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
@@ -5087,11 +7995,41 @@
               "content": "No additional advanced behavior is declared for createElectronRendererThreadChannelFactory."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/electron-renderer.d.ts:createElectronRendererThreadChannelFactory:export declare function createElectronRendererThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./web.js\").IWebThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。",
+              "descriptionEn": "",
+              "descriptionZh": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。"
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionEn": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/electron-renderer--createElectronRendererThreadChannelFactory"
         },
         {
@@ -5116,6 +8054,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for createElectronRendererThreadLauncher.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/electron-renderer",
           "overloadSignatures": [
             "export declare function createElectronRendererThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../web-launcher.js\").IAdapterWebThreadHandle>;"
@@ -5166,11 +8105,55 @@
               "content": "No additional advanced behavior is declared for createElectronRendererThreadLauncher."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/electron-renderer.d.ts:createElectronRendererThreadLauncher:export declare function createElectronRendererThreadLauncher(options: IWebThreadLauncherOptions): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../web-launcher.js\").IAdapterWebThreadHandle>;",
           "guidance": [],
           "usageScore": 6,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "Worker",
+              "type": "new (entry: string | URL, options: { type: 'module'; name?: string; }) => IWebThreadWorker",
+              "optional": true,
+              "description": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）",
+              "descriptionEn": "",
+              "descriptionZh": "`createWebThreadLauncher({ Worker, report })` — 用你提供的 Worker 构造函数创建 Web Worker（例如 polyfill 或受限环境中的构造器）"
+            },
+            {
+              "name": "report",
+              "type": "(error: unknown) => void",
+              "optional": false,
+              "description": "`report` — 必填，接收后台错误。",
+              "descriptionEn": "",
+              "descriptionZh": "`report` — 必填，接收后台错误。"
+            },
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/electron-renderer--createElectronRendererThreadLauncher"
         }
       ],
@@ -5239,6 +8222,7 @@
             "import { fileURLToPath } from 'node:url'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 后台错误由应用统一记录。 */\nconst report = (error: unknown) => console.error(error)\n/** Node source 显式持有一个 Worker 的预算与监督依赖。 */\nexport const spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/node",
           "overloadSignatures": [
             "export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./node.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;"
@@ -5289,11 +8273,41 @@
               "content": "No additional advanced behavior is declared for createNodeThreadChannelFactory."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK."
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadChannelFactory:export declare function createNodeThreadChannelFactory(options: IThreadChannelOptions): Readonly<{ open(handle: import(\"./node.js\").INodeThreadHandle, signal: import(\"@migaia/utils\").IAbortSignal): Promise<Readonly<{ transport: import(\"@migaia/rpc-core\").IRpcTransport; peerId: string; scheduler: import(\"@migaia/utils\").IScheduler; agreement: Readonly<{ source: \"negotiated\" | \"static\"; codec: string; capabilities: readonly string[]; }>; pipeline: Readonly<{ codec: import(\"@migaia/serialize\").ICodec<unknown, unknown>; framer: import(\"@migaia/rpc-contract\").IRpcFramer<unknown, unknown, string, number>; }>; features: readonly import(\"@migaia/rpc-core\").IRpcFeature[]; close(): Promise<void>; }>>; }>;",
           "guidance": [],
           "usageScore": 44,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": false,
+              "description": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。",
+              "descriptionEn": "",
+              "descriptionZh": "`scheduler` — 计时与调度；channel factory 必须使用同一个 scheduler。"
+            },
+            {
+              "name": "capabilities",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionEn": "Fixed-profile subsets remain synchronous; runtime extensions await Core's actual bilateral ACK.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/node--createNodeThreadChannelFactory"
         },
         {
@@ -5325,6 +8339,7 @@
             "import { fileURLToPath } from 'node:url'\nimport {\n  createNodeThreadLauncher,\n  createNodeThreadChannelFactory\n} from '@migaia/rpc-threads/adapters/node'\nimport { createUnitBudget } from '@migaia/supervision'\nimport { systemScheduler } from '@migaia/utils/scheduler'\n\n/** 后台错误由应用统一记录。 */\nconst report = (error: unknown) => console.error(error)\n/** Node source 显式持有一个 Worker 的预算与监督依赖。 */\nexport const spawn = {\n  spec: { entry: fileURLToPath(new URL('./worker.js', import.meta.url)), name: 'math-worker' },\n  budget: createUnitBudget({ kind: 'thread', maxUnits: 1 }),\n  scheduler: systemScheduler,\n  launcher: createNodeThreadLauncher(),\n  channelFactory: createNodeThreadChannelFactory({ scheduler: systemScheduler }),\n  report\n}"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./adapters/node",
           "overloadSignatures": [
             "export declare function createNodeThreadLauncher(options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; /** Explicit runtime flags apply to short entries without replaying their parent's controller. */ execArgv?: readonly string[]; }>): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>;"
@@ -5375,11 +8390,41 @@
               "content": "No additional advanced behavior is declared for createNodeThreadLauncher."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "execArgv",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Explicit runtime flags apply to short entries without replaying their parent's controller."
+            }
+          ],
           "identity": "packages/rpc-threads/dist/threads/adapters/node.d.ts:createNodeThreadLauncher:export declare function createNodeThreadLauncher(options?: Readonly<{ runtimeApi?: IRuntimePeerSourceContext; /** Explicit runtime flags apply to short entries without replaying their parent's controller. */ execArgv?: readonly string[]; }>): import(\"@migaia/supervision/threads\").IThreadLauncher<import(\"../node-launcher.js\").IAdapterNodeThreadHandle>;",
           "guidance": [],
           "usageScore": 58,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "runtimeApi",
+              "type": "IRuntimePeerSourceContext",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "execArgv",
+              "type": "readonly string[]",
+              "optional": true,
+              "description": "Explicit runtime flags apply to short entries without replaying their parent's controller.",
+              "descriptionEn": "Explicit runtime flags apply to short entries without replaying their parent's controller.",
+              "descriptionZh": ""
+            }
+          ],
           "fragment": "rpc-threads-adapters/node--createNodeThreadLauncher"
         }
       ],

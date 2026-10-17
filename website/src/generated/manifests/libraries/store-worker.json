@@ -1193,6 +1193,7 @@
             "throw createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, [err1, err2], '清理失败');"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWorkerAggregateError(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string): AggregateError;"
@@ -1447,6 +1448,7 @@
             "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createStoreWorkerError(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
@@ -1505,7 +1507,14 @@
               "content": "No additional advanced behavior is declared for createStoreWorkerError."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-worker/dist/errors.d.ts:createStoreWorkerError:export declare function createStoreWorkerError(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
           "guidance": [
             {
@@ -1659,7 +1668,16 @@
             }
           ],
           "usageScore": 34,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "签名：`(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown }) => Error`。构造一个标准 `Error`，`options.cause` 提供时透传给原生 `Error` 的 `cause`；内部经 `@migaia/utils/error` 的 `attachErrorIdentity` 贴上 `source: '@migaia/store-worker'` 与传入的 `code`，不改写 `stack`。",
+              "descriptionEn": "",
+              "descriptionZh": "签名：`(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown }) => Error`。构造一个标准 `Error`，`options.cause` 提供时透传给原生 `Error` 的 `cause`；内部经 `@migaia/utils/error` 的 `attachErrorIdentity` 贴上 `source: '@migaia/store-worker'` 与传入的 `code`，不改写 `stack`。"
+            }
+          ],
           "fragment": "store-worker-index--createStoreWorkerError"
         },
         {
@@ -1701,6 +1719,7 @@
             "declare const self: DedicatedWorkerGlobalScope;\n\nconst handler = createWorkerHandler<number[], number>(\n  (values) => values.reduce((sum, value) => sum + value, 0),\n  (message) => self.postMessage(message)\n);\nself.onmessage = (event) => {\n  void handler(event.data);\n};"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: INativeAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;"
@@ -1759,7 +1778,14 @@
               "content": "No additional advanced behavior is declared for createWorkerHandler."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-worker/dist/worker.d.ts:createWorkerHandler:export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: INativeAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;",
           "guidance": [
             {
@@ -1783,7 +1809,16 @@
             }
           ],
           "usageScore": 100,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "`options.timeoutMs`：Worker 侧对每次请求处理设的超时（一般主线程侧的 `timeoutMs` 已经够用，Worker 侧这个是双保险）。",
+              "descriptionEn": "",
+              "descriptionZh": "`options.timeoutMs`：Worker 侧对每次请求处理设的超时（一般主线程侧的 `timeoutMs` 已经够用，Worker 侧这个是双保险）。"
+            }
+          ],
           "fragment": "store-worker-index--createWorkerHandler"
         },
         {
@@ -1806,6 +1841,7 @@
             "type IByteOwnership = 'copy' | 'transfer';"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IByteOwnership",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1908,7 +1944,45 @@
             "function createWorkerHandler<Input, Output>(\n  compute: (payload: Input, context: { signal: IAbortSignal }) => Output | Promise<Output>,\n  postMessage: (message: unknown) => void,\n  options?: { readonly timeoutMs?: number }\n): IManagedRpcHandler;",
             "function createSerializeWorkerHandler(\n  parser: ISerializeParser,\n  post: (message: unknown, transfer?: readonly unknown[]) => void\n): IManagedRpcHandler;"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<void>;",
+              "description": "Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup failures reject the promise instead of being swallowed. Repeated calls return the same promise.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): void;",
+              "description": "Synchronously marks the handler unavailable by setting `disposed = true`. It does not release the endpoint. Repeated calls have no additional effect.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "pendingCount",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pendingCount: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
           "aliasOf": "IManagedRpcHandler",
           "exportPath": ".",
           "overloadSignatures": [
@@ -1978,6 +2052,221 @@
           "fragment": "store-worker-index--IManagedRpcHandler"
         },
         {
+          "name": "IStoreWorkerErrorCode",
+          "kind": "type",
+          "signature": "export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode];",
+          "declarationLine": 53,
+          "source": "packages/store-worker/dist/error-code.d.ts",
+          "purpose": "IStoreWorkerErrorCode is part of this module's public type contract.",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreWorkerErrorCode.",
+          "advanced": "No additional advanced behavior is declared for IStoreWorkerErrorCode.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": ["No documented errors are declared for IStoreWorkerErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IStoreWorkerErrorCode.",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IStoreWorkerErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use IStoreWorkerErrorCode when its type contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when IStoreWorkerErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "IStoreWorkerErrorCode is part of this module's public type contract."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStoreWorkerErrorCode from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStoreWorkerErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreWorkerErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for IStoreWorkerErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for IStoreWorkerErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/error-code.d.ts:IStoreWorkerErrorCode:export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode];",
+          "guidance": [
+            {
+              "id": "7-2-storeworkererrorcode-与错误工厂",
+              "heading": "7.2 StoreWorkerErrorCode 与错误工厂",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreWorkerErrorCode,\n  createStoreWorkerError,\n  createStoreWorkerAggregateError\n} from '@migaia/store-worker';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreWorkerErrorCode` —— 本包稳定错误码表，配合 `attachErrorIdentity` 贴出来的 `error.code` 字段做 `switch`/比较："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if ((error as { code?: string }).code === StoreWorkerErrorCode.adapterDisposed) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值："
+                },
+                {
+                  "type": "table",
+                  "headers": ["常量", "值", "触发场景"],
+                  "rows": [
+                    [
+                      "`invalidOption`",
+                      "`INVALID_OPTION`",
+                      "Worker parser/adapter 的 options 在 JavaScript 边界上不是对象，或某个字段类型不对"
+                    ],
+                    [
+                      "`adapterDisposed`",
+                      "`ADAPTER_DISPOSED`",
+                      "Worker 适配器已释放（`close()`/`dispose()` 之后）继续调用"
+                    ],
+                    [
+                      "`requestAborted`",
+                      "`REQUEST_ABORTED`",
+                      "Worker 侧的序列化请求被协作式取消（`AbortSignal`）；`ownership: 'transfer'` 时输入已 detach，不可重试"
+                    ],
+                    [
+                      "`invalidRequestChunk`",
+                      "`INVALID_REQUEST_CHUNK`",
+                      "发给 Worker 的请求 chunk 形状非法（`isChunkShape` 校验未通过），协议错误"
+                    ],
+                    [
+                      "`invalidResponseChunk`",
+                      "`INVALID_RESPONSE_CHUNK`",
+                      "Worker 返回的 chunk 形状非法，Worker 侧实现错误"
+                    ],
+                    [
+                      "`chunkMergeFailed`",
+                      "`CHUNK_MERGE_FAILED`",
+                      "Worker 输出为空，或把 value 段并入字节流；修正 parser 分段输出"
+                    ],
+                    [
+                      "`cleanupFailed`",
+                      "`CLEANUP_FAILED`",
+                      "释放期间 endpoint 与（可选的）`worker.terminate()` 清理均失败"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWorkerError(code, message, options?)`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');\nthrow createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息', {\n  cause: originalError\n});"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "签名：`(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown }) => Error`。构造一个标准 `Error`，`options.cause` 提供时透传给原生 `Error` 的 `cause`；内部经 `@migaia/utils/error` 的 `attachErrorIdentity` 贴上 `source: '@migaia/store-worker'` 与传入的 `code`，不改写 `stack`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWorkerAggregateError(code, errors, message)`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWorkerAggregateError(\n  StoreWorkerErrorCode.cleanupFailed,\n  [endpointDisposeError, terminateError],\n  '清理失败'\n);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "签名：`(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string) => AggregateError`。构造 `AggregateError(errors, message)`，`errors` 原样保留在结果的 `errors` 字段（顺序不变），同样贴上 `(source, code)` 身份。包内唯一的实际调用点是 `workerParser().dispose()`——endpoint 清理与 `terminateOnDispose: true` 时的 `worker.terminate()` 若同时失败，两个原始错误都会被保留在 `errors[]` 里，不会只保留其中一个。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_WORKER_SOURCE`（`'@migaia/store-worker'`）是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误（例如把它和 `@migaia/rpc/core` 的 `RpcError`——`source: '@migaia/rpc/core'`——区分开）。"
+                }
+              ]
+            },
+            {
+              "id": "错误码与错误工厂",
+              "heading": "错误码与错误工厂",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreWorkerErrorCode,\n  createStoreWorkerError,\n  createStoreWorkerAggregateError\n} from '@migaia/store-worker';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreWorkerErrorCode`｜3 秒上手 —— 稳定错误码表："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (error.code === StoreWorkerErrorCode.adapterDisposed) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`cleanupFailed`(`CLEANUP_FAILED`)、`chunkMergeFailed`(`CHUNK_MERGE_FAILED`)。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWorkerError`｜5 秒上手："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "签名：`(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown }) => Error`，内部经 `attachErrorIdentity` 贴上 `source: '@migaia/store-worker'` 与传入的 `code`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWorkerAggregateError`｜5 秒上手："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, [err1, err2], '清理失败');"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "签名：`(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string) => AggregateError`，`errors` 原样保留在结果的 `errors` 字段。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_WORKER_SOURCE`(`'@migaia/store-worker'`)是贴在每个本包错误上的固定 `source` 值，用于判定\"是否是本包抛出的错误\"。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 12,
+          "configuration": [],
+          "fragment": "store-worker-index--IStoreWorkerErrorCode"
+        },
+        {
           "name": "IWorkerComputedOptions",
           "kind": "type",
           "signature": "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly unknown[]; };",
@@ -1994,7 +2283,27 @@
           "examples": [
             "type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & {\n  readonly runtime?: IRuntime;\n  readonly transfer?: (input: Input) => readonly unknown[];\n};\n\nfunction workerComputed<Input, Output>(\n  adapter: WorkerAdapter,\n  selectInput: () => Input,\n  options?: IWorkerComputedOptions<Input, Output>\n): Resource<Output>;"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly runtime?: IRuntime;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "transfer",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly transfer?: (input: Input) => readonly unknown[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "(input: Input) => readonly unknown[]"
+            }
+          ],
+          "composes": ["IResourceOptions"],
           "exportPath": ".",
           "overloadSignatures": [
             "export type IWorkerComputedOptions<Input, Output> = IResourceOptions<Output> & { readonly runtime?: IRuntime; readonly transfer?: (input: Input) => readonly unknown[]; };"
@@ -2060,6 +2369,7 @@
             "const WorkerDiagnosticType = { worker: 'worker' } as const;\ntype IWorkerDiagnosticType = 'worker';"
           ],
           "members": [],
+          "composes": [],
           "aliasOf": "IWorkerDiagnosticType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2126,6 +2436,7 @@
             "class WorkerAdapter {\n  constructor(\n    port: IWorkerPort,\n    options?: { readonly clientId?: string; readonly timeoutMs?: number }\n  );\n  readonly disposed: boolean;\n  request<Input, Output>(\n    payload: Input,\n    options?: { signal?: IAbortSignal; transfer?: readonly unknown[] }\n  ): Promise<Output>;\n  close(): void;\n  dispose(): Promise<void>;\n}"
           ],
           "members": [],
+          "composes": ["IWebWorkerLikePort"],
           "exportPath": ".",
           "overloadSignatures": ["export type IWorkerPort = IWebWorkerLikePort;"],
           "overloadParameterDetails": [[]],
@@ -2187,6 +2498,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for STORE_WORKER_SOURCE.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare const STORE_WORKER_SOURCE = \"@migaia/store-worker\";"
@@ -2385,6 +2697,305 @@
           "fragment": "store-worker-index--STORE_WORKER_SOURCE"
         },
         {
+          "name": "StoreWorkerErrorCode",
+          "kind": "const",
+          "signature": "export declare const StoreWorkerErrorCode: { /** Worker parser/adapter options were not an object at the JavaScript boundary. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: \"ADAPTER_DISPOSED\"; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. With `ownership: 'transfer'`, the input is already detached and * cannot be retried. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: \"INVALID_REQUEST_CHUNK\"; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: \"INVALID_RESPONSE_CHUNK\"; /** * Worker wire chunks cannot be merged because the list is empty or a value chunk is mixed into a * byte stream. * * Check the worker parser output chunks. This is a parser implementation error. */ readonly chunkMergeFailed: \"CHUNK_MERGE_FAILED\"; /** * Endpoint and/or owned Worker cleanup failed during parser disposal. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };",
+          "declarationLine": 11,
+          "source": "packages/store-worker/dist/error-code.d.ts",
+          "purpose": "Declares the public error codes for `@migaia/store-worker` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-worker'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2).",
+          "core": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreWorkerErrorCode.",
+          "advanced": "No additional advanced behavior is declared for StoreWorkerErrorCode.",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": ["No documented errors are declared for StoreWorkerErrorCode."],
+          "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for StoreWorkerErrorCode.",
+          "examples": [
+            "import {\n  StoreWorkerErrorCode,\n  createStoreWorkerError,\n  createStoreWorkerAggregateError\n} from '@migaia/store-worker';",
+            "if ((error as { code?: string }).code === StoreWorkerErrorCode.adapterDisposed) {\n  /* ... */\n}",
+            "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');\nthrow createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息', {\n  cause: originalError\n});",
+            "throw createStoreWorkerAggregateError(\n  StoreWorkerErrorCode.cleanupFailed,\n  [endpointDisposeError, terminateError],\n  '清理失败'\n);",
+            "if (error.code === StoreWorkerErrorCode.adapterDisposed) {\n  /* ... */\n}",
+            "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');",
+            "throw createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, [err1, err2], '清理失败');",
+            "import { StoreWorkerErrorCode } from '@migaia/store-worker';\n\ntry {\n  await adapter.request(payload, { signal: controller.signal, transfer: [buffer] });\n} catch (error) {\n  if ((error as { code?: string }).code === StoreWorkerErrorCode.requestAborted) {\n    // ownership: 'transfer' 场景下原始数据已 detach，不能直接重试同一份数据\n  }\n  throw error;\n}"
+          ],
+          "members": [
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: \"INVALID_OPTION\";",
+              "description": "Worker parser/adapter options were not an object at the JavaScript boundary.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_OPTION\""
+            },
+            {
+              "name": "adapterDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly adapterDisposed: \"ADAPTER_DISPOSED\";",
+              "description": "A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance.",
+              "parameterDetails": [],
+              "returns": "\"ADAPTER_DISPOSED\""
+            },
+            {
+              "name": "requestAborted",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly requestAborted: \"REQUEST_ABORTED\";",
+              "description": "Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. With `ownership: 'transfer'`, the input is already detached and * cannot be retried.",
+              "parameterDetails": [],
+              "returns": "\"REQUEST_ABORTED\""
+            },
+            {
+              "name": "invalidRequestChunk",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidRequestChunk: \"INVALID_REQUEST_CHUNK\";",
+              "description": "A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_REQUEST_CHUNK\""
+            },
+            {
+              "name": "invalidResponseChunk",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidResponseChunk: \"INVALID_RESPONSE_CHUNK\";",
+              "description": "A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error.",
+              "parameterDetails": [],
+              "returns": "\"INVALID_RESPONSE_CHUNK\""
+            },
+            {
+              "name": "chunkMergeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly chunkMergeFailed: \"CHUNK_MERGE_FAILED\";",
+              "description": "Worker wire chunks cannot be merged because the list is empty or a value chunk is mixed into a * byte stream. * * Check the worker parser output chunks. This is a parser implementation error.",
+              "parameterDetails": [],
+              "returns": "\"CHUNK_MERGE_FAILED\""
+            },
+            {
+              "name": "cleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupFailed: \"CLEANUP_FAILED\";",
+              "description": "Endpoint and/or owned Worker cleanup failed during parser disposal. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal.",
+              "parameterDetails": [],
+              "returns": "\"CLEANUP_FAILED\""
+            }
+          ],
+          "composes": [],
+          "aliasOf": "StoreWorkerErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const StoreWorkerErrorCode: { /** Worker parser/adapter options were not an object at the JavaScript boundary. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: \"ADAPTER_DISPOSED\"; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. With `ownership: 'transfer'`, the input is already detached and * cannot be retried. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: \"INVALID_REQUEST_CHUNK\"; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: \"INVALID_RESPONSE_CHUNK\"; /** * Worker wire chunks cannot be merged because the list is empty or a value chunk is mixed into a * byte stream. * * Check the worker parser output chunks. This is a parser implementation error. */ readonly chunkMergeFailed: \"CHUNK_MERGE_FAILED\"; /** * Endpoint and/or owned Worker cleanup failed during parser disposal. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Use StoreWorkerErrorCode when its const contract and declared inputs match the result you need.",
+          "notUse": "Choose a different public symbol when StoreWorkerErrorCode does not match the required inputs or return contract.",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Declares the public error codes for `@migaia/store-worker` in one place. The registry in `docs/contracts/error-codes.md` identifies errors by `(source, code)`. The `source` is always `'@migaia/store-worker'`. Throw sites use these constants instead of inline literals. Code values are public API. Renaming a code is a breaking change (`docs/contracts/error-code-rollout.sdd.md` §1.2)."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import StoreWorkerErrorCode from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use StoreWorkerErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when StoreWorkerErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The structured inputs, output, errors, and lifecycle facts below define the public contract for StoreWorkerErrorCode."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "No additional advanced behavior is declared for StoreWorkerErrorCode."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/error-code.d.ts:StoreWorkerErrorCode:export declare const StoreWorkerErrorCode: { /** Worker parser/adapter options were not an object at the JavaScript boundary. */ readonly invalidOption: \"INVALID_OPTION\"; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: \"ADAPTER_DISPOSED\"; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. With `ownership: 'transfer'`, the input is already detached and * cannot be retried. */ readonly requestAborted: \"REQUEST_ABORTED\"; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: \"INVALID_REQUEST_CHUNK\"; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: \"INVALID_RESPONSE_CHUNK\"; /** * Worker wire chunks cannot be merged because the list is empty or a value chunk is mixed into a * byte stream. * * Check the worker parser output chunks. This is a parser implementation error. */ readonly chunkMergeFailed: \"CHUNK_MERGE_FAILED\"; /** * Endpoint and/or owned Worker cleanup failed during parser disposal. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: \"CLEANUP_FAILED\"; };",
+          "guidance": [
+            {
+              "id": "7-2-storeworkererrorcode-与错误工厂",
+              "heading": "7.2 StoreWorkerErrorCode 与错误工厂",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreWorkerErrorCode,\n  createStoreWorkerError,\n  createStoreWorkerAggregateError\n} from '@migaia/store-worker';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreWorkerErrorCode` —— 本包稳定错误码表，配合 `attachErrorIdentity` 贴出来的 `error.code` 字段做 `switch`/比较："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if ((error as { code?: string }).code === StoreWorkerErrorCode.adapterDisposed) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值："
+                },
+                {
+                  "type": "table",
+                  "headers": ["常量", "值", "触发场景"],
+                  "rows": [
+                    [
+                      "`invalidOption`",
+                      "`INVALID_OPTION`",
+                      "Worker parser/adapter 的 options 在 JavaScript 边界上不是对象，或某个字段类型不对"
+                    ],
+                    [
+                      "`adapterDisposed`",
+                      "`ADAPTER_DISPOSED`",
+                      "Worker 适配器已释放（`close()`/`dispose()` 之后）继续调用"
+                    ],
+                    [
+                      "`requestAborted`",
+                      "`REQUEST_ABORTED`",
+                      "Worker 侧的序列化请求被协作式取消（`AbortSignal`）；`ownership: 'transfer'` 时输入已 detach，不可重试"
+                    ],
+                    [
+                      "`invalidRequestChunk`",
+                      "`INVALID_REQUEST_CHUNK`",
+                      "发给 Worker 的请求 chunk 形状非法（`isChunkShape` 校验未通过），协议错误"
+                    ],
+                    [
+                      "`invalidResponseChunk`",
+                      "`INVALID_RESPONSE_CHUNK`",
+                      "Worker 返回的 chunk 形状非法，Worker 侧实现错误"
+                    ],
+                    [
+                      "`chunkMergeFailed`",
+                      "`CHUNK_MERGE_FAILED`",
+                      "Worker 输出为空，或把 value 段并入字节流；修正 parser 分段输出"
+                    ],
+                    [
+                      "`cleanupFailed`",
+                      "`CLEANUP_FAILED`",
+                      "释放期间 endpoint 与（可选的）`worker.terminate()` 清理均失败"
+                    ]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWorkerError(code, message, options?)`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');\nthrow createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息', {\n  cause: originalError\n});"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "签名：`(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown }) => Error`。构造一个标准 `Error`，`options.cause` 提供时透传给原生 `Error` 的 `cause`；内部经 `@migaia/utils/error` 的 `attachErrorIdentity` 贴上 `source: '@migaia/store-worker'` 与传入的 `code`，不改写 `stack`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWorkerAggregateError(code, errors, message)`："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWorkerAggregateError(\n  StoreWorkerErrorCode.cleanupFailed,\n  [endpointDisposeError, terminateError],\n  '清理失败'\n);"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "签名：`(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string) => AggregateError`。构造 `AggregateError(errors, message)`，`errors` 原样保留在结果的 `errors` 字段（顺序不变），同样贴上 `(source, code)` 身份。包内唯一的实际调用点是 `workerParser().dispose()`——endpoint 清理与 `terminateOnDispose: true` 时的 `worker.terminate()` 若同时失败，两个原始错误都会被保留在 `errors[]` 里，不会只保留其中一个。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_WORKER_SOURCE`（`'@migaia/store-worker'`）是贴在每个本包错误上的固定 `source` 值，一般不需要手动引用，除非要用它去过滤/识别本包抛出的错误（例如把它和 `@migaia/rpc/core` 的 `RpcError`——`source: '@migaia/rpc/core'`——区分开）。"
+                }
+              ]
+            },
+            {
+              "id": "错误码与错误工厂",
+              "heading": "错误码与错误工厂",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import {\n  StoreWorkerErrorCode,\n  createStoreWorkerError,\n  createStoreWorkerAggregateError\n} from '@migaia/store-worker';"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`StoreWorkerErrorCode`｜3 秒上手 —— 稳定错误码表："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "if (error.code === StoreWorkerErrorCode.adapterDisposed) {\n  /* ... */\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "全部取值：`invalidOption`(`INVALID_OPTION`)、`adapterDisposed`(`ADAPTER_DISPOSED`)、`requestAborted`(`REQUEST_ABORTED`)、`invalidRequestChunk`(`INVALID_REQUEST_CHUNK`)、`invalidResponseChunk`(`INVALID_RESPONSE_CHUNK`)、`cleanupFailed`(`CLEANUP_FAILED`)、`chunkMergeFailed`(`CHUNK_MERGE_FAILED`)。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWorkerError`｜5 秒上手："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWorkerError(StoreWorkerErrorCode.invalidOption, '自定义消息');"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "签名：`(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown }) => Error`，内部经 `attachErrorIdentity` 贴上 `source: '@migaia/store-worker'` 与传入的 `code`。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`createStoreWorkerAggregateError`｜5 秒上手："
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "throw createStoreWorkerAggregateError(StoreWorkerErrorCode.cleanupFailed, [err1, err2], '清理失败');"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "签名：`(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string) => AggregateError`，`errors` 原样保留在结果的 `errors` 字段。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`STORE_WORKER_SOURCE`(`'@migaia/store-worker'`)是贴在每个本包错误上的固定 `source` 值，用于判定\"是否是本包抛出的错误\"。"
+                }
+              ]
+            },
+            {
+              "id": "高阶组合示例-3-用错误码分支处理-abort-场景-判断是否可以重试",
+              "heading": "高阶组合示例 · 3. 用错误码分支处理 abort 场景，判断是否可以重试",
+              "blocks": [
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { StoreWorkerErrorCode } from '@migaia/store-worker';\n\ntry {\n  await adapter.request(payload, { signal: controller.signal, transfer: [buffer] });\n} catch (error) {\n  if ((error as { code?: string }).code === StoreWorkerErrorCode.requestAborted) {\n    // ownership: 'transfer' 场景下原始数据已 detach，不能直接重试同一份数据\n  }\n  throw error;\n}"
+                }
+              ]
+            }
+          ],
+          "usageScore": 68,
+          "configuration": [],
+          "fragment": "store-worker-index--StoreWorkerErrorCode"
+        },
+        {
           "name": "WorkerAdapter",
           "kind": "class",
           "signature": "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. */ dispose(): Promise<void>; }",
@@ -2421,6 +3032,7 @@
             {
               "name": "disposed",
               "kind": "get",
+              "optional": false,
               "signature": "get disposed(): boolean;",
               "description": null,
               "parameterDetails": [],
@@ -2429,6 +3041,7 @@
             {
               "name": "request",
               "kind": "method",
+              "optional": false,
               "signature": "request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>;",
               "description": null,
               "parameterDetails": [
@@ -2448,6 +3061,7 @@
             {
               "name": "close",
               "kind": "method",
+              "optional": false,
               "signature": "close(): void;",
               "description": "Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release the endpoint. Repeated calls have no additional effect.",
               "parameterDetails": [],
@@ -2456,12 +3070,14 @@
             {
               "name": "dispose",
               "kind": "method",
+              "optional": false,
               "signature": "dispose(): Promise<void>;",
               "description": "Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls return the same promise.",
               "parameterDetails": [],
               "returns": "Promise<void>"
             }
           ],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. */ dispose(): Promise<void>; }"
@@ -2515,7 +3131,20 @@
               "content": "No additional advanced behavior is declared for WorkerAdapter."
             }
           ],
-          "declaredConfiguration": [],
+          "declaredConfiguration": [
+            {
+              "name": "clientId",
+              "type": "string",
+              "optional": true,
+              "description": "Overrides the default client id (a fixed value rather than a factory — see `src/rpc`)."
+            },
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            }
+          ],
           "identity": "packages/store-worker/dist/worker.d.ts:WorkerAdapter:export declare class WorkerAdapter { #private; constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); get disposed(): boolean; request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; transfer?: readonly unknown[]; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. */ dispose(): Promise<void>; }",
           "guidance": [
             {
@@ -2530,7 +3159,24 @@
             }
           ],
           "usageScore": 154,
-          "configuration": [],
+          "configuration": [
+            {
+              "name": "clientId",
+              "type": "string",
+              "optional": true,
+              "description": "`options.clientId`：本端在 RPC core 拓扑里的 `id`，默认 `'main'`。同一个 Worker 如果被多个 `WorkerAdapter` 实例共用（不推荐，见下方注意事项），需要传不同的 `clientId` 区分。",
+              "descriptionEn": "Overrides the default client id (a fixed value rather than a factory — see `src/rpc`).",
+              "descriptionZh": "`options.clientId`：本端在 RPC core 拓扑里的 `id`，默认 `'main'`。同一个 Worker 如果被多个 `WorkerAdapter` 实例共用（不推荐，见下方注意事项），需要传不同的 `clientId` 区分。"
+            },
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "`options.timeoutMs`：请求默认超时（毫秒）。省略时不设默认超时——单次 `request()` 一直等对方响应，可以在 `request()` 调用点传 `signal` 自行控制取消。",
+              "descriptionEn": "",
+              "descriptionZh": "`options.timeoutMs`：请求默认超时（毫秒）。省略时不设默认超时——单次 `request()` 一直等对方响应，可以在 `request()` 调用点传 `signal` 自行控制取消。"
+            }
+          ],
           "fragment": "store-worker-index--WorkerAdapter"
         },
         {
@@ -2552,7 +3198,27 @@
             "const WorkerByteOwnership = { copy: 'copy', transfer: 'transfer' } as const;\ntype IByteOwnership = 'copy' | 'transfer';",
             "WorkerByteOwnership.copy; // 'copy'\nWorkerByteOwnership.transfer; // 'transfer'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "copy",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly copy: \"copy\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"copy\""
+            },
+            {
+              "name": "transfer",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly transfer: \"transfer\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"transfer\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "WorkerByteOwnership",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2641,6 +3307,7 @@
             "// main.ts\nimport { WorkerAdapter, workerComputed } from '@migaia/store-worker';\nimport { defaultRuntime } from '@migaia/reactive';\n\nconst worker = new Worker(new URL('./aggregate.worker.ts', import.meta.url), { type: 'module' });\nconst adapter = new WorkerAdapter(worker, { timeoutMs: 10_000 });\n\nconst rows = defaultRuntime.signal<readonly Row[]>([]);\nconst totals = workerComputed(adapter, () => rows.value, {\n  ttl: 30_000,\n  staleWhileRevalidate: true,\n  debugName: 'category-totals'\n});\n\nrows.value = fetchedRows;\nconsole.log(await totals.refetch());\n\ntotals.dispose();\nadapter.dispose();\nworker.terminate();"
           ],
           "members": [],
+          "composes": [],
           "exportPath": ".",
           "overloadSignatures": [
             "export declare function workerComputed<Input, Output>(adapter: WorkerAdapter, selectInput: () => Input, options?: IWorkerComputedOptions<Input, Output>): Resource<Output>;"
@@ -2711,6 +3378,60 @@
               "type": "(input: Input) => readonly unknown[]",
               "optional": true,
               "description": ""
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Human-readable owner label used in reactive diagnostics and request error context."
+            },
+            {
+              "name": "ttl",
+              "type": "number",
+              "optional": true,
+              "description": "Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called."
+            },
+            {
+              "name": "autoStart",
+              "type": "boolean",
+              "optional": true,
+              "description": "Start the first request in the constructor. Defaults to true."
+            },
+            {
+              "name": "staleWhileRevalidate",
+              "type": "boolean",
+              "optional": true,
+              "description": "Keep stale success data visible while a background refresh runs."
+            },
+            {
+              "name": "retry",
+              "type": "IResourceRetryPolicy",
+              "optional": true,
+              "description": "Retry count or predicate. Suspense Promise throws do not count."
+            },
+            {
+              "name": "retryDelay",
+              "type": "number | ((failureCount: number, error: unknown) => number)",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "keepAlive",
+              "type": "boolean",
+              "optional": true,
+              "description": "Keep upstream reactive edges while no state consumer exists."
+            },
+            {
+              "name": "initialSnapshot",
+              "type": "IResourceCacheSnapshot<T>",
+              "optional": true,
+              "description": "SSR/persisted success cache used before optional revalidation."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing * host capabilities fail immediately instead of silently falling back to microtasks."
             }
           ],
           "identity": "packages/store-worker/dist/worker.d.ts:workerComputed:export declare function workerComputed<Input, Output>(adapter: WorkerAdapter, selectInput: () => Input, options?: IWorkerComputedOptions<Input, Output>): Resource<Output>;",
@@ -2743,6 +3464,78 @@
               "description": "构造入口会先验证 `adapter`、`selectInput` 与可选 `transfer`，并只读取 runtime/Resource 已知 options 一次；不会通过 object-rest 枚举未知属性。非法 callback 或 hostile getter 在 Resource ownership/auto-start 前同步抛带 `INVALID_OPTION` 的 Store Worker 错误，getter 原异常保留在 `cause`。",
               "descriptionEn": "",
               "descriptionZh": "构造入口会先验证 `adapter`、`selectInput` 与可选 `transfer`，并只读取 runtime/Resource 已知 options 一次；不会通过 object-rest 枚举未知属性。非法 callback 或 hostile getter 在 Resource ownership/auto-start 前同步抛带 `INVALID_OPTION` 的 Store Worker 错误，getter 原异常保留在 `cause`。"
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。",
+              "descriptionEn": "Human-readable owner label used in reactive diagnostics and request error context.",
+              "descriptionZh": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。"
+            },
+            {
+              "name": "ttl",
+              "type": "number",
+              "optional": true,
+              "description": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。",
+              "descriptionEn": "Successful values remain fresh for this many milliseconds. `Infinity` keeps them fresh until a * dependency changes or `refetch()` is called.",
+              "descriptionZh": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。"
+            },
+            {
+              "name": "autoStart",
+              "type": "boolean",
+              "optional": true,
+              "description": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。",
+              "descriptionEn": "Start the first request in the constructor. Defaults to true.",
+              "descriptionZh": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。"
+            },
+            {
+              "name": "staleWhileRevalidate",
+              "type": "boolean",
+              "optional": true,
+              "description": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。",
+              "descriptionEn": "Keep stale success data visible while a background refresh runs.",
+              "descriptionZh": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。"
+            },
+            {
+              "name": "retry",
+              "type": "IResourceRetryPolicy",
+              "optional": true,
+              "description": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。",
+              "descriptionEn": "Retry count or predicate. Suspense Promise throws do not count.",
+              "descriptionZh": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。"
+            },
+            {
+              "name": "retryDelay",
+              "type": "number | ((failureCount: number, error: unknown) => number)",
+              "optional": true,
+              "description": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。",
+              "descriptionEn": "",
+              "descriptionZh": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。"
+            },
+            {
+              "name": "keepAlive",
+              "type": "boolean",
+              "optional": true,
+              "description": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。",
+              "descriptionEn": "Keep upstream reactive edges while no state consumer exists.",
+              "descriptionZh": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。"
+            },
+            {
+              "name": "initialSnapshot",
+              "type": "IResourceCacheSnapshot<T>",
+              "optional": true,
+              "description": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。",
+              "descriptionEn": "SSR/persisted success cache used before optional revalidation.",
+              "descriptionZh": "其余字段（`ttl`、`autoStart`、`staleWhileRevalidate`、`retry`、`retryDelay`、`keepAlive`、`initialSnapshot`、`debugName`）：原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致，本文不重复展开，参见该包文档。"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "`debugName?`、`ttl?`、`autoStart?`、`staleWhileRevalidate?`、`retry?`、`retryDelay?`、`keepAlive?`、`initialSnapshot?`、`scheduler?` —— 原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致",
+              "descriptionEn": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays * (`runtime-neutrality.sdd.md` R-9 / AR-02). Defaults to lifecycle `systemScheduler`. Missing * host capabilities fail immediately instead of silently falling back to microtasks.",
+              "descriptionZh": "`debugName?`、`ttl?`、`autoStart?`、`staleWhileRevalidate?`、`retry?`、`retryDelay?`、`keepAlive?`、`initialSnapshot?`、`scheduler?` —— 原样透传给 `Resource`，语义与 `@migaia/resource` 的 `IResourceOptions` 完全一致"
             }
           ],
           "fragment": "store-worker-index--workerComputed"
@@ -2767,7 +3560,18 @@
             "class SerializeCodecError<TCode> extends Error {\n  readonly source: string; // 恒为 '@migaia/store-worker'\n  readonly code: TCode; // 'REQUEST_ABORTED'\n  readonly context?: string; // 出错时定位是哪个 store/key 的辅助字段\n  readonly type: string; // 插件的 type 标签，缺省 WorkerDiagnosticType.worker\n  readonly phase: 'encode' | 'decode';\n  readonly chunkIndex: number; // 恒为 0（这一层不涉及分片索引）\n  readonly bytesConsumed: number; // 输入是 bytes 段时为其字节长度，否则 0\n}",
             "WorkerDiagnosticType.worker; // 'worker'"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "worker",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly worker: \"worker\";",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "\"worker\""
+            }
+          ],
+          "composes": [],
           "aliasOf": "WorkerDiagnosticType",
           "exportPath": ".",
           "overloadSignatures": [
@@ -2901,6 +3705,7 @@
             "// encode.worker.ts\nimport { createSerializeWorkerHandler } from '@migaia/store-worker/serialize/worker';\nimport { jsonParser } from '@migaia/serialize';\n\ndeclare const self: DedicatedWorkerGlobalScope;\n\nconst handler = createSerializeWorkerHandler(jsonParser(), (message, transfer) =>\n  self.postMessage(message, { transfer })\n);\nself.onmessage = (event) => {\n  void handler(event.data);\n};"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function createSerializeWorkerHandler(parser: ISerializeParser, post: (message: unknown, transfer?: readonly unknown[]) => void): IManagedRpcHandler;"
@@ -2994,6 +3799,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for decodeWorkerValue.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function decodeWorkerValue(value: unknown): ISerializeChunk;"
@@ -3071,6 +3877,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for encodeWorkerValue.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function encodeWorkerValue(value: unknown): ISerializeChunk;"
@@ -3142,6 +3949,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for IWorkerFailureEvent.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": ["export type IWorkerFailureEvent = 'error' | 'messageerror';"],
           "overloadParameterDetails": [[]],
@@ -3204,7 +4012,18 @@
           "examples": [
             "type IWorkerPluginOptions = {\n  readonly worker: IWorkerLike;\n  readonly type?: string;\n  readonly terminateOnDispose?: boolean;\n  readonly ownership?: IByteOwnership;\n  readonly clientId?: string;\n};"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "terminate",
+              "kind": "method",
+              "optional": true,
+              "signature": "terminate?(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": ["IWebWorkerLikePort"],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export type IWorkerLike = IWebWorkerLikePort & { terminate?(): void; };"
@@ -3305,7 +4124,54 @@
             "type IWorkerPluginOptions = {\n  readonly worker: IWorkerLike;\n  readonly type?: string;\n  readonly terminateOnDispose?: boolean;\n  readonly ownership?: IByteOwnership;\n  readonly clientId?: string;\n};",
             "const workerPlugin = (options: IWorkerPluginOptions): ISerializePlugin => ({\n  type: options.type ?? 'worker',\n  parser: workerParser(options)\n});"
           ],
-          "members": [],
+          "members": [
+            {
+              "name": "worker",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly worker: IWorkerLike;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IWorkerLike"
+            },
+            {
+              "name": "type",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly type?: string;",
+              "description": "Names the format registered in the registry. It must match the encoding used by the worker.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "terminateOnDispose",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly terminateOnDispose?: boolean;",
+              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "ownership",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly ownership?: IByteOwnership;",
+              "description": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes are exclusively owned and no longer used after handoff.",
+              "parameterDetails": [],
+              "returns": "IByteOwnership"
+            },
+            {
+              "name": "clientId",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly clientId?: string;",
+              "description": "Overrides the default client id (a fixed value rather than a factory — see `src/rpc`).",
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export type IWorkerPluginOptions = { readonly worker: IWorkerLike; /** Names the format registered in the registry. It must match the encoding used by the worker. */ readonly type?: string; /** * Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default. */ readonly terminateOnDispose?: boolean; /** * Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff. */ readonly ownership?: IByteOwnership; /** Overrides the default client id (a fixed value rather than a factory — see `src/rpc`). */ readonly clientId?: string; };"
@@ -3430,6 +4296,7 @@
           "lifecycleConcurrency": "No lifecycle or concurrency behavior is declared for transferablesOf.",
           "examples": [],
           "members": [],
+          "composes": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function transferablesOf(chunk: ISerializeChunk, ownership: IByteOwnership): unknown[];"
@@ -3515,6 +4382,7 @@
             "const parser = workerParser({ worker });"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare function workerParser(options: IWorkerPluginOptions): ISerializeParser;"
@@ -3580,13 +4448,13 @@
               "name": "terminateOnDispose",
               "type": "boolean",
               "optional": true,
-              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default."
+              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default."
             },
             {
               "name": "ownership",
               "type": "IByteOwnership",
               "optional": true,
-              "description": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff."
+              "description": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes are exclusively owned and no longer used after handoff."
             },
             {
               "name": "clientId",
@@ -3753,7 +4621,7 @@
               "type": "boolean",
               "optional": true,
               "description": "`dispose()`：异步 dispose 底层端点，并在 `terminateOnDispose: true` 时继续尝试 `worker.terminate?.()`；两步都会执行。单个 cleanup 失败会被原样 reject，端点与 terminate 都失败时返回 `CLEANUP_FAILED` `AggregateError`，不会吞掉 parser/endpoint/terminate 错误。",
-              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default.",
+              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default.",
               "descriptionZh": "`dispose()`：异步 dispose 底层端点，并在 `terminateOnDispose: true` 时继续尝试 `worker.terminate?.()`；两步都会执行。单个 cleanup 失败会被原样 reject，端点与 terminate 都失败时返回 `CLEANUP_FAILED` `AggregateError`，不会吞掉 parser/endpoint/terminate 错误。"
             },
             {
@@ -3761,7 +4629,7 @@
               "type": "IByteOwnership",
               "optional": true,
               "description": "无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型，见 §8。",
-              "descriptionEn": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff.",
+              "descriptionEn": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes are exclusively owned and no longer used after handoff.",
               "descriptionZh": "无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型，见 §8。"
             },
             {
@@ -3797,6 +4665,7 @@
             "// main.ts\nimport { workerPlugin } from '@migaia/store-worker/serialize/worker';\nimport { createSerializeRegistry } from '@migaia/serialize';\n\nconst worker = new Worker(new URL('./encode.worker.ts', import.meta.url), { type: 'module' });\nconst registry = createSerializeRegistry([workerPlugin({ worker, terminateOnDispose: true })]);\n\nconst chunk = await registry.encode({ id: 1, name: 'demo' });\nconst value = await registry.decode(chunk);\n\nregistry.dispose(); // 连带 dispose workerParser 的端点，并 terminate worker"
           ],
           "members": [],
+          "composes": [],
           "exportPath": "./serialize/*",
           "overloadSignatures": [
             "export declare const workerPlugin: (options: IWorkerPluginOptions) => ISerializePlugin;"
@@ -3854,13 +4723,13 @@
               "name": "terminateOnDispose",
               "type": "boolean",
               "optional": true,
-              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default."
+              "description": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default."
             },
             {
               "name": "ownership",
               "type": "IByteOwnership",
               "optional": true,
-              "description": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff."
+              "description": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes are exclusively owned and no longer used after handoff."
             },
             {
               "name": "clientId",
@@ -3910,7 +4779,7 @@
               "type": "boolean",
               "optional": true,
               "description": "Q:`adapter.dispose()`/`registry.dispose()` 之后,Worker 进程/线程还活着。 `WorkerAdapter.dispose()`/`workerParser` 的 `dispose()` 默认只 dispose RPC 端点,不会 terminate 底层 `Worker`——外部传入的 Worker 默认被认为归调用方所有。需要连带终止 Worker,`workerPlugin`/`workerParser` 传 `terminateOnDispose: true`;`WorkerAdapter` 场景下需要调用方自己在合适的时机调用 `worker.terminate()`。",
-              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by * default.",
+              "descriptionEn": "Controls whether disposal also terminates the worker. A supplied worker remains caller-owned by default.",
               "descriptionZh": "Q:`adapter.dispose()`/`registry.dispose()` 之后,Worker 进程/线程还活着。 `WorkerAdapter.dispose()`/`workerParser` 的 `dispose()` 默认只 dispose RPC 端点,不会 terminate 底层 `Worker`——外部传入的 Worker 默认被认为归调用方所有。需要连带终止 Worker,`workerPlugin`/`workerParser` 传 `terminateOnDispose: true`;`WorkerAdapter` 场景下需要调用方自己在合适的时机调用 `worker.terminate()`。"
             },
             {
@@ -3918,7 +4787,7 @@
               "type": "IByteOwnership",
               "optional": true,
               "description": "无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型，见 §8。",
-              "descriptionEn": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes * are exclusively owned and no longer used after handoff.",
+              "descriptionEn": "Defaults to `copy`, which copies the bytes. Choose `transfer` for zero-copy only when the bytes are exclusively owned and no longer used after handoff.",
               "descriptionZh": "无调用参数，`as const` 常量对象；`IByteOwnership` 是其取值的联合类型，也是 `workerPlugin`/`workerParser` 的 `ownership` 选项类型，见 §8。"
             },
             {
