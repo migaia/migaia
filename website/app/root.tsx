@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Link,
   Links,
@@ -21,7 +21,7 @@ import { BRAND_BLADE_PATH, whirlBrandMark } from './brand-mark.js'
 import { energizeCardEdge, trackCardFocus } from './card-focus.js'
 import { LOCALES, type ILocale } from './route-contract.js'
 import { copyFor, interfaceCopyFor } from './copy.js'
-import { revealRouteContent } from './motion.js'
+import { dissolveRouteContent, emergeRouteContent, settleRouteContent } from './motion.js'
 import { OPEN_SEARCH_EVENT } from './search.js'
 import { Button } from './components/ui/button.js'
 import type { IPageNavigationContext } from './components/page-navigation.js'
@@ -421,26 +421,32 @@ function App() {
 }
 
 /**
- * Thin accent bar under the header while a route's data loads, then a short fade-and-rise of the
- * new article after push/replace navigations. History (POP) and in-page anchors stay still.
+ * Thin accent bar under the header while a route's data loads, plus the route transition: the
+ * centre column fades out as soon as a navigation to another page starts loading, and the new
+ * page's content blocks emerge one by one once the route commits. Side rails, in-page anchors and
+ * the first server-rendered page stay still.
  */
 function RouteProgress() {
   const navigation = useNavigation()
-  const { hash, pathname } = useLocation()
-  const navigationType = useNavigationType()
-  /** Skips the first effect run so the initial server-rendered page is never re-animated. */
+  const { pathname } = useLocation()
+  /** Skips the first layout effect so the initial server-rendered page is never re-animated. */
   const firstRender = useRef(true)
+  /** Destination pathname of the loading navigation, or undefined while idle. */
+  const destination = navigation.state !== 'idle' ? navigation.location?.pathname : undefined
 
   useEffect(() => {
+    if (destination === undefined) settleRouteContent()
+    else if (destination !== pathname) dissolveRouteContent()
+  }, [destination, pathname])
+
+  // Layout effect: the new blocks must be hidden before their first paint, or they would flash in.
+  useLayoutEffect(() => {
     if (firstRender.current) {
       firstRender.current = false
       return
     }
-    if (navigationType === 'POP' || hash) return
-    void revealRouteContent(
-      document.querySelector('.article-column') ?? document.querySelector('#main-content')
-    )
-  }, [hash, navigationType, pathname])
+    emergeRouteContent()
+  }, [pathname])
 
   return (
     <div
