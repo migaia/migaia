@@ -37,6 +37,9 @@
   --accent-contrast: oklch(0.985 0.004 85);
   --brand-mark-blade: var(--text-strong);
   --brand-mark-pupil: var(--accent-default);
+  /* Ambient field palette (ambient-field.tsx `indigo` / `teal`), reused by the card edge light. */
+  --field-indigo: rgb(92 99 214);
+  --field-teal: rgb(31 140 153);
   --focus-ring: oklch(0.6 0.17 270);
 
   --kind-function: oklch(0.52 0.15 270);
@@ -66,6 +69,13 @@
 
   --shadow-raised:
     0 1px 2px oklch(0.3 0.02 270 / 0.05), 0 8px 24px -12px oklch(0.3 0.02 270 / 0.12);
+  /*
+   * Borderless cards sit in the page, not above it: no drop shadow, only a faint top sheen that
+   * reads as a glass edge. Hover sinks the card (`--shadow-card-sunk`) instead of lifting it.
+   */
+  --shadow-card: inset 0 1px 0 oklch(1 0 0 / 0.55);
+  --shadow-card-sunk:
+    inset 0 2px 10px -2px oklch(0.3 0.02 270 / 0.18), inset 0 1px 0 oklch(1 0 0 / 0.3);
   --shadow-overlay:
     0 24px 64px -24px oklch(0.2 0.03 270 / 0.35), 0 2px 8px oklch(0.2 0.03 270 / 0.08);
 
@@ -137,6 +147,8 @@
   --accent-contrast: oklch(0.2 0.02 270);
   --brand-mark-blade: var(--accent-default);
   --brand-mark-pupil: var(--text-strong);
+  --field-indigo: rgb(140 153 255);
+  --field-teal: rgb(92 204 209);
   --focus-ring: oklch(0.78 0.13 270);
 
   --kind-function: oklch(0.77 0.11 270);
@@ -155,6 +167,8 @@
   --inline-code-text: color-mix(in oklab, var(--text-strong) 88%, var(--accent-default));
 
   --shadow-raised: 0 1px 2px oklch(0 0 0 / 0.2), 0 8px 24px -12px oklch(0 0 0 / 0.4);
+  --shadow-card: inset 0 1px 0 oklch(1 0 0 / 0.04);
+  --shadow-card-sunk: inset 0 3px 14px -2px oklch(0 0 0 / 0.55), inset 0 1px 0 oklch(1 0 0 / 0.02);
   --shadow-overlay: 0 24px 64px -24px oklch(0 0 0 / 0.6), 0 2px 8px oklch(0 0 0 / 0.25);
 }
 
@@ -2376,14 +2390,20 @@ div:has(> .explained-code:not([data-output])) + div > [data-output='true'] {
 
 .journey-grid {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-5);
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 16.5rem), 1fr));
 }
 
 .journey-item {
-  background: var(--surface-base);
-  border: 1px solid var(--border-default);
+  background: color-mix(in oklab, var(--surface-base) 24%, transparent);
+  /*
+   * Transparent border keeps the card box size. No backdrop blur: the ambient particles must pass
+   * through the translucent surface, not smear behind it.
+   */
+  border: 1px solid transparent;
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  isolation: isolate;
   color: var(--text-body);
   display: grid;
   gap: var(--space-2);
@@ -2391,15 +2411,15 @@ div:has(> .explained-code:not([data-output])) + div > [data-output='true'] {
   padding: var(--space-5);
   position: relative;
   transition:
-    border-color var(--motion-base) var(--motion-ease),
+    background-color var(--motion-base) var(--motion-ease),
     box-shadow var(--motion-base) var(--motion-ease),
     transform var(--motion-base) var(--motion-ease);
 }
 
 /*
- * Card edge light: a broad, faint accent glow that wanders slowly inside each card and shows only
- * on its 1px border ring. The glow drifts and breathes instead of tracing the border, and every
- * card runs on a different phase so the grid never pulses in sync. Reduced motion freezes it.
+ * Card light: a broad, faint accent wash that wanders slowly across each borderless card, under its
+ * text (`z-index: -1` inside the card's isolated stacking context). It drifts and breathes, and
+ * every card runs on a different phase so the grid never pulses in sync. Reduced motion freezes it.
  */
 @property --edge-x {
   syntax: '<percentage>';
@@ -2419,20 +2439,17 @@ div:has(> .explained-code:not([data-output])) + div > [data-output='true'] {
     card-edge-drift 19s ease-in-out infinite alternate,
     card-edge-breathe 13s ease-in-out infinite alternate;
   background: radial-gradient(
-    70% 60% at var(--edge-x) var(--edge-y),
-    color-mix(in oklab, var(--accent-default) 85%, transparent),
+    75% 70% at var(--edge-x) var(--edge-y),
+    color-mix(in oklab, var(--accent-default) 22%, transparent),
     transparent 75%
   );
   border-radius: inherit;
   content: '';
-  inset: -1px;
-  mask:
-    linear-gradient(#000 0 0) content-box exclude,
-    linear-gradient(#000 0 0);
+  inset: 0;
   opacity: 0.5;
-  padding: 1px;
   pointer-events: none;
   position: absolute;
+  z-index: -1;
 }
 
 .journey-item:nth-child(3n + 2)::before,
@@ -2445,6 +2462,72 @@ div:has(> .explained-code:not([data-output])) + div > [data-output='true'] {
 .library-item:nth-child(3n)::before {
   animation-delay: -13s, -9s;
   animation-duration: 17s, 15s;
+}
+
+/*
+ * Card edge trace: a short comet of light in the ambient field's indigo → teal palette circles each
+ * card's 1px edge, as if the background's light ran along it. Slow, faint, and on a different
+ * phase per card so the grid never moves in sync. Reduced motion leaves each comet still.
+ */
+@property --trace-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.journey-item::after,
+.library-item::after {
+  animation: card-edge-trace 16s linear infinite;
+  background: conic-gradient(
+    from var(--trace-angle),
+    transparent 0deg,
+    color-mix(in oklab, var(--field-teal) 70%, transparent) 26deg,
+    var(--field-indigo) 52deg,
+    transparent 84deg,
+    transparent 360deg
+  );
+  border-radius: inherit;
+  content: '';
+  inset: -1px;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  opacity: 0.55;
+  padding: 1px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.journey-item:nth-child(3n + 2)::after,
+.library-item:nth-child(3n + 2)::after {
+  animation-delay: -6s;
+  animation-duration: 19s;
+}
+
+.journey-item:nth-child(3n)::after,
+.library-item:nth-child(3n)::after {
+  animation-delay: -11s;
+  animation-duration: 14s;
+}
+
+/* Focused edge: deeper, more saturated light; speed-up and flicker come from card-focus.ts. */
+a.journey-item:hover::after,
+a.library-item:hover::after {
+  background: conic-gradient(
+    from var(--trace-angle),
+    transparent 0deg,
+    var(--field-teal) 22deg,
+    color-mix(in oklab, var(--field-indigo) 80%, black) 48deg,
+    var(--field-indigo) 70deg,
+    transparent 100deg,
+    transparent 360deg
+  );
+}
+
+@keyframes card-edge-trace {
+  to {
+    --trace-angle: 360deg;
+  }
 }
 
 @keyframes card-edge-drift {
@@ -2479,10 +2562,15 @@ div:has(> .explained-code:not([data-output])) + div > [data-output='true'] {
   }
 }
 
-a.journey-item:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-raised);
-  transform: translateY(-2px);
+/*
+ * Hovered link cards sink into the page: they press down slightly, an inner shadow deepens, and
+ * the surface thins so the denser field light behind them (ambient-field focus) shows through.
+ */
+a.journey-item:hover,
+a.library-item:hover {
+  background: color-mix(in oklab, var(--surface-base) 10%, transparent);
+  box-shadow: var(--shadow-card-sunk);
+  transform: translateY(1px) scale(0.99);
 }
 
 .journey-item small {
@@ -2552,12 +2640,15 @@ a.journey-item:hover b {
 .architecture-layer nav {
   align-content: start;
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-4);
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
 }
 
 .library-item {
-  border: 1px solid var(--border-default);
+  background: color-mix(in oklab, var(--surface-base) 16%, transparent);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-card);
+  isolation: isolate;
   position: relative;
   border-radius: var(--radius-md);
   display: grid;
@@ -2565,13 +2656,9 @@ a.journey-item:hover b {
   grid-template-rows: auto 1fr auto;
   padding: var(--space-3) var(--space-4);
   transition:
-    border-color var(--motion-quick) var(--motion-ease),
-    background-color var(--motion-quick) var(--motion-ease);
-}
-
-.library-item:hover {
-  background: var(--surface-base);
-  border-color: var(--border-strong);
+    box-shadow var(--motion-quick) var(--motion-ease),
+    background-color var(--motion-quick) var(--motion-ease),
+    transform var(--motion-quick) var(--motion-ease);
 }
 
 .library-item strong {
