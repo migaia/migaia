@@ -759,9 +759,12 @@ svg {
   align-items: center;
   border-bottom: 1px solid var(--border-default);
   display: flex;
+  /* The dialog is a flex column; without this the result list squeezes the field and clips it. */
+  flex: none;
   gap: var(--space-3);
-  height: 3.375rem;
-  padding: 0 var(--space-4);
+  /* Border-box: the 1rem top padding sits above the original 3.375rem input row. */
+  height: calc(3.375rem + var(--space-4));
+  padding: var(--space-4) var(--space-4) 0;
 }
 
 .palette-field-icon {
