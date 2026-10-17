@@ -2,7 +2,13 @@
  * Reference documentation of `@migaia/rpc-browser`. Rules: `app/reference/contract.ts`. Verified
  * against `packages/rpc-browser/src` (browser/peer*.ts, browser/adapters/*.ts, error-code.ts),
  * `packages/rpc-core/src/remote/runtime-api/peer.ts` (inherited Peer options and the returned
- * `IRuntimePeer`), README and USEGUIDE on 2026-10-17.
+ * `IRuntimePeer`), README and USEGUIDE on 2026-10-17. Interop examples rechecked on 2026-10-17:
+ * Window/ServiceWorker transports dispatch raw inbound records and expose sourceProof; Peer
+ * projection or Endpoint connect owns actual admission. RTC transport stringifies sends but does
+ * not decode receives (peer-port owns JSON decoding). SharedWorker listeners accept every event
+ * port, not only ports[0]. WebTransport has no shipped direct Core Endpoint recipe: its
+ * Uint8Array-only carrier rejects the default unknown-output framer and the native binary framer's
+ * carrier-or-fragment output. Its example stays raw I/O.
  */
 import type { ICode, IEnhancerDoc, ILibraryReference, IMemberDoc, IText } from './contract.js'
 import { runtimePeerOptionMembers } from './rpc-runtime-shared.js'
@@ -11,7 +17,11 @@ import { runtimePeerOptionMembers } from './rpc-runtime-shared.js'
 const t = (en: string, zh: string): IText => ({ en, zh })
 
 /** Docs of `addEventListener` / `removeEventListener` pairs on message receivers. */
-const listenerPair = (event: string, owner: IText): Readonly<Record<string, IMemberDoc>> => ({
+const listenerPair = (
+  event: string,
+  owner: IText,
+  example: ICode
+): Readonly<Record<string, IMemberDoc>> => ({
   addEventListener: {
     summary: t(
       `Registers a \`${event}\` listener on ${owner.en}; the transport calls it once when created.`,
@@ -22,7 +32,7 @@ const listenerPair = (event: string, owner: IText): Readonly<Record<string, IMem
       listener: t('Listener the transport installs.', '由 transport 安装的监听函数。')
     },
     returns: t('Nothing; the listener is registered.', '无返回值；监听已登记。'),
-    example: `receiver.addEventListener('message', onMessage)`
+    example
   },
   removeEventListener: {
     summary: t(
@@ -34,79 +44,587 @@ const listenerPair = (event: string, owner: IText): Readonly<Record<string, IMem
       listener: t('The same listener installed before.', '之前安装的同一个监听函数。')
     },
     returns: t('Nothing; the listener is removed.', '无返回值；监听已移除。'),
-    example: `receiver.removeEventListener('message', onMessage)`
+    example
   }
 })
 
-/** Canonical RTC carrier methods shared by the low-level transport and Runtime Peer source. */
-const rtcChannelMembers: Readonly<Record<string, IMemberDoc>> = {
-  send: {
-    summary: t('Sends one message as a JSON string.', '把一条消息作为 JSON 字符串发送出去。'),
-    params: { data: t('The encoded message.', '编码后的消息文本。') },
-    returns: t('Nothing; the message is queued.', '无返回值；消息已进入发送队列。'),
-    example: `channel.send(JSON.stringify(message))`
-  },
-  readyState: {
-    summary: t(
-      'Must be `open` or `closed` when the transport is created.',
-      '创建 transport 时频道状态必须为 `open` 或 `closed`。'
+/** Places both real files in one code node with explicitly translated file and ownership notes. */
+const paired = (
+  first: IText,
+  firstCode: string,
+  second: IText,
+  secondCode: string,
+  notes: readonly IText[] = []
+): IText => {
+  /** Only comments differ by locale; executable contracts and values stay identical. */
+  const render = (locale: keyof IText): string =>
+    [
+      ...notes.map((note) => '// ' + note[locale]),
+      '// ' + first[locale],
+      firstCode,
+      '',
+      '// ' + second[locale],
+      secondCode
+    ].join('\n')
+  return { en: render('en'), zh: render('zh') }
+}
+
+/** Both iframe peers expose one typed contract and keep the borrowed Window lifecycle explicit. */
+const iframePeerExample = paired(
+  t(
+    'parent.ts at https://shop.example: origins come from fixed deployment URLs.',
+    '父页面 parent.ts：部署在固定商城源，来源域取自应用部署地址。'
+  ),
+  `import { createBrowserPeer } from '@migaia/rpc-browser'
+type IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): Promise<number> }
+type IPageApi = { pageTitle(): string }
+const childUrl = new URL('https://billing.example/child.html')
+const iframe = document.createElement('iframe')
+document.body.append(iframe)
+const started = new Promise<void>((resolve) => {
+  const ready = (event: MessageEvent) => {
+    if (event.source === iframe.contentWindow && event.origin === childUrl.origin && event.data === 'billing-ready') {
+      window.removeEventListener('message', ready)
+      resolve()
+    }
+  }
+  window.addEventListener('message', ready)
+})
+iframe.src = childUrl.href
+await started
+const billing = await createBrowserPeer<IBillingApi>({
+  connect: { window: iframe.contentWindow!, origin: childUrl.origin },
+  provide: { pageTitle: () => document.title } satisfies IPageApi,
+  defaultTimeoutMs: 5000
+})
+try { console.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 })) }
+finally { await billing.close(); iframe.remove() }`,
+  t(
+    'child.ts at https://billing.example: the parent origin is fixed by deployment, never inferred from incoming data.',
+    '子页面 child.ts：部署在固定账单源，父来源域由部署指定，不从接收数据推断。'
+  ),
+  `import { createBrowserPeer } from '@migaia/rpc-browser'
+import type { IRuntimeTypedPeer } from '@migaia/rpc-core/remote'
+type IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): Promise<number> }
+type IPageApi = { pageTitle(): string }
+const parentOrigin = 'https://shop.example'
+const opening: Promise<IRuntimeTypedPeer<IPageApi>> = createBrowserPeer<IPageApi>({
+  connect: { window: window.parent, origin: parentOrigin },
+  provide: {
+    async calculateTotal({ prices, taxRate }) {
+      const parent = await opening
+      console.log(await parent.request('pageTitle'))
+      return prices.reduce((a, b) => a + b, 0) * (1 + taxRate)
+    }
+  } satisfies IBillingApi
+})
+window.parent.postMessage('billing-ready', parentOrigin)
+const parent = await opening
+window.addEventListener('pagehide', () => { void parent.close() }, { once: true })`,
+  [
+    t(
+      'Both factories run concurrently. The parent owns the iframe; pagehide cleanup is best-effort during navigation.',
+      '两端工厂并发启动；父页面拥有内嵌窗口，导航期间的页面隐藏清理为尽力执行。'
     )
-  },
-  ...listenerPair('message / closing / close / error', t('the channel', '数据频道'))
-}
+  ]
+)
 
-/** Parent page side of the README iframe example. */
+/** Popup ownership requires a retained opener and an explicit origin in each direction. */
+const popupPeerExample = paired(
+  t(
+    'opener.ts at https://shop.example: run from a user gesture; the opener owns popup.close().',
+    '打开方 opener.ts：部署在商城源，从用户操作运行，由打开方负责关闭弹窗。'
+  ),
+  `import { createBrowserPeer } from '@migaia/rpc-browser'
+type IPopupApi = { double(value: number): Promise<number> }
+type IOpenerApi = { pageTitle(): string }
+export async function openCalculator() {
+  const childUrl = new URL('https://billing.example/popup.html')
+  const popup = window.open('about:blank', 'calculator')
+  if (!popup) throw new Error('Popup blocked')
+  const started = new Promise<void>((resolve) => {
+    const ready = (event: MessageEvent) => {
+      if (event.source === popup && event.origin === childUrl.origin && event.data === 'popup-ready') {
+        window.removeEventListener('message', ready)
+        resolve()
+      }
+    }
+    window.addEventListener('message', ready)
+  })
+  popup.location.href = childUrl.href
+  await started
+  const peer = await createBrowserPeer<IPopupApi>({
+    connect: { window: popup, origin: childUrl.origin },
+    provide: { pageTitle: () => document.title } satisfies IOpenerApi
+  })
+  try { console.log(await peer.request('double', 21)) }
+  finally { await peer.close(); popup.close() }
+}`,
+  t(
+    'popup.ts at https://billing.example: deployment must retain window.opener; no noopener or isolating policy.',
+    '弹窗 popup.ts：部署须保留原生打开方引用，不能使用断开打开方的设置或隔离策略。'
+  ),
+  `import { createBrowserPeer } from '@migaia/rpc-browser'
+import type { IRuntimeTypedPeer } from '@migaia/rpc-core/remote'
+type IPopupApi = { double(value: number): Promise<number> }
+type IOpenerApi = { pageTitle(): string }
+const openerOrigin = 'https://shop.example'
+const opener = window.opener as Window | null
+if (!opener) throw new Error('Opener unavailable')
+const opening: Promise<IRuntimeTypedPeer<IOpenerApi>> = createBrowserPeer<IOpenerApi>({
+  connect: { window: opener, origin: openerOrigin },
+  provide: {
+    async double(value) {
+      const parent = await opening
+      console.log(await parent.request('pageTitle'))
+      return value * 2
+    }
+  } satisfies IPopupApi
+})
+opener.postMessage('popup-ready', openerOrigin)
+const parent = await opening
+window.addEventListener('pagehide', () => { void parent.close() }, { once: true })`
+)
+
+/**
+ * One SharedWorker listener accepts many page-owned ports without pretending there is one remote
+ * page.
+ */
+const sharedPeerExample = paired(
+  t(
+    'page.ts: open this same page in two tabs; each has an independent Peer and native port.',
+    '页面 page.ts：在两个标签页打开同一页面，各自拥有独立对端和原生端口。'
+  ),
+  `import { createBrowserPeer } from '@migaia/rpc-browser'
+type ISharedApi = { double(value: number): number; count(limit: number): AsyncIterableIterator<number> }
+type IPageApi = { pageTitle(): string }
+const worker = new SharedWorker(new URL('./shared.worker.js', import.meta.url), { type: 'module', name: 'shared-rpc' })
+const shared = await createBrowserPeer<ISharedApi>({
+  connect: { sharedWorker: worker },
+  provide: { pageTitle: () => document.title } satisfies IPageApi
+})
+try {
+  console.log(await shared.request('double', 21))
+  for await (const value of shared.stream('count', 3)) console.log(value)
+} finally { await shared.close(); worker.port.close() }`,
+  t(
+    'shared.worker.ts: compile with the WebWorker library; the application service owner calls stopService when all pages are done.',
+    '共享工作者 shared.worker.ts：以工作者类型库编译，所有页面结束后由应用服务所有者调用停止函数。'
+  ),
+  `import { createBrowserPeer } from '@migaia/rpc-browser'
+declare const self: SharedWorkerGlobalScope
+type ISharedApi = { double(value: number): number; count(limit: number): AsyncIterableIterator<number> }
+type IPageApi = { pageTitle(): string }
+const server = await createBrowserPeer<IPageApi>({
+  listen: self,
+  provide: {
+    double: (value) => value * 2,
+    async *count(limit) { for (let value = 1; value <= limit; value++) yield value }
+  } satisfies ISharedApi,
+  report: (error) => console.error(error)
+})
+server.on('ready', (event) => console.log(event.instanceId))
+export async function stopService() { await server.close(); self.close() }`,
+  [
+    t(
+      'The listener serves all accepted pages. An unqualified reverse request is ambiguous with several pages; do not invent a target selector.',
+      '监听者服务全部已接纳页面；多个页面存在时未指定目标的反向请求有歧义，不能虚构目标选择参数。'
+    )
+  ]
+)
+
+/** Signaling is an explicit application prerequisite, separate from the actual connected Peer pair. */
+const rtcPeerExample = paired(
+  t(
+    'rtc-a.ts: application supplies the open caller-created channel and its owning RTCPeerConnection.',
+    '对等端甲 rtc-a.ts：应用提供已打开的主动创建频道及其所属原生连接。'
+  ),
+  `import { createBrowserPeer } from '@migaia/rpc-browser'
+type IRemoteApi = { double(value: number): number }
+type ILocalApi = { label(): string }
+export async function attachA(channel: RTCDataChannel, connection: RTCPeerConnection) {
+  const peer = await createBrowserPeer<IRemoteApi>({
+    connect: { rtcDataChannel: channel },
+    provide: { label: () => 'browser-a' } satisfies ILocalApi
+  })
+  console.log(await peer.request('double', 21))
+  return async () => { await peer.close(); channel.close(); connection.close() }
+}`,
+  t(
+    'rtc-b.ts: application supplies the matching open channel received through the native datachannel event.',
+    '对等端乙 rtc-b.ts：应用提供从原生数据频道事件取得的匹配已打开频道。'
+  ),
+  `import { createBrowserPeer } from '@migaia/rpc-browser'
+type IRemoteApi = { double(value: number): number }
+type ILocalApi = { label(): string }
+export async function attachB(channel: RTCDataChannel, connection: RTCPeerConnection) {
+  const peer = await createBrowserPeer<ILocalApi>({
+    connect: { rtcDataChannel: channel },
+    provide: { double: (value) => value * 2 } satisfies IRemoteApi
+  })
+  console.log(await peer.request('label'))
+  return async () => { await peer.close(); channel.close(); connection.close() }
+}`,
+  [
+    t(
+      'Application supplies SDP/ICE signaling and waits for open on both ends; use ordered:true and unlimited retransmission. After both attachments, application calls both returned cleanup functions.',
+      '应用自备会话描述及候选地址信令，等待两端频道打开；使用有序及无限重传配置，两端挂接后由应用调用返回的清理函数。'
+    )
+  ]
+)
+
+/** Direct Endpoint example binds source proof and typed provider data at both actual Window owners. */
+const windowEndpointExample = paired(
+  t(
+    'parent-endpoint.ts at https://shop.example: attach readiness before navigating the owned iframe.',
+    '父端点 parent-endpoint.ts：部署在商城源，导航自有内嵌窗口之前登记就绪监听。'
+  ),
+  `import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
+type IChildApi = { double(value: number): number }
+type IParentApi = { title(): string }
+const childUrl = new URL('https://billing.example/endpoint.html')
+const iframe = document.createElement('iframe')
+document.body.append(iframe)
+const started = new Promise<void>((resolve) => {
+  const ready = (event: MessageEvent) => {
+    if (event.source === iframe.contentWindow && event.origin === childUrl.origin && event.data === 'endpoint-ready') {
+      window.removeEventListener('message', ready); resolve()
+    }
+  }
+  window.addEventListener('message', ready)
+})
+iframe.src = childUrl.href
+await started
+const transport = createWindowMessageTransport({ target: iframe.contentWindow!, targetOrigin: childUrl.origin })
+const endpoint = await createEndpoint({ id: 'parent', targetIds: ['child'], transport, middlewares: [connect({ transport }), contract({ version: '1.0.0' })] })
+endpoint.provide('title', (context) => context.success(document.title satisfies ReturnType<IParentApi['title']>))
+try { console.log(await endpoint.send<ReturnType<IChildApi['double']>>('child', 'double', 21 satisfies Parameters<IChildApi['double']>[0])) }
+finally { await endpoint.dispose(); iframe.remove() }`,
+  t(
+    'child-endpoint.ts at https://billing.example: parent origin is a fixed deployment value.',
+    '子端点 child-endpoint.ts：部署在账单源，父来源域为固定部署值。'
+  ),
+  `import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
+type IChildApi = { double(value: number): number }
+type IParentApi = { title(): string }
+const parentOrigin = 'https://shop.example'
+const transport = createWindowMessageTransport({ target: window.parent, targetOrigin: parentOrigin })
+const endpoint = await createEndpoint({ id: 'child', targetIds: ['parent'], transport, middlewares: [connect({ transport }), contract({ version: '1.0.0' })] })
+endpoint.provide('double', async (context) => {
+  console.log(await endpoint.send<ReturnType<IParentApi['title']>>('parent', 'title', null))
+  return context.success((context.data as Parameters<IChildApi['double']>[0]) * 2)
+})
+window.addEventListener('pagehide', () => { void endpoint.dispose() }, { once: true })
+window.parent.postMessage('endpoint-ready', parentOrigin)`
+)
+
+/** Direct shared-worker endpoints retain separate native ports and per-page provider registries. */
+const sharedEndpointExample = paired(
+  t(
+    'page-endpoint.ts: each page owns and finally closes its own SharedWorker port.',
+    '页面端点 page-endpoint.ts：每个页面拥有并最终关闭自身共享工作者端口。'
+  ),
+  `import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'
+type ISharedApi = { double(value: number): number }
+type IPageApi = { title(): string }
+const worker = new SharedWorker(new URL('./shared-endpoint.worker.js', import.meta.url), { type: 'module' })
+const transport = createSharedWorkerTransport(worker.port)
+const endpoint = await createEndpoint({ id: 'page', targetIds: ['shared'], transport, middlewares: [connect({ transport }), contract({ version: '1.0.0' })] })
+endpoint.provide('title', (context) => context.success(document.title satisfies ReturnType<IPageApi['title']>))
+try { console.log(await endpoint.send<ReturnType<ISharedApi['double']>>('shared', 'double', 21 satisfies Parameters<ISharedApi['double']>[0])) }
+finally { await endpoint.dispose(); worker.port.close() }`,
+  t(
+    'shared-endpoint.worker.ts: one Endpoint per actual connect port; service owner calls stopService at shutdown.',
+    '工作者端点 shared-endpoint.worker.ts：每个实际连接端口建立一个端点，关闭服务时由服务所有者调用停止函数。'
+  ),
+  `import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'
+declare const self: SharedWorkerGlobalScope
+type ISharedApi = { double(value: number): number }
+type IPageApi = { title(): string }
+const cleanups = new Set<() => Promise<void>>()
+self.addEventListener('connect', (event) => {
+  for (const port of event.ports) {
+    const transport = createSharedWorkerTransport(port)
+    const opening = createEndpoint({ id: 'shared', targetIds: ['page'], transport, middlewares: [connect({ transport }), contract({ version: '1.0.0' })] }).then((endpoint) => {
+      endpoint.provide('double', async (context) => {
+        console.log(await endpoint.send<ReturnType<IPageApi['title']>>('page', 'title', null))
+        return context.success((context.data as Parameters<ISharedApi['double']>[0]) * 2)
+      })
+      cleanups.add(async () => { await endpoint.dispose(); port.close() })
+    })
+    void opening.catch((error) => console.error(error))
+  }
+})
+export async function stopService() {
+  for (const close of cleanups) await close()
+  cleanups.clear(); self.close()
+}`
+)
+
+/**
+ * Same-origin BroadcastChannel remains broadcast while explicit endpoint IDs select logical
+ * methods.
+ */
+const broadcastExample = paired(
+  t(
+    'tab-a.ts: open tab B first; both tabs must share origin, storage partition and channel name.',
+    '标签页甲 tab-a.ts：先打开乙页，两页须同源、同存储分区且使用相同频道名。'
+  ),
+  `import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
+type ICartApi = { count(input: { add: number }): number }
+type IPageApi = { title(): string }
+const channel = new BroadcastChannel('cart-rpc')
+const transport = createBroadcastChannelTransport(channel)
+const endpoint = await createEndpoint({ id: 'tab-a', targetIds: ['tab-b'], transport, middlewares: [connect({ transport }), contract({ version: '1.0.0' })] })
+endpoint.provide('title', (context) => context.success(document.title satisfies ReturnType<IPageApi['title']>))
+try { console.log(await endpoint.send<ReturnType<ICartApi['count']>>('tab-b', 'count', { add: 2 } satisfies Parameters<ICartApi['count']>[0])) }
+finally { await endpoint.dispose(); channel.close() }`,
+  t(
+    'tab-b.ts: provider tab owns its channel; application calls closeTab before removing this service.',
+    '标签页乙 tab-b.ts：提供方页面拥有频道，应用移除此服务前调用关闭函数。'
+  ),
+  `import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
+type ICartApi = { count(input: { add: number }): number }
+type IPageApi = { title(): string }
+const channel = new BroadcastChannel('cart-rpc')
+const transport = createBroadcastChannelTransport(channel)
+const endpoint = await createEndpoint({ id: 'tab-b', targetIds: ['tab-a'], transport, middlewares: [connect({ transport }), contract({ version: '1.0.0' })] })
+endpoint.provide('count', async (context) => {
+  console.log(await endpoint.send<ReturnType<IPageApi['title']>>('tab-a', 'title', null))
+  return context.success(3 + (context.data as Parameters<ICartApi['count']>[0]).add)
+})
+export async function closeTab() { await endpoint.dispose(); channel.close() }
+window.addEventListener('pagehide', () => { void closeTab() }, { once: true })`
+)
+
+/** Service Worker bootstrap obtains a real Client before creating its source-bound Endpoint. */
+const serviceExample = paired(
+  t(
+    'service-page.ts: application owns the registration; cleanup closes the logical endpoint without unregistering the service.',
+    '服务页面 service-page.ts：应用拥有注册，清理关闭逻辑端点而不注销服务。'
+  ),
+  `import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
+type IServiceApi = { double(value: number): number }
+type IPageApi = { title(): string }
+await navigator.serviceWorker.register(new URL('./service-worker.js', import.meta.url), { type: 'module' })
+const registration = await navigator.serviceWorker.ready
+const target = registration.active!
+const opened = new Promise<string>((resolve) => {
+  const ready = (event: MessageEvent) => {
+    if (event.source === target && event.data?.kind === 'endpoint-ready') {
+      navigator.serviceWorker.removeEventListener('message', ready)
+      resolve(event.data.clientId)
+    }
+  }
+  navigator.serviceWorker.addEventListener('message', ready)
+})
+target.postMessage({ kind: 'open-endpoint' })
+const clientId = await opened
+const transport = createServiceWorkerTransport({ target, receiver: navigator.serviceWorker })
+const endpoint = await createEndpoint({ id: 'page-' + clientId, targetIds: ['service-' + clientId], transport, middlewares: [connect({ transport, useBaseIdVerifyOnly: false, identifier: ({ senderId }) => senderId === 'service-' + clientId }), contract({ version: '1.0.0' })] })
+endpoint.provide('title', (context) => context.success(document.title satisfies ReturnType<IPageApi['title']>))
+try { console.log(await endpoint.send<ReturnType<IServiceApi['double']>>('service-' + clientId, 'double', 21 satisfies Parameters<IServiceApi['double']>[0])) }
+finally { await endpoint.dispose(); target.postMessage({ kind: 'close-endpoint' }) }`,
+  t(
+    'service-worker.ts: compile with WebWorker types; clients.get supplies the actual browser-issued Client identity.',
+    '服务工作者 service-worker.ts：以工作者类型库编译，通过原生客户端查询取得浏览器签发的真实客户端身份。'
+  ),
+  `import { connect, contract, createEndpoint } from '@migaia/rpc-core'
+import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
+declare const self: ServiceWorkerGlobalScope
+type IServiceApi = { double(value: number): number }
+type IPageApi = { title(): string }
+const endpoints = new Map<string, Promise<() => Promise<void>>>()
+self.addEventListener('message', (event) => {
+  if (!event.source || !('id' in event.source)) return
+  const clientId = event.source.id
+  if (event.data?.kind === 'close-endpoint') {
+    const opening = endpoints.get(clientId)
+    endpoints.delete(clientId)
+    if (opening) event.waitUntil(opening.then((close) => close()))
+    return
+  }
+  if (event.data?.kind !== 'open-endpoint') return
+  event.waitUntil((async () => {
+    const client = await self.clients.get(clientId)
+    if (!client) return
+    if (!endpoints.has(clientId)) {
+      const transport = createServiceWorkerTransport({ target: client, receiver: self, peerId: client.id })
+      const opening = createEndpoint({ id: 'service-' + client.id, targetIds: ['page-' + client.id], transport, middlewares: [connect({ transport, useBaseIdVerifyOnly: false, identifier: ({ senderId }) => senderId === 'page-' + client.id }), contract({ version: '1.0.0' })] }).then((endpoint) => {
+        endpoint.provide('double', async (context) => {
+          console.log(await endpoint.send<ReturnType<IPageApi['title']>>('page-' + client.id, 'title', null))
+          return context.success((context.data as Parameters<IServiceApi['double']>[0]) * 2)
+        })
+        return () => endpoint.dispose()
+      })
+      endpoints.set(clientId, opening)
+    }
+    await endpoints.get(clientId)
+    client.postMessage({ kind: 'endpoint-ready', clientId })
+  })())
+})`,
+  [
+    t(
+      'Both identifiers bind the expected logical sender after transport sourceProof binds the real ServiceWorker or Client. Native Client.id and logical Endpoint ids are different identities.',
+      '两端身份校验在载体来源证明绑定真实服务工作者或客户端后，再核对预期逻辑发送方；原生客户端标识与逻辑端点标识属于不同身份。'
+    ),
+    t(
+      'No Runtime Peer is supported here. Worker idle termination discards this in-memory service; calls can time out and application must reopen it. Bootstrap waitUntil does not keep later RPC work alive indefinitely.',
+      '此场景不支持运行对端；工作者空闲终止会丢弃内存服务，调用可能超时，应用须重新打开；初始事件延长生命周期并不能永久保活后续调用。'
+    )
+  ]
+)
+
+/**
+ * RTC adapter example deliberately shows raw string protocol instead of inventing a default
+ * Endpoint pipeline.
+ */
+const rtcTransportExample = paired(
+  t(
+    'rtc-client.ts: application supplies an already-open reliable channel after its own signaling.',
+    '数据频道调用方 rtc-client.ts：应用完成自备信令后提供已打开可靠频道。'
+  ),
+  `import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'
+type IEchoApi = { echo(input: { text: string }): { text: string } }
+type IRequest = { id: string; method: 'echo'; payload: Parameters<IEchoApi['echo']>[0] }
+type IResponse = { id: string; payload: ReturnType<IEchoApi['echo']> }
+export async function runClient(channel: RTCDataChannel, connection: RTCPeerConnection) {
+  const transport = createRtcDataChannelTransport(channel)
+  let resolveReply!: (response: IResponse) => void
+  let rejectReply!: (error: unknown) => void
+  const reply = new Promise<IResponse>((resolve, reject) => { resolveReply = resolve; rejectReply = reject })
+  const remove = transport.subscribe(({ data }) => {
+    try {
+      const response = JSON.parse(data as string) as IResponse
+      if (response.id === 'echo-1') resolveReply(response)
+    } catch (error) { rejectReply(error) }
+  })
+  const removeError = transport.onTransportError?.(rejectReply)
+  const timer = setTimeout(() => rejectReply(new Error('Reply deadline elapsed')), 3000)
+  try {
+    transport.send({ id: 'echo-1', method: 'echo', payload: { text: 'hello' } } satisfies IRequest)
+    console.log((await reply).payload)
+  } finally { clearTimeout(timer); remove(); removeError?.(); channel.close(); connection.close() }
+}`,
+  t(
+    'rtc-service.ts: run before runClient on the matching remote channel; owner later invokes the returned cleanup.',
+    '数据频道服务方 rtc-service.ts：在匹配远端频道上先于调用方运行，随后由所有者调用返回的清理。'
+  ),
+  `import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'
+type IEchoApi = { echo(input: { text: string }): { text: string } }
+type IRequest = { id: string; method: 'echo'; payload: Parameters<IEchoApi['echo']>[0] }
+type IResponse = { id: string; payload: ReturnType<IEchoApi['echo']> }
+export function attachService(channel: RTCDataChannel, connection: RTCPeerConnection) {
+  const service: IEchoApi = { echo: (input) => input }
+  const transport = createRtcDataChannelTransport(channel)
+  const remove = transport.subscribe(({ data }) => {
+    const request = JSON.parse(data as string) as IRequest
+    if (request.method === 'echo') transport.send({ id: request.id, payload: service.echo(request.payload) } satisfies IResponse)
+  })
+  return () => { remove(); channel.close(); connection.close() }
+}`,
+  [
+    t(
+      'This is an application JSON protocol over raw transport, not Runtime Peer traffic. Application owns signaling, channel and RTCPeerConnection shutdown. For RPC use the paired createBrowserPeer example; default Endpoint framing is not this string protocol.',
+      '此处为原始载体上的应用字符串协议，不是运行对端流量；应用拥有信令、频道及原生连接的关闭；远程调用应使用双端运行对端示例，默认端点分帧不等于此字符串协议。'
+    )
+  ]
+)
+
+/**
+ * WebTransport has no server SDK here; only concrete raw datagrams and an explicit matching
+ * application protocol are shown.
+ */
+const webTransportExample = paired(
+  t(
+    'web-client.ts: the application owns its native WebTransport session and request identifier.',
+    '网页客户端 web-client.ts：应用拥有原生网页传输会话并签发请求标识。'
+  ),
+  `import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'
+type IEchoApi = { echo(input: { text: string }): { text: string } }
+type IRequest = { id: string; method: 'echo'; payload: Parameters<IEchoApi['echo']>[0] }
+type IResponse = { id: string; payload: ReturnType<IEchoApi['echo']> }
+const session = new WebTransport('https://rpc.example:4433/echo')
+await session.ready
+const transport = createWebTransportDatagramTransport(session.datagrams)
+const encoder = new TextEncoder()
+const decoder = new TextDecoder('utf-8', { fatal: true })
+let resolveReply!: (response: IResponse) => void
+let rejectReply!: (error: unknown) => void
+const reply = new Promise<IResponse>((resolve, reject) => { resolveReply = resolve; rejectReply = reject })
+const remove = transport.subscribe(({ data }) => {
+  try {
+    const response = JSON.parse(decoder.decode(data)) as IResponse
+    if (response.id === 'echo-1') resolveReply(response)
+  } catch (error) { rejectReply(error) }
+})
+const removeError = transport.onTransportError?.(rejectReply)
+const timer = setTimeout(() => rejectReply(new Error('Datagram deadline elapsed')), 3000)
+try {
+  const request: IRequest = { id: 'echo-1', method: 'echo', payload: { text: 'hello' } }
+  await transport.send(encoder.encode(JSON.stringify(request)))
+  console.log((await reply).payload)
+} finally {
+  clearTimeout(timer); remove(); removeError?.()
+  try { await transport.close?.() } finally { session.close() }
+}`,
+  t(
+    'External server protocol: no server library is provided; implement these exact datagram constraints in the actual server.',
+    '外部服务端协议：本库不提供服务端库，须在实际服务端实现下列精确数据报约束。'
+  ),
+  `type IEchoApi = { echo(input: { text: string }): { text: string } }
+type IRequest = { id: string; method: 'echo'; payload: Parameters<IEchoApi['echo']>[0] }
+type IResponse = { id: string; payload: ReturnType<IEchoApi['echo']> }
+const received: IRequest = { id: 'echo-1', method: 'echo', payload: { text: 'hello' } }
+const reply: IResponse = { id: received.id, payload: { text: received.payload.text } }`,
+  [
+    t(
+      'Server must accept WebTransport at the configured HTTPS URL and exchange one complete UTF-8 JSON object per datagram. Echo the request id and echo payload; both messages must fit the path MTU. Datagram loss/reordering is possible, and this client does not retry business operations.',
+      '服务端须在配置的安全网址接纳网页传输，每个数据报承载一个完整通用文本编码对象；原样返回请求标识及回显载荷，两类消息均须适合路径最大传输单元；可能丢失乱序，此客户端不重试业务操作。'
+    ),
+    t(
+      'No createBrowserPeer source or ready-made Core Endpoint combination is provided for datagrams. A byte codec alone is insufficient: default framing reports unknown output and native binary framing can emit fragment objects, which this carrier rejects. These objects are the application protocol, not Core envelopes or Runtime handshake frames.',
+      '数据报不提供运行对端来源或现成核心端点组合；仅字节编解码不足，默认分帧报告未知输出，原生二进制分帧可能输出此载体拒绝的分片对象；这里的对象是应用协议，不是核心信封或运行握手帧。'
+    )
+  ]
+)
+
+/**
+ * Root and factory introduction includes all three supported Peer source families and popup
+ * ownership.
+ */
 const peerExample: ICode = {
-  en: `import { createBrowserPeer } from '@migaia/rpc-browser'
-
-type IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): number }
-const iframe = document.querySelector<HTMLIFrameElement>('#billing')!
-const billing = await createBrowserPeer<IBillingApi>({
-  connect: { window: iframe.contentWindow!, origin: 'https://billing.example' },
-  defaultTimeoutMs: 5000
-})
-console.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 })) // 45.36
-await billing.close() // the iframe itself stays open`,
-  zh: `import { createBrowserPeer } from '@migaia/rpc-browser'
-
-type IBillingApi = { calculateTotal(input: { prices: number[]; taxRate: number }): number }
-const iframe = document.querySelector<HTMLIFrameElement>('#billing')!
-const billing = await createBrowserPeer<IBillingApi>({
-  connect: { window: iframe.contentWindow!, origin: 'https://billing.example' },
-  defaultTimeoutMs: 5000
-})
-console.log(await billing.request('calculateTotal', { prices: [12, 30], taxRate: 0.08 })) // 45.36
-await billing.close() // iframe 本身保持打开`
+  en: [iframePeerExample, popupPeerExample, sharedPeerExample, rtcPeerExample]
+    .map((example) => example.en)
+    .join('\n\n'),
+  zh: [iframePeerExample, popupPeerExample, sharedPeerExample, rtcPeerExample]
+    .map((example) => example.zh)
+    .join('\n\n')
 }
-
-/** Endpoint assembly used by every transport install snippet. */
-const endpointWith = (
-  setup: string
-): string => `import { connect, contract, createEndpoint, protocol } from '@migaia/rpc-core'
-${setup}
-const endpoint = await createEndpoint({
-  id: 'page',
-  transport,
-  middlewares: [contract({ version: '1' }), protocol(), connect({ transport })]
-})`
 
 /** Enhancer doc for one transport factory. */
 const transportEnhancer = (
   summary: IText,
-  install: string,
+  install: ICode,
   behaviors: readonly IText[],
-  scenarios: readonly IText[]
+  scenarios: readonly IText[],
+  target = 'Endpoint'
 ): IEnhancerDoc => ({
   kind: 'transport',
-  target: 'Endpoint',
+  target,
   summary,
-  install: endpointWith(install),
+  install,
   grants: [],
   behaviors,
   scenarios,
-  example: `${endpointWith(install)}
-await endpoint.send('remote', 'ping')
-await endpoint.dispose()`
+  example: install
 })
 
 /** Behaviour shared by every transport: observation through `observe(probe)`. */
@@ -114,6 +632,27 @@ const observeBehavior = t(
   '`transport.observe(probe)` reports one event per physical send and per accepted receive, with `carrier`, `origin`, `transfers` and `rejectedSource` in `detail`.',
   '`transport.observe(probe)` 为每次物理发送和每次通过来源校验的接收各报告一个事件，`detail` 中包含 `carrier`、`origin`、`transfers` 与 `rejectedSource`。'
 )
+
+/** Canonical RTC carrier methods shared by the low-level transport and Runtime Peer source. */
+const rtcChannelMembers: Readonly<Record<string, IMemberDoc>> = {
+  send: {
+    summary: t('Sends one message as a JSON string.', '把一条消息作为 JSON 字符串发送出去。'),
+    params: { data: t('The encoded message.', '编码后的消息文本。') },
+    returns: t('Nothing; the message is queued.', '无返回值；消息已进入发送队列。'),
+    example: rtcTransportExample
+  },
+  readyState: {
+    summary: t(
+      'Must be `open` or `closed` when the transport is created.',
+      '创建 transport 时频道状态必须为 `open` 或 `closed`。'
+    )
+  },
+  ...listenerPair(
+    'message / closing / close / error',
+    t('the channel', '数据频道'),
+    rtcTransportExample
+  )
+}
 
 /** Reference of `@migaia/rpc-browser`. */
 export const rpcBrowserReference: ILibraryReference = {
@@ -127,65 +666,53 @@ export const rpcBrowserReference: ILibraryReference = {
     },
     'adapters/window': {
       summary: t(
-        'Low-level `postMessage` transport between windows (iframe, popup) for `createEndpoint()`; only messages from the target window and origin are accepted.',
-        '供 `createEndpoint()` 使用的窗口间（iframe、弹窗）`postMessage` 底层 transport；只接受来自目标窗口和指定源的消息。'
+        'Low-level Window carrier for a paired Endpoint. Its raw subscriptions preserve message attribution; install `connect({ transport })` so sourceProof rejects another window or origin.',
+        '供双端端点使用的窗口载体，原始订阅保留消息归属；须搭配 `connect({ transport })`，由来源证明拒绝其他窗口或来源域。'
       ),
-      example: `import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
-
-const transport = createWindowMessageTransport({ target: iframe.contentWindow!, targetOrigin: 'https://billing.example' })`
+      example: windowEndpointExample
     },
     'adapters/shared-worker': {
       summary: t(
         'Low-level transport over one SharedWorker `MessagePort` for `createEndpoint()`; the port stays owned by the caller.',
         '供 `createEndpoint()` 使用的、基于单个 SharedWorker `MessagePort` 的底层 transport；端口仍由调用方持有。'
       ),
-      example: `import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'
-
-const transport = createSharedWorkerTransport(new SharedWorker(workerUrl).port)`
+      example: sharedEndpointExample
     },
     'adapters/service-worker': {
       summary: t(
         'Low-level transport between a page and its Service Worker for `createEndpoint()`. No Runtime Peer is offered because the browser may stop a Service Worker at any time.',
         '供 `createEndpoint()` 使用的、页面与其 Service Worker 之间的底层 transport。因为浏览器随时可能停止 Service Worker，所以不提供 Runtime Peer。'
       ),
-      example: `import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
-
-const transport = createServiceWorkerTransport({ target: registration.active!, receiver: navigator.serviceWorker })`
+      example: serviceExample
     },
     'adapters/broadcast-channel': {
       summary: t(
         'Low-level transport over a `BroadcastChannel` for `createEndpoint()`: one-to-many between same-origin tabs, so no Runtime Peer.',
         '供 `createEndpoint()` 使用的、基于 `BroadcastChannel` 的底层 transport：在同源标签页之间一对多广播，因此不提供 Runtime Peer。'
       ),
-      example: `import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
-
-const transport = createBroadcastChannelTransport(new BroadcastChannel('app'))`
+      example: broadcastExample
     },
     'adapters/rtc-data-channel': {
       summary: t(
-        'Low-level transport over an open `RTCDataChannel` for `createEndpoint()`; messages travel as JSON strings.',
-        '供 `createEndpoint()` 使用的、基于已打开 `RTCDataChannel` 的底层 transport；消息以 JSON 字符串传输。'
+        'Raw RTC carrier stringifies non-string sends and preserves received values. The paired application example decodes its own JSON; use createBrowserPeer for the canonical Runtime protocol.',
+        '原始数据频道载体把非字符串发送值转换为字符串，并保留接收值；双端应用示例自行解码，规范运行协议请使用运行对端工厂。'
       ),
-      example: `import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'
-
-const transport = createRtcDataChannelTransport(peerConnection.createDataChannel('rpc'))`
+      example: rtcTransportExample
     },
     'adapters/web-transport': {
       summary: t(
-        'Low-level transport over WebTransport datagrams (`Uint8Array`) for `createEndpoint()`; datagrams may be lost or reordered, so no Runtime Peer.',
-        '供 `createEndpoint()` 使用的、基于 WebTransport 数据报（`Uint8Array`）的底层 transport；数据报可能丢失或乱序，因此不提供 Runtime Peer。'
+        'Raw Uint8Array WebTransport datagrams, with application-owned server protocol and session. No Runtime Peer source or ready-made Core Endpoint/framer combination is supplied; loss and reordering remain possible.',
+        '原始字节数组网页传输数据报，由应用拥有服务器协议及会话；不提供运行对端来源或现成核心端点分帧组合，仍可能丢失乱序。'
       ),
-      example: `import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'
-
-const transport = createWebTransportDatagramTransport(session.datagrams)`
+      example: webTransportExample
     }
   },
   symbols: {
     createBrowserPeer: {
       role: 'factory',
       purpose: t(
-        'Opens a Runtime Peer over a borrowed browser carrier and resolves after the handshake and method directory exchange. Pass exactly one of `connect` (window, SharedWorker port, RTC channel) or `listen` (a SharedWorker scope accepting one Peer per page).',
-        '基于借用的浏览器载体打开一个 Runtime Peer，在握手与方法目录交换完成后 resolve。`connect`（窗口、SharedWorker 端口、RTC 频道）与 `listen`（为每个页面接纳一个 Peer 的 SharedWorker 作用域）二者必须且只能提供一个。'
+        'Creates a browser Runtime Peer. Connect resolves after the real handshake/directory exchange; listen returns an accept facade, and each incoming SharedWorker port has its own handshake. Supply exactly one supported source and pair both sides with `createBrowserPeer`.',
+        '创建浏览器运行对端；主动连接在真实握手及目录交换后完成，监听模式返回接纳表面，每个入站共享工作者端口独立握手；两端分别调用工厂，本端请求须搭配对端 `provide`。'
       ),
       params: {
         options: t(
@@ -219,8 +746,8 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
           '需要由库来创建 Dedicated Worker 时：请使用 `@migaia/rpc-threads`。'
         ),
         t(
-          'Service Worker, BroadcastChannel and WebTransport: use the `adapters/*` transports with `createEndpoint()`.',
-          'Service Worker、BroadcastChannel 与 WebTransport：请把 `adapters/*` 中的 transport 与 `createEndpoint()` 组合使用。'
+          'Service Worker and BroadcastChannel use paired Endpoint transports. WebTransport uses raw byte transport with an external application protocol; this package ships no ready-made compatible Endpoint/framer recipe.',
+          '服务工作者与广播频道使用双端端点载体；网页传输使用原始字节载体及外部应用协议，本包不提供现成兼容端点分帧配方。'
         )
       ]
     },
@@ -230,7 +757,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
         'The `source` value (`@migaia/rpc/browser`) of Peer configuration and decoding errors of this package; compare it before branching on `code`.',
         '本包 Peer 配置错误与解码错误上的 `source` 值（`@migaia/rpc/browser`）；先比对它确认来源，再按 `code` 分支处理。'
       ),
-      example: `if (error.source === RPC_BROWSER_ERROR_SOURCE && error.code === RpcBrowserErrorCode.windowOriginRequired) showSetupHint()`
+      example: iframePeerExample
     },
     RpcBrowserErrorCode: {
       role: 'constant',
@@ -238,24 +765,20 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
         'Table of the stable error codes of this package; values are the strings on `error.code`.',
         '本包稳定错误码的对照表；值就是错误对象 `error.code` 上的字符串。'
       ),
-      example: `if (error.code === RpcBrowserErrorCode.rtcChannelUnreliable) useReliableChannel()`
+      example: rtcPeerExample
     },
     createWindowMessageTransport: {
       role: 'enhancer',
       purpose: t(
-        'Creates a `postMessage` transport to one window. Sends go to `targetOrigin`; only messages whose `event.source` is `target` (and whose origin matches) are delivered.',
-        '创建通往某个窗口的 `postMessage` transport。发送时指定 `targetOrigin`；只有 `event.source` 为 `target`（且源匹配）的消息才会被交付。'
+        'Creates a Window postMessage carrier with exact target/origin sourceProof. Raw subscribe preserves all event records; pair it with `connect` for Endpoint admission or use the Browser Peer projection.',
+        '创建带精确目标及来源域证明的窗口载体；原始订阅保留全部事件记录，端点须搭配 `connect` 执行准入，或使用浏览器对端投影。'
       ),
       returns: t(
         'An `IRpcTransport` for `createEndpoint()`; `*` as origin without `allowUnsafeTargetOrigin` throws `INVALID_CONFIG`.',
         '供 `createEndpoint()` 使用的 `IRpcTransport`；源为 `*` 且未开启 `allowUnsafeTargetOrigin` 时抛 `INVALID_CONFIG`。'
       ),
       options: 'IWindowMessageTransportOptions',
-      example: `const transport = createWindowMessageTransport({
-  target: iframe.contentWindow!,
-  receiver: window,
-  targetOrigin: 'https://billing.example'
-})`
+      example: windowEndpointExample
     },
     createSharedWorkerTransport: {
       role: 'enhancer',
@@ -273,23 +796,20 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
         'An `IRpcTransport`; the port is borrowed and must be closed by its owner.',
         '一个 `IRpcTransport`；端口是借用的，需由其持有者关闭。'
       ),
-      example: `const transport = createSharedWorkerTransport(worker.port)`
+      example: sharedEndpointExample
     },
     createServiceWorkerTransport: {
       role: 'enhancer',
       purpose: t(
-        'Creates a transport between a page and a Service Worker (or a worker and one `Client`); messages are accepted only from `target` or the client whose id equals `peerId`.',
-        '创建页面与 Service Worker（或 Worker 与某个 `Client`）之间的 transport；只接受来自 `target` 或 id 等于 `peerId` 的客户端的消息。'
+        'Creates a page/ServiceWorker carrier whose sourceProof accepts its exact target or actual matching Client id. Raw subscribe retains records; pair `connect` with this transport for Endpoint admission.',
+        '创建页面服务工作者载体，其来源证明认可精确目标或实际匹配客户端标识；原始订阅保留记录，端点须搭配 `connect` 执行准入。'
       ),
       returns: t(
         'An `IRpcTransport` for `createEndpoint()`.',
         '供 `createEndpoint()` 使用的 `IRpcTransport`。'
       ),
       options: 'IServiceWorkerTransportOptions',
-      example: `const transport = createServiceWorkerTransport({
-  target: registration.active!,
-  receiver: navigator.serviceWorker
-})`
+      example: serviceExample
     },
     createBroadcastChannelTransport: {
       role: 'enhancer',
@@ -307,13 +827,13 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
         'An `IRpcTransport`; the caller still closes the channel.',
         '一个 `IRpcTransport`；频道仍需调用方自行关闭。'
       ),
-      example: `const transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))`
+      example: broadcastExample
     },
     createRtcDataChannelTransport: {
       role: 'enhancer',
       purpose: t(
-        'Creates a transport over an `RTCDataChannel` in state `open` or `closed`, sending messages as JSON strings; malformed JSON is reported with `MESSAGE_DECODE_FAILED`.',
-        '创建基于状态为 `open` 或 `closed` 的 `RTCDataChannel` 的 transport，消息以 JSON 字符串发送；格式错误的 JSON 以 `MESSAGE_DECODE_FAILED` 上报。'
+        'Creates a raw RTC carrier in open or already-terminal closed state; non-string sends are JSON-stringified, while received data is not parsed. MESSAGE_DECODE_FAILED belongs to the Browser Peer projection, not this raw transport.',
+        '在已打开或已经终止关闭状态创建原始数据频道载体；非字符串发送值被转换为字符串，接收数据不解析；消息解码失败属于浏览器对端投影，不属于此原始载体。'
       ),
       params: {
         channel: t(
@@ -325,7 +845,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
         'An `IRpcTransport`; other channel states throw `INVALID_CONFIG`.',
         '一个 `IRpcTransport`；频道处于其它状态时抛 `INVALID_CONFIG`。'
       ),
-      example: `const transport = createRtcDataChannelTransport(peerConnection.createDataChannel('rpc'))`
+      example: rtcTransportExample
     },
     createWebTransportDatagramTransport: {
       role: 'enhancer',
@@ -343,11 +863,12 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
         'An `IRpcTransport<Uint8Array>`; the session itself is closed by the caller.',
         '一个 `IRpcTransport<Uint8Array>`；会话本身仍由调用方关闭。'
       ),
-      example: `const transport = createWebTransportDatagramTransport(session.datagrams)`
+      example: webTransportExample
     }
   },
   types: {
     IRuntimeBrowserPeerOptions: {
+      example: peerExample,
       summary: t(
         'Options of `createBrowserPeer()`: the browser source plus the Core Peer options.',
         '`createBrowserPeer()` 的选项：浏览器载体来源，以及 Core Peer 的通用选项。'
@@ -370,14 +891,18 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
         },
         signal: {
           summary: t(
-            'Cancels an unfinished handshake and releases its listeners without closing the borrowed carrier.',
-            '取消尚未完成的握手并释放其监听，不会关闭借用的载体。'
+            'Cancels unfinished connection work; in listen mode it also closes the listener and its accepted logical peers. Borrowed native carriers stay application-owned.',
+            '取消未完成连接工作；监听模式还会关闭监听者及其已接纳逻辑对端，借用原生载体仍由应用拥有。'
           ),
-          default: t('Not set: the handshake cannot be cancelled.', '不设置：握手无法被取消。')
+          default: t(
+            'Absent: no caller cancellation signal; existing Core deadlines still apply.',
+            '默认没有调用方取消信号，既有核心截止仍适用。'
+          )
         }
       }
     },
     IRuntimeBrowserConnect: {
+      example: peerExample,
       summary: t(
         'Union of the three connect sources: window, SharedWorker, RTC channel.',
         '三种连接来源的联合类型：窗口、SharedWorker、RTC 频道。'
@@ -385,6 +910,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       members: {}
     },
     IRuntimeBrowserWindowConnect: {
+      example: iframePeerExample,
       summary: t(
         '`connect` source for an iframe or popup window.',
         '用于 iframe 或弹窗窗口的 `connect` 来源。'
@@ -419,6 +945,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       }
     },
     IRuntimeBrowserSharedWorkerConnect: {
+      example: sharedPeerExample,
       summary: t(
         '`connect` source for a SharedWorker created by the page.',
         '用于页面所创建 SharedWorker 的 `connect` 来源。'
@@ -433,6 +960,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       }
     },
     IRuntimeBrowserRtcConnect: {
+      example: rtcPeerExample,
       summary: t(
         '`connect` source for an open WebRTC DataChannel.',
         '用于已打开 WebRTC DataChannel 的 `connect` 连接来源。'
@@ -447,6 +975,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       }
     },
     IRuntimeBrowserRtcDataChannel: {
+      example: rtcPeerExample,
       summary: t(
         'The RTC channel settings a Peer checks before connecting.',
         'Peer 在连接前检查的 RTC 频道设置。'
@@ -468,13 +997,19 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       }
     },
     IRuntimeBrowserListen: {
+      example: sharedPeerExample,
       summary: t(
         'SharedWorker scope accepted by `listen`.',
         '`listen` 选项接受的 SharedWorker 全局作用域。'
       ),
-      members: listenerPair('connect', t('the SharedWorker scope', 'SharedWorker 作用域'))
+      members: listenerPair(
+        'connect',
+        t('the SharedWorker scope', 'SharedWorker 作用域'),
+        sharedPeerExample
+      )
     },
     IRuntimeBrowserConnectEvent: {
+      example: sharedPeerExample,
       summary: t(
         '`connect` event of a SharedWorker scope.',
         'SharedWorker 作用域上触发的 `connect` 连接事件。'
@@ -482,8 +1017,8 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       members: {
         ports: {
           summary: t(
-            'Ports of the connecting page; the first one is used.',
-            '发起连接的页面的端口；使用其中第一个。'
+            'Actual native ports from this connect event; the listener accepts each port independently.',
+            '本次原生连接事件提供的实际端口，监听者分别接纳每个端口。'
           )
         }
       }
@@ -496,6 +1031,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       members: {}
     },
     IWindowMessageTransportOptions: {
+      example: windowEndpointExample,
       summary: t(
         'Options of `createWindowMessageTransport()`.',
         '`createWindowMessageTransport()` 的选项：目标窗口、接收者与源。'
@@ -537,6 +1073,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       }
     },
     IWindowMessageTarget: {
+      example: windowEndpointExample,
       summary: t('Window-like object messages are posted to.', '接收发送消息的类窗口对象。'),
       members: {
         postMessage: {
@@ -553,18 +1090,24 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
             )
           },
           returns: t('Nothing; the message is posted.', '无返回值；消息已发出。'),
-          example: `iframe.contentWindow!.postMessage(message, 'https://billing.example')`
+          example: windowEndpointExample
         }
       }
     },
     IWindowMessageReceiver: {
+      example: windowEndpointExample,
       summary: t(
         'Object whose `message` events are read.',
         'transport 从中读取 `message` 事件的接收对象。'
       ),
-      members: listenerPair('message', t('the receiving window', '接收消息的窗口'))
+      members: listenerPair(
+        'message',
+        t('the receiving window', '接收消息的窗口'),
+        windowEndpointExample
+      )
     },
     ISharedWorkerPort: {
+      example: sharedEndpointExample,
       summary: t(
         'The `MessagePort` of a SharedWorker connection.',
         'SharedWorker 连接所使用的消息端口 `MessagePort`。'
@@ -577,7 +1120,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
             transfer: t('Transferable objects.', '要转移所有权的可转移对象。')
           },
           returns: t('Nothing; the message is posted.', '无返回值；消息已发出。'),
-          example: `port.postMessage(message)`
+          example: sharedEndpointExample
         },
         start: {
           summary: t(
@@ -585,12 +1128,13 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
             '可选；开始监听时调用，使排队的消息得以交付。'
           ),
           returns: t('Nothing; the port delivers messages.', '无返回值；端口开始交付消息。'),
-          example: `port.start?.()`
+          example: sharedEndpointExample
         },
-        ...listenerPair('message / messageerror', t('the port', '端口'))
+        ...listenerPair('message / messageerror', t('the port', '端口'), sharedEndpointExample)
       }
     },
     IServiceWorkerTransportOptions: {
+      example: serviceExample,
       summary: t(
         'Options of `createServiceWorkerTransport()`.',
         '`createServiceWorkerTransport()` 的选项：目标、接收者与对端 id。'
@@ -618,6 +1162,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       }
     },
     IServiceWorkerMessageTarget: {
+      example: serviceExample,
       summary: t(
         'ServiceWorker or Client messages are posted to.',
         '接收本端发送消息的 ServiceWorker 或 Client 对象。'
@@ -633,7 +1178,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
             transfer: t('Transferable objects.', '要转移所有权的可转移对象。')
           },
           returns: t('Nothing; the message is posted.', '无返回值；消息已发出。'),
-          example: `registration.active!.postMessage(message)`
+          example: serviceExample
         },
         id: {
           summary: t(
@@ -644,13 +1189,19 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       }
     },
     IServiceWorkerMessageReceiver: {
+      example: serviceExample,
       summary: t(
         'Owner of Service Worker `message` events.',
         'Service Worker 场景中负责派发 `message` 事件的对象。'
       ),
-      members: listenerPair('message', t('the Service Worker container', 'Service Worker 容器'))
+      members: listenerPair(
+        'message',
+        t('the Service Worker container', 'Service Worker 容器'),
+        serviceExample
+      )
     },
     IRTCDataChannel: {
+      example: rtcTransportExample,
       summary: t(
         'The parts of `RTCDataChannel` the transport uses.',
         'transport 实际使用的那部分 `RTCDataChannel` 能力。'
@@ -658,6 +1209,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
       members: rtcChannelMembers
     },
     IWebTransportDatagrams: {
+      example: webTransportExample,
       summary: t(
         '`session.datagrams` of a WebTransport session.',
         'WebTransport 会话上的 `session.datagrams` 数据报读写流对象。'
@@ -714,8 +1266,7 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`
         'After installation the Endpoint exchanges messages with one window over `postMessage`, accepting only that window and origin.',
         '安装后 Endpoint 通过 `postMessage` 与某个窗口交换消息，只接受该窗口与该源的消息。'
       ),
-      `import { createWindowMessageTransport } from '@migaia/rpc-browser/adapters/window'
-const transport = createWindowMessageTransport({ target: iframe.contentWindow!, targetOrigin: 'https://billing.example' })`,
+      windowEndpointExample,
       [
         observeBehavior,
         t(
@@ -735,8 +1286,7 @@ const transport = createWindowMessageTransport({ target: iframe.contentWindow!, 
         'After installation the Endpoint talks over one SharedWorker port.',
         '安装后 Endpoint 通过一个 SharedWorker 端口与对面的 Worker 或页面互相发送调用。'
       ),
-      `import { createSharedWorkerTransport } from '@migaia/rpc-browser/adapters/shared-worker'
-const transport = createSharedWorkerTransport(new SharedWorker(workerUrl).port)`,
+      sharedEndpointExample,
       [
         observeBehavior,
         t(
@@ -756,8 +1306,7 @@ const transport = createSharedWorkerTransport(new SharedWorker(workerUrl).port)`
         'After installation the Endpoint talks between a page and its Service Worker.',
         '安装后 Endpoint 可以在页面与其注册的 Service Worker 之间互相发送调用。'
       ),
-      `import { createServiceWorkerTransport } from '@migaia/rpc-browser/adapters/service-worker'
-const transport = createServiceWorkerTransport({ target: registration.active!, receiver: navigator.serviceWorker })`,
+      serviceExample,
       [
         observeBehavior,
         t('Messages from other clients are ignored.', '来自其它客户端的消息会被忽略。')
@@ -774,8 +1323,7 @@ const transport = createServiceWorkerTransport({ target: registration.active!, r
         'After installation the Endpoint broadcasts to every same-origin context on the channel.',
         '安装后 Endpoint 会向该频道上所有同源上下文广播每一条消息。'
       ),
-      `import { createBroadcastChannelTransport } from '@migaia/rpc-browser/adapters/broadcast-channel'
-const transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))`,
+      broadcastExample,
       [
         observeBehavior,
         t(
@@ -787,11 +1335,10 @@ const transport = createBroadcastChannelTransport(new BroadcastChannel('cart'))`
     ),
     createRtcDataChannelTransport: transportEnhancer(
       t(
-        'After installation the Endpoint talks to a remote browser over an RTC DataChannel using JSON strings.',
-        '安装后 Endpoint 通过 RTC DataChannel 以 JSON 字符串的形式与远端浏览器互相调用。'
+        'The application exchanges raw JSON strings through the same real RTC carrier; decoding remains explicit in the paired application protocol.',
+        '应用通过同一真实数据频道载体交换原始字符串，解码仍由双端应用协议显式执行。'
       ),
-      `import { createRtcDataChannelTransport } from '@migaia/rpc-browser/adapters/rtc-data-channel'
-const transport = createRtcDataChannelTransport(peerConnection.createDataChannel('rpc'))`,
+      rtcTransportExample,
       [
         observeBehavior,
         t(
@@ -804,15 +1351,15 @@ const transport = createRtcDataChannelTransport(peerConnection.createDataChannel
           'Peer-to-peer calls between two browsers without a server relay.',
           '两个浏览器之间不经服务器中转的点对点调用。'
         )
-      ]
+      ],
+      'RTCDataChannel'
     ),
     createWebTransportDatagramTransport: transportEnhancer(
       t(
-        'After installation the Endpoint sends byte messages as WebTransport datagrams.',
-        '安装后 Endpoint 以 WebTransport 数据报的形式与服务器交换字节消息。'
+        'The application exchanges actual Uint8Array datagrams with its external server protocol; no Runtime Peer or ready-made compatible Endpoint framing is installed.',
+        '应用使用外部服务端协议交换实际字节数组数据报，不安装运行对端或现成兼容端点分帧。'
       ),
-      `import { createWebTransportDatagramTransport } from '@migaia/rpc-browser/adapters/web-transport'
-const transport = createWebTransportDatagramTransport(session.datagrams)`,
+      webTransportExample,
       [
         observeBehavior,
         t(
@@ -825,7 +1372,8 @@ const transport = createWebTransportDatagramTransport(session.datagrams)`,
           'Low-latency game or telemetry updates where a lost update is acceptable.',
           '允许丢失更新的低延迟游戏或遥测数据。'
         )
-      ]
+      ],
+      'WebTransport.datagrams'
     )
   }
 }

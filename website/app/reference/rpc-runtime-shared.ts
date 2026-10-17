@@ -2,12 +2,126 @@
  * Shared reference docs for the Runtime Peer types that `@migaia/rpc-threads` and
  * `@migaia/rpc-process` both re-export from `@migaia/rpc-core` (one source of truth, so the two
  * libraries never drift). Verified against `packages/rpc-core/src/remote/runtime-api` (overview.ts,
- * outlet.ts, events.ts, typing.ts, constants.ts) on 2026-10-17.
+ * outlet.ts, events.ts, typing.ts, constants.ts, catalog.ts, peer.ts) on 2026-10-17. Paired
+ * keyed-call examples include the advanced method declaration required by catalog.ts; a TypeScript
+ * method type alone does not declare runtime idempotency support.
  */
-import type { IEnumDoc, IGrantDoc, IMemberDoc, ISymbolDoc, IText, ITypeDoc } from './contract.js'
+import type {
+  ICode,
+  IEnumDoc,
+  IGrantDoc,
+  IMemberDoc,
+  ISymbolDoc,
+  IText,
+  ITypeDoc
+} from './contract.js'
 
 /** Builds one bilingual text. */
 const t = (en: string, zh: string): IText => ({ en, zh })
+
+/** Complete multi-file examples use the selected platform's real automatic child bootstrap. */
+const runtimePairedExample = (
+  slot: 'thread' | 'process',
+  action: string,
+  managed = false
+): ICode => {
+  /** The public package and factory spellings follow the selected native execution family. */
+  const family = slot === 'thread' ? 'Thread' : 'Process'
+  /** Child entry is compiled alongside the main entry before running Node. */
+  const childFile = slot === 'thread' ? 'worker' : 'service'
+  /** A managed outlet dispatches through the installed plugin rather than a separate Peer. */
+  const setup = managed
+    ? `const plugin = create${family}Plugin<IWorkerApi, IParentApi, 'worker'>({
+  name: 'worker', spawn: new URL('./${childFile}.js', import.meta.url), provide
+})
+const host = defineHost<Record<string, never>, never, readonly [typeof plugin]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})`
+    : `const worker = await create${family}Peer<IWorkerApi>({
+  spawn: new URL('./${childFile}.js', import.meta.url), provide
+})`
+  /** Each locale describes real files and parent-owned shutdown without English prose leakage. */
+  const render = (
+    zh: boolean
+  ): string => `${zh ? '// 类型契约文件：api.ts' : '// Contract file: api.ts'}
+export type IWorkerApi = {
+  demo: {
+    math: { double(value: number): number }
+    log: { write(message: string): void }
+    feed: { count(limit: number): AsyncIterableIterator<number> }
+  }
+}
+export type IParentApi = { hello(name: string): string; ready(): void }
+
+${zh ? '// 子端文件：' : '// Child file: '}${childFile}.ts
+import { create${family}Peer } from '@migaia/rpc-${slot === 'thread' ? 'threads' : 'process'}'
+import type { IWorkerApi, IParentApi } from './api.js'
+const provide: IWorkerApi = {
+  demo: {
+    math: { double: value => value * 2 },
+    log: { write: message => console.${slot === 'process' ? 'error' : 'log'}(message) },
+    feed: { count: async function* (limit) {
+      for (let index = 1; index <= limit; index++) yield index
+    } }
+  }
+}
+const parent = await create${family}Peer<IParentApi>({
+  provide,
+  contract: {
+    schemaVersion: 1, plugin: 'demo', features: {
+      math: { methods: { double: { mode: 'request', idempotent: true } } },
+      log: { methods: { write: { mode: 'one-way', idempotent: false } } },
+      feed: { methods: { count: { mode: 'async-generator', idempotent: false } } }
+    }
+  }
+})
+console.${slot === 'process' ? 'error' : 'log'}(await parent.request('hello', '${childFile}'))
+await parent.notify('ready')
+${zh ? '// 父端持有派生资源；父端关闭时会释放此连接并终止子端。' : '// The parent owns this spawned resource; its close releases the connection and child.'}
+
+${zh ? '// 父端文件：main.ts；先将这三个文件编译为同目录的模块。' : '// Parent file: main.ts; compile all three files to modules in the same directory first.'}
+import { create${family}${managed ? 'Plugin' : 'Peer'}, RuntimeEventName } from '@migaia/rpc-${slot === 'thread' ? 'threads' : 'process'}'
+${managed ? "import { defineHost } from '@migaia/plugin-host'\n" : ''}import type { IWorkerApi, IParentApi } from './api.js'
+const childReady = Promise.withResolvers<void>()
+const provide: IParentApi = {
+  hello: name => 'hello ' + name,
+  ready: () => childReady.resolve()
+}
+${setup}
+try {
+${managed ? '  await host.use(plugin)\n' : ''}  await childReady.promise
+${action
+  .split('\n')
+  .map((line) => `  ${line}`)
+  .join('\n')}
+} finally {
+  await ${managed ? 'host.dispose()' : 'worker.close()'}
+}`
+  return { en: render(false), zh: render(true) }
+}
+
+/** Typed methods remain fully paired even on pages that render just one member example. */
+const pairedPeerActions: Readonly<Record<string, string>> = {
+  outcome: `await worker.request('demo.math.double', 21, { idempotencyKey: 'double-42' })
+console.log(await worker.outcome('double-42'))`,
+  describe: `console.log(await worker.request('demo.math.double', 21))
+console.log(await worker.describe())
+console.log(await worker.describe({ format: 'json' }))`,
+  on: `const off = worker.on(RuntimeEventName.exit, event => console.log(event))
+try { console.log(await worker.request('demo.math.double', 21)) } finally { off() }`,
+  close: `console.log(await worker.request('demo.math.double', 21))
+await worker.close()
+await worker.close()`,
+  '[Symbol.asyncDispose]': `console.log(await worker.request('demo.math.double', 21))
+await worker[Symbol.asyncDispose]()`,
+  request: `console.log(await worker.request('demo.math.double', 21, { timeoutMs: 1000 }))`,
+  notify: `await worker.notify('demo.log.write', 'started')`,
+  stream: `for await (const value of worker.stream('demo.feed.count', 3)) console.log(value)`,
+  group: `console.log(await worker.group([
+  { method: 'demo.math.double', payload: 1 },
+  { method: 'demo.math.double', payload: 2 }
+]))`
+}
 
 /** Text for fields whose value can be an explicit "unavailable" marker. */
 const orUnavailable = t(
@@ -821,6 +935,31 @@ export const runtimeEventSymbol: ISymbolDoc = {
   example: `const off = peer.on(RuntimeEventName.exit, (event) => console.warn(event.name, event.reason))`
 }
 
+/** Platform pages share semantics while showing that platform's own complete child/parent pair. */
+export const runtimePairedTypes = (
+  slot: 'thread' | 'process'
+): Readonly<Record<string, ITypeDoc>> => ({
+  ...runtimeSharedTypes,
+  IRuntimeTypedPeer: {
+    ...runtimeSharedTypes.IRuntimeTypedPeer!,
+    example: runtimePairedExample(slot, pairedPeerActions.request!),
+    members: Object.fromEntries(
+      Object.entries(typedPeerMembers).map(([name, member]) => [
+        name,
+        pairedPeerActions[name]
+          ? { ...member, example: runtimePairedExample(slot, pairedPeerActions[name]) }
+          : member
+      ])
+    )
+  }
+})
+
+/** Event pages also establish the real connection that owns the observed lifecycle. */
+export const runtimePairedEventSymbol = (slot: 'thread' | 'process'): ISymbolDoc => ({
+  ...runtimeEventSymbol,
+  example: runtimePairedExample(slot, pairedPeerActions.on!)
+})
+
 /**
  * Grants of a runtime plugin (`createThreadPlugin` / `createProcessPlugin`): the `host.thread` or
  * `host.process` outlet the host gains after installation. `slot` is the outlet property name.
@@ -844,6 +983,8 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
           '`{ graceMs, signal }`: grace time and the signal sent first (default `SIGTERM`).',
           '`{ graceMs, signal }`：宽限时间以及首先发送的信号（默认 `SIGTERM`）。'
         )
+  /** Every granted method example installs its provider and releases the owning Host. */
+  const example = (action: string): ICode => runtimePairedExample(slot, action, true)
   return [
     {
       signature: `${on}.request(target, method, payload?, options?)`,
@@ -864,7 +1005,7 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         'The method result; an unknown target rejects with `TARGET_UNKNOWN`.',
         '方法的结果；目标不存在时以 `TARGET_UNKNOWN` reject。'
       ),
-      example: `await ${on}.request('worker', 'math.double', 21)`
+      example: example(`console.log(await ${on}!.request('worker', 'demo.math.double', 21))`)
     },
     {
       signature: `${on}.notify(target, method, payload?, options?)`,
@@ -876,7 +1017,7 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         options: t('Call options.', '调用选项，例如 `signal`。')
       },
       returns: t('Resolves once sent.', '调用发送后 resolve。'),
-      example: `await ${on}.notify('worker', 'log.write', 'started')`
+      example: example(`await ${on}!.notify('worker', 'demo.log.write', 'started')`)
     },
     {
       signature: `${on}.stream(target, method, payload?, options?)`,
@@ -891,7 +1032,9 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         options: t('Call options.', '调用选项，例如 `signal`。')
       },
       returns: t('An async iterator.', '产出元素的异步迭代器。'),
-      example: `for await (const value of ${on}.stream('worker', 'feed.count', 3)) console.log(value)`
+      example: example(
+        `for await (const value of ${on}!.stream('worker', 'demo.feed.count', 3)) console.log(value)`
+      )
     },
     {
       signature: `${on}.group(target, steps, options?)`,
@@ -911,7 +1054,9 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         )
       },
       returns: t('One outcome per step.', '每一步对应一个结果。'),
-      example: `await ${on}.group('worker', [{ method: 'math.double', payload: 1 }])`
+      example: example(
+        `console.log(await ${on}!.group('worker', [{ method: 'demo.math.double', payload: 1 }]))`
+      )
     },
     {
       signature: `${on}.outcome(target, idempotencyKey)`,
@@ -930,7 +1075,9 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         'The recorded outcome, or a status saying none exists.',
         '记录的结果，或说明不存在记录的状态。'
       ),
-      example: `await ${on}.outcome('worker', orderKey)`
+      example:
+        example(`await ${on}!.request('worker', 'demo.math.double', 21, { idempotencyKey: 'double-42' })
+console.log(await ${on}!.outcome('worker', 'double-42'))`)
     },
     {
       signature: `${on}.list(options?)`,
@@ -948,7 +1095,8 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         'An `IRuntimeOverview`, or text when `format` is set.',
         '一个 `IRuntimeOverview`；设置 `format` 时返回文本。'
       ),
-      example: `const overview = await ${on}.list({ filter: { state: 'ready' } })`
+      example: example(`console.log(await ${on}!.request('worker', 'demo.math.double', 21))
+console.log(await ${on}!.list({ filter: { state: 'ready' } }))`)
     },
     {
       signature: `${on}.get(target, options?)`,
@@ -961,13 +1109,14 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         'An `IRuntimeConnectionDetail`, or text.',
         '一个 `IRuntimeConnectionDetail`，或文本。'
       ),
-      example: `const detail = await ${on}.get('worker')`
+      example: example(`console.log(await ${on}!.request('worker', 'demo.math.double', 21))
+console.log(await ${on}!.get('worker'))`)
     },
     {
       signature: `${on}.broadcast(method, payload?, options?)`,
       summary: t(
-        'Calls the same method on every ready connection.',
-        '在每个就绪连接上调用同一个方法。'
+        'Sends the same one-way notification to every ready connection; the method must admit notify mode.',
+        '向每个就绪连接发送同一个单向通知；该方法必须支持 `notify` 模式。'
       ),
       params: {
         method: t('Dotted method path.', '要调用的方法的点分路径。'),
@@ -978,7 +1127,7 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         '`{ instanceId, ok, error? }` for each connection.',
         '每个连接对应一个 `{ instanceId, ok, error? }`。'
       ),
-      example: `const results = await ${on}.broadcast('cache.clear')`
+      example: example(`console.log(await ${on}!.broadcast('demo.log.write', 'broadcast message'))`)
     },
     {
       signature: `${on}.stop(name, options?)`,
@@ -991,14 +1140,16 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         options: stopOptions
       },
       returns: t('Resolves once stopped.', '停止完成后 resolve。'),
-      example: `await ${on}.stop('worker', { graceMs: 1000 })`
+      example: example(`console.log(await ${on}!.request('worker', 'demo.math.double', 21))
+await ${on}!.stop('worker', { graceMs: 1000 })`)
     },
     {
       signature: `${on}.kill(name)`,
       summary: t('Terminates a spawned connection immediately.', '立即终止某个 spawn 出来的连接。'),
       params: { name: t('Connection name.', '要终止的连接名称。') },
       returns: t('Resolves once terminated.', '终止完成后 resolve。'),
-      example: `await ${on}.kill('worker')`
+      example: example(`console.log(await ${on}!.request('worker', 'demo.math.double', 21))
+await ${on}!.kill('worker')`)
     },
     {
       signature: `${on}.restart(name)`,
@@ -1008,7 +1159,8 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
       ),
       params: { name: t('Connection name.', '要重启的连接名称。') },
       returns: t('A ready outcome of the new generation.', '新代次的就绪结果。'),
-      example: `await ${on}.restart('worker')`
+      example: example(`await ${on}!.restart('worker')
+console.log(await ${on}!.request('worker', 'demo.math.double', 21))`)
     },
     {
       signature: `${on}.replace(name, spec?)`,
@@ -1024,7 +1176,8 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         'A replace outcome; `replaced` means the new generation is ready.',
         '替换结果；`replaced` 表示新代次已就绪。'
       ),
-      example: `await ${on}.replace('worker', { entry: newEntry })`
+      example: example(`await ${on}!.replace('worker')
+console.log(await ${on}!.request('worker', 'demo.math.double', 21))`)
     },
     {
       signature: `${on}.on(event, listener)`,
@@ -1037,13 +1190,23 @@ export const runtimeOutletGrants = (slot: 'thread' | 'process'): IGrantDoc[] => 
         listener: t('Receives an `IRuntimeEvent`.', '接收一个 `IRuntimeEvent` 事件对象。')
       },
       returns: t('An unsubscribe function.', '取消订阅的函数。'),
-      example: `${on}.on('exit', (event) => console.warn(event.name, event.code))`
+      example:
+        example(`const off = ${on}!.on(RuntimeEventName.exit, event => console.warn(event.name, event.code))
+try { console.log(await ${on}!.request('worker', 'demo.math.double', 21)) } finally { off() }`)
     },
     {
       signature: `${on}.watch()`,
       summary: t('Iterates over lifecycle events.', '以异步迭代的方式读取生命周期事件。'),
       returns: t('An async iterator of `IRuntimeEvent`.', '`IRuntimeEvent` 的异步迭代器。'),
-      example: `for await (const event of ${on}.watch()) console.log(event.type)`
+      example: example(`const events = ${on}!.watch()
+try {
+  const next = events.next()
+  await ${on}!.restart('worker')
+  console.log((await next).value)
+  console.log(await ${on}!.request('worker', 'demo.math.double', 21))
+} finally {
+  await events.return?.()
+}`)
     }
   ]
 }
