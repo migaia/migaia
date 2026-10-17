@@ -17,6 +17,7 @@ import '@fontsource-variable/inter/wght.css'
 import '@fontsource-variable/jetbrains-mono/wght.css'
 import './app.css'
 import faviconHref from './favicon.svg?url'
+import { BRAND_BLADE_PATH, whirlBrandMark } from './brand-mark.js'
 import { LOCALES, type ILocale } from './route-contract.js'
 import { copyFor, interfaceCopyFor } from './copy.js'
 import { revealRouteContent } from './motion.js'
@@ -159,7 +160,7 @@ function BrandMark() {
       {[0, 90, 180, 270].map((angle) => (
         <path
           className="brand-mark-node"
-          d="M10 10C9.4 6.2 11.8 3.2 15.6 3.4 13 4.6 12.2 7.6 10 10Z"
+          d={BRAND_BLADE_PATH}
           key={angle}
           transform={`rotate(${angle} 10 10)`}
         />
@@ -276,7 +277,14 @@ function ShellHeader({ pageNavigation }: { readonly pageNavigation: React.ReactN
       </a>
       <header className="site-header" data-scrolled={scrolled ? 'true' : 'false'}>
         <div className="site-header-inner">
-          <Link className="brand" to={`/${locale}`} aria-label={ui.brandHome}>
+          <Link
+            className="brand"
+            to={`/${locale}`}
+            aria-label={ui.brandHome}
+            onMouseEnter={(event) =>
+              whirlBrandMark(event.currentTarget.querySelector('.brand-mark'))
+            }
+          >
             <BrandMark />
             <span>migaia</span>
           </Link>
