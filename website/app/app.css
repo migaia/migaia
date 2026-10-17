@@ -675,6 +675,24 @@ svg {
   transition: none;
 }
 
+/*
+ * Route entrance (motion.ts `emergeRouteContent`): each content block of the new centre column
+ * condenses out of the field on its own, in reading order, instead of the column appearing as one
+ * sheet. `--emerge-delay` staggers the blocks; reduced motion collapses the animation.
+ */
+.route-emerge-item {
+  animation: content-emerge 0.9s cubic-bezier(0.22, 0.7, 0.2, 1) both;
+  animation-delay: var(--emerge-delay, 0ms);
+}
+
+@keyframes content-emerge {
+  from {
+    filter: blur(6px);
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
 @keyframes route-progress {
   from {
     transform: scaleX(0);
